@@ -62,6 +62,7 @@ ClayWorld2d {
     GameController {
         id: gameCtrl
         anchors.fill: parent
+        showDebugOverlay: true
 
         Component.onCompleted: {
             console.log("[Game] GameController.onCompleted - os:", Qt.platform.os)
@@ -145,6 +146,7 @@ ClayWorld2d {
         if (player) {
             player.moveX = Qt.binding(() => gameCtrl.axisX)
             player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.attackPressed = Qt.binding(() => gameCtrl.buttonAPressed)
             observedItem = player
         }
 
