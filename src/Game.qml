@@ -279,23 +279,43 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
 
-        // Create walls where grid has CELL_WALL
-        for (let gy = 0; gy < gridHeight; gy++) {
-            for (let gx = 0; gx < gridWidth; gx++) {
-                if (grid[gy][gx] === cellWall) {
-                    // Convert grid coords to world coords
-                    let wx = gx * cellSize
-                    let wy = gy * cellSize
-                    // yWu is TOP of wall, so add cellSize
-                    createWallAt(wx, wy + cellSize, cellSize, cellSize)
-                }
-            }
-        }
+        // Create merged walls using run-length encoding
+        let wallCount = createMergedWalls()
 
         // Create boundary walls
         createBoundaryWalls()
 
-        console.log("[Game] Built dungeon from grid")
+        console.log("[Game] Built dungeon with", wallCount, "merged walls")
+    }
+
+    function createMergedWalls() {
+        // Run-length encoding: merge consecutive wall cells horizontally
+        let wallCount = 0
+
+        for (let gy = 0; gy < gridHeight; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                if (grid[gy][gx] === cellWall) {
+                    // Found start of wall run, find its length
+                    let startX = gx
+                    while (gx < gridWidth && grid[gy][gx] === cellWall) {
+                        gx++
+                    }
+                    let runLength = gx - startX
+
+                    // Create single wall for entire run
+                    let wx = startX * cellSize
+                    let wy = gy * cellSize
+                    let ww = runLength * cellSize
+                    createWallAt(wx, wy + cellSize, ww, cellSize)
+                    wallCount++
+                } else {
+                    gx++
+                }
+            }
+        }
+
+        return wallCount
     }
 
     function createBoundaryWalls() {
