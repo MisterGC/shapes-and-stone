@@ -9,7 +9,7 @@ ClayWorld2d {
 
     // World configuration (fit world to viewport)
     pixelPerUnit: 20//Math.min(width / xWuMax, height / yWuMax)
-    gravity: Qt.poiant(0, 0)  // Top-down, no gravity
+    gravity: Qt.point(0, 0)  // Top-down, no gravity
     timeStep: 1/60.0
     anchors.fill: parent
     focus: true
@@ -21,7 +21,7 @@ ClayWorld2d {
     // Debug visualization
     debugPhysics: false  // Show collision shapes
 
-    canvas.showDebugInfo: true
+    canvas.showDebugInfo: false
 
     // Game state
     property var player: null
@@ -86,88 +86,228 @@ ClayWorld2d {
     Component { id: wallComponent; Wall {} }
     Component { id: floorComponent; Floor {} }
 
-    // Simple dungeon generation (placeholder for full algorithm)
+    // Dungeon generation constants
+    readonly property int cellSize: 2      // Each grid cell = 2x2 world units (for 2-wide hallways)
+    readonly property int wallThickness: 1
+
+    // Cell types for the grid
+    readonly property int cellWall: 0
+    readonly property int cellFloor: 1
+    readonly property int cellRoom: 2
+    readonly property int cellHallway: 3
+
+    // Grid dimensions (in cells, not world units)
+    readonly property int gridWidth: Math.floor(xWuMax / cellSize)
+    readonly property int gridHeight: Math.floor(yWuMax / cellSize)
+
+    // Dungeon data
+    property var grid: []
+    property var rooms: []
+
     function generateDungeon() {
         console.log("[Game] generateDungeon() called")
-        const tileSize = 1.0  // 1 world unit per tile
+        console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
-        // Create room at world boundaries
-        const roomX = 0
-        const roomY = 0
-        const roomW = xWuMax
-        const roomH = yWuMax
+        // Step 1: Initialize grid with walls
+        initializeGrid()
 
-        console.log("[Game] Creating room...")
-        createRoom(roomX, roomY, roomW, roomH, tileSize)
+        // Step 2: Place rooms
+        placeRooms(6, 8, 5, 8)  // minRooms, maxRooms, minSize, maxSize (in cells)
 
-        // Spawn player in room center
-        const centerX = roomX + roomW / 2
-        const centerY = roomY + roomH / 2
-        console.log("[Game] Spawning player at center:", centerX, centerY)
-        spawnPlayer(centerX, centerY)
+        // Step 3: Connect rooms with spanning tree
+        connectRooms()
 
-        // Spawn test enemy above player
-        console.log("[Game] Spawning enemy...")
-        spawnEnemy(centerX, centerY + 3)
+        // Step 4: Add entrance (south) and exit (north)
+        addEntranceAndExit()
 
-        // Bind player movement to controller
-        if (player) {
-            console.log("[Game] Player spawned successfully, binding controls")
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)  // Invert Y for top-down
-            observedItem = player
-            console.log("[Game] observedItem set to player:", observedItem)
-        } else {
-            console.log("[Game] ERROR: Player is null!")
+        // Step 5: Convert grid to actual game objects
+        buildDungeonFromGrid()
+
+        // Step 6: Spawn player in first room
+        if (rooms.length > 0) {
+            let startRoom = rooms[0]
+            let px = (startRoom.x + startRoom.w / 2) * cellSize
+            let py = (startRoom.y + startRoom.h / 2) * cellSize
+            console.log("[Game] Spawning player at:", px, py)
+            spawnPlayer(px, py)
         }
+
+        // Step 7: Spawn enemy in last room
+        if (rooms.length > 1) {
+            let endRoom = rooms[rooms.length - 1]
+            let ex = (endRoom.x + endRoom.w / 2) * cellSize
+            let ey = (endRoom.y + endRoom.h / 2) * cellSize
+            console.log("[Game] Spawning enemy at:", ex, ey)
+            spawnEnemy(ex, ey)
+        }
+
+        // Bind player controls
+        if (player) {
+            player.moveX = Qt.binding(() => gameCtrl.axisX)
+            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            observedItem = player
+        }
+
         console.log("[Game] generateDungeon() complete")
     }
 
-    function createBoundary(tileSize) {
-        const wallThickness = 1
-        const margin = 5  // Inset from world edges so walls are visible
-
-        const left = margin
-        const right = xWuMax - margin
-        const bottom = margin
-        const top = yWuMax - margin
-        const boundaryWidth = right - left
-        const boundaryHeight = top - bottom
-
-        // Bottom wall
-        createWall(left, bottom, boundaryWidth, wallThickness)
-        // Top wall
-        createWall(left, top - wallThickness, boundaryWidth, wallThickness)
-        // Left wall
-        createWall(left, bottom, wallThickness, boundaryHeight)
-        // Right wall
-        createWall(right - wallThickness, bottom, wallThickness, boundaryHeight)
+    function initializeGrid() {
+        grid = []
+        for (let y = 0; y < gridHeight; y++) {
+            let row = []
+            for (let x = 0; x < gridWidth; x++) {
+                row.push(cellWall)
+            }
+            grid.push(row)
+        }
+        console.log("[Game] Grid initialized:", grid.length, "rows")
     }
 
-    function createRoom(rx, ry, rw, rh, tileSize) {
-        // Floor (visual only)
-        let floor = floorComponent.createObject(world.room, {
-            xWu: rx, yWu: ry + rh, widthWu: rw, heightWu: rh,
+    function placeRooms(minRooms, maxRooms, minSize, maxSize) {
+        rooms = []
+        let numRooms = minRooms + Math.floor(Math.random() * (maxRooms - minRooms + 1))
+        let attempts = 0
+        let maxAttempts = 100
+
+        while (rooms.length < numRooms && attempts < maxAttempts) {
+            attempts++
+
+            // Random room size (in cells)
+            let rw = minSize + Math.floor(Math.random() * (maxSize - minSize + 1))
+            let rh = minSize + Math.floor(Math.random() * (maxSize - minSize + 1))
+
+            // Random position (leave 1 cell border for walls)
+            let rx = 1 + Math.floor(Math.random() * (gridWidth - rw - 2))
+            let ry = 1 + Math.floor(Math.random() * (gridHeight - rh - 2))
+
+            // Check if room overlaps with existing rooms (with 1 cell padding)
+            let overlaps = false
+            for (let room of rooms) {
+                if (rx < room.x + room.w + 1 &&
+                    rx + rw + 1 > room.x &&
+                    ry < room.y + room.h + 1 &&
+                    ry + rh + 1 > room.y) {
+                    overlaps = true
+                    break
+                }
+            }
+
+            if (!overlaps) {
+                rooms.push({x: rx, y: ry, w: rw, h: rh})
+                // Carve room into grid
+                for (let y = ry; y < ry + rh; y++) {
+                    for (let x = rx; x < rx + rw; x++) {
+                        grid[y][x] = cellRoom
+                    }
+                }
+                console.log("[Game] Placed room", rooms.length, "at", rx, ry, "size", rw, "x", rh)
+            }
+        }
+
+        // Sort rooms by Y position (bottom to top) for spanning tree
+        rooms.sort((a, b) => a.y - b.y)
+        console.log("[Game] Placed", rooms.length, "rooms")
+    }
+
+    function connectRooms() {
+        if (rooms.length < 2) return
+
+        // Simple spanning tree: connect each room to the next
+        for (let i = 0; i < rooms.length - 1; i++) {
+            let roomA = rooms[i]
+            let roomB = rooms[i + 1]
+
+            // Get center of each room
+            let ax = Math.floor(roomA.x + roomA.w / 2)
+            let ay = Math.floor(roomA.y + roomA.h / 2)
+            let bx = Math.floor(roomB.x + roomB.w / 2)
+            let by = Math.floor(roomB.y + roomB.h / 2)
+
+            // Carve L-shaped hallway
+            carveHallway(ax, ay, bx, by)
+        }
+    }
+
+    function carveHallway(x1, y1, x2, y2) {
+        // Carve horizontal first, then vertical (L-shape)
+        let x = x1
+        let y = y1
+
+        // Horizontal segment
+        let dx = x2 > x1 ? 1 : -1
+        while (x !== x2) {
+            if (grid[y][x] === cellWall) {
+                grid[y][x] = cellHallway
+            }
+            x += dx
+        }
+
+        // Vertical segment
+        let dy = y2 > y1 ? 1 : -1
+        while (y !== y2) {
+            if (grid[y][x] === cellWall) {
+                grid[y][x] = cellHallway
+            }
+            y += dy
+        }
+    }
+
+    function addEntranceAndExit() {
+        if (rooms.length === 0) return
+
+        // Entrance: carve path from bottom room to south edge
+        let startRoom = rooms[0]
+        let entranceX = Math.floor(startRoom.x + startRoom.w / 2)
+        for (let y = 0; y < startRoom.y; y++) {
+            grid[y][entranceX] = cellHallway
+        }
+
+        // Exit: carve path from top room to north edge
+        let endRoom = rooms[rooms.length - 1]
+        let exitX = Math.floor(endRoom.x + endRoom.w / 2)
+        for (let y = endRoom.y + endRoom.h; y < gridHeight; y++) {
+            grid[y][exitX] = cellHallway
+        }
+
+        console.log("[Game] Added entrance at x=", entranceX, "exit at x=", exitX)
+    }
+
+    function buildDungeonFromGrid() {
+        // Create floor for entire dungeon area
+        let floorObj = floorComponent.createObject(world.room, {
+            xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
 
-        // Solid walls enclosing the room
-        // Note: yWu is the TOP of the wall, height extends downward
-        const wallThickness = 1
+        // Create walls where grid has CELL_WALL
+        for (let gy = 0; gy < gridHeight; gy++) {
+            for (let gx = 0; gx < gridWidth; gx++) {
+                if (grid[gy][gx] === cellWall) {
+                    // Convert grid coords to world coords
+                    let wx = gx * cellSize
+                    let wy = gy * cellSize
+                    // yWu is TOP of wall, so add cellSize
+                    createWallAt(wx, wy + cellSize, cellSize, cellSize)
+                }
+            }
+        }
 
-        // Bottom wall (south) - top of wall at ry + wallThickness
-        createWall(rx, ry + wallThickness, rw, wallThickness)
-        // Top wall (north) - top of wall at ry + rh
-        createWall(rx, ry + rh, rw, wallThickness)
-        // Left wall (west) - top of wall at ry + rh
-        createWall(rx, ry + rh, wallThickness, rh)
-        // Right wall (east) - top of wall at ry + rh
-        createWall(rx + rw - wallThickness, ry + rh, wallThickness, rh)
+        // Create boundary walls
+        createBoundaryWalls()
+
+        console.log("[Game] Built dungeon from grid")
     }
 
-    function createWall(wx, wy, ww, wh) {
-        console.log("[Game] createWall - room.height:", world.room.height, "room.width:", world.room.width)
-        // Create in room and bind physics world
+    function createBoundaryWalls() {
+        // South wall (with entrance gap handled by grid)
+        // North wall (with exit gap handled by grid)
+        // West wall
+        createWallAt(0, yWuMax, wallThickness, yWuMax)
+        // East wall
+        createWallAt(xWuMax - wallThickness, yWuMax, wallThickness, yWuMax)
+    }
+
+    function createWallAt(wx, wy, ww, wh) {
         let wall = wallComponent.createObject(world.room, {
             xWu: wx, yWu: wy, widthWu: ww, heightWu: wh,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
@@ -175,12 +315,6 @@ ClayWorld2d {
             categories: catWall,
             collidesWith: catPlayer | catEnemy
         })
-        if (!wall) {
-            console.log("[Game] ERROR: Failed to create wall at", wx, wy)
-        } else {
-            console.log("[Game] Wall created - xWu:", wx, "yWu:", wy, "-> screen x:", wall.x, "y:", wall.y,
-                        "size:", wall.width, "x", wall.height)
-        }
         return wall
     }
 
