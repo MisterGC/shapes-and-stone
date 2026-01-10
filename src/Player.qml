@@ -5,13 +5,19 @@ import Clayground.Physics
 PhysicsItem {
     id: player
 
+    Component.onCompleted: {
+        console.log("[Player] Created - xWu:", xWu, "yWu:", yWu, "widthWu:", widthWu, "heightWu:", heightWu)
+        console.log("[Player] -> pixels x:", x, "y:", y, "w:", width, "h:", height, "ppu:", pixelPerUnit)
+    }
+
     // Visual size (the square shape)
     widthWu: 1.0
     heightWu: 1.0
 
-    // Physics config
-    bodyType: Body.Kinematic
+    // Physics config - Dynamic for collision response
+    bodyType: Body.Dynamic
     fixedRotation: true
+    gravityScale: 0     // No gravity effect (top-down)
 
     // Collision setup - uses circle fixture smaller than visual
     property alias categories: collider.categories
@@ -23,7 +29,7 @@ PhysicsItem {
     property real moveY: 0
 
     // Stats from concept doc
-    property real speed: 5.0        // World units per second (70% of base)
+    readonly property real maxSpeed: 15.0  // World units per second
     property int hp: 120
     property int maxHp: 120
     property int atk: 15
@@ -36,8 +42,9 @@ PhysicsItem {
     property bool isBlocking: false
     property real attackCooldown: 0
 
-    // Movement
-    linearVelocity: Qt.point(moveX * speed, moveY * speed)
+    // Movement - direct velocity binding (like topdown demo)
+    linearVelocity.x: moveX * maxSpeed
+    linearVelocity.y: moveY * maxSpeed
 
     // Visual: Steel Blue square (Knight)
     Rectangle {
@@ -64,6 +71,9 @@ PhysicsItem {
             radius: player.width * 0.35  // 70% of half-width
             x: player.width / 2
             y: player.height / 2
+            density: 1.0
+            friction: 0.0
+            restitution: 0.0
 
             onBeginContact: (other) => player.onCollision(other)
         }
