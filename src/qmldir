@@ -1,0 +1,7 @@
+module shapes_and_stone
+Main 1.0 Main.qml
+Game 1.0 Game.qml
+Player 1.0 Player.qml
+Enemy 1.0 Enemy.qml
+Wall 1.0 Wall.qml
+Floor 1.0 Floor.qml
