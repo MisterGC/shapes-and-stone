@@ -62,7 +62,7 @@ ClayWorld2d {
     GameController {
         id: gameCtrl
         anchors.fill: parent
-        showDebugOverlay: true
+        showDebugOverlay: false
 
         Component.onCompleted: {
             console.log("[Game] GameController.onCompleted - os:", Qt.platform.os)
