@@ -19,16 +19,20 @@ PhysicsItem {
     property alias collidesWith: collider.collidesWith
     property alias sensor: collider.sensor
 
+    // Attack sensor collision setup
+    property alias attackSensorCategories: attackSensor.categories
+    property alias attackSensorCollidesWith: attackSensor.collidesWith
+
     // Movement input (-1 to 1)
     property real moveX: 0
     property real moveY: 0
 
-    // Attack input (directly bound to controller)
-    property bool attackPressed: false
-    onAttackPressedChanged: if (attackPressed) attack()
+    // Mouse target position (for facing direction)
+    property real targetX: xWu
+    property real targetY: yWu
 
-    // Facing direction (updated when moving)
-    property real facingAngle: 0  // Degrees, 0 = right, 90 = up
+    // Facing direction (calculated from player to mouse)
+    property real facingAngle: Math.atan2(-(targetY - yWu), targetX - xWu) * 180 / Math.PI
 
     // Stats from concept doc
     readonly property real maxSpeed: 15.0  // World units per second
@@ -45,16 +49,8 @@ PhysicsItem {
     property real attackCooldown: 0
     readonly property real attackDuration: 0.25  // Visual swing duration
     readonly property real attackCooldownTime: 0.5
-
-    // Update facing direction when moving
-    onMoveXChanged: updateFacing()
-    onMoveYChanged: updateFacing()
-
-    function updateFacing() {
-        if (Math.abs(moveX) > 0.1 || Math.abs(moveY) > 0.1) {
-            facingAngle = Math.atan2(-moveY, moveX) * 180 / Math.PI
-        }
-    }
+    readonly property real attackRange: 2.0  // World units
+    readonly property real attackArcAngle: 60  // Degrees from facing direction
 
     // Movement - direct velocity binding (like topdown demo)
     linearVelocity.x: moveX * maxSpeed
@@ -141,16 +137,29 @@ PhysicsItem {
         SequentialAnimation {
             id: attackAnimation
 
-            ParallelAnimation {
-                // Swing the sword
-                PropertyAnimation {
-                    target: attackArc
-                    property: "swingProgress"
-                    from: 0
-                    to: 1
-                    duration: attackDuration * 1000
-                    easing.type: Easing.OutQuad
-                }
+            // First half of swing (wind up)
+            PropertyAnimation {
+                target: attackArc
+                property: "swingProgress"
+                from: 0
+                to: 0.5
+                duration: attackDuration * 500
+                easing.type: Easing.OutQuad
+            }
+
+            // Hit detection at mid-swing
+            ScriptAction {
+                script: hitEnemiesInArc()
+            }
+
+            // Second half of swing (follow through)
+            PropertyAnimation {
+                target: attackArc
+                property: "swingProgress"
+                from: 0.5
+                to: 1
+                duration: attackDuration * 500
+                easing.type: Easing.OutQuad
             }
 
             // Fade out
@@ -184,15 +193,62 @@ PhysicsItem {
             restitution: 0.0
 
             onBeginContact: (other) => player.onCollision(other)
+        },
+        // Attack range sensor - detects enemies in melee range
+        Circle {
+            id: attackSensor
+            radius: attackRange * pixelPerUnit
+            x: player.width / 2
+            y: player.height / 2
+            sensor: true  // Non-physical, detection only
+
+            onBeginContact: (other) => {
+                let entity = other.getBody().target
+                if (entity && entity.objectName === "enemy") {
+                    enemiesInRange.add(entity)
+                }
+            }
+            onEndContact: (other) => {
+                let entity = other.getBody().target
+                if (entity) {
+                    enemiesInRange.delete(entity)
+                }
+            }
         }
     ]
 
-    // Combat sensor (slightly larger, detects enemies for melee range)
-    // TODO: Add separate sensor fixture for attack range
+    // Track enemies currently in attack range
+    property var enemiesInRange: new Set()
 
     function onCollision(other) {
-        // Handle collision with enemies (sensor collision for combat)
-        console.log("Player collision detected")
+        // Handle collision with enemies
+    }
+
+    // Check if an enemy is within the attack arc
+    function isInAttackArc(enemy) {
+        let dx = enemy.xWu - xWu
+        let dy = enemy.yWu - yWu
+        let angleToEnemy = Math.atan2(-dy, dx) * 180 / Math.PI
+
+        // Normalize angle difference to -180 to 180
+        let angleDiff = angleToEnemy - facingAngle
+        while (angleDiff > 180) angleDiff -= 360
+        while (angleDiff < -180) angleDiff += 360
+
+        return Math.abs(angleDiff) <= attackArcAngle
+    }
+
+    // Deal damage to enemies in attack arc
+    function hitEnemiesInArc() {
+        let hitCount = 0
+        for (let enemy of enemiesInRange) {
+            if (enemy && !enemy.destroyed && isInAttackArc(enemy)) {
+                enemy.takeDamage(atk)
+                hitCount++
+                console.log("[Player] Hit enemy for", atk, "damage!")
+            }
+        }
+        return hitCount
     }
 
     function takeDamage(amount) {

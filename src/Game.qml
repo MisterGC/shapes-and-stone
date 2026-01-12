@@ -47,12 +47,19 @@ ClayWorld2d {
         }
     }
 
-    // Restore focus when clicked (for WASM)
+    // Mouse input: aiming + attack (also handles WASM focus)
     MouseArea {
+        id: mouseInput
         anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton
+
+        property real mouseWorldX: canvas.screenXToWorld(mouseX)
+        property real mouseWorldY: canvas.screenYToWorld(mouseY)
+
         onPressed: (mouse) => {
             world.forceActiveFocus()
-            mouse.accepted = false
+            if (player) player.attack()
         }
     }
 
@@ -79,6 +86,47 @@ ClayWorld2d {
 
         onAxisXChanged: console.log("[Input] axisX:", axisX)
         onAxisYChanged: console.log("[Input] axisY:", axisY)
+    }
+
+    // Player Health HUD (fixed position, not following camera)
+    Rectangle {
+        id: healthHud
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.margins: 10
+        width: 200
+        height: 24
+        color: "#333333"
+        radius: 4
+        z: 1000  // Above everything
+
+        Rectangle {
+            id: healthFill
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 2
+            width: player ? (parent.width - 4) * (player.hp / player.maxHp) : parent.width - 4
+            radius: 2
+            color: {
+                if (!player) return "#22CC22"
+                let ratio = player.hp / player.maxHp
+                if (ratio > 0.5) return "#22CC22"
+                if (ratio > 0.25) return "#CCCC22"
+                return "#CC2222"
+            }
+
+            Behavior on width { NumberAnimation { duration: 100 } }
+            Behavior on color { ColorAnimation { duration: 200 } }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: player ? player.hp + " / " + player.maxHp : ""
+            color: "white"
+            font.pixelSize: 12
+            font.bold: true
+        }
     }
 
     // Component factories
@@ -146,7 +194,9 @@ ClayWorld2d {
         if (player) {
             player.moveX = Qt.binding(() => gameCtrl.axisX)
             player.moveY = Qt.binding(() => -gameCtrl.axisY)
-            player.attackPressed = Qt.binding(() => gameCtrl.buttonAPressed)
+            // Mouse aiming: bind target position for facing direction
+            player.targetX = Qt.binding(() => mouseInput.mouseWorldX)
+            player.targetY = Qt.binding(() => mouseInput.mouseWorldY)
             observedItem = player
         }
 
@@ -347,7 +397,10 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             categories: catPlayer,
-            collidesWith: catWall
+            collidesWith: catWall,
+            // Attack sensor detects enemies
+            attackSensorCategories: catPlayer,
+            attackSensorCollidesWith: catEnemy
         })
         if (player) {
             console.log("[Game] Player created:", player, "xWu:", player.xWu, "yWu:", player.yWu,
@@ -366,7 +419,7 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,  // For MoveTo behavior
             categories: catEnemy,
-            collidesWith: catWall
+            collidesWith: catWall | catPlayer
         })
         if (enemy) {
             console.log("[Game] Enemy created:", enemy, "xWu:", enemy.xWu, "yWu:", enemy.yWu)

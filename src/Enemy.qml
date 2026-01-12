@@ -5,6 +5,7 @@ import Clayground.Behavior
 
 PhysicsItem {
     id: enemy
+    objectName: "enemy"  // For detection by player attack sensor
 
     // Reference to game world (set when spawned)
     property var gameWorld: null
@@ -13,9 +14,12 @@ PhysicsItem {
         console.log("[Enemy] Created - xWu:", xWu, "yWu:", yWu)
     }
 
+    // Track if destroyed (for cleanup)
+    property bool destroyed: false
+
     // Visual size
-    widthWu: 0.5
-    heightWu: 0.5
+    widthWu: 0.8
+    heightWu: 0.8
 
     // Physics config - Dynamic for collision response
     bodyType: Body.Dynamic
@@ -53,6 +57,50 @@ PhysicsItem {
         color: aiState === "telegraph" ? "#FF8C00" : "#8B3A3A"
 
         Behavior on color { ColorAnimation { duration: 100 } }
+    }
+
+    // Hit flash overlay
+    Rectangle {
+        id: hitFlash
+        anchors.fill: visual
+        color: "white"
+        opacity: 0
+
+        SequentialAnimation {
+            id: hitFlashAnimation
+            PropertyAnimation {
+                target: hitFlash
+                property: "opacity"
+                from: 0.8
+                to: 0
+                duration: 150
+                easing.type: Easing.OutQuad
+            }
+        }
+    }
+
+    // Floating health bar (Warcraft 3 style)
+    Rectangle {
+        id: healthBarBg
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.top
+        anchors.bottomMargin: 4
+        width: parent.width * 1.2
+        height: 4
+        color: "#333333"
+        visible: hp < maxHp  // Only show when damaged
+
+        Rectangle {
+            id: healthBarFill
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * (hp / maxHp)
+            color: hp > maxHp * 0.5 ? "#22CC22" : (hp > maxHp * 0.25 ? "#CCCC22" : "#CC2222")
+
+            Behavior on width { NumberAnimation { duration: 100 } }
+            Behavior on color { ColorAnimation { duration: 200 } }
+        }
     }
 
     // Circular collider
@@ -157,6 +205,10 @@ PhysicsItem {
         let finalDamage = Math.max(1, amount - def)
         hp = Math.max(0, hp - finalDamage)
         console.log("[Enemy] Took", finalDamage, "damage, HP:", hp)
+
+        // Trigger hit flash
+        hitFlashAnimation.restart()
+
         if (hp <= 0) {
             die()
         }
@@ -164,6 +216,7 @@ PhysicsItem {
 
     function die() {
         console.log("[Enemy] Died!")
+        destroyed = true
         destroy()
     }
 }
