@@ -27,12 +27,15 @@ PhysicsItem {
     property real moveX: 0
     property real moveY: 0
 
-    // Mouse target position (for facing direction)
-    property real targetX: xWu
-    property real targetY: yWu
+    // Screen coordinates for aiming (set by Game.qml)
+    property real mouseScreenX: 0
+    property real mouseScreenY: 0
+    property real playerScreenX: 0
+    property real playerScreenY: 0
 
-    // Facing direction (calculated from player to mouse)
-    property real facingAngle: Math.atan2(-(targetY - yWu), targetX - xWu) * 180 / Math.PI
+    // Facing direction (calculated in screen space)
+    // Screen Y is flipped (down = positive), so we use (playerScreenY - mouseScreenY)
+    property real facingAngle: Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats from concept doc
     readonly property real maxSpeed: 15.0  // World units per second
@@ -85,6 +88,18 @@ PhysicsItem {
         }
     }
 
+    // Direction indicator line
+    Rectangle {
+        id: aimLine
+        width: parent.width * 0.8
+        height: 2
+        color: "#7AB8D4"
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: parent.horizontalCenter
+        rotation: -facingAngle
+        transformOrigin: Item.Left
+    }
+
     // Attack swing visualization
     Canvas {
         id: attackArc
@@ -107,30 +122,35 @@ PhysicsItem {
             var centerX = width / 2
             var centerY = height / 2
             var radius = width * 0.4
-            var innerRadius = width * 0.1
+            var innerRadius = width * 0.15
 
-            // Arc width shrinks from 50 degrees to 1 degree as swing progresses
-            var maxArcWidth = Math.PI * 0.28  // 50 degrees
-            var minArcWidth = Math.PI * 0.006  // ~1 degree
-            var arcWidth = maxArcWidth - (swingProgress * (maxArcWidth - minArcWidth))
-
-            // Full swing range is 120 degrees
+            // Swing range 120 degrees
             var swingRange = Math.PI * 0.67
-
-            // Arc leading edge moves from -(swingRange/2) to +(swingRange/2)
             var startAngle = -swingRange / 2
-            var arcLeadingEdge = startAngle + (swingProgress * swingRange)
-            var arcCenter = arcLeadingEdge - arcWidth / 2
+            var currentAngle = startAngle + (swingProgress * swingRange)
 
-            // Draw the moving arc
+            // Draw motion trails (3 curved arcs = "cut air" effect)
+            var arcSpan = 0.18  // ~10 degrees per arc
+            for (var i = 3; i >= 1; i--) {
+                var trailOffset = currentAngle - (i * 0.25)  // Offset behind blade
+                var trailRadius = innerRadius + (radius - innerRadius) * (i / 4)  // Varying radii
+                var trailOpacity = swingOpacity * (1.0 - i * 0.25)
+                ctx.beginPath()
+                ctx.arc(centerX, centerY, trailRadius, trailOffset - arcSpan/2, trailOffset + arcSpan/2)
+                ctx.strokeStyle = "rgba(122, 184, 212, " + trailOpacity + ")"
+                ctx.lineWidth = 2
+                ctx.stroke()
+            }
+
+            // Draw sword blade (thick line at leading edge)
             ctx.beginPath()
-            ctx.arc(centerX, centerY, radius, arcCenter - arcWidth/2, arcCenter + arcWidth/2)
-            ctx.arc(centerX, centerY, innerRadius, arcCenter + arcWidth/2, arcCenter - arcWidth/2, true)
-            ctx.closePath()
-
-            // Solid color - lighter than player (#4A90A4)
-            ctx.fillStyle = "rgba(122, 184, 212, " + swingOpacity + ")"  // #7AB8D4
-            ctx.fill()
+            ctx.moveTo(centerX + innerRadius * Math.cos(currentAngle),
+                       centerY + innerRadius * Math.sin(currentAngle))
+            ctx.lineTo(centerX + radius * Math.cos(currentAngle),
+                       centerY + radius * Math.sin(currentAngle))
+            ctx.strokeStyle = "rgba(122, 184, 212, " + swingOpacity + ")"
+            ctx.lineWidth = 4
+            ctx.stroke()
         }
 
         // Swing animation

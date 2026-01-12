@@ -8,7 +8,7 @@ ClayWorld2d {
     id: world
 
     // World configuration (fit world to viewport)
-    pixelPerUnit: 20//Math.min(width / xWuMax, height / yWuMax)
+    pixelPerUnit: 40//Math.min(width / xWuMax, height / yWuMax)
     gravity: Qt.point(0, 0)  // Top-down, no gravity
     timeStep: 1/60.0
     anchors.fill: parent
@@ -54,14 +54,16 @@ ClayWorld2d {
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton
 
-        property real mouseWorldX: canvas.screenXToWorld(mouseX)
-        property real mouseWorldY: canvas.screenYToWorld(mouseY)
-
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (player) player.attack()
         }
     }
+
+    // Player center in screen coords (for aiming) - map from player's parent to mouseInput coords
+    property var playerScreenPos: player ? player.parent.mapToItem(mouseInput, player.x + player.width * 0.5, player.y + player.height * 0.5) : Qt.point(width/2, height/2)
+    property real playerScreenX: playerScreenPos.x
+    property real playerScreenY: playerScreenPos.y
 
 
     // Input handling
@@ -126,6 +128,31 @@ ClayWorld2d {
             color: "white"
             font.pixelSize: 12
             font.bold: true
+        }
+    }
+
+    // Crosshair at mouse position
+    Item {
+        id: crosshair
+        x: mouseInput.mouseX - 6
+        y: mouseInput.mouseY - 6
+        width: 12
+        height: 12
+        z: 1000
+
+        // Horizontal line
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width
+            height: 2
+            color: "#7AB8D4"
+        }
+        // Vertical line
+        Rectangle {
+            anchors.centerIn: parent
+            width: 2
+            height: parent.height
+            color: "#7AB8D4"
         }
     }
 
@@ -194,9 +221,11 @@ ClayWorld2d {
         if (player) {
             player.moveX = Qt.binding(() => gameCtrl.axisX)
             player.moveY = Qt.binding(() => -gameCtrl.axisY)
-            // Mouse aiming: bind target position for facing direction
-            player.targetX = Qt.binding(() => mouseInput.mouseWorldX)
-            player.targetY = Qt.binding(() => mouseInput.mouseWorldY)
+            // Mouse aiming: bind screen coords for facing calculation
+            player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
+            player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+            player.playerScreenX = Qt.binding(() => playerScreenX)
+            player.playerScreenY = Qt.binding(() => playerScreenY)
             observedItem = player
         }
 
