@@ -156,6 +156,66 @@ ClayWorld2d {
         }
     }
 
+    // Track player movement for minimap exploration
+    Connections {
+        target: player
+        function onXWuChanged() { revealAroundPlayer() }
+        function onYWuChanged() { revealAroundPlayer() }
+    }
+
+    // Minimap with fog of war
+    Canvas {
+        id: minimap
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 10
+        width: 150
+        height: 150
+        z: 1000
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.fillStyle = "#111"
+            ctx.fillRect(0, 0, width, height)
+
+            var scale = width / gridWidth
+
+            // Draw explored cells
+            for (var gy = 0; gy < gridHeight; gy++) {
+                for (var gx = 0; gx < gridWidth; gx++) {
+                    if (exploredCells[gy] && exploredCells[gy][gx]) {
+                        var cellType = grid[gy][gx]
+                        ctx.fillStyle = (cellType === cellWall) ? "#333" : "#666"
+                        ctx.fillRect(gx * scale, (gridHeight - 1 - gy) * scale, scale, scale)
+                    }
+                }
+            }
+
+            // Draw player
+            if (player) {
+                var px = player.xWu / cellSize * scale
+                var py = (gridHeight - player.yWu / cellSize) * scale
+                ctx.fillStyle = "#4A90A4"
+                ctx.beginPath()
+                ctx.arc(px, py, 3, 0, Math.PI * 2)
+                ctx.fill()
+            }
+
+            // Draw enemies (if in explored area)
+            for (var e of enemies) {
+                if (!e || e.destroyed) continue
+                var ex = Math.floor(e.xWu / cellSize)
+                var ey = Math.floor(e.yWu / cellSize)
+                if (exploredCells[ey] && exploredCells[ey][ex]) {
+                    ctx.fillStyle = "#CC4444"
+                    ctx.beginPath()
+                    ctx.arc(e.xWu / cellSize * scale, (gridHeight - e.yWu / cellSize) * scale, 2, 0, Math.PI * 2)
+                    ctx.fill()
+                }
+            }
+        }
+    }
+
     // Component factories
     Component { id: playerComponent; Player {} }
     Component { id: enemyComponent; Enemy {} }
@@ -180,12 +240,17 @@ ClayWorld2d {
     property var grid: []
     property var rooms: []
 
+    // Minimap exploration
+    property var exploredCells: []
+    property int revealRadius: 6
+
     function generateDungeon() {
         console.log("[Game] generateDungeon() called")
         console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
         // Step 1: Initialize grid with walls
         initializeGrid()
+        initExploredCells()
 
         // Step 2: Place rooms
         placeRooms(6, 8, 5, 8)  // minRooms, maxRooms, minSize, maxSize (in cells)
@@ -227,6 +292,7 @@ ClayWorld2d {
             player.playerScreenX = Qt.binding(() => playerScreenX)
             player.playerScreenY = Qt.binding(() => playerScreenY)
             observedItem = player
+            revealAroundPlayer()  // Initial reveal
         }
 
         console.log("[Game] generateDungeon() complete")
@@ -242,6 +308,36 @@ ClayWorld2d {
             grid.push(row)
         }
         console.log("[Game] Grid initialized:", grid.length, "rows")
+    }
+
+    function initExploredCells() {
+        exploredCells = []
+        for (let y = 0; y < gridHeight; y++) {
+            let row = []
+            for (let x = 0; x < gridWidth; x++) {
+                row.push(false)
+            }
+            exploredCells.push(row)
+        }
+    }
+
+    function revealAroundPlayer() {
+        if (!player) return
+        let px = Math.floor(player.xWu / cellSize)
+        let py = Math.floor(player.yWu / cellSize)
+
+        for (let dy = -revealRadius; dy <= revealRadius; dy++) {
+            for (let dx = -revealRadius; dx <= revealRadius; dx++) {
+                let gx = px + dx
+                let gy = py + dy
+                if (gx >= 0 && gx < gridWidth && gy >= 0 && gy < gridHeight) {
+                    if (dx*dx + dy*dy <= revealRadius*revealRadius) {
+                        exploredCells[gy][gx] = true
+                    }
+                }
+            }
+        }
+        minimap.requestPaint()
     }
 
     function placeRooms(minRooms, maxRooms, minSize, maxSize) {

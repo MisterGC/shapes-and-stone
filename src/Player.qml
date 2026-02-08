@@ -100,6 +100,40 @@ PhysicsItem {
         transformOrigin: Item.Left
     }
 
+    // DEBUG: Attack damage area visualization (wedge showing hit zone)
+    Canvas {
+        id: attackZoneDebug
+        anchors.centerIn: parent
+        width: attackRange * pixelPerUnit * 2.2
+        height: attackRange * pixelPerUnit * 2.2
+        rotation: -facingAngle
+        opacity: 0.3
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+
+            var centerX = width / 2
+            var centerY = height / 2
+            var radius = attackRange * pixelPerUnit
+
+            // Draw wedge for attack arc (±attackArcAngle degrees)
+            var arcRad = attackArcAngle * Math.PI / 180
+            ctx.beginPath()
+            ctx.moveTo(centerX, centerY)
+            ctx.arc(centerX, centerY, radius, -arcRad, arcRad)
+            ctx.closePath()
+            ctx.fillStyle = "#FF6600"
+            ctx.fill()
+        }
+
+        // Repaint when facing changes
+        Connections {
+            target: player
+            function onFacingAngleChanged() { attackZoneDebug.requestPaint() }
+        }
+    }
+
     // Attack swing visualization
     Canvas {
         id: attackArc
@@ -248,7 +282,7 @@ PhysicsItem {
     function isInAttackArc(enemy) {
         let dx = enemy.xWu - xWu
         let dy = enemy.yWu - yWu
-        let angleToEnemy = Math.atan2(-dy, dx) * 180 / Math.PI
+        let angleToEnemy = Math.atan2(dy, dx) * 180 / Math.PI
 
         // Normalize angle difference to -180 to 180
         let angleDiff = angleToEnemy - facingAngle
