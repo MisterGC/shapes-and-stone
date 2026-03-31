@@ -25,6 +25,7 @@ ClayWorld2d {
     // Debug visualization
     debugPhysics: false
     property bool debugBehavior: false
+    property bool debugMechanics: false
 
     canvas.showDebugInfo: false
 
@@ -240,6 +241,23 @@ ClayWorld2d {
             MouseArea {
                 anchors.fill: parent
                 onClicked: world.debugBehavior = !world.debugBehavior
+            }
+        }
+
+        Rectangle {
+            visible: devMenu.expanded
+            width: 160; height: 24; radius: 4
+            color: world.debugMechanics ? "#4A90A480" : "#33333380"
+
+            Text {
+                anchors.centerIn: parent
+                text: "Mechanics: " + (world.debugMechanics ? "ON" : "OFF")
+                color: "white"; font.pixelSize: 11
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: world.debugMechanics = !world.debugMechanics
             }
         }
     }
@@ -641,6 +659,7 @@ ClayWorld2d {
             xWu: px, yWu: py,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
+            gameWorld: world,
             categories: catPlayer,
             collidesWith: catWall,
             // Attack sensor detects enemies
