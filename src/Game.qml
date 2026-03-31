@@ -1,5 +1,6 @@
 import QtQuick
 import Box2D
+import Clayground.Common
 import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
@@ -14,18 +15,28 @@ ClayWorld2d {
     anchors.fill: parent
     focus: true
 
+    // Dark background behind the world
+    Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
+
     // World bounds (in world units) - portrait orientation
     xWuMax: 100
     yWuMax: 100
 
     // Debug visualization
-    debugPhysics: false  // Show collision shapes
+    debugPhysics: false
+    property bool debugBehavior: false
 
     canvas.showDebugInfo: false
 
     // Game state
     property var player: null
     property var enemies: []
+    property var dungeonObjects: []
+    property int entranceGridX: 0
+    property int exitGridX: 0
+    property int masterSeed: -1   // -1 = random on first run
+    property int levelIndex: 0
+    property var rng: null
     components: []
 
     // Collision categories
@@ -156,6 +167,83 @@ ClayWorld2d {
         }
     }
 
+    // DEV menu (sandbox only)
+    Column {
+        id: devMenu
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.margins: 10
+        z: 1000
+        visible: Clayground.runsInSandbox
+        spacing: 4
+
+        property bool expanded: false
+
+        Rectangle {
+            width: devMenu.expanded ? 160 : 36
+            height: 24; radius: 4
+            color: "#333333CC"
+
+            Text {
+                anchors.centerIn: parent
+                text: devMenu.expanded ? "DEV [v]" : "DEV"
+                color: "#AAAAAA"
+                font.pixelSize: 12; font.bold: true
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: devMenu.expanded = !devMenu.expanded
+            }
+        }
+
+        Rectangle {
+            visible: devMenu.expanded
+            width: 160; height: 24; radius: 4
+            color: "#33333380"
+
+            Text {
+                anchors.centerIn: parent
+                text: "Seed: " + masterSeed
+                color: "#AAAAAA"; font.pixelSize: 11
+            }
+        }
+
+        Rectangle {
+            visible: devMenu.expanded
+            width: 160; height: 24; radius: 4
+            color: world.debugPhysics ? "#4A90A480" : "#33333380"
+
+            Text {
+                anchors.centerIn: parent
+                text: "Physics: " + (world.debugPhysics ? "ON" : "OFF")
+                color: "white"; font.pixelSize: 11
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: world.debugPhysics = !world.debugPhysics
+            }
+        }
+
+        Rectangle {
+            visible: devMenu.expanded
+            width: 160; height: 24; radius: 4
+            color: world.debugBehavior ? "#4A90A480" : "#33333380"
+
+            Text {
+                anchors.centerIn: parent
+                text: "Behavior: " + (world.debugBehavior ? "ON" : "OFF")
+                color: "white"; font.pixelSize: 11
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: world.debugBehavior = !world.debugBehavior
+            }
+        }
+    }
+
     // Track player movement for minimap exploration
     Connections {
         target: player
@@ -216,6 +304,21 @@ ClayWorld2d {
         }
     }
 
+    // Exit trigger sensor
+    property var exitSensor: null
+    property bool resetting: false
+
+    CollisionTracker {
+        fixture: exitSensor ? exitSensor.fixture : null
+        onBeginContact: (entity) => {
+            if (entity === player && !resetting) {
+                console.log("[Game] Player reached the exit!")
+                resetting = true
+                Qt.callLater(resetDungeon)
+            }
+        }
+    }
+
     // Component factories
     Component { id: playerComponent; Player {} }
     Component { id: enemyComponent; Enemy {} }
@@ -245,7 +348,11 @@ ClayWorld2d {
     property int revealRadius: 6
 
     function generateDungeon() {
-        console.log("[Game] generateDungeon() called")
+        if (masterSeed < 0)
+            masterSeed = Math.floor(Math.random() * 2147483647)
+        let levelSeed = deriveSeed(masterSeed, levelIndex)
+        rng = createRng(levelSeed)
+        console.log("[Game] Seed:", masterSeed, "Level:", levelIndex, "LevelSeed:", levelSeed)
         console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
         // Step 1: Initialize grid with walls
@@ -273,13 +380,22 @@ ClayWorld2d {
             spawnPlayer(px, py)
         }
 
-        // Step 7: Spawn enemy in last room
+        // Step 7: Block the entrance so player can't backtrack
+        blockEntrance()
+
+        // Step 8: Place exit trigger sensor at the north edge
+        placeExitSensor()
+
+        // Step 9: Spawn 5 enemies across non-start rooms
         if (rooms.length > 1) {
-            let endRoom = rooms[rooms.length - 1]
-            let ex = (endRoom.x + endRoom.w / 2) * cellSize
-            let ey = (endRoom.y + endRoom.h / 2) * cellSize
-            console.log("[Game] Spawning enemy at:", ex, ey)
-            spawnEnemy(ex, ey)
+            let spawnRooms = rooms.slice(1)
+            for (let i = 0; i < 5; i++) {
+                let room = spawnRooms[i % spawnRooms.length]
+                let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
+                let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
+                console.log("[Game] Spawning enemy", i, "at:", ex, ey)
+                spawnEnemy(ex, ey)
+            }
         }
 
         // Bind player controls
@@ -342,7 +458,7 @@ ClayWorld2d {
 
     function placeRooms(minRooms, maxRooms, minSize, maxSize) {
         rooms = []
-        let numRooms = minRooms + Math.floor(Math.random() * (maxRooms - minRooms + 1))
+        let numRooms = minRooms + Math.floor(rng() * (maxRooms - minRooms + 1))
         let attempts = 0
         let maxAttempts = 100
 
@@ -350,12 +466,12 @@ ClayWorld2d {
             attempts++
 
             // Random room size (in cells)
-            let rw = minSize + Math.floor(Math.random() * (maxSize - minSize + 1))
-            let rh = minSize + Math.floor(Math.random() * (maxSize - minSize + 1))
+            let rw = minSize + Math.floor(rng() * (maxSize - minSize + 1))
+            let rh = minSize + Math.floor(rng() * (maxSize - minSize + 1))
 
             // Random position (leave 1 cell border for walls)
-            let rx = 1 + Math.floor(Math.random() * (gridWidth - rw - 2))
-            let ry = 1 + Math.floor(Math.random() * (gridHeight - rh - 2))
+            let rx = 1 + Math.floor(rng() * (gridWidth - rw - 2))
+            let ry = 1 + Math.floor(rng() * (gridHeight - rh - 2))
 
             // Check if room overlaps with existing rooms (with 1 cell padding)
             let overlaps = false
@@ -446,6 +562,8 @@ ClayWorld2d {
             grid[y][exitX] = cellHallway
         }
 
+        entranceGridX = entranceX
+        exitGridX = exitX
         console.log("[Game] Added entrance at x=", entranceX, "exit at x=", exitX)
     }
 
@@ -455,6 +573,7 @@ ClayWorld2d {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
+        dungeonObjects.push(floorObj)
 
         // Create merged walls using run-length encoding
         let wallCount = createMergedWalls()
@@ -512,6 +631,7 @@ ClayWorld2d {
             categories: catWall,
             collidesWith: catPlayer | catEnemy
         })
+        dungeonObjects.push(wall)
         return wall
     }
 
@@ -542,7 +662,7 @@ ClayWorld2d {
             xWu: ex, yWu: ey,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
-            gameWorld: world,  // For MoveTo behavior
+            gameWorld: world,
             categories: catEnemy,
             collidesWith: catWall | catPlayer
         })
@@ -553,5 +673,220 @@ ClayWorld2d {
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
         }
+    }
+
+    function blockEntrance() {
+        let wx = entranceGridX * cellSize
+        let wy = cellSize  // Bottom edge of map
+        let wall = createWallAt(wx, wy, cellSize, cellSize)
+        wall.opacity = 0  // Invisible blocker
+        console.log("[Game] Entrance blocked at grid x=", entranceGridX)
+    }
+
+    function placeExitSensor() {
+        let wx = exitGridX * cellSize
+        let wy = yWuMax  // Top edge of map
+        exitSensor = wallComponent.createObject(world.room, {
+            xWu: wx, yWu: wy, widthWu: cellSize, heightWu: cellSize,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catWall,
+            collidesWith: catPlayer,
+            sensor: true
+        })
+        exitSensor.opacity = 0
+        dungeonObjects.push(exitSensor)
+        console.log("[Game] Exit sensor placed at grid x=", exitGridX)
+    }
+
+    function clearDungeon() {
+        exitSensor = null
+
+        // Destroy enemies
+        for (let e of enemies) {
+            try { if (e && !e.destroyed) e.destroy() } catch(err) {}
+        }
+        enemies = []
+
+        // Destroy player
+        if (player) {
+            try { player.destroy() } catch(err) {}
+            player = null
+        }
+
+        // Destroy all tracked dungeon objects (walls, floors)
+        for (let obj of dungeonObjects) {
+            try { if (obj) obj.destroy() } catch(err) {}
+        }
+        dungeonObjects = []
+
+        grid = []
+        rooms = []
+    }
+
+    function resetDungeon() {
+        let savedHp = player ? player.hp : 120
+        console.log("[Game] Resetting dungeon, preserving HP:", savedHp)
+        clearDungeon()
+        levelIndex++
+        generateDungeon()
+        if (player) player.hp = savedHp
+        resetting = false
+    }
+
+    // --- Seeded PRNG (mulberry32) ---
+    function createRng(seed) {
+        let s = seed | 0
+        return function() {
+            s = (s + 0x6D2B79F5) | 0
+            var t = Math.imul(s ^ (s >>> 15), 1 | s)
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
+    }
+
+    function deriveSeed(master, index) {
+        return (master * 2654435761 + index * 2246822519) | 0
+    }
+
+    // --- Line-of-sight (Bresenham on grid) ---
+    function hasLineOfSight(x1Wu, y1Wu, x2Wu, y2Wu) {
+        let gx0 = Math.floor(x1Wu / cellSize)
+        let gy0 = Math.floor(y1Wu / cellSize)
+        let gx1 = Math.floor(x2Wu / cellSize)
+        let gy1 = Math.floor(y2Wu / cellSize)
+
+        let dx = Math.abs(gx1 - gx0)
+        let dy = Math.abs(gy1 - gy0)
+        let sx = gx0 < gx1 ? 1 : -1
+        let sy = gy0 < gy1 ? 1 : -1
+        let err = dx - dy
+
+        while (true) {
+            if (gx0 < 0 || gx0 >= gridWidth || gy0 < 0 || gy0 >= gridHeight)
+                return false
+            if (grid[gy0][gx0] === cellWall)
+                return false
+            if (gx0 === gx1 && gy0 === gy1)
+                return true
+            let e2 = 2 * err
+            if (e2 > -dy) { err -= dy; gx0 += sx }
+            if (e2 < dx)  { err += dx; gy0 += sy }
+        }
+    }
+
+    // --- A* pathfinder on grid ---
+    function findPath(x1Wu, y1Wu, x2Wu, y2Wu) {
+        let sx = Math.floor(x1Wu / cellSize)
+        let sy = Math.floor(y1Wu / cellSize)
+        let ex = Math.floor(x2Wu / cellSize)
+        let ey = Math.floor(y2Wu / cellSize)
+
+        // Clamp to grid
+        sx = Math.max(0, Math.min(gridWidth - 1, sx))
+        sy = Math.max(0, Math.min(gridHeight - 1, sy))
+        ex = Math.max(0, Math.min(gridWidth - 1, ex))
+        ey = Math.max(0, Math.min(gridHeight - 1, ey))
+
+        // Snap start/end to nearest walkable cell if on a wall
+        function snapToWalkable(cx, cy) {
+            if (grid[cy][cx] !== cellWall) return {x: cx, y: cy}
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]
+            for (let d of dirs) {
+                let nx = cx + d[0], ny = cy + d[1]
+                if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight
+                    && grid[ny][nx] !== cellWall)
+                    return {x: nx, y: ny}
+            }
+            return null
+        }
+        let s = snapToWalkable(sx, sy)
+        let e = snapToWalkable(ex, ey)
+        if (!s || !e) return []
+        sx = s.x; sy = s.y; ex = e.x; ey = e.y
+
+        // Binary heap (min-heap by f score)
+        let open = []
+        let closed = new Set()
+        let cameFrom = {}
+        let gScore = {}
+
+        function key(x, y) { return y * gridWidth + x }
+        function heuristic(x, y) { return Math.abs(x - ex) + Math.abs(y - ey) }
+
+        function heapPush(node) {
+            open.push(node)
+            let i = open.length - 1
+            while (i > 0) {
+                let p = (i - 1) >> 1
+                if (open[p].f <= open[i].f) break
+                let tmp = open[p]; open[p] = open[i]; open[i] = tmp
+                i = p
+            }
+        }
+
+        function heapPop() {
+            let top = open[0]
+            let last = open.pop()
+            if (open.length > 0) {
+                open[0] = last
+                let i = 0
+                while (true) {
+                    let best = i
+                    let l = 2 * i + 1, r = 2 * i + 2
+                    if (l < open.length && open[l].f < open[best].f) best = l
+                    if (r < open.length && open[r].f < open[best].f) best = r
+                    if (best === i) break
+                    let tmp = open[best]; open[best] = open[i]; open[i] = tmp
+                    i = best
+                }
+            }
+            return top
+        }
+
+        let startKey = key(sx, sy)
+        gScore[startKey] = 0
+        heapPush({x: sx, y: sy, f: heuristic(sx, sy)})
+
+        let dirs = [[1,0],[-1,0],[0,1],[0,-1]]
+
+        while (open.length > 0) {
+            let cur = heapPop()
+            let ck = key(cur.x, cur.y)
+
+            if (cur.x === ex && cur.y === ey) {
+                // Reconstruct path as world-unit waypoints
+                let path = []
+                let k = ck
+                while (k !== undefined) {
+                    let py = Math.floor(k / gridWidth)
+                    let px = k % gridWidth
+                    path.unshift(Qt.point(px * cellSize + cellSize / 2,
+                                          py * cellSize + cellSize / 2))
+                    k = cameFrom[k]
+                }
+                return path
+            }
+
+            if (closed.has(ck)) continue
+            closed.add(ck)
+
+            for (let d of dirs) {
+                let nx = cur.x + d[0]
+                let ny = cur.y + d[1]
+                if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) continue
+                if (grid[ny][nx] === cellWall) continue
+                let nk = key(nx, ny)
+                if (closed.has(nk)) continue
+                let ng = gScore[ck] + 1
+                if (gScore[nk] === undefined || ng < gScore[nk]) {
+                    gScore[nk] = ng
+                    cameFrom[nk] = ck
+                    heapPush({x: nx, y: ny, f: ng + heuristic(nx, ny)})
+                }
+            }
+        }
+
+        return [] // No path found
     }
 }
