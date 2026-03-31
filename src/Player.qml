@@ -55,9 +55,14 @@ PhysicsItem {
     readonly property real attackRange: 2.0  // World units
     readonly property real attackArcAngle: 60  // Degrees from facing direction
 
-    // Movement - direct velocity binding (like topdown demo)
-    linearVelocity.x: moveX * maxSpeed
-    linearVelocity.y: moveY * maxSpeed
+    // Movement - set velocity every physics step so collision response
+    // doesn't permanently zero a component while the key is held
+    Connections {
+        target: player.world
+        function onStepped() {
+            player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
+        }
+    }
 
     // Attack cooldown timer
     Timer {
@@ -101,9 +106,13 @@ PhysicsItem {
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
+    // Positioned manually to avoid inflating parent's childrenRect
+    // which would distort Box2D debug draw.
     Canvas {
         id: attackZoneDebug
-        anchors.centerIn: parent
+        parent: player.parent
+        x: player.x + player.width/2 - width/2
+        y: player.y + player.height/2 - height/2
         width: attackRange * pixelPerUnit * 2.2
         height: attackRange * pixelPerUnit * 2.2
         rotation: -facingAngle
@@ -135,13 +144,16 @@ PhysicsItem {
     }
 
     // Attack swing visualization
+    // Reparented to avoid inflating PhysicsItem's childrenRect.
     Canvas {
         id: attackArc
-        anchors.centerIn: parent
-        width: parent.width * 4
-        height: parent.height * 4
+        parent: player.parent
+        x: player.x + player.width/2 - width/2
+        y: player.y + player.height/2 - height/2
+        width: player.width * 4
+        height: player.height * 4
         visible: isAttacking
-        rotation: -facingAngle  // Canvas 0 = right, rotate to match facing
+        rotation: -facingAngle
 
         // Swing progress: 0 = start, 1 = end
         property real swingProgress: 0
@@ -235,11 +247,11 @@ PhysicsItem {
         }
     }
 
-    // Circular collider (smaller than visual to avoid corner snagging)
+    // Circular collider — matches visual size closely
     fixtures: [
         Circle {
             id: collider
-            radius: player.width * 0.35  // 70% of half-width
+            radius: player.width * 0.45
             x: player.width / 2
             y: player.height / 2
             density: 1.0
@@ -248,13 +260,15 @@ PhysicsItem {
 
             onBeginContact: (other) => player.onCollision(other)
         },
-        // Attack range sensor - detects enemies in melee range
+        // Attack range sensor — proximity detector for melee candidates.
+        // Actual hit detection uses hitEnemiesInArc() with distance + angle checks,
+        // so this just needs to be a rough proximity envelope.
         Circle {
             id: attackSensor
-            radius: attackRange * pixelPerUnit
+            radius: player.width * 1.5
             x: player.width / 2
             y: player.height / 2
-            sensor: true  // Non-physical, detection only
+            sensor: true
 
             onBeginContact: (other) => {
                 let entity = other.getBody().target
