@@ -5,6 +5,8 @@ import Clayground.Physics
 PhysicsItem {
     id: player
 
+    property var gameWorld: null
+
     // Visual size (the square shape)
     widthWu: 1.0
     heightWu: 1.0
@@ -82,27 +84,34 @@ PhysicsItem {
         width: parent.width
         height: parent.height
         color: "#4A90A4"  // Steel Blue
-
-        // Inner glow effect
-        Rectangle {
-            anchors.centerIn: parent
-            width: parent.width * 0.7
-            height: parent.height * 0.7
-            color: "#5BA0B4"
-            opacity: 0.5
-        }
+        radius: width * .5
     }
 
-    // Direction indicator line
-    Rectangle {
-        id: aimLine
-        width: parent.width * 0.8
-        height: 2
-        color: "#7AB8D4"
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.left: parent.horizontalCenter
+    // Direction indicator arrowhead (orbits around player)
+    Canvas {
+        id: aimArrow
+        opacity: 0.5
+        readonly property real arrowSize: player.width * 0.3
+        readonly property real orbitRadius: player.width * 0.7
+        readonly property real angleRad: facingAngle * Math.PI / 180
+        width: arrowSize
+        height: arrowSize
+        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
+        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
         rotation: -facingAngle
-        transformOrigin: Item.Left
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var w = width, h = height
+            ctx.beginPath()
+            ctx.moveTo(w, h * 0.5)
+            ctx.lineTo(0, 0)
+            ctx.lineTo(w * 0.3, h * 0.5)
+            ctx.lineTo(0, h)
+            ctx.closePath()
+            ctx.fillStyle = "#7AB8D4"
+            ctx.fill()
+        }
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -110,6 +119,7 @@ PhysicsItem {
     // which would distort Box2D debug draw.
     Canvas {
         id: attackZoneDebug
+        visible: gameWorld ? gameWorld.debugMechanics : false
         parent: player.parent
         x: player.x + player.width/2 - width/2
         y: player.y + player.height/2 - height/2

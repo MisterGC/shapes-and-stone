@@ -32,8 +32,13 @@ PhysicsItem {
     property var target: null
 
     // Stats
-    readonly property real chaseSpeed: 8.0
-    readonly property real patrolSpeed: 3.0
+    readonly property real chaseSpeed: 4.0
+    readonly property real patrolSpeed: 1.5
+    property real _lungeSpeed: 0  // Calculated per attack
+    readonly property real windUpSpeed: 4.0
+    readonly property real windUpDuration: 0.3
+    readonly property real lungeDuration: 0.35
+    readonly property real lungeRange: 2.0
     property int hp: 20
     property int maxHp: 20
     property int atk: 10
@@ -41,9 +46,11 @@ PhysicsItem {
 
     // Combat state
     property real attackCooldown: 0
-    property real telegraphTimer: 0
+    property real _attackTimer: 0
+    property real _dirToTargetX: 0
+    property real _dirToTargetY: 0
 
-    // AI state: patrol, chase, telegraph, attack, recovery
+    // AI state: patrol, chase, telegraph, lunge, recovery
     property string aiState: "patrol"
 
     // Internal state
@@ -56,13 +63,14 @@ PhysicsItem {
     Rectangle {
         id: visual
         anchors.centerIn: parent
-        width: parent.width
-        height: parent.height
+        anchors.fill: parent
+        radius: width * .5
         color: {
             switch (enemy.aiState) {
             case "patrol": return "#8B3A3A"
             case "chase": return "#CC4444"
             case "telegraph": return "#FF8C00"
+            case "lunge": return "#FF4444"
             default: return "#8B3A3A"
             }
         }
@@ -160,7 +168,7 @@ PhysicsItem {
         }
 
         if (attackCooldown > 0) attackCooldown -= dt
-        if (telegraphTimer > 0) telegraphTimer -= dt
+        if (_attackTimer > 0) _attackTimer -= dt
         _pathRecalcTimer -= dt
 
         let dx = target.xWu - xWu
@@ -182,9 +190,13 @@ PhysicsItem {
             break
 
         case "chase":
-            if (dist < 1.5) {
+            if (dist < lungeRange && canSee) {
+                // Capture direction to target for wind-up/lunge
+                let len = Math.max(0.01, dist)
+                _dirToTargetX = dx / len
+                _dirToTargetY = dy / len
+                _attackTimer = windUpDuration
                 aiState = "telegraph"
-                telegraphTimer = 0.3
             } else if (_pathRecalcTimer <= 0) {
                 _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
                 _recalcChasePath()
@@ -193,18 +205,39 @@ PhysicsItem {
             break
 
         case "telegraph":
-            if (telegraphTimer <= 0) {
-                aiState = "attack"
-                performAttack()
+            // Pull backward (wind-up) — negate Y for world-to-screen
+            body.linearVelocity = Qt.point(
+                -_dirToTargetX * windUpSpeed,
+                _dirToTargetY * windUpSpeed)
+            if (_attackTimer <= 0) {
+                // Calculate lunge speed to reach the player
+                let lungeDx = target.xWu - xWu
+                let lungeDy = target.yWu - yWu
+                let lungeDist = Math.sqrt(lungeDx * lungeDx + lungeDy * lungeDy)
+                let len = Math.max(0.01, lungeDist)
+                _dirToTargetX = lungeDx / len
+                _dirToTargetY = lungeDy / len
+                _lungeSpeed = lungeDist / lungeDuration
+                _attackTimer = lungeDuration
+                aiState = "lunge"
             }
             break
 
-        case "attack":
-            aiState = "recovery"
-            attackCooldown = 0.8
+        case "lunge":
+            // Dash forward — negate Y for world-to-screen
+            body.linearVelocity = Qt.point(
+                _dirToTargetX * _lungeSpeed,
+                -_dirToTargetY * _lungeSpeed)
+            if (_attackTimer <= 0) {
+                body.linearVelocity = Qt.point(0, 0)
+                performAttack()
+                aiState = "recovery"
+                attackCooldown = 0.8
+            }
             break
 
         case "recovery":
+            body.linearVelocity = Qt.point(0, 0)
             if (attackCooldown <= 0)
                 aiState = "chase"
             break
@@ -254,9 +287,9 @@ PhysicsItem {
             let dx = target.xWu - xWu
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < 1.5) {
+            if (dist < 1.2) {
                 target.takeDamage(atk)
-                console.log("[Enemy] Attack hit! Dealt", atk, "damage")
+                console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
         }
     }
