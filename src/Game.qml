@@ -19,13 +19,61 @@ ClayWorld2d {
     // Dark background behind the world
     Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
 
-    // Dungeon ambience
+    // Dungeon audio
     Music {
         id: dungeonAmbience
         source: "assets/dungeon_ambience.mp3"
         volume: 0.4
         loop: true
         Component.onCompleted: play()
+    }
+
+    Music {
+        id: dungeonMusic
+        source: "assets/dungeon_music.mp3"
+        volume: 0.3
+        loop: true
+        Component.onCompleted: play()
+    }
+
+    Sound {
+        id: impactSound
+        source: "assets/punch_hitting.wav"
+        volume: 0.7
+    }
+
+    Sound {
+        id: dashSound
+        source: "assets/dash.wav"
+        volume: 0.6
+    }
+
+    function playImpact() {
+        impactSound.play()
+    }
+
+    Sound {
+        id: deathBurstSound
+        source: "assets/burst.wav"
+        volume: 0.7
+    }
+
+    Sound {
+        id: swordSwingSound
+        source: "assets/sword_swing.wav"
+        volume: 0.5
+    }
+
+    function playDash() {
+        dashSound.play()
+    }
+
+    function playSwordSwing() {
+        swordSwingSound.play()
+    }
+
+    function playDeathBurst() {
+        deathBurstSound.play()
     }
 
     // Apply screen shake via transform on room

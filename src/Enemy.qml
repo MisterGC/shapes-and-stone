@@ -343,6 +343,7 @@ PhysicsItem {
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < 1.2) {
                 target.takeDamage(atk)
+                if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
         }
@@ -369,7 +370,10 @@ PhysicsItem {
 
     function die() {
         console.log("[Enemy] Died!")
-        if (gameWorld) gameWorld.spawnDeathParticles(xWu, yWu)
+        if (gameWorld) {
+            gameWorld.spawnDeathParticles(xWu, yWu)
+            gameWorld.playDeathBurst()
+        }
         destroyed = true
         destroy()
     }

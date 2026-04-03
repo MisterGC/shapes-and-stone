@@ -419,6 +419,7 @@ PhysicsItem {
                 enemy.takeDamage(atk)
                 _hitThisSwing.add(enemy)
                 hitCount++
+                if (gameWorld) gameWorld.playImpact()
                 console.log("[Player] Hit enemy for", atk, "damage!")
             }
         }
@@ -454,6 +455,7 @@ PhysicsItem {
         _dashStepCount = 0
         dashCooldown = dashCooldownTime
         dashFlash.restart()
+        if (gameWorld) gameWorld.playDash()
     }
 
     function attack() {
@@ -463,6 +465,7 @@ PhysicsItem {
             attackCooldown = attackCooldownTime
             attackArc.requestPaint()
             attackAnimation.restart()
+            if (!isDashing && gameWorld) gameWorld.playSwordSwing()
             console.log("[Player] Attack! Facing:", facingAngle.toFixed(0), "degrees")
         }
     }
