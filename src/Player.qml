@@ -57,27 +57,54 @@ PhysicsItem {
     readonly property real attackRange: 2.0  // World units
     readonly property real attackArcAngle: 60  // Degrees from facing direction
 
+    // Dash state
+    property bool isDashing: false
+    property real dashCooldown: 0
+    readonly property real dashSpeed: 40.0
+    readonly property real dashDuration: 0.15
+    readonly property real dashCooldownTime: 0.8
+    property real _dashTimer: 0
+    property real _dashDirX: 0
+    property real _dashDirY: 0
+
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held
+    property int _dashStepCount: 0
     Connections {
         target: player.world
         function onStepped() {
-            player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
+            if (isDashing) {
+                player.body.linearVelocity = Qt.point(_dashDirX * dashSpeed, _dashDirY * dashSpeed)
+                _dashTimer -= 1/60.0
+                _dashStepCount++
+                if (_dashStepCount % 2 === 0 && player.parent) {
+                    afterimageComp.createObject(player.parent, {
+                        x: player.x, y: player.y,
+                        width: player.width, height: player.height
+                    })
+                }
+                if (_dashTimer <= 0) isDashing = false
+            } else {
+                player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
+            }
+            if (isAttacking) hitEnemiesInArc()
         }
     }
 
-    // Attack cooldown timer
+    // Cooldown timer (attack + dash)
     Timer {
         id: cooldownTimer
         interval: 50
         repeat: true
-        running: attackCooldown > 0
+        running: attackCooldown > 0 || dashCooldown > 0
         onTriggered: {
-            attackCooldown = Math.max(0, attackCooldown - interval / 1000)
+            let dt = interval / 1000
+            attackCooldown = Math.max(0, attackCooldown - dt)
+            dashCooldown = Math.max(0, dashCooldown - dt)
         }
     }
 
-    // Visual: Steel Blue square (Knight)
+    // Visual: Steel Blue circle (Knight)
     Rectangle {
         id: visual
         anchors.centerIn: parent
@@ -85,6 +112,78 @@ PhysicsItem {
         height: parent.height
         color: "#4A90A4"  // Steel Blue
         radius: width * .5
+
+        Canvas {
+            anchors.centerIn: parent
+            width: parent.width * 0.6
+            height: parent.height * 0.6
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                var w = width, h = height
+                ctx.fillStyle = "#2A6A84"
+                ctx.strokeStyle = "#2A6A84"
+                ctx.lineWidth = w * 0.06
+
+                // Dome
+                ctx.beginPath()
+                ctx.moveTo(w * 0.15, h * 0.55)
+                ctx.quadraticCurveTo(w * 0.15, h * 0.1, w * 0.5, h * 0.08)
+                ctx.quadraticCurveTo(w * 0.85, h * 0.1, w * 0.85, h * 0.55)
+                ctx.closePath()
+                ctx.fill()
+
+                // Visor slit
+                ctx.fillStyle = "#4A90A4"
+                ctx.fillRect(w * 0.2, h * 0.42, w * 0.6, h * 0.1)
+
+                // Cheek guards
+                ctx.fillStyle = "#2A6A84"
+                ctx.beginPath()
+                ctx.moveTo(w * 0.15, h * 0.55)
+                ctx.lineTo(w * 0.15, h * 0.78)
+                ctx.lineTo(w * 0.3, h * 0.88)
+                ctx.lineTo(w * 0.3, h * 0.55)
+                ctx.closePath()
+                ctx.fill()
+
+                ctx.beginPath()
+                ctx.moveTo(w * 0.85, h * 0.55)
+                ctx.lineTo(w * 0.85, h * 0.78)
+                ctx.lineTo(w * 0.7, h * 0.88)
+                ctx.lineTo(w * 0.7, h * 0.55)
+                ctx.closePath()
+                ctx.fill()
+
+                // Nose guard
+                ctx.fillRect(w * 0.46, h * 0.35, w * 0.08, h * 0.25)
+            }
+        }
+
+        SequentialAnimation {
+            id: dashFlash
+            PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
+        }
+    }
+
+    // Dash afterimage component
+
+    Component {
+        id: afterimageComp
+        Rectangle {
+            id: _ghost
+            radius: width * 0.5
+            color: "#7AB8D4"
+            opacity: 0.5
+            SequentialAnimation {
+                running: true
+                ParallelAnimation {
+                    NumberAnimation { target: _ghost; property: "opacity"; to: 0; duration: 200 }
+                    NumberAnimation { target: _ghost; property: "scale"; to: 0.5; duration: 200 }
+                }
+                ScriptAction { script: _ghost.destroy() }
+            }
+        }
     }
 
     // Direction indicator arrowhead (orbits around player)
@@ -223,11 +322,6 @@ PhysicsItem {
                 easing.type: Easing.OutQuad
             }
 
-            // Hit detection at mid-swing
-            ScriptAction {
-                script: hitEnemiesInArc()
-            }
-
             // Second half of swing (follow through)
             PropertyAnimation {
                 target: attackArc
@@ -297,6 +391,7 @@ PhysicsItem {
 
     // Track enemies currently in attack range
     property var enemiesInRange: new Set()
+    property var _hitThisSwing: new Set()
 
     function onCollision(other) {
         // Handle collision with enemies
@@ -316,12 +411,13 @@ PhysicsItem {
         return Math.abs(angleDiff) <= attackArcAngle
     }
 
-    // Deal damage to enemies in attack arc
+    // Deal damage to enemies in attack arc (skips already-hit enemies this swing)
     function hitEnemiesInArc() {
         let hitCount = 0
         for (let enemy of enemiesInRange) {
-            if (enemy && !enemy.destroyed && isInAttackArc(enemy)) {
+            if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
                 enemy.takeDamage(atk)
+                _hitThisSwing.add(enemy)
                 hitCount++
                 console.log("[Player] Hit enemy for", atk, "damage!")
             }
@@ -330,17 +426,40 @@ PhysicsItem {
     }
 
     function takeDamage(amount) {
+        if (isDashing) return  // Invulnerable during dash
         let finalDamage = Math.max(1, amount - def)
         if (isBlocking) {
             finalDamage = Math.floor(finalDamage * 0.3)
         }
         hp = Math.max(0, hp - finalDamage)
-        // TODO: Trigger hit flash animation
+        if (gameWorld) gameWorld.shake(3)
+    }
+
+    function dash() {
+        if (dashCooldown > 0 || isDashing) return
+        // Use movement direction, or facing direction if stationary
+        let dirX = moveX
+        let dirY = moveY
+        if (dirX === 0 && dirY === 0) {
+            let rad = facingAngle * Math.PI / 180
+            dirX = Math.cos(rad)
+            dirY = -Math.sin(rad)  // Screen Y is flipped
+        }
+        let len = Math.sqrt(dirX * dirX + dirY * dirY)
+        if (len < 0.01) return
+        _dashDirX = dirX / len
+        _dashDirY = dirY / len
+        isDashing = true
+        _dashTimer = dashDuration
+        _dashStepCount = 0
+        dashCooldown = dashCooldownTime
+        dashFlash.restart()
     }
 
     function attack() {
         if (attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
+            _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
             attackArc.requestPaint()
             attackAnimation.restart()

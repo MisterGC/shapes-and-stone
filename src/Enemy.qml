@@ -75,6 +75,60 @@ PhysicsItem {
             }
         }
         Behavior on color { ColorAnimation { duration: 100 } }
+
+        Canvas {
+            id: goblinIcon
+            anchors.centerIn: parent
+            width: parent.width * 0.7
+            height: parent.height * 0.7
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                var w = width, h = height
+                var dark = Qt.darker(visual.color, 1.8)
+                ctx.fillStyle = dark
+                ctx.strokeStyle = dark
+                ctx.lineWidth = w * 0.06
+
+                // Pointy ears
+                ctx.beginPath()
+                ctx.moveTo(w * 0.05, h * 0.45)
+                ctx.lineTo(w * -0.05, h * 0.05)
+                ctx.lineTo(w * 0.25, h * 0.35)
+                ctx.closePath()
+                ctx.fill()
+
+                ctx.beginPath()
+                ctx.moveTo(w * 0.95, h * 0.45)
+                ctx.lineTo(w * 1.05, h * 0.05)
+                ctx.lineTo(w * 0.75, h * 0.35)
+                ctx.closePath()
+                ctx.fill()
+
+                // Eyes
+                ctx.beginPath()
+                ctx.arc(w * 0.33, h * 0.42, w * 0.09, 0, Math.PI * 2)
+                ctx.fill()
+                ctx.beginPath()
+                ctx.arc(w * 0.67, h * 0.42, w * 0.09, 0, Math.PI * 2)
+                ctx.fill()
+
+                // Jagged mouth
+                ctx.beginPath()
+                ctx.moveTo(w * 0.25, h * 0.7)
+                ctx.lineTo(w * 0.35, h * 0.62)
+                ctx.lineTo(w * 0.45, h * 0.72)
+                ctx.lineTo(w * 0.55, h * 0.62)
+                ctx.lineTo(w * 0.65, h * 0.72)
+                ctx.lineTo(w * 0.75, h * 0.62)
+                ctx.stroke()
+            }
+
+            Connections {
+                target: visual
+                function onColorChanged() { goblinIcon.requestPaint() }
+            }
+        }
     }
 
     Rectangle {
@@ -301,6 +355,7 @@ PhysicsItem {
         hp = Math.max(0, hp - finalDamage)
         console.log("[Enemy] Took", finalDamage, "damage, HP:", hp)
         hitFlashAnimation.restart()
+        if (gameWorld) gameWorld.shake(1.5)
 
         // Getting hit while patrolling triggers chase
         if (aiState === "patrol" && target) {
@@ -314,6 +369,7 @@ PhysicsItem {
 
     function die() {
         console.log("[Enemy] Died!")
+        if (gameWorld) gameWorld.spawnDeathParticles(xWu, yWu)
         destroyed = true
         destroy()
     }

@@ -4,6 +4,7 @@ import Clayground.Common
 import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
+import Clayground.Sound
 
 ClayWorld2d {
     id: world
@@ -18,6 +19,18 @@ ClayWorld2d {
     // Dark background behind the world
     Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
 
+    // Dungeon ambience
+    Music {
+        id: dungeonAmbience
+        source: "assets/dungeon_ambience.mp3"
+        volume: 0.4
+        loop: true
+        Component.onCompleted: play()
+    }
+
+    // Apply screen shake via transform on room
+    transform: Translate { x: _shakeOffsetX; y: _shakeOffsetY }
+
     // World bounds (in world units) - portrait orientation
     xWuMax: 100
     yWuMax: 100
@@ -28,6 +41,32 @@ ClayWorld2d {
     property bool debugMechanics: false
 
     canvas.showDebugInfo: false
+
+    // Screen shake
+    property real _shakeIntensity: 0
+    property real _shakeOffsetX: 0
+    property real _shakeOffsetY: 0
+
+    Timer {
+        id: shakeTimer
+        interval: 30
+        repeat: true
+        running: _shakeIntensity > 0.5
+        onTriggered: {
+            _shakeOffsetX = (Math.random() * 2 - 1) * _shakeIntensity
+            _shakeOffsetY = (Math.random() * 2 - 1) * _shakeIntensity
+            _shakeIntensity *= 0.7
+            if (_shakeIntensity <= 0.5) {
+                _shakeOffsetX = 0
+                _shakeOffsetY = 0
+                _shakeIntensity = 0
+            }
+        }
+    }
+
+    function shake(intensity) {
+        _shakeIntensity = Math.max(_shakeIntensity, intensity)
+    }
 
     // Game state
     property var player: null
@@ -100,6 +139,7 @@ ClayWorld2d {
 
         onAxisXChanged: console.log("[Input] axisX:", axisX)
         onAxisYChanged: console.log("[Input] axisY:", axisY)
+        onButtonBPressedChanged: if (buttonBPressed && player) player.dash()
     }
 
     // Player Health HUD (fixed position, not following camera)
@@ -342,6 +382,38 @@ ClayWorld2d {
     Component { id: enemyComponent; Enemy {} }
     Component { id: wallComponent; Wall {} }
     Component { id: floorComponent; Floor {} }
+
+    // Death particle
+    Component {
+        id: deathParticleComp
+        Rectangle {
+            id: _dp
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real widthWu: 0.2
+            property real heightWu: 0.2
+            property real velX: 0
+            property real velY: 0
+            x: xWu * pixelPerUnit
+            y: parent ? parent.height - yWu * pixelPerUnit : 0
+            width: widthWu * pixelPerUnit
+            height: heightWu * pixelPerUnit
+            radius: width * 0.3
+            rotation: Math.random() * 360
+            SequentialAnimation {
+                running: true
+                ParallelAnimation {
+                    NumberAnimation { target: _dp; property: "xWu"; to: _dp.xWu + _dp.velX; duration: 500; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: _dp; property: "yWu"; to: _dp.yWu + _dp.velY; duration: 500; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: _dp; property: "opacity"; from: 1.0; to: 0; duration: 500 }
+                    NumberAnimation { target: _dp; property: "widthWu"; to: 0.05; duration: 500 }
+                    NumberAnimation { target: _dp; property: "heightWu"; to: 0.05; duration: 500 }
+                }
+                ScriptAction { script: _dp.destroy() }
+            }
+        }
+    }
 
     // Dungeon generation constants
     readonly property int cellSize: 2      // Each grid cell = 2x2 world units (for 2-wide hallways)
@@ -691,6 +763,21 @@ ClayWorld2d {
             enemies.push(enemy)
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
+        }
+    }
+
+    function spawnDeathParticles(wx, wy) {
+        let colors = ["#CC4444", "#8B3A3A", "#FF6644", "#AA2222", "#FF8866"]
+        for (let i = 0; i < 8; i++) {
+            let angle = (i / 8) * Math.PI * 2 + (Math.random() - 0.5)
+            let speed = 1.5 + Math.random() * 2.0
+            deathParticleComp.createObject(world.room, {
+                xWu: wx, yWu: wy,
+                velX: Math.cos(angle) * speed,
+                velY: Math.sin(angle) * speed,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
         }
     }
 
