@@ -648,31 +648,17 @@ Minimal, geometric, non-intrusive.
 | Victory Sting | Boss defeated | Triumphant, brief (5-10 sec) |
 | Death Sting | Player dies | Somber, brief (3-5 sec) |
 
-**Sound Effects:**
+**Sound Effects (Minimal Core):**
 
-| Sound | Trigger |
-|-------|---------|
-| Sword swing | Knight primary attack |
-| Sword hit | Damage dealt to enemy |
-| Shield block | Damage blocked |
-| Shield bash | Special ability used |
-| Player hurt | Player takes damage |
-| Player death | Health reaches zero |
-| Enemy hurt | Enemy takes damage |
-| Enemy death | Enemy health reaches zero (+ particle burst) |
-| Grunt attack | Grunt melee swing |
-| Dasher dash | Dasher charges |
-| Spitter fire | Projectile launched |
-| Projectile hit | Spitter projectile connects |
-| Boss slam | Warden slam attack |
-| Boss charge | Warden phase 2 charge |
-| Footsteps | Player movement (varies by surface) |
-| Campfire crackle | Ambient in rest room |
-| Gold pickup | Gold collected |
-| Potion use | Health or mana potion consumed |
-| Vendor dialogue | Vendor interaction (subtle chime) |
-| Lore stone | Lore stone interaction (resonant hum) |
-| Door open | Room transition |
+Diablo 1 principle: a few great sounds with pitch/volume variation beat many mediocre ones.
+
+| Sound | Trigger | Variation | ElevenLabs Prompt |
+|-------|---------|-----------|-------------------|
+| **Impact** | All melee hits (player sword, enemy lunge) | Pitch-shift: low for heavy hits, high for light. Volume scales with damage. | *Short punchy impact, blade hitting stone armor, single crisp hit, dark fantasy, no reverb* |
+| **Death burst** | Enemy killed (plays with particle explosion) | Randomize pitch ±10% per death | *Crystalline shatter, glass and stone breaking apart, short burst, fantasy game, satisfying crunch* |
+| **Dash whoosh** | Player dash | None needed | *Fast short wind whoosh, quick dodge movement, snappy air burst, game sound effect* |
+| **Dungeon ambient** | Background loop, always playing | None (single seamless loop) | *Dark underground ambience, slow water drips echoing in stone cavern, distant wind, eerie and empty, seamless loop, no music* |
+| **Low HP pulse** | Player HP below 25%, repeating | Tempo increases as HP drops | *Deep slow heartbeat pulse, single beat, dark tension, low frequency thud, horror game* |
 
 ---
 
