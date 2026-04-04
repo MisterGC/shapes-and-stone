@@ -2,6 +2,8 @@
 
 *A Minimalist Dungeon Crawler*
 
+![Box Cover](assets/box_cover.png)
+
 ---
 
 ## CONCEPT
