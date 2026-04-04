@@ -174,6 +174,20 @@ PhysicsItem {
             id: dashFlash
             PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
         }
+
+        // Parry glow
+        Rectangle {
+            id: parryGlowRect
+            anchors.fill: parent
+            radius: parent.radius
+            color: "#FFD700"
+            opacity: 0
+        }
+
+        SequentialAnimation {
+            id: parryGlow
+            PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
+        }
     }
 
     // Shield arc visual (orbits on facing side when blocking)
@@ -512,16 +526,31 @@ PhysicsItem {
         let hitCount = 0
         for (let enemy of enemiesInRange) {
             if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
+                let parried = enemy.parryWindow
                 let dmg = isBlocking ? Math.floor(atk * 0.85)
                         : isDashing ? Math.floor(atk * 1.5) : atk
-                enemy.takeDamage(dmg)
+                if (parried) dmg = atk * 2
+                enemy.takeDamage(dmg, xWu, yWu)
                 _hitThisSwing.add(enemy)
                 hitCount++
-                if (gameWorld) {
-                    gameWorld.playImpact()
-                    gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFCC44")
+                if (parried) {
+                    enemy.stagger()
+                    attackCooldown = 0
+                    parryGlow.restart()
+                    if (gameWorld) {
+                        gameWorld.playImpact()
+                        gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
+                        gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFD700")
+                        gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
+                    }
+                    console.log("[Player] PARRY! Dealt", dmg, "damage!")
+                } else {
+                    if (gameWorld) {
+                        gameWorld.playImpact()
+                        gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFCC44")
+                    }
+                    console.log("[Player] Hit enemy for", dmg, "damage!")
                 }
-                console.log("[Player] Hit enemy for", dmg, "damage!")
             }
         }
         return hitCount
@@ -539,8 +568,10 @@ PhysicsItem {
                     (dx / len) * pushForce,
                     -(dy / len) * pushForce)  // Negate Y for screen coords
                 _hitThisSwing.add(enemy)
+                // Shield-push breaks guardian guard
+                if (enemy.enemyType === "guardian") enemy.stagger()
                 if (gameWorld) gameWorld.playImpact()
-                console.log("[Player] Pushed enemy!")
+                console.log("[Player] Pushed enemy!" + (enemy.enemyType === "guardian" ? " (guard broken!)" : ""))
             }
         }
     }

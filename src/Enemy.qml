@@ -33,6 +33,10 @@ PhysicsItem {
 
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
+    property string enemyType: "grunt"  // "grunt" or "guardian"
+    property real facingAngle: 0          // Guardian tracks player direction
+    readonly property real shieldArc: 60  // ±60 degrees frontal shield
+    readonly property real shieldRotSpeed: 120  // Degrees per second
 
     // Stats
     readonly property real chaseSpeed: 4.0
@@ -42,8 +46,8 @@ PhysicsItem {
     readonly property real windUpDuration: 0.3
     readonly property real lungeDuration: 0.35
     readonly property real lungeRange: 2.0
-    property int hp: 20
-    property int maxHp: 20
+    property int hp: 30
+    property int maxHp: 30
     property int atk: 10
     property int def: 2
 
@@ -52,8 +56,9 @@ PhysicsItem {
     property real _attackTimer: 0
     property real _dirToTargetX: 0
     property real _dirToTargetY: 0
+    property bool parryWindow: false
 
-    // AI state: patrol, chase, telegraph, lunge, recovery
+    // AI state: patrol, chase, telegraph, lunge, stagger, recovery
     property string aiState: "patrol"
 
     // Internal state
@@ -89,6 +94,7 @@ PhysicsItem {
             case "chase": base = "#CC4444"; break
             case "telegraph": base = "#FF8C00"; break
             case "lunge": base = "#FF4444"; break
+            case "stagger": base = "#666666"; break
             default: base = "#8B3A3A"
             }
             return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
@@ -165,6 +171,24 @@ PhysicsItem {
         }
     }
 
+    // Parry window flash
+    Rectangle {
+        id: parryFlash
+        anchors.fill: visual
+        radius: visual.radius
+        color: "white"
+        opacity: parryWindow ? 0.4 : 0
+        Behavior on opacity { NumberAnimation { duration: 50 } }
+    }
+
+    // Stagger wobble animation
+    SequentialAnimation {
+        id: staggerWobble
+        loops: Animation.Infinite
+        PropertyAnimation { target: enemy; property: "rotation"; to: 10; duration: 80 }
+        PropertyAnimation { target: enemy; property: "rotation"; to: -10; duration: 80 }
+    }
+
     // Health bar
     Rectangle {
         id: healthBarBg
@@ -185,6 +209,50 @@ PhysicsItem {
             Behavior on width { NumberAnimation { duration: 100 } }
             Behavior on color { ColorAnimation { duration: 200 } }
         }
+    }
+
+    // Guardian shield arc
+    Canvas {
+        id: guardianShield
+        visible: enemyType === "guardian" && aiState !== "stagger"
+        readonly property real shieldSize: enemy.width * 0.8
+        readonly property real orbitRadius: enemy.width * 0.5
+        readonly property real angleRad: facingAngle * Math.PI / 180
+        width: shieldSize
+        height: shieldSize
+        x: enemy.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
+        y: enemy.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
+        rotation: -facingAngle
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var w = width, h = height
+            ctx.beginPath()
+            ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
+            ctx.strokeStyle = "#CC6644"
+            ctx.lineWidth = w * 0.25
+            ctx.stroke()
+        }
+
+        Connections {
+            target: enemy
+            function onFacingAngleChanged() { guardianShield.requestPaint() }
+        }
+        Component.onCompleted: requestPaint()
+    }
+
+    // Mechanics debug hint
+    Text {
+        visible: gameWorld ? gameWorld.debugMechanics : false
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.top
+        anchors.bottomMargin: hp < maxHp ? 14 : 6
+        text: enemyType === "guardian" ? "Flank/Push" : "Block/Counter"
+        color: enemyType === "guardian" ? "#CC6644" : "#AAAAAA"
+        font.pixelSize: 9
+        font.bold: true
+        style: Text.Outline
+        styleColor: "#000000"
     }
 
     fixtures: [
@@ -263,6 +331,7 @@ PhysicsItem {
             break
 
         case "chase":
+            if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
             if (dist < lungeRange && canSee) {
                 // Capture direction to target for wind-up/lunge
                 let len = Math.max(0.01, dist)
@@ -301,7 +370,9 @@ PhysicsItem {
             body.linearVelocity = Qt.point(
                 _dirToTargetX * _lungeSpeed,
                 -_dirToTargetY * _lungeSpeed)
+            parryWindow = _attackTimer < 0.15
             if (_attackTimer <= 0) {
+                parryWindow = false
                 body.linearVelocity = Qt.point(0, 0)
                 performAttack()
                 aiState = "recovery"
@@ -309,12 +380,31 @@ PhysicsItem {
             }
             break
 
+        case "stagger":
+            body.linearVelocity = Qt.point(0, 0)
+            if (_attackTimer <= 0) {
+                staggerWobble.stop()
+                enemy.rotation = 0
+                aiState = "chase"
+            }
+            break
+
         case "recovery":
             body.linearVelocity = Qt.point(0, 0)
+            if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
             if (attackCooldown <= 0)
                 aiState = "chase"
             break
         }
+    }
+
+    function _lerpFacing(dy, dx, dt) {
+        let targetAngle = Math.atan2(dy, dx) * 180 / Math.PI
+        let diff = targetAngle - facingAngle
+        while (diff > 180) diff -= 360
+        while (diff < -180) diff += 360
+        let maxRot = shieldRotSpeed * dt
+        facingAngle += Math.max(-maxRot, Math.min(maxRot, diff))
     }
 
     function _recalcChasePath() {
@@ -368,14 +458,53 @@ PhysicsItem {
         }
     }
 
+    function stagger() {
+        parryWindow = false
+        _attackTimer = 1.0
+        aiState = "stagger"
+        staggerWobble.restart()
+    }
+
     function onCollision(other) {}
 
-    function takeDamage(amount) {
+    function _isShieldFacing(attackerX, attackerY) {
+        let dx = attackerX - xWu
+        let dy = attackerY - yWu
+        let angleToAttacker = Math.atan2(dy, dx) * 180 / Math.PI
+        let angleDiff = angleToAttacker - facingAngle
+        while (angleDiff > 180) angleDiff -= 360
+        while (angleDiff < -180) angleDiff += 360
+        return Math.abs(angleDiff) <= shieldArc
+    }
+
+    function takeDamage(amount, attackerX, attackerY) {
         let finalDamage = Math.max(1, amount - def)
+
+        // Guardian frontal shield
+        let blocked = false
+        if (enemyType === "guardian" && aiState !== "stagger"
+            && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
+            finalDamage = Math.floor(finalDamage * 0.3)
+            blocked = true
+        }
+
         hp = Math.max(0, hp - finalDamage)
-        console.log("[Enemy] Took", finalDamage, "damage, HP:", hp)
+        console.log("[Enemy] Took", finalDamage, "damage, HP:", hp, blocked ? "(blocked)" : "")
         hitFlashAnimation.restart()
-        if (gameWorld) gameWorld.shake(1.5)
+        if (gameWorld) gameWorld.shake(blocked ? 0.5 : 1.5)
+
+        // Guardian counter-attacks after blocking
+        if (blocked && aiState !== "telegraph" && aiState !== "lunge") {
+            if (target) {
+                let dx = target.xWu - xWu
+                let dy = target.yWu - yWu
+                let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
+                _dirToTargetX = dx / len
+                _dirToTargetY = dy / len
+                _attackTimer = windUpDuration * 0.5  // Faster counter
+                aiState = "telegraph"
+            }
+        }
 
         // Getting hit while patrolling triggers chase
         if (aiState === "patrol" && target) {

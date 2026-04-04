@@ -87,6 +87,9 @@ ClayWorld2d {
     debugPhysics: false
     property bool debugBehavior: false
     property bool debugMechanics: false
+    property bool fightRoomActive: false
+    property real _fightRoomCx: 0
+    property real _fightRoomCy: 0
 
     canvas.showDebugInfo: false
 
@@ -388,6 +391,24 @@ ClayWorld2d {
                 onClicked: world.debugMechanics = !world.debugMechanics
             }
         }
+
+        Rectangle {
+            visible: devMenu.expanded
+            width: 160; height: 24; radius: 4
+            color: fightRoomActive ? "#AA444480" : "#33333380"
+
+            Text {
+                anchors.centerIn: parent
+                text: fightRoomActive ? "Fight Room: ON" : "Fight Room"
+                color: fightRoomActive ? "#FF8888" : "white"
+                font.pixelSize: 11
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: fightRoomActive ? exitFightRoom() : enterFightRoom()
+            }
+        }
     }
 
     // Track player movement for minimap exploration
@@ -567,7 +588,7 @@ ClayWorld2d {
         // Step 9: Spawn 10-20 enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            let numEnemies = 10 + Math.floor(rng() * 11)
+            let numEnemies = 5 + Math.floor(rng() * 4)
             for (let i = 0; i < numEnemies; i++) {
                 let room = spawnRooms[i % spawnRooms.length]
                 let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
@@ -575,7 +596,9 @@ ClayWorld2d {
                 // Tier: 0=weak(20%), 1=normal(60%), 2=tough(20%)
                 let roll = rng()
                 let tier = roll < 0.2 ? 0 : (roll < 0.8 ? 1 : 2)
-                spawnEnemy(ex, ey, tier)
+                // ~20% chance of guardian (tougher tiers more likely)
+                let type = rng() < (tier === 2 ? 0.4 : 0.15) ? "guardian" : "grunt"
+                spawnEnemy(ex, ey, tier, type)
             }
         }
 
@@ -838,18 +861,21 @@ ClayWorld2d {
         }
     }
 
-    function spawnEnemy(ex, ey, tier) {
+    function spawnEnemy(ex, ey, tier, type) {
         tier = tier || 1
+        type = type || "grunt"
         let tierData = [
-            { hp: 12, tint: "#6B2A2A" },  // weak: darker, desaturated
-            { hp: 20, tint: "" },           // normal: default colors
-            { hp: 28, tint: "#CC6644" }     // tough: brighter, warm glow
+            { hp: 18, tint: "#6B2A2A" },  // weak: darker, desaturated
+            { hp: 30, tint: "" },           // normal: default colors
+            { hp: 42, tint: "#CC6644" }     // tough: brighter, warm glow
         ]
         let td = tierData[tier]
+        let ehp = td.hp + (type === "guardian" ? 10 : 0)
         let enemy = enemyComponent.createObject(world.room, {
             xWu: ex, yWu: ey,
-            hp: td.hp, maxHp: td.hp,
+            hp: ehp, maxHp: ehp,
             tier: tier,
+            enemyType: type,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
@@ -857,7 +883,7 @@ ClayWorld2d {
             collidesWith: catWall | catPlayer
         })
         if (enemy) {
-            console.log("[Game] Enemy created - tier:", tier, "hp:", td.hp)
+            console.log("[Game] Enemy created -", type, "tier:", tier, "hp:", ehp)
             enemy.target = player
             enemies.push(enemy)
         } else {
@@ -918,6 +944,21 @@ ClayWorld2d {
         })
     }
 
+    function spawnParryEffect(wx, wy) {
+        let colors = ["#FFD700", "#FFFFFF", "#FFE866", "#FFFFAA"]
+        for (let i = 0; i < 5; i++) {
+            let angle = (i / 5) * Math.PI * 2 + (Math.random() - 0.5)
+            let speed = 2.0 + Math.random() * 1.5
+            deathParticleComp.createObject(world.room, {
+                xWu: wx, yWu: wy,
+                velX: Math.cos(angle) * speed,
+                velY: Math.sin(angle) * speed,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+        }
+    }
+
     function blockEntrance() {
         let wx = entranceGridX * cellSize
         let wy = cellSize  // Bottom edge of map
@@ -975,6 +1016,90 @@ ClayWorld2d {
         generateDungeon()
         if (player) player.hp = savedHp
         resetting = false
+    }
+
+    // --- Fight Room ---
+    function enterFightRoom() {
+        console.log("[Game] Entering fight room")
+        clearDungeon()
+        fightRoomActive = true
+
+        // Simple walled room: 15x15 cells centered
+        let roomSize = 15
+        let ox = Math.floor((gridWidth - roomSize) / 2)
+        let oy = Math.floor((gridHeight - roomSize) / 2)
+
+        // Initialize grid and carve room
+        initializeGrid()
+        initExploredCells()
+        for (let y = oy; y < oy + roomSize; y++)
+            for (let x = ox; x < ox + roomSize; x++) {
+                grid[y][x] = cellRoom
+                exploredCells[y][x] = true
+            }
+
+        // Build walls and floor
+        let floorObj = floorComponent.createObject(world.room, {
+            xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(floorObj)
+        createMergedWalls()
+        createBoundaryWalls()
+
+        // Spawn player at center
+        let cx = (ox + roomSize / 2) * cellSize
+        let cy = (oy + roomSize / 2) * cellSize
+        _fightRoomCx = cx
+        _fightRoomCy = cy
+        spawnPlayer(cx, cy)
+
+        // Bind controls
+        if (player) {
+            player.moveX = Qt.binding(() => gameCtrl.axisX)
+            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
+            player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+            player.playerScreenX = Qt.binding(() => playerScreenX)
+            player.playerScreenY = Qt.binding(() => playerScreenY)
+            observedItem = player
+        }
+
+        // Spawn test enemies: 2 grunts + 1 guardian
+        _spawnFightRoomEnemies()
+    }
+
+    // Auto-respawn enemies in fight room when all dead
+    Timer {
+        id: fightRoomRespawn
+        interval: 2000
+        repeat: true
+        running: fightRoomActive
+        onTriggered: {
+            if (!player) return
+            let alive = 0
+            for (let e of enemies)
+                if (e && e.destroyed === false) alive++
+            if (alive > 0) return
+            enemies = []
+            _spawnFightRoomEnemies()
+            console.log("[Game] Fight room: respawned enemies")
+        }
+    }
+
+    function _spawnFightRoomEnemies() {
+        let cx = _fightRoomCx
+        let cy = _fightRoomCy
+        spawnEnemy(cx + 4, cy + 2, 1, "grunt")
+        spawnEnemy(cx - 4, cy + 2, 1, "grunt")
+        spawnEnemy(cx, cy + 4, 2, "guardian")
+    }
+
+    function exitFightRoom() {
+        console.log("[Game] Exiting fight room")
+        fightRoomActive = false
+        clearDungeon()
+        generateDungeon()
     }
 
     // --- Seeded PRNG (mulberry32) ---
