@@ -31,6 +31,9 @@ PhysicsItem {
     // AI target
     property var target: null
 
+    // Tier: 0=weak, 1=normal, 2=tough
+    property int tier: 1
+
     // Stats
     readonly property real chaseSpeed: 4.0
     readonly property real patrolSpeed: 1.5
@@ -59,20 +62,36 @@ PhysicsItem {
     property var _lastKnownTargetPos: null
     property real _pathRecalcTimer: 0
 
+    // Tough enemy glow ring
+    Rectangle {
+        visible: tier === 2
+        anchors.centerIn: parent
+        width: parent.width * 1.4
+        height: parent.height * 1.4
+        radius: width * 0.5
+        color: "transparent"
+        border.color: "#CC6644"
+        border.width: 2
+        opacity: 0.6
+    }
+
     // Visual
     Rectangle {
         id: visual
         anchors.centerIn: parent
         anchors.fill: parent
         radius: width * .5
+        opacity: tier === 0 ? 0.6 : 1.0
         color: {
+            let base
             switch (enemy.aiState) {
-            case "patrol": return "#8B3A3A"
-            case "chase": return "#CC4444"
-            case "telegraph": return "#FF8C00"
-            case "lunge": return "#FF4444"
-            default: return "#8B3A3A"
+            case "patrol": base = "#8B3A3A"; break
+            case "chase": base = "#CC4444"; break
+            case "telegraph": base = "#FF8C00"; break
+            case "lunge": base = "#FF4444"; break
+            default: base = "#8B3A3A"
             }
+            return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
         }
         Behavior on color { ColorAnimation { duration: 100 } }
 
@@ -342,7 +361,7 @@ PhysicsItem {
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < 1.2) {
-                target.takeDamage(atk)
+                target.takeDamage(atk, xWu, yWu)
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }

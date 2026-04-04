@@ -52,6 +52,8 @@ PhysicsItem {
     property bool isAttacking: false
     property bool isBlocking: false
     property real attackCooldown: 0
+    readonly property real blockSpeedMultiplier: 0.5
+    readonly property real pushForce: 20.0          // Knockback velocity for dash-push
     readonly property real attackDuration: 0.25  // Visual swing duration
     readonly property real attackCooldownTime: 0.5
     readonly property real attackRange: 2.0  // World units
@@ -73,9 +75,12 @@ PhysicsItem {
     Connections {
         target: player.world
         function onStepped() {
+            let dt = 1/60.0
+
             if (isDashing) {
-                player.body.linearVelocity = Qt.point(_dashDirX * dashSpeed, _dashDirY * dashSpeed)
-                _dashTimer -= 1/60.0
+                let spd = isBlocking ? dashSpeed * blockSpeedMultiplier : dashSpeed
+                player.body.linearVelocity = Qt.point(_dashDirX * spd, _dashDirY * spd)
+                _dashTimer -= dt
                 _dashStepCount++
                 if (_dashStepCount % 2 === 0 && player.parent) {
                     afterimageComp.createObject(player.parent, {
@@ -83,7 +88,12 @@ PhysicsItem {
                         width: player.width, height: player.height
                     })
                 }
+                // Dash-push: knockback enemies instead of damage
+                if (isBlocking) pushEnemiesInRange()
                 if (_dashTimer <= 0) isDashing = false
+            } else if (isBlocking) {
+                let spd = maxSpeed * blockSpeedMultiplier
+                player.body.linearVelocity = Qt.point(moveX * spd, moveY * spd)
             } else {
                 player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
             }
@@ -163,6 +173,60 @@ PhysicsItem {
         SequentialAnimation {
             id: dashFlash
             PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
+        }
+    }
+
+    // Shield arc visual (orbits on facing side when blocking)
+    Canvas {
+        id: shieldArc
+        visible: isBlocking
+        readonly property real shieldSize: player.width * 0.8
+        readonly property real orbitRadius: player.width * 0.5
+        readonly property real angleRad: facingAngle * Math.PI / 180
+        width: shieldSize
+        height: shieldSize
+        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
+        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
+        rotation: -facingAngle
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var w = width, h = height
+            ctx.beginPath()
+            ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
+            ctx.strokeStyle = "#7AB8D4"
+            ctx.lineWidth = w * 0.25
+            ctx.stroke()
+        }
+
+        onVisibleChanged: if (visible) requestPaint()
+    }
+
+    // Dash cooldown ring
+    Canvas {
+        id: dashCooldownRing
+        anchors.centerIn: parent
+        width: parent.width * 1.3
+        height: parent.height * 1.3
+        visible: dashCooldown > 0
+        opacity: 0.4
+
+        property real progress: 1.0 - (dashCooldown / dashCooldownTime)
+
+        onProgressChanged: requestPaint()
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var cx = width / 2, cy = height / 2
+            var r = width * 0.45
+            var startAngle = -Math.PI / 2
+            var endAngle = startAngle + progress * Math.PI * 2
+            ctx.beginPath()
+            ctx.arc(cx, cy, r, startAngle, endAngle)
+            ctx.strokeStyle = "#AAAAAA"
+            ctx.lineWidth = 2
+            ctx.stroke()
         }
     }
 
@@ -297,14 +361,46 @@ PhysicsItem {
                 ctx.stroke()
             }
 
-            // Draw sword blade (thick line at leading edge)
+            // Draw sword blade at leading edge
+            var bladeLen = radius - innerRadius
+            var bladeW = bladeLen * 0.15
+            var bx = centerX + innerRadius * Math.cos(currentAngle)
+            var by = centerY + innerRadius * Math.sin(currentAngle)
+            var tx = centerX + radius * Math.cos(currentAngle)
+            var ty = centerY + radius * Math.sin(currentAngle)
+            var perpX = -Math.sin(currentAngle)
+            var perpY = Math.cos(currentAngle)
+
             ctx.beginPath()
-            ctx.moveTo(centerX + innerRadius * Math.cos(currentAngle),
-                       centerY + innerRadius * Math.sin(currentAngle))
-            ctx.lineTo(centerX + radius * Math.cos(currentAngle),
-                       centerY + radius * Math.sin(currentAngle))
+            // Tip
+            ctx.moveTo(tx, ty)
+            // Right shoulder
+            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) + perpX * bladeW,
+                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) + perpY * bladeW)
+            // Right base
+            ctx.lineTo(bx + perpX * bladeW * 0.6, by + perpY * bladeW * 0.6)
+            // Cross-guard right
+            ctx.lineTo(bx + perpX * bladeW * 0.9, by + perpY * bladeW * 0.9)
+            // Cross-guard left
+            ctx.lineTo(bx - perpX * bladeW * 0.9, by - perpY * bladeW * 0.9)
+            // Left base
+            ctx.lineTo(bx - perpX * bladeW * 0.6, by - perpY * bladeW * 0.6)
+            // Left shoulder
+            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) - perpX * bladeW,
+                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) - perpY * bladeW)
+            ctx.closePath()
+            ctx.fillStyle = "rgba(90, 154, 180, " + swingOpacity + ")"
+            ctx.fill()
             ctx.strokeStyle = "rgba(122, 184, 212, " + swingOpacity + ")"
-            ctx.lineWidth = 4
+            ctx.lineWidth = 1.5
+            ctx.stroke()
+
+            // Center ridge
+            ctx.beginPath()
+            ctx.moveTo(bx, by)
+            ctx.lineTo(tx, ty)
+            ctx.strokeStyle = "rgba(58, 138, 154, " + swingOpacity * 0.8 + ")"
+            ctx.lineWidth = 1
             ctx.stroke()
         }
 
@@ -416,24 +512,64 @@ PhysicsItem {
         let hitCount = 0
         for (let enemy of enemiesInRange) {
             if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
-                enemy.takeDamage(atk)
+                let dmg = isBlocking ? Math.floor(atk * 0.85)
+                        : isDashing ? Math.floor(atk * 1.5) : atk
+                enemy.takeDamage(dmg)
                 _hitThisSwing.add(enemy)
                 hitCount++
-                if (gameWorld) gameWorld.playImpact()
-                console.log("[Player] Hit enemy for", atk, "damage!")
+                if (gameWorld) {
+                    gameWorld.playImpact()
+                    gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFCC44")
+                }
+                console.log("[Player] Hit enemy for", dmg, "damage!")
             }
         }
         return hitCount
     }
 
-    function takeDamage(amount) {
+    // Push enemies away during dash-push (skips already-pushed this dash)
+    function pushEnemiesInRange() {
+        for (let enemy of enemiesInRange) {
+            if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy)) {
+                let dx = enemy.xWu - xWu
+                let dy = enemy.yWu - yWu
+                let len = Math.sqrt(dx * dx + dy * dy)
+                if (len < 0.01) continue
+                enemy.body.linearVelocity = Qt.point(
+                    (dx / len) * pushForce,
+                    -(dy / len) * pushForce)  // Negate Y for screen coords
+                _hitThisSwing.add(enemy)
+                if (gameWorld) gameWorld.playImpact()
+                console.log("[Player] Pushed enemy!")
+            }
+        }
+    }
+
+    readonly property real shieldArcAngle: 60  // ±60 degrees from facing
+
+    function isShieldFacing(attackerX, attackerY) {
+        let dx = attackerX - xWu
+        let dy = attackerY - yWu
+        let angleToAttacker = Math.atan2(dy, dx) * 180 / Math.PI
+        let angleDiff = angleToAttacker - facingAngle
+        while (angleDiff > 180) angleDiff -= 360
+        while (angleDiff < -180) angleDiff += 360
+        return Math.abs(angleDiff) <= shieldArcAngle
+    }
+
+    function takeDamage(amount, attackerX, attackerY) {
         if (isDashing) return  // Invulnerable during dash
         let finalDamage = Math.max(1, amount - def)
-        if (isBlocking) {
+        let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
+        if (blocked) {
             finalDamage = Math.floor(finalDamage * 0.3)
+            if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
-        if (gameWorld) gameWorld.shake(3)
+        if (gameWorld) {
+            gameWorld.shake(blocked ? 1 : 3)
+            gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
+        }
     }
 
     function dash() {
@@ -451,6 +587,7 @@ PhysicsItem {
         _dashDirX = dirX / len
         _dashDirY = dirY / len
         isDashing = true
+        _hitThisSwing = new Set()
         _dashTimer = dashDuration
         _dashStepCount = 0
         dashCooldown = dashCooldownTime

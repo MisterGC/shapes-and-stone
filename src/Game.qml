@@ -10,7 +10,7 @@ ClayWorld2d {
     id: world
 
     // World configuration (fit world to viewport)
-    pixelPerUnit: 40//Math.min(width / xWuMax, height / yWuMax)
+    pixelPerUnit: 55
     gravity: Qt.point(0, 0)  // Top-down, no gravity
     timeStep: 1/60.0
     anchors.fill: parent
@@ -146,16 +146,23 @@ ClayWorld2d {
         }
     }
 
-    // Mouse input: aiming + attack (also handles WASM focus)
+    // Mouse input: aiming + attack + shield (also handles WASM focus)
     MouseArea {
         id: mouseInput
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         onPressed: (mouse) => {
             world.forceActiveFocus()
-            if (player) player.attack()
+            if (!player) return
+            if (mouse.button === Qt.LeftButton) player.attack()
+            if (mouse.button === Qt.RightButton) player.isBlocking = true
+        }
+
+        onReleased: (mouse) => {
+            if (mouse.button === Qt.RightButton && player)
+                player.isBlocking = false
         }
     }
 
@@ -227,6 +234,39 @@ ClayWorld2d {
             text: player ? player.hp + " / " + player.maxHp : ""
             color: "white"
             font.pixelSize: 12
+            font.bold: true
+        }
+    }
+
+    // Player Mana HUD
+    Rectangle {
+        id: manaHud
+        anchors.top: healthHud.bottom
+        anchors.left: parent.left
+        anchors.margins: 10
+        anchors.topMargin: 4
+        width: 200
+        height: 16
+        color: "#333333"
+        radius: 4
+        z: 1000
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 2
+            width: player ? (parent.width - 4) * (player.mana / player.maxMana) : parent.width - 4
+            radius: 2
+            color: "#8844AA"
+            Behavior on width { NumberAnimation { duration: 100 } }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: player ? player.mana + " / " + player.maxMana : ""
+            color: "white"
+            font.pixelSize: 10
             font.bold: true
         }
     }
@@ -524,15 +564,18 @@ ClayWorld2d {
         // Step 8: Place exit trigger sensor at the north edge
         placeExitSensor()
 
-        // Step 9: Spawn 5 enemies across non-start rooms
+        // Step 9: Spawn 10-20 enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            for (let i = 0; i < 5; i++) {
+            let numEnemies = 10 + Math.floor(rng() * 11)
+            for (let i = 0; i < numEnemies; i++) {
                 let room = spawnRooms[i % spawnRooms.length]
                 let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
                 let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
-                console.log("[Game] Spawning enemy", i, "at:", ex, ey)
-                spawnEnemy(ex, ey)
+                // Tier: 0=weak(20%), 1=normal(60%), 2=tough(20%)
+                let roll = rng()
+                let tier = roll < 0.2 ? 0 : (roll < 0.8 ? 1 : 2)
+                spawnEnemy(ex, ey, tier)
             }
         }
 
@@ -795,10 +838,18 @@ ClayWorld2d {
         }
     }
 
-    function spawnEnemy(ex, ey) {
-        console.log("[Game] spawnEnemy at", ex, ey)
+    function spawnEnemy(ex, ey, tier) {
+        tier = tier || 1
+        let tierData = [
+            { hp: 12, tint: "#6B2A2A" },  // weak: darker, desaturated
+            { hp: 20, tint: "" },           // normal: default colors
+            { hp: 28, tint: "#CC6644" }     // tough: brighter, warm glow
+        ]
+        let td = tierData[tier]
         let enemy = enemyComponent.createObject(world.room, {
             xWu: ex, yWu: ey,
+            hp: td.hp, maxHp: td.hp,
+            tier: tier,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
@@ -806,7 +857,7 @@ ClayWorld2d {
             collidesWith: catWall | catPlayer
         })
         if (enemy) {
-            console.log("[Game] Enemy created:", enemy, "xWu:", enemy.xWu, "yWu:", enemy.yWu)
+            console.log("[Game] Enemy created - tier:", tier, "hp:", td.hp)
             enemy.target = player
             enemies.push(enemy)
         } else {
@@ -827,6 +878,44 @@ ClayWorld2d {
                 pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
             })
         }
+    }
+
+    // Floating damage number component
+    Component {
+        id: damageNumberComp
+        Text {
+            id: _dmgText
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real startYWu: 0
+            x: xWu * pixelPerUnit - width / 2
+            y: parent ? parent.height - yWu * pixelPerUnit - height : 0
+            font.pixelSize: 14
+            font.bold: true
+            style: Text.Outline
+            styleColor: "#000000"
+            z: 999
+            SequentialAnimation {
+                running: true
+                ParallelAnimation {
+                    NumberAnimation { target: _dmgText; property: "yWu"; to: _dmgText.startYWu + 1.5; duration: 600; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: _dmgText; property: "opacity"; from: 1.0; to: 0; duration: 600 }
+                }
+                ScriptAction { script: _dmgText.destroy() }
+            }
+        }
+    }
+
+    function spawnDamageNumber(wx, wy, amount, color) {
+        if (!debugMechanics) return
+        damageNumberComp.createObject(world.room, {
+            xWu: wx, yWu: wy + 0.5,
+            startYWu: wy + 0.5,
+            text: "" + amount,
+            color: color,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
     }
 
     function blockEntrance() {
