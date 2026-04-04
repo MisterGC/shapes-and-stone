@@ -75,6 +75,26 @@ All mechanics are intentionally classical and proven:
 
 ---
 
+### IDEA: Per-Class Resource Systems (Stamina)
+
+> **Status:** Design idea, not yet implemented. Captured for future reference.
+
+The Knight uses **cooldown-based** combat: each action (attack, dash) has a fixed recovery time. This creates a natural attack-recover rhythm without requiring resource management. Adding a stamina bar on top would double-gate every action (cooldown AND stamina cost), which feels restrictive without adding meaningful decisions.
+
+However, stamina could define a **future class's identity**:
+
+| Class | Core Resource | Feel |
+|-------|--------------|------|
+| **Knight** | Cooldowns | Steady, reliable, patient — you wait for your opening |
+| **Hunter** | Stamina | Fast, risky — many quick actions but exhaust quickly |
+| **Sorcerer** | Mana | Powerful bursts — manage a finite pool, high impact per cast |
+
+Each class would feel fundamentally different not just in abilities but in *how you think about spending your actions*. The Knight never worries about running dry — the question is timing. The Hunter can do everything fast but must rest. The Sorcerer hits hard but every spell is a commitment.
+
+**Design principle:** Don't add stamina to a class that already has cooldowns. One action-limiting resource per class. The limiter IS the class identity.
+
+---
+
 ## COMBAT SYSTEM
 
 Deterministic damage with skill-based avoidance. No hit-chance RNG — every swing connects if in range. Skill expression comes from positioning, timing, and resource management.
