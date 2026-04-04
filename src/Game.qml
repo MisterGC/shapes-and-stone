@@ -19,13 +19,12 @@ ClayWorld2d {
     // Dark background behind the world
     Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
 
-    // Dungeon audio
+    // Audio — switches based on levelType
     Music {
         id: dungeonAmbience
         source: "assets/dungeon_ambience.mp3"
         volume: 0.4
         loop: true
-        Component.onCompleted: play()
     }
 
     Music {
@@ -33,8 +32,37 @@ ClayWorld2d {
         source: "assets/dungeon_music.mp3"
         volume: 0.3
         loop: true
-        Component.onCompleted: play()
     }
+
+    Music {
+        id: villageAmbience
+        source: "assets/village_ambience.mp3"
+        volume: 0.4
+        loop: true
+    }
+
+    Music {
+        id: villageMusic
+        source: "assets/village_music.mp3"
+        volume: 0.35
+        loop: true
+    }
+
+    onLevelTypeChanged: {
+        if (levelType === "village") {
+            dungeonAmbience.stop()
+            dungeonMusic.stop()
+            villageAmbience.play()
+            villageMusic.play()
+        } else {
+            villageAmbience.stop()
+            villageMusic.stop()
+            dungeonAmbience.play()
+            dungeonMusic.play()
+        }
+    }
+
+
 
     Sound {
         id: impactSound
@@ -127,6 +155,7 @@ ClayWorld2d {
     property int exitGridX: 0
     property int masterSeed: -1   // -1 = random on first run
     property int levelIndex: 0
+    property string levelType: "dungeon"  // "dungeon" or "village"
     property var rng: null
     components: []
 
@@ -138,6 +167,8 @@ ClayWorld2d {
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         forceActiveFocus()
+        dungeonAmbience.play()
+        dungeonMusic.play()
     }
 
     // Wait for valid size before generating dungeon
@@ -491,6 +522,7 @@ ClayWorld2d {
     Component { id: enemyComponent; Enemy {} }
     Component { id: wallComponent; Wall {} }
     Component { id: floorComponent; Floor {} }
+    Component { id: campfireComponent; Campfire {} }
 
     // Death particle
     Component {
@@ -1010,12 +1042,150 @@ ClayWorld2d {
 
     function resetDungeon() {
         let savedHp = player ? player.hp : 120
-        console.log("[Game] Resetting dungeon, preserving HP:", savedHp)
+        console.log("[Game] Resetting, preserving HP:", savedHp)
         clearDungeon()
         levelIndex++
-        generateDungeon()
+        // Alternate: dungeon → village → dungeon → ...
+        levelType = (levelType === "dungeon") ? "village" : "dungeon"
+        if (levelType === "village")
+            generateVillage()
+        else
+            generateDungeon()
         if (player) player.hp = savedHp
         resetting = false
+    }
+
+    // --- Village/Camp generation ---
+    function generateVillage() {
+        if (masterSeed < 0)
+            masterSeed = Math.floor(Math.random() * 2147483647)
+        let levelSeed = deriveSeed(masterSeed, levelIndex)
+        rng = createRng(levelSeed)
+        console.log("[Game] Village - Seed:", masterSeed, "Level:", levelIndex)
+
+        let roomSize = 20
+        let ox = Math.floor((gridWidth - roomSize) / 2)
+        let oy = Math.floor((gridHeight - roomSize) / 2)
+
+        // Initialize grid and carve village area
+        initializeGrid()
+        initExploredCells()
+        for (let y = oy; y < oy + roomSize; y++)
+            for (let x = ox; x < ox + roomSize; x++) {
+                grid[y][x] = cellRoom
+                exploredCells[y][x] = true
+            }
+
+        // Entrance at bottom, exit at top
+        let entranceX = Math.floor(ox + roomSize / 2)
+        let exitX = entranceX
+        for (let y = 0; y < oy; y++) grid[y][entranceX] = cellHallway
+        for (let y = oy + roomSize; y < gridHeight; y++) grid[y][exitX] = cellHallway
+        entranceGridX = entranceX
+        exitGridX = exitX
+
+        // Build walls and floor (cool blue palette)
+        let floorObj = floorComponent.createObject(world.room, {
+            xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        floorObj.color = "#2A3A4A"
+        dungeonObjects.push(floorObj)
+        createMergedWalls()
+        createBoundaryWalls()
+
+        // Room center in world units
+        let cx = (ox + roomSize / 2) * cellSize
+        let cy = (oy + roomSize / 2) * cellSize
+
+        // Campfire (bottom-center of village)
+        let cf = campfireComponent.createObject(world.room, {
+            xWu: cx, yWu: cy - 3,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world
+        })
+        dungeonObjects.push(cf)
+
+        // Tavern building (top-left) — open-top walled enclosure, entrance facing south
+        _buildVillageBuilding(cx - 8, cy + 5, 6, 5, "south")
+        // Innkeeper NPC inside
+        _spawnVillageNpc(cx - 8, cy + 6, "#C9A227", "mug")
+
+        // Blacksmith building (top-right) — entrance facing south
+        _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
+        // Blacksmith NPC inside
+        _spawnVillageNpc(cx + 6, cy + 6, "#C9A227", "hammer")
+        // Anvil in front of blacksmith
+        _spawnAnvil(cx + 6, cy + 2)
+
+        // Spawn player at entrance
+        spawnPlayer(cx, (oy + 2) * cellSize)
+
+        // Block entrance + exit sensor
+        blockEntrance()
+        placeExitSensor()
+
+        // Bind controls
+        if (player) {
+            player.moveX = Qt.binding(() => gameCtrl.axisX)
+            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
+            player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+            player.playerScreenX = Qt.binding(() => playerScreenX)
+            player.playerScreenY = Qt.binding(() => playerScreenY)
+            observedItem = player
+            revealAroundPlayer()
+        }
+
+        console.log("[Game] Village generated")
+    }
+
+    function _buildVillageBuilding(cx, cy, bw, bh, entrance) {
+        // All params in world units. Builds 3 walls with one side open.
+        let wallColor = "#1E2E3E"
+        let t = 0.5  // Wall thickness in wu
+        let x1 = cx - bw / 2
+        let x2 = cx + bw / 2
+        let y1 = cy - bh / 2
+        let y2 = cy + bh / 2
+
+        // Top wall (always present)
+        createWallAt(x1, y2 + t, bw, t).color = wallColor
+        // Left wall
+        createWallAt(x1, y2 + t, t, bh + t).color = wallColor
+        // Right wall
+        createWallAt(x2 - t, y2 + t, t, bh + t).color = wallColor
+        // Bottom wall (skip if entrance is south)
+        if (entrance !== "south")
+            createWallAt(x1, y1 + t, bw, t).color = wallColor
+    }
+
+    function _spawnVillageNpc(wx, wy, color, iconType) {
+        let npc = wallComponent.createObject(world.room, {
+            xWu: wx, yWu: wy,
+            widthWu: 0.8, heightWu: 0.8,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catWall,
+            collidesWith: catPlayer,
+            color: color
+        })
+        npc.radius = npc.width * 0.5
+        dungeonObjects.push(npc)
+    }
+
+    function _spawnAnvil(wx, wy) {
+        let anvil = wallComponent.createObject(world.room, {
+            xWu: wx, yWu: wy,
+            widthWu: 0.6, heightWu: 0.4,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catWall,
+            collidesWith: catPlayer,
+            color: "#333344"
+        })
+        dungeonObjects.push(anvil)
     }
 
     // --- Fight Room ---
