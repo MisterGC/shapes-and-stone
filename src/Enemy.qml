@@ -33,14 +33,14 @@ PhysicsItem {
 
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
-    property string enemyType: "grunt"  // "grunt" or "guardian"
+    property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
     property real facingAngle: 0          // Guardian tracks player direction
     readonly property real shieldArc: 60  // ±60 degrees frontal shield
     readonly property real shieldRotSpeed: 120  // Degrees per second
 
     // Stats
-    readonly property real chaseSpeed: 4.0
-    readonly property real patrolSpeed: 1.5
+    readonly property real chaseSpeed: enemyType === "spitter" ? 2.4 : 4.0
+    readonly property real patrolSpeed: enemyType === "spitter" ? 0.9 : 1.5
     property real _lungeSpeed: 0  // Calculated per attack
     readonly property real windUpSpeed: 4.0
     readonly property real windUpDuration: 0.3
@@ -51,6 +51,13 @@ PhysicsItem {
     property int atk: 10
     property int def: 2
 
+    // Spitter-specific
+    readonly property real preferredDist: 5.0   // Distance to maintain from player
+    readonly property real shootRange: 8.0      // Max range to start shooting
+    readonly property real kiteSpeed: 3.0       // Retreat speed
+    readonly property real shootCooldown: 1.2
+    property real _shootTimer: 0
+
     // Combat state
     property real attackCooldown: 0
     property real _attackTimer: 0
@@ -58,7 +65,7 @@ PhysicsItem {
     property real _dirToTargetY: 0
     property bool parryWindow: false
 
-    // AI state: patrol, chase, telegraph, lunge, stagger, recovery
+    // AI state: patrol, chase, telegraph, lunge, stagger, recovery, kite, shoot
     property string aiState: "patrol"
 
     // Internal state
@@ -88,14 +95,17 @@ PhysicsItem {
         radius: width * .5
         opacity: tier === 0 ? 0.6 : 1.0
         color: {
+            let isSpitter = enemyType === "spitter"
             let base
             switch (enemy.aiState) {
-            case "patrol": base = "#8B3A3A"; break
-            case "chase": base = "#CC4444"; break
+            case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
+            case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
+            case "kite": base = "#8EBB5A"; break
+            case "shoot": base = "#AADD66"; break
             case "telegraph": base = "#FF8C00"; break
             case "lunge": base = "#FF4444"; break
             case "stagger": base = "#666666"; break
-            default: base = "#8B3A3A"
+            default: base = isSpitter ? "#6B8E4A" : "#8B3A3A"
             }
             return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
         }
@@ -115,38 +125,55 @@ PhysicsItem {
                 ctx.strokeStyle = dark
                 ctx.lineWidth = w * 0.06
 
-                // Pointy ears
-                ctx.beginPath()
-                ctx.moveTo(w * 0.05, h * 0.45)
-                ctx.lineTo(w * -0.05, h * 0.05)
-                ctx.lineTo(w * 0.25, h * 0.35)
-                ctx.closePath()
-                ctx.fill()
+                if (enemyType === "spitter") {
+                    // Big central eye
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.4, w * 0.22, 0, Math.PI * 2)
+                    ctx.fill()
+                    // Pupil (lighter)
+                    ctx.fillStyle = visual.color
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.4, w * 0.1, 0, Math.PI * 2)
+                    ctx.fill()
+                    // Open mouth (spitting)
+                    ctx.fillStyle = dark
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.72, w * 0.14, 0, Math.PI * 2)
+                    ctx.fill()
+                } else {
+                    // Pointy ears
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.05, h * 0.45)
+                    ctx.lineTo(w * -0.05, h * 0.05)
+                    ctx.lineTo(w * 0.25, h * 0.35)
+                    ctx.closePath()
+                    ctx.fill()
 
-                ctx.beginPath()
-                ctx.moveTo(w * 0.95, h * 0.45)
-                ctx.lineTo(w * 1.05, h * 0.05)
-                ctx.lineTo(w * 0.75, h * 0.35)
-                ctx.closePath()
-                ctx.fill()
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.95, h * 0.45)
+                    ctx.lineTo(w * 1.05, h * 0.05)
+                    ctx.lineTo(w * 0.75, h * 0.35)
+                    ctx.closePath()
+                    ctx.fill()
 
-                // Eyes
-                ctx.beginPath()
-                ctx.arc(w * 0.33, h * 0.42, w * 0.09, 0, Math.PI * 2)
-                ctx.fill()
-                ctx.beginPath()
-                ctx.arc(w * 0.67, h * 0.42, w * 0.09, 0, Math.PI * 2)
-                ctx.fill()
+                    // Eyes
+                    ctx.beginPath()
+                    ctx.arc(w * 0.33, h * 0.42, w * 0.09, 0, Math.PI * 2)
+                    ctx.fill()
+                    ctx.beginPath()
+                    ctx.arc(w * 0.67, h * 0.42, w * 0.09, 0, Math.PI * 2)
+                    ctx.fill()
 
-                // Jagged mouth
-                ctx.beginPath()
-                ctx.moveTo(w * 0.25, h * 0.7)
-                ctx.lineTo(w * 0.35, h * 0.62)
-                ctx.lineTo(w * 0.45, h * 0.72)
-                ctx.lineTo(w * 0.55, h * 0.62)
-                ctx.lineTo(w * 0.65, h * 0.72)
-                ctx.lineTo(w * 0.75, h * 0.62)
-                ctx.stroke()
+                    // Jagged mouth
+                    ctx.beginPath()
+                    ctx.moveTo(w * 0.25, h * 0.7)
+                    ctx.lineTo(w * 0.35, h * 0.62)
+                    ctx.lineTo(w * 0.45, h * 0.72)
+                    ctx.lineTo(w * 0.55, h * 0.62)
+                    ctx.lineTo(w * 0.65, h * 0.72)
+                    ctx.lineTo(w * 0.75, h * 0.62)
+                    ctx.stroke()
+                }
             }
 
             Connections {
@@ -247,8 +274,8 @@ PhysicsItem {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.top
         anchors.bottomMargin: hp < maxHp ? 14 : 6
-        text: enemyType === "guardian" ? "Flank/Push" : "Block/Counter"
-        color: enemyType === "guardian" ? "#CC6644" : "#AAAAAA"
+        text: enemyType === "guardian" ? "Flank/Push" : (enemyType === "spitter" ? "Close/Shield" : "Block/Counter")
+        color: enemyType === "guardian" ? "#CC6644" : (enemyType === "spitter" ? "#6B8E4A" : "#AAAAAA")
         font.pixelSize: 9
         font.bold: true
         style: Text.Outline
@@ -272,6 +299,7 @@ PhysicsItem {
     // Manage FollowPath.running imperatively — a declarative binding gets
     // broken by FollowPath's internal "running = false" on path completion.
     onAiStateChanged: followPath.running = (aiState === "patrol" || aiState === "chase")
+    onEnemyTypeChanged: goblinIcon.requestPaint()
 
     FollowPath {
         id: followPath
@@ -310,6 +338,7 @@ PhysicsItem {
 
         if (attackCooldown > 0) attackCooldown -= dt
         if (_attackTimer > 0) _attackTimer -= dt
+        if (_shootTimer > 0) _shootTimer -= dt
         _pathRecalcTimer -= dt
 
         let dx = target.xWu - xWu
@@ -331,18 +360,73 @@ PhysicsItem {
             break
 
         case "chase":
-            if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
-            if (dist < lungeRange && canSee) {
-                // Capture direction to target for wind-up/lunge
+            if (enemyType === "spitter") {
+                // Spitter transitions to kite when in range with LOS
+                if (canSee && dist < shootRange) {
+                    aiState = "kite"
+                } else if (_pathRecalcTimer <= 0) {
+                    _recalcChasePath()
+                    _pathRecalcTimer = 1.0
+                }
+            } else {
+                if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
+                if (dist < lungeRange && canSee) {
+                    // Capture direction to target for wind-up/lunge
+                    let len = Math.max(0.01, dist)
+                    _dirToTargetX = dx / len
+                    _dirToTargetY = dy / len
+                    _attackTimer = windUpDuration
+                    aiState = "telegraph"
+                } else if (_pathRecalcTimer <= 0) {
+                    _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
+                    _recalcChasePath()
+                    _pathRecalcTimer = 1.0
+                }
+            }
+            break
+
+        case "kite":
+            // Spitter: maintain distance, retreat if too close, advance if too far
+            if (!canSee) {
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            {
+                let len = Math.max(0.01, dist)
+                let ndx = dx / len
+                let ndy = dy / len
+                if (dist < preferredDist * 0.7) {
+                    // Too close — retreat
+                    body.linearVelocity = Qt.point(
+                        -ndx * kiteSpeed, ndy * kiteSpeed)
+                } else if (dist > preferredDist * 1.3) {
+                    // Too far — approach
+                    body.linearVelocity = Qt.point(
+                        ndx * chaseSpeed, -ndy * chaseSpeed)
+                } else {
+                    // Good range — strafe slightly
+                    body.linearVelocity = Qt.point(
+                        -ndy * patrolSpeed, -ndx * patrolSpeed)
+                }
+            }
+            // Shoot when cooldown ready
+            if (_shootTimer <= 0 && dist <= shootRange) {
+                _shootTimer = shootCooldown
+                _attackTimer = 0.3  // Brief telegraph
                 let len = Math.max(0.01, dist)
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
-                _attackTimer = windUpDuration
-                aiState = "telegraph"
-            } else if (_pathRecalcTimer <= 0) {
-                _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
-                _recalcChasePath()
-                _pathRecalcTimer = 1.0
+                aiState = "shoot"
+            }
+            break
+
+        case "shoot":
+            // Brief telegraph then fire
+            body.linearVelocity = Qt.point(0, 0)
+            if (_attackTimer <= 0) {
+                fireProjectile()
+                aiState = "kite"
             }
             break
 
@@ -455,6 +539,14 @@ PhysicsItem {
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
+        }
+    }
+
+    function fireProjectile() {
+        if (gameWorld && gameWorld.spawnProjectile) {
+            gameWorld.spawnProjectile(xWu, yWu, _dirToTargetX, _dirToTargetY, atk)
+            if (gameWorld.playSpitShot) gameWorld.playSpitShot()
+            console.log("[Enemy] Spitter fired projectile!")
         }
     }
 

@@ -24,4 +24,6 @@ clay_app(shapes_and_stone
         src/Enemy.qml
         src/Wall.qml
         src/Floor.qml
+        src/Campfire.qml
+        src/Projectile.qml
 )

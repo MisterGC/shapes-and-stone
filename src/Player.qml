@@ -4,6 +4,7 @@ import Clayground.Physics
 
 PhysicsItem {
     id: player
+    objectName: "player"
 
     property var gameWorld: null
 
@@ -586,6 +587,11 @@ PhysicsItem {
         while (angleDiff > 180) angleDiff -= 360
         while (angleDiff < -180) angleDiff += 360
         return Math.abs(angleDiff) <= shieldArcAngle
+    }
+
+    function getShieldWorldPos() {
+        let rad = facingAngle * Math.PI / 180
+        return { x: xWu + Math.cos(rad) * 0.5, y: yWu + Math.sin(rad) * 0.5 }
     }
 
     function takeDamage(amount, attackerX, attackerY) {

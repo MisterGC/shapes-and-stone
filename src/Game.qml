@@ -104,6 +104,16 @@ ClayWorld2d {
         deathBurstSound.play()
     }
 
+    Sound {
+        id: spitterSound
+        source: "assets/spitter.wav"
+        volume: 0.6
+    }
+
+    function playSpitShot() {
+        spitterSound.play()
+    }
+
     // Apply screen shake via transform on room
     transform: Translate { x: _shakeOffsetX; y: _shakeOffsetY }
 
@@ -163,6 +173,7 @@ ClayWorld2d {
     readonly property int catWall: Box.Category1
     readonly property int catPlayer: Box.Category2
     readonly property int catEnemy: Box.Category3
+    readonly property int catProjectile: Box.Category4
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
@@ -523,6 +534,7 @@ ClayWorld2d {
     Component { id: wallComponent; Wall {} }
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
+    Component { id: projectileComponent; Projectile {} }
 
     // Death particle
     Component {
@@ -628,8 +640,11 @@ ClayWorld2d {
                 // Tier: 0=weak(20%), 1=normal(60%), 2=tough(20%)
                 let roll = rng()
                 let tier = roll < 0.2 ? 0 : (roll < 0.8 ? 1 : 2)
-                // ~20% chance of guardian (tougher tiers more likely)
-                let type = rng() < (tier === 2 ? 0.4 : 0.15) ? "guardian" : "grunt"
+                // Enemy type: ~20% guardian, ~20% spitter, rest grunt
+                let typeRoll = rng()
+                let guardianChance = tier === 2 ? 0.4 : 0.15
+                let type = typeRoll < guardianChance ? "guardian"
+                    : typeRoll < guardianChance + 0.2 ? "spitter" : "grunt"
                 spawnEnemy(ex, ey, tier, type)
             }
         }
@@ -865,7 +880,7 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             categories: catWall,
-            collidesWith: catPlayer | catEnemy
+            collidesWith: catPlayer | catEnemy | catProjectile
         })
         dungeonObjects.push(wall)
         return wall
@@ -879,7 +894,7 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catPlayer,
-            collidesWith: catWall,
+            collidesWith: catWall | catProjectile,
             // Attack sensor detects enemies
             attackSensorCategories: catPlayer,
             attackSensorCollidesWith: catEnemy
@@ -902,10 +917,13 @@ ClayWorld2d {
             { hp: 42, tint: "#CC6644" }     // tough: brighter, warm glow
         ]
         let td = tierData[tier]
-        let ehp = td.hp + (type === "guardian" ? 10 : 0)
+        let ehp = td.hp + (type === "guardian" ? 10 : (type === "spitter" ? -6 : 0))
+        let eatk = type === "spitter" ? 8 : 10
+        let edef = type === "spitter" ? 0 : 2
         let enemy = enemyComponent.createObject(world.room, {
             xWu: ex, yWu: ey,
             hp: ehp, maxHp: ehp,
+            atk: eatk, def: edef,
             tier: tier,
             enemyType: type,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
@@ -928,6 +946,52 @@ ClayWorld2d {
         for (let i = 0; i < 8; i++) {
             let angle = (i / 8) * Math.PI * 2 + (Math.random() - 0.5)
             let speed = 1.5 + Math.random() * 2.0
+            deathParticleComp.createObject(world.room, {
+                xWu: wx, yWu: wy,
+                velX: Math.cos(angle) * speed,
+                velY: Math.sin(angle) * speed,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+        }
+    }
+
+    function spawnProjectile(px, py, dirX, dirY, damage) {
+        let proj = projectileComponent.createObject(world.room, {
+            xWu: px, yWu: py,
+            dirX: dirX, dirY: dirY,
+            speed: 5.0,
+            damage: damage,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world,
+            categories: catProjectile,
+            collidesWith: catWall | catPlayer
+        })
+        if (proj)
+            console.log("[Game] Projectile spawned at", px.toFixed(1), py.toFixed(1))
+    }
+
+    function spawnSpitParticles(wx, wy) {
+        let colors = ["#6B8E4A", "#8EBB5A", "#AADD66", "#4A6B2A"]
+        for (let i = 0; i < 5; i++) {
+            let angle = (i / 5) * Math.PI * 2 + (Math.random() - 0.5)
+            let speed = 0.8 + Math.random() * 1.2
+            deathParticleComp.createObject(world.room, {
+                xWu: wx, yWu: wy,
+                velX: Math.cos(angle) * speed,
+                velY: Math.sin(angle) * speed,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+        }
+    }
+
+    function spawnDeflectParticles(wx, wy) {
+        let colors = ["#7AB8D4", "#A0D0E8", "#FFFFFF", "#4A90A4"]
+        for (let i = 0; i < 6; i++) {
+            let angle = (i / 6) * Math.PI * 2 + (Math.random() - 0.5)
+            let speed = 1.0 + Math.random() * 1.5
             deathParticleComp.createObject(world.room, {
                 xWu: wx, yWu: wy,
                 velX: Math.cos(angle) * speed,
@@ -1263,6 +1327,7 @@ ClayWorld2d {
         spawnEnemy(cx + 4, cy + 2, 1, "grunt")
         spawnEnemy(cx - 4, cy + 2, 1, "grunt")
         spawnEnemy(cx, cy + 4, 2, "guardian")
+        spawnEnemy(cx - 3, cy - 3, 1, "spitter")
     }
 
     function exitFightRoom() {
