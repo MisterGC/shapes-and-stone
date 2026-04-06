@@ -11,3 +11,4 @@ Npc 1.0 Npc.qml
 DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
+RemotePlayer 1.0 RemotePlayer.qml

@@ -1,13 +1,13 @@
 import QtQuick
-import Clayground.Network
 import Clayground.Sound
 
 Item {
     id: lobby
 
-    signal startGame(var network)
+    signal startGame()
     signal back()
 
+    property var network: null
     property string playerName: "Knight"
 
     Sound {
@@ -21,23 +21,9 @@ Item {
         volume: 0.6
     }
 
-    Network {
-        id: network
-        maxNodes: 4
-        topology: Network.Topology.Star
-        signalingMode: Network.SignalingMode.Cloud
-        autoRelay: true
-
-        onNetworkCreated: (networkId) => {
-            console.log("[Lobby] Network created:", networkId)
-        }
-        onNodeJoined: (nodeId) => {
-            console.log("[Lobby] Node joined:", nodeId)
-        }
-        onNodeLeft: (nodeId) => {
-            console.log("[Lobby] Node left:", nodeId)
-        }
-        onErrorOccurred: (message) => {
+    Connections {
+        target: network
+        function onErrorOccurred(message) {
             console.log("[Lobby] Error:", message)
             statusText.text = "Error: " + message
         }
@@ -246,7 +232,7 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     menuConfirmSound.play()
-                    lobby.startGame(network)
+                    lobby.startGame()
                 }
             }
         }
@@ -268,10 +254,7 @@ Item {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    if (network.connected) network.leave()
-                    lobby.back()
-                }
+                onClicked: lobby.back()
             }
         }
     }
@@ -280,7 +263,6 @@ Item {
 
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
-            if (network.connected) network.leave()
             back()
             event.accepted = true
         }

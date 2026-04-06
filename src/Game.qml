@@ -5,6 +5,7 @@ import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
 import Clayground.Sound
+import Clayground.Network
 
 ClayWorld2d {
     id: world
@@ -192,6 +193,59 @@ ClayWorld2d {
     // Screen state: "title", "lobby", "game"
     property string screen: "title"
 
+    // Multiplayer
+    property var remotePlayers: ({})
+
+    Network {
+        id: gameNetwork
+        maxNodes: 4
+        topology: Network.Topology.Star
+        signalingMode: Network.SignalingMode.Cloud
+        autoRelay: true
+
+        onMessageReceived: (fromId, data) => {
+            if (data.type === "gameStart") {
+                masterSeed = data.seed
+                screen = "game"
+                world.forceActiveFocus()
+            }
+        }
+
+        onStateReceived: (fromId, data) => {
+            let rp = remotePlayers[fromId]
+            if (rp) {
+                rp.targetX = data.x
+                rp.targetY = data.y
+                rp.facingAngle = data.a
+                rp.actionState = data.s
+                rp.remoteHp = data.h
+            }
+        }
+
+        onNodeLeft: (nodeId) => {
+            if (remotePlayers[nodeId]) {
+                remotePlayers[nodeId].destroy()
+                delete remotePlayers[nodeId]
+            }
+        }
+    }
+
+    // Player state broadcast (~20 Hz)
+    Timer {
+        interval: 50
+        repeat: true
+        running: screen === "game" && gameNetwork.connected && player !== null
+        onTriggered: {
+            gameNetwork.broadcastState({
+                x: player.xWu,
+                y: player.yWu,
+                a: player.facingAngle,
+                s: player.isAttacking ? 1 : player.isBlocking ? 2 : player.isDashing ? 3 : 0,
+                h: player.hp
+            })
+        }
+    }
+
     // Game state
     property var player: null
     property var enemies: []
@@ -226,6 +280,14 @@ ClayWorld2d {
             dungeonMusic.play()
             generateDungeon()
         }
+    }
+
+    function _startMultiplayerGame() {
+        if (masterSeed < 0)
+            masterSeed = Math.floor(Math.random() * 2147483647)
+        gameNetwork.broadcast({type: "gameStart", seed: masterSeed})
+        screen = "game"
+        world.forceActiveFocus()
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -630,6 +692,7 @@ ClayWorld2d {
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
     Component { id: npcComponent; Npc {} }
+    Component { id: remotePlayerComponent; RemotePlayer {} }
 
     // Dialogue panel (bottom-center, hidden by default)
     DialoguePanel { id: dialoguePanel; parent: world }
@@ -762,6 +825,13 @@ ClayWorld2d {
             player.playerScreenY = Qt.binding(() => playerScreenY)
             gameCamera.target = player
             revealAroundPlayer()  // Initial reveal
+        }
+
+        // Spawn remote players for multiplayer
+        if (gameNetwork.connected) {
+            let colors = ["#A44A90", "#90A44A", "#A4904A"]
+            for (let i = 0; i < gameNetwork.nodes.length; i++)
+                _spawnRemotePlayer(gameNetwork.nodes[i], colors[i % colors.length])
         }
 
         console.log("[Game] generateDungeon() complete")
@@ -1043,6 +1113,22 @@ ClayWorld2d {
         }
     }
 
+    function _spawnRemotePlayer(nodeId, color) {
+        let startRoom = rooms[0]
+        let rp = remotePlayerComponent.createObject(world.room, {
+            nodeId: nodeId,
+            playerColor: color,
+            xWu: (startRoom.x + startRoom.w / 2) * cellSize,
+            yWu: (startRoom.y + startRoom.h / 2) * cellSize,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics
+        })
+        if (rp) {
+            remotePlayers[nodeId] = rp
+            console.log("[Game] Remote player created for", nodeId, "color:", color)
+        }
+    }
+
     function spawnDeathParticles(wx, wy) {
         let colors = ["#CC4444", "#8B3A3A", "#FF6644", "#AA2222", "#FF8866"]
         for (let i = 0; i < 8; i++) {
@@ -1193,6 +1279,12 @@ ClayWorld2d {
             try { if (e && !e.destroyed) e.destroy() } catch(err) {}
         }
         enemies = []
+
+        // Destroy remote players
+        for (let id in remotePlayers) {
+            try { if (remotePlayers[id]) remotePlayers[id].destroy() } catch(err) {}
+        }
+        remotePlayers = ({})
 
         // Destroy player
         if (player) {
@@ -1668,12 +1760,9 @@ ClayWorld2d {
         active: screen === "lobby"
         sourceComponent: Component {
             MultiplayerLobby {
-                onStartGame: (network) => {
-                    // TODO: pass network reference for multiplayer sync
-                    screen = "game"
-                    world.forceActiveFocus()
-                }
-                onBack: screen = "title"
+                network: gameNetwork
+                onStartGame: _startMultiplayerGame()
+                onBack: { gameNetwork.leave(); screen = "title" }
             }
         }
     }

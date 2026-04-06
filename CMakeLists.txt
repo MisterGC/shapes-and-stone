@@ -30,4 +30,5 @@ clay_app(shapes_and_stone
         src/DialoguePanel.qml
         src/TitleScreen.qml
         src/MultiplayerLobby.qml
+        src/RemotePlayer.qml
 )
