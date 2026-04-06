@@ -16,12 +16,16 @@ PhysicsItem {
     widthWu: 0.3
     heightWu: 0.3
 
-    bodyType: Body.Kinematic
+    bodyType: Body.Dynamic
     fixedRotation: true
     gravityScale: 0
 
-    property alias categories: collider.categories
-    property alias collidesWith: collider.collidesWith
+    // Wall collider (solid — stops at wall boundary)
+    property alias categories: wallCollider.categories
+    property alias collidesWith: wallCollider.collidesWith
+    // Player sensor (detects hit without pushing)
+    property alias sensorCategories: playerSensor.categories
+    property alias sensorCollidesWith: playerSensor.collidesWith
 
     // Visual: sickly green glowing orb
     Rectangle {
@@ -44,12 +48,22 @@ PhysicsItem {
 
     fixtures: [
         Circle {
-            id: collider
+            id: wallCollider
+            radius: projectile.width * 0.4
+            x: projectile.width / 2
+            y: projectile.height / 2
+            density: 0.1
+            restitution: 0
+            friction: 0
+            onBeginContact: (other) => projectile.onHitWall(other)
+        },
+        Circle {
+            id: playerSensor
             radius: projectile.width * 0.4
             x: projectile.width / 2
             y: projectile.height / 2
             sensor: true
-            onBeginContact: (other) => projectile.onHit(other)
+            onBeginContact: (other) => projectile.onHitPlayer(other)
         }
     ]
 
@@ -70,38 +84,36 @@ PhysicsItem {
         onTriggered: projectile.die()
     }
 
-    function onHit(other) {
+    function onHitWall(other) {
         if (destroyed) return
         let entity = other.getBody().target
-        if (!entity) return
-
-        // Hit a wall — destroy
-        if (entity.objectName === "wall" || !entity.objectName) {
+        if (entity && (entity.objectName === "wall" || !entity.objectName))
             die()
+    }
+
+    function onHitPlayer(other) {
+        if (destroyed) return
+        let entity = other.getBody().target
+        if (!entity || !entity.takeDamage || entity.objectName === "enemy") return
+
+        // Shield blocks projectile completely
+        if (entity.isBlocking && entity.isShieldFacing(xWu, yWu)) {
+            let sp = entity.getShieldWorldPos()
+            if (gameWorld) {
+                gameWorld.playImpact()
+                gameWorld.shake(0.5)
+                gameWorld.spawnDeflectParticles(sp.x, sp.y)
+            }
+            destroyed = true
+            destroy()
             return
         }
-
-        // Hit the player
-        if (entity.takeDamage && entity.objectName !== "enemy") {
-            // Shield blocks projectile completely
-            if (entity.isBlocking && entity.isShieldFacing(xWu, yWu)) {
-                let sp = entity.getShieldWorldPos()
-                if (gameWorld) {
-                    gameWorld.playImpact()
-                    gameWorld.shake(0.5)
-                    gameWorld.spawnDeflectParticles(sp.x, sp.y)
-                }
-                destroyed = true
-                destroy()
-                return
-            }
-            entity.takeDamage(damage, xWu, yWu)
-            if (gameWorld) {
-                gameWorld.shake(1)
-                gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
-            }
-            die()
+        entity.takeDamage(damage, xWu, yWu)
+        if (gameWorld) {
+            gameWorld.shake(1)
+            gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
         }
+        die()
     }
 
     function die() {
