@@ -28,4 +28,6 @@ clay_app(shapes_and_stone
         src/Projectile.qml
         src/Npc.qml
         src/DialoguePanel.qml
+        src/TitleScreen.qml
+        src/MultiplayerLobby.qml
 )

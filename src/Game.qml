@@ -189,6 +189,9 @@ ClayWorld2d {
         _shakeIntensity = Math.max(_shakeIntensity, intensity)
     }
 
+    // Screen state: "title", "lobby", "game"
+    property string screen: "title"
+
     // Game state
     property var player: null
     property var enemies: []
@@ -210,15 +213,17 @@ ClayWorld2d {
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         forceActiveFocus()
-        dungeonAmbience.play()
-        dungeonMusic.play()
     }
 
-    // Wait for valid size before generating dungeon
-    onWidthChanged: {
-        if (width > 0 && height > 0 && !player) {
-            console.log("[Game] Size ready - width:", width, "height:", height)
+    // Wait for valid size + game screen before generating dungeon
+    onWidthChanged: _tryStartGame()
+    onScreenChanged: _tryStartGame()
+    function _tryStartGame() {
+        if (screen === "game" && width > 0 && height > 0 && !player) {
+            console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
+            dungeonAmbience.play()
+            dungeonMusic.play()
             generateDungeon()
         }
     }
@@ -1639,5 +1644,37 @@ ClayWorld2d {
         }
 
         return [] // No path found
+    }
+
+    // --- Screen Overlays ---
+
+    // Title screen (covers everything when active)
+    Loader {
+        anchors.fill: parent
+        z: 5000
+        active: screen === "title"
+        sourceComponent: Component {
+            TitleScreen {
+                onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
+                onMultiplayerSelected: screen = "lobby"
+            }
+        }
+    }
+
+    // Multiplayer lobby
+    Loader {
+        anchors.fill: parent
+        z: 5000
+        active: screen === "lobby"
+        sourceComponent: Component {
+            MultiplayerLobby {
+                onStartGame: (network) => {
+                    // TODO: pass network reference for multiplayer sync
+                    screen = "game"
+                    world.forceActiveFocus()
+                }
+                onBack: screen = "title"
+            }
+        }
     }
 }

@@ -9,3 +9,5 @@ Campfire 1.0 Campfire.qml
 Projectile 1.0 Projectile.qml
 Npc 1.0 Npc.qml
 DialoguePanel 1.0 DialoguePanel.qml
+TitleScreen 1.0 TitleScreen.qml
+MultiplayerLobby 1.0 MultiplayerLobby.qml
