@@ -41,7 +41,7 @@ PhysicsItem {
     property real facingAngle: Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats from concept doc
-    readonly property real maxSpeed: 15.0  // World units per second
+    readonly property real maxSpeed: 7.5  // World units per second
     property int hp: 120
     property int maxHp: 120
     property int atk: 15
@@ -53,7 +53,7 @@ PhysicsItem {
     property bool isAttacking: false
     property bool isBlocking: false
     property real attackCooldown: 0
-    readonly property real blockSpeedMultiplier: 0.5
+    readonly property real blockSpeedMultiplier: 0.4
     readonly property real pushForce: 20.0          // Knockback velocity for dash-push
     readonly property real attackDuration: 0.25  // Visual swing duration
     readonly property real attackCooldownTime: 0.5
