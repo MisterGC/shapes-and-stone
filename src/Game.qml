@@ -124,6 +124,28 @@ ClayWorld2d {
         spitterSound.play()
     }
 
+    Sound {
+        id: innkeeperGreeting
+        source: "assets/innkeeper_greeting.wav"
+        volume: muted ? 0 : 0.8
+    }
+    Sound {
+        id: blacksmithGreeting
+        source: "assets/blacksmith_greeting.wav"
+        volume: muted ? 0 : 0.8
+    }
+    Sound {
+        id: witchGreeting
+        source: "assets/witch_greeting.wav"
+        volume: muted ? 0 : 0.8
+    }
+
+    function playNpcGreeting(soundFile) {
+        if (soundFile.indexOf("innkeeper") >= 0) innkeeperGreeting.play()
+        else if (soundFile.indexOf("blacksmith") >= 0) blacksmithGreeting.play()
+        else if (soundFile.indexOf("witch") >= 0) witchGreeting.play()
+    }
+
     // Apply screen shake via transform on room
     transform: Translate { x: _shakeOffsetX; y: _shakeOffsetY }
 
@@ -228,6 +250,25 @@ ClayWorld2d {
 
 
     // Input handling
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_E) {
+            if (dialoguePanel.visible) {
+                dialoguePanel.advance()
+            } else if (player) {
+                // Find nearby NPC to interact with
+                let items = world.room.children
+                for (let i = 0; i < items.length; i++) {
+                    let npc = items[i]
+                    if (npc.objectName === "npc" && npc.nearbyPlayer) {
+                        npc.interact()
+                        break
+                    }
+                }
+            }
+            event.accepted = true
+            return
+        }
+    }
     Keys.forwardTo: gameCtrl
     GameController {
         id: gameCtrl
@@ -583,6 +624,14 @@ ClayWorld2d {
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
+    Component { id: npcComponent; Npc {} }
+
+    // Dialogue panel (bottom-center, hidden by default)
+    DialoguePanel { id: dialoguePanel; parent: world }
+
+    function openDialogue(name, color, lines) {
+        dialoguePanel.open(name, color, lines)
+    }
 
     // Death particle
     Component {
@@ -1223,17 +1272,58 @@ ClayWorld2d {
         })
         dungeonObjects.push(cf)
 
-        // Tavern building (top-left) — open-top walled enclosure, entrance facing south
+        // Tavern building (top-left) — entrance facing south
         _buildVillageBuilding(cx - 8, cy + 5, 6, 5, "south")
-        // Innkeeper NPC inside
-        _spawnVillageNpc(cx - 8, cy + 6, "#C9A227", "mug")
+        // Innkeeper NPC with routine
+        _spawnVillageNpc(cx - 8, cy + 4, "#C9A227", "mug", "Innkeeper", [
+            { x: cx - 8, y: cy + 6, duration: 4, text: "*polishing mugs*" },
+            { x: cx - 8, y: cy + 4, duration: 3, text: "*sweeping floor*" },
+            { x: cx - 9, y: cy + 3, duration: 2, text: "*checking supplies*" }
+        ], [
+            "Welcome, traveler! You look like you've seen better days.",
+            "Rest by the campfire — it'll patch you right up.",
+            "The deeper floors have nastier creatures. Be careful."
+        ], "assets/innkeeper_greeting.wav")
 
         // Blacksmith building (top-right) — entrance facing south
         _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
-        // Blacksmith NPC inside
-        _spawnVillageNpc(cx + 6, cy + 6, "#C9A227", "hammer")
         // Anvil in front of blacksmith
         _spawnAnvil(cx + 6, cy + 2)
+        // Blacksmith NPC with routine
+        _spawnVillageNpc(cx + 6, cy + 4, "#B87333", "hammer", "Blacksmith", [
+            { x: cx + 6, y: cy + 2, duration: 5, text: "*hammering*" },
+            { x: cx + 6, y: cy + 6, duration: 3, text: "*sorting tools*" },
+            { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
+        ], [
+            "Ah, another one from the depths. Your blade's seen some work.",
+            "I could sharpen that for you... if I had the right stone.",
+            "Bring me materials from below and I'll forge something proper."
+        ], "assets/blacksmith_greeting.wav")
+
+        // Tree at village edge (dark green static object)
+        let tree = wallComponent.createObject(world.room, {
+            xWu: cx - 6, yWu: cy - 5,
+            widthWu: 1.0, heightWu: 1.0,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catWall,
+            collidesWith: catPlayer,
+            color: "#2A4A2A"
+        })
+        tree.radius = tree.width * 0.5
+        dungeonObjects.push(tree)
+
+        // Witch — fortune teller near the tree
+        _spawnVillageNpc(cx - 5, cy - 5, "#7B2D8E", "crystal", "Witch", [
+            { x: cx - 6, y: cy - 4.5, duration: 4, text: "*gazing into crystal*" },
+            { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
+            { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
+        ], [
+            "The stones whisper of what lies below...",
+            "I see shapes in the dark — hungry ones.",
+            "Beware the hollow chamber. Something ancient stirs.",
+            "Return to me... if you survive."
+        ], "assets/witch_greeting.wav")
 
         // Spawn player at entrance
         spawnPlayer(cx, (oy + 2) * cellSize)
@@ -1277,17 +1367,23 @@ ClayWorld2d {
             createWallAt(x1, y1 + t, bw, t).color = wallColor
     }
 
-    function _spawnVillageNpc(wx, wy, color, iconType) {
-        let npc = wallComponent.createObject(world.room, {
+    function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting) {
+        let npc = npcComponent.createObject(world.room, {
             xWu: wx, yWu: wy,
-            widthWu: 0.8, heightWu: 0.8,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
+            gameWorld: world,
             categories: catWall,
             collidesWith: catPlayer,
-            color: color
+            interactionCategories: catWall,
+            interactionCollidesWith: catPlayer,
+            npcColor: color,
+            iconType: iconType,
+            npcName: name || "",
+            routine: routine || [],
+            dialogueLines: dialogue || [],
+            greetingSound: greeting || ""
         })
-        npc.radius = npc.width * 0.5
         dungeonObjects.push(npc)
     }
 

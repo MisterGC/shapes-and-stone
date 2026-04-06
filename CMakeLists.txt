@@ -26,4 +26,6 @@ clay_app(shapes_and_stone
         src/Floor.qml
         src/Campfire.qml
         src/Projectile.qml
+        src/Npc.qml
+        src/DialoguePanel.qml
 )

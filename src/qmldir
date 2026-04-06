@@ -7,3 +7,5 @@ Wall 1.0 Wall.qml
 Floor 1.0 Floor.qml
 Campfire 1.0 Campfire.qml
 Projectile 1.0 Projectile.qml
+Npc 1.0 Npc.qml
+DialoguePanel 1.0 DialoguePanel.qml
