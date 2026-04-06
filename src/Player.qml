@@ -115,6 +115,9 @@ PhysicsItem {
         }
     }
 
+    // Healing state (set by Campfire)
+    property bool isHealing: false
+
     // Visual: Steel Blue circle (Knight)
     Rectangle {
         id: visual
@@ -123,6 +126,20 @@ PhysicsItem {
         height: parent.height
         color: "#4A90A4"  // Steel Blue
         radius: width * .5
+
+        // Healing shimmer
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: "#44CC44"
+            opacity: 0
+            SequentialAnimation on opacity {
+                running: isHealing
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.25; duration: 400; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 0; duration: 400; easing.type: Easing.InOutSine }
+            }
+        }
 
         Canvas {
             anchors.centerIn: parent
