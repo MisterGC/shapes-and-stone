@@ -16,35 +16,45 @@ ClayWorld2d {
     anchors.fill: parent
     focus: true
 
+    camera: ClayWorld2dCamera {
+        id: gameCamera
+        mode: ClayWorld2dCamera.LookAhead
+        lookAheadFactor: 0.2
+        smoothing: 3.0
+    }
+
     // Dark background behind the world
     Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
+
+    // Global mute
+    property bool muted: true
 
     // Audio — switches based on levelType
     Music {
         id: dungeonAmbience
         source: "assets/dungeon_ambience.mp3"
-        volume: 0.4
+        volume: muted ? 0 : 0.4
         loop: true
     }
 
     Music {
         id: dungeonMusic
         source: "assets/dungeon_music.mp3"
-        volume: 0.3
+        volume: muted ? 0 : 0.3
         loop: true
     }
 
     Music {
         id: villageAmbience
         source: "assets/village_ambience.mp3"
-        volume: 0.4
+        volume: muted ? 0 : 0.4
         loop: true
     }
 
     Music {
         id: villageMusic
         source: "assets/village_music.mp3"
-        volume: 0.35
+        volume: muted ? 0 : 0.35
         loop: true
     }
 
@@ -67,13 +77,13 @@ ClayWorld2d {
     Sound {
         id: impactSound
         source: "assets/punch_hitting.wav"
-        volume: 0.7
+        volume: muted ? 0 : 0.7
     }
 
     Sound {
         id: dashSound
         source: "assets/dash.wav"
-        volume: 0.6
+        volume: muted ? 0 : 0.6
     }
 
     function playImpact() {
@@ -83,13 +93,13 @@ ClayWorld2d {
     Sound {
         id: deathBurstSound
         source: "assets/burst.wav"
-        volume: 0.7
+        volume: muted ? 0 : 0.7
     }
 
     Sound {
         id: swordSwingSound
         source: "assets/sword_swing.wav"
-        volume: 0.5
+        volume: muted ? 0 : 0.5
     }
 
     function playDash() {
@@ -107,7 +117,7 @@ ClayWorld2d {
     Sound {
         id: spitterSound
         source: "assets/spitter.wav"
-        volume: 0.6
+        volume: muted ? 0 : 0.6
     }
 
     function playSpitShot() {
@@ -341,6 +351,26 @@ ClayWorld2d {
         }
     }
 
+    // Mute indicator (always visible when muted)
+    Rectangle {
+        anchors.top: minimap.bottom
+        anchors.right: parent.right
+        anchors.topMargin: 4
+        anchors.rightMargin: 10
+        width: 32; height: 32; radius: 6
+        z: 1000
+        visible: muted
+        color: "#AA222222"
+
+        Text {
+            anchors.centerIn: parent
+            text: "\u266A\u0338"
+            color: "#CC6666"
+            font.pixelSize: 28
+            font.bold: true
+        }
+    }
+
     // DEV menu (sandbox only)
     Column {
         id: devMenu
@@ -449,6 +479,24 @@ ClayWorld2d {
             MouseArea {
                 anchors.fill: parent
                 onClicked: fightRoomActive ? exitFightRoom() : enterFightRoom()
+            }
+        }
+
+        Rectangle {
+            visible: devMenu.expanded
+            width: 160; height: 24; radius: 4
+            color: muted ? "#33333380" : "#4A90A480"
+
+            Text {
+                anchors.centerIn: parent
+                text: muted ? "\u266A\u0338 Sound: OFF" : "\u266A Sound: ON"
+                color: muted ? "#AA6666" : "white"
+                font.pixelSize: 11
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: muted = !muted
             }
         }
     }
@@ -658,7 +706,7 @@ ClayWorld2d {
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
             player.playerScreenY = Qt.binding(() => playerScreenY)
-            observedItem = player
+            gameCamera.target = player
             revealAroundPlayer()  // Initial reveal
         }
 
@@ -965,8 +1013,12 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
+            // Solid fixture: collides with walls
             categories: catProjectile,
-            collidesWith: catWall | catPlayer
+            collidesWith: catWall,
+            // Sensor fixture: detects player
+            sensorCategories: catProjectile,
+            sensorCollidesWith: catPlayer
         })
         if (proj)
             console.log("[Game] Projectile spawned at", px.toFixed(1), py.toFixed(1))
@@ -1198,7 +1250,7 @@ ClayWorld2d {
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
             player.playerScreenY = Qt.binding(() => playerScreenY)
-            observedItem = player
+            gameCamera.target = player
             revealAroundPlayer()
         }
 
@@ -1296,7 +1348,7 @@ ClayWorld2d {
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
             player.playerScreenY = Qt.binding(() => playerScreenY)
-            observedItem = player
+            gameCamera.target = player
         }
 
         // Spawn test enemies: 2 grunts + 1 guardian
