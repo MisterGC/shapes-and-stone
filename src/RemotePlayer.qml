@@ -1,5 +1,6 @@
 import QtQuick
 import Box2D
+import Clayground.Network
 import Clayground.Physics
 
 PhysicsItem {
@@ -7,8 +8,6 @@ PhysicsItem {
 
     property string nodeId: ""
     property color playerColor: "#A44A90"
-    property real targetX: 0
-    property real targetY: 0
     property real facingAngle: 0
     property int actionState: 0   // 0=idle, 1=atk, 2=block, 3=dash
     property int remoteHp: 120
@@ -27,11 +26,34 @@ PhysicsItem {
         sensor: true
     }
 
-    // Smooth position interpolation
-    onTargetXChanged: xWu = targetX
-    onTargetYChanged: yWu = targetY
-    Behavior on xWu { NumberAnimation { duration: 60 } }
-    Behavior on yWu { NumberAnimation { duration: 60 } }
+    // Snapshot-buffer interpolation: the avatar renders a small constant
+    // delay in the past so it always blends between two received states.
+    // (A Behavior on xWu/yWu is the wrong tool here - see clayground #139.)
+    function pushState(data) {
+        sync.push(data)
+        actionState = data.s !== undefined ? data.s : 0
+        if (data.h !== undefined) remoteHp = data.h
+    }
+
+    StateInterpolator {
+        id: sync
+        delayMs: 120
+        angleKeys: ["a"]
+        onUpdated: {
+            rp.xWu = value.x
+            rp.yWu = value.y
+            if (value.a !== undefined) rp.facingAngle = value.a
+        }
+    }
+
+    // Reliable action events (broadcast) trigger crisp effects even when
+    // the sampled 20 Hz action state misses the moment.
+    function triggerAction(name) {
+        if (name === "attack") _attackFlash.restart()
+        else if (name === "dash") _dashFlash.restart()
+    }
+    Timer { id: _attackFlash; interval: 250 }
+    Timer { id: _dashFlash; interval: 150 }
 
     // Visual circle
     Rectangle {
@@ -41,7 +63,7 @@ PhysicsItem {
         height: parent.height
         color: playerColor
         radius: width * 0.5
-        opacity: actionState === 3 ? 0.5 : 1.0
+        opacity: actionState === 3 || _dashFlash.running ? 0.5 : 1.0
 
         // Helmet icon (simplified, tinted)
         Canvas {
@@ -121,7 +143,7 @@ PhysicsItem {
     // Attack arc flash (visible briefly when attacking)
     Canvas {
         id: attackArc
-        visible: actionState === 1
+        visible: actionState === 1 || _attackFlash.running
         readonly property real arcSize: rp.width * 2.5
         readonly property real angleRad: facingAngle * Math.PI / 180
         width: arcSize

@@ -208,18 +208,21 @@ ClayWorld2d {
                 masterSeed = data.seed
                 screen = "game"
                 world.forceActiveFocus()
+            } else if (data.type === "action") {
+                let rp = remotePlayers[fromId]
+                if (rp) rp.triggerAction(data.action)
+            } else if (data.type === "levelChange") {
+                _applyLevelChange(data.levelIndex)
+            } else if (data.type === "exitReached") {
+                // Host is level authority: any player reaching the exit
+                // advances the whole session
+                if (gameNetwork.isHost && !resetting) _hostAdvanceLevel()
             }
         }
 
         onStateReceived: (fromId, data) => {
             let rp = remotePlayers[fromId]
-            if (rp) {
-                rp.targetX = data.x
-                rp.targetY = data.y
-                rp.facingAngle = data.a
-                rp.actionState = data.s
-                rp.remoteHp = data.h
-            }
+            if (rp) rp.pushState(data)
         }
 
         onNodeLeft: (nodeId) => {
@@ -228,6 +231,15 @@ ClayWorld2d {
                 delete remotePlayers[nodeId]
             }
         }
+    }
+
+    // Sync health overlay (multiplayer only)
+    NetworkMonitor {
+        network: gameNetwork
+        visible: gameNetwork.connected && screen === "game"
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.margins: 10
     }
 
     // Player state broadcast (~20 Hz)
@@ -300,7 +312,12 @@ ClayWorld2d {
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            if (mouse.button === Qt.LeftButton) player.attack()
+            if (mouse.button === Qt.LeftButton) {
+                player.attack()
+                // Reliable event so remote clients show the swing crisply
+                if (gameNetwork.connected && player.isAttacking)
+                    gameNetwork.broadcast({type: "action", action: "attack"})
+            }
             if (mouse.button === Qt.RightButton) player.isBlocking = true
         }
 
@@ -357,7 +374,13 @@ ClayWorld2d {
 
         onAxisXChanged: console.log("[Input] axisX:", axisX)
         onAxisYChanged: console.log("[Input] axisY:", axisY)
-        onButtonBPressedChanged: if (buttonBPressed && player) player.dash()
+        onButtonBPressedChanged: {
+            if (buttonBPressed && player) {
+                player.dash()
+                if (gameNetwork.connected && player.isDashing)
+                    gameNetwork.broadcast({type: "action", action: "dash"})
+            }
+        }
     }
 
     // Player Health HUD (fixed position, not following camera)
@@ -616,6 +639,20 @@ ClayWorld2d {
         function onYWuChanged() { revealAroundPlayer() }
     }
 
+    // Lantern lighting mask anchored to the player — only in the dungeon.
+    // outerRadius is set larger than the viewport half-diagonal so the dark
+    // edge fades off-screen rather than leaving visible pitch-black areas.
+    AnchoredMask {
+        world: world
+        target: player
+        enabled: levelType === "dungeon"
+        innerRadius: 4
+        outerRadius: 18
+        color: "#ffb060"
+        darkness: "#000000"
+        flicker: 0.15
+    }
+
     // Minimap with fog of war
     Canvas {
         id: minimap
@@ -678,10 +715,42 @@ ClayWorld2d {
         onBeginContact: (entity) => {
             if (entity === player && !resetting) {
                 console.log("[Game] Player reached the exit!")
-                resetting = true
-                Qt.callLater(resetDungeon)
+                if (!gameNetwork.connected) {
+                    resetting = true
+                    Qt.callLater(resetDungeon)
+                } else if (gameNetwork.isHost) {
+                    _hostAdvanceLevel()
+                } else {
+                    // Ask the host to advance; it answers with levelChange
+                    gameNetwork.broadcast({type: "exitReached"})
+                }
             }
         }
+    }
+
+    // Host-authoritative level transitions: without this every client
+    // regenerates on its own and the worlds silently diverge.
+    function _hostAdvanceLevel() {
+        if (resetting) return
+        gameNetwork.broadcast({type: "levelChange", levelIndex: levelIndex + 1})
+        _applyLevelChange(levelIndex + 1)
+    }
+
+    function _applyLevelChange(newIndex) {
+        if (resetting || newIndex === levelIndex) return
+        resetting = true
+        Qt.callLater(() => {
+            let savedHp = player ? player.hp : 120
+            clearDungeon()
+            levelIndex = newIndex
+            levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
+            if (levelType === "village")
+                generateVillage()
+            else
+                generateDungeon()
+            if (player) player.hp = savedHp
+            resetting = false
+        })
     }
 
     // Component factories
@@ -828,10 +897,10 @@ ClayWorld2d {
         }
 
         // Spawn remote players for multiplayer
-        if (gameNetwork.connected) {
-            let colors = ["#A44A90", "#90A44A", "#A4904A"]
-            for (let i = 0; i < gameNetwork.nodes.length; i++)
-                _spawnRemotePlayer(gameNetwork.nodes[i], colors[i % colors.length])
+        if (rooms.length > 0) {
+            let startRoom = rooms[0]
+            _spawnRemotePlayers((startRoom.x + startRoom.w / 2) * cellSize,
+                                (startRoom.y + startRoom.h / 2) * cellSize)
         }
 
         console.log("[Game] generateDungeon() complete")
@@ -1113,13 +1182,19 @@ ClayWorld2d {
         }
     }
 
-    function _spawnRemotePlayer(nodeId, color) {
-        let startRoom = rooms[0]
+    function _spawnRemotePlayers(px, py) {
+        if (!gameNetwork.connected) return
+        let colors = ["#A44A90", "#90A44A", "#A4904A"]
+        for (let i = 0; i < gameNetwork.nodes.length; i++)
+            _spawnRemotePlayer(gameNetwork.nodes[i], colors[i % colors.length], px, py)
+    }
+
+    function _spawnRemotePlayer(nodeId, color, px, py) {
         let rp = remotePlayerComponent.createObject(world.room, {
             nodeId: nodeId,
             playerColor: color,
-            xWu: (startRoom.x + startRoom.w / 2) * cellSize,
-            yWu: (startRoom.y + startRoom.h / 2) * cellSize,
+            xWu: px,
+            yWu: py,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics
         })
@@ -1424,6 +1499,7 @@ ClayWorld2d {
 
         // Spawn player at entrance
         spawnPlayer(cx, (oy + 2) * cellSize)
+        _spawnRemotePlayers(cx, (oy + 2) * cellSize)
 
         // Block entrance + exit sensor
         blockEntrance()
