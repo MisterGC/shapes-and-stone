@@ -81,6 +81,11 @@ PhysicsItem {
         radius: width * 0.5
         opacity: actionState === 3 || _dashFlash.running ? 0.5 : 1.0
 
+        BodyShade {
+            visible: rp.fx
+            baseColor: visual.color
+        }
+
         // Helmet icon (simplified, tinted)
         Canvas {
             anchors.centerIn: parent

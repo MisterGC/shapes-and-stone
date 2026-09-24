@@ -133,14 +133,43 @@ PhysicsItem {
         opacity: 0.38
     }
 
+    // Life: breathing at rest, a step bob and a lean while walking.
+    // Visual only - the body and its collider do not move.
+    readonly property bool _fx: gameWorld ? gameWorld.fx === true : false
+    readonly property real _moveAmount: Math.min(1, Math.sqrt(moveX * moveX + moveY * moveY))
+    property real _lifeT: 0
+    NumberAnimation on _lifeT {
+        running: player._fx
+        from: 0; to: 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+    readonly property real _breath: Math.sin(_lifeT * 2.4) * (1 - _moveAmount)
+    readonly property real _step: Math.abs(Math.sin(_lifeT * 11)) * _moveAmount
+
     // Visual: Steel Blue circle (Knight)
     Rectangle {
         id: visual
         anchors.centerIn: parent
         width: parent.width
         height: parent.height
+        transform: [
+            Scale {
+                origin.x: visual.width / 2; origin.y: visual.height
+                xScale: player._fx ? 1 - 0.02 * player._breath + 0.03 * player._step : 1
+                yScale: player._fx ? 1 + 0.03 * player._breath - 0.05 * player._step : 1
+            },
+            Translate {
+                x: player._fx ? player.moveX * visual.width * 0.04 : 0
+                y: player._fx ? -player._step * visual.height * 0.07 : 0
+            }
+        ]
         color: "#4A90A4"  // Steel Blue
         radius: width * .5
+
+        BodyShade {
+            visible: gameWorld ? gameWorld.fx : false
+            baseColor: visual.color
+        }
 
         // Healing shimmer
         Rectangle {
@@ -235,6 +264,53 @@ PhysicsItem {
         SequentialAnimation {
             id: parryGlow
             PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
+        }
+    }
+
+    // The lantern: carried in the off hand, a quarter turn from the facing
+    // direction, swinging a little with each step. The light around the
+    // knight has a source you can see.
+    Item {
+        id: lantern
+        visible: player._fx
+        readonly property real angleRad: (facingAngle + 100) * Math.PI / 180
+        readonly property real orbit: player.width * 0.62
+        readonly property real swing: Math.sin(player._lifeT * 5.5) * player._moveAmount * player.width * 0.05
+        width: player.width * 0.26
+        height: width * 1.25
+        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbit + swing
+        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbit
+        z: facingAngle > 0 && facingAngle < 180 ? -0.5 : 1
+        // Halo
+        Rectangle {
+            anchors.centerIn: glass
+            width: lantern.width * 2.2
+            height: width
+            radius: width / 2
+            color: "#FFD27A"
+            opacity: 0.18 + 0.05 * Math.sin(player._lifeT * 13)
+        }
+        // Handle, cage and the flame behind the glass
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width * 0.5; height: parent.height * 0.18
+            radius: height / 2
+            color: "transparent"
+            border.color: "#2A2420"; border.width: Math.max(1, width * 0.18)
+        }
+        Rectangle {
+            id: glass
+            y: parent.height * 0.14
+            width: parent.width; height: parent.height * 0.86
+            radius: width * 0.2
+            color: "#FFE8A8"
+            border.color: "#3A302A"; border.width: Math.max(1, width * 0.14)
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.34; height: parent.height * 0.42
+                radius: width / 2
+                color: "#FFFFFF"
+            }
         }
     }
 

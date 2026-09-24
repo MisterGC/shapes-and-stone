@@ -32,6 +32,7 @@ clay_app(shapes_and_stone
         src/Motes.qml
         src/FxParticle.qml
         src/Stain.qml
+        src/BodyShade.qml
         src/ExitStairs.qml
         src/Floor.qml
         src/Campfire.qml
@@ -58,6 +59,7 @@ qt_add_shaders(shapes_and_stone "shapes_and_stone_shaders"
     HLSL 50
     MSL 12
     FILES
+        src/shaders/body.frag
         src/shaders/floor.frag
         src/shaders/motes.frag
         src/shaders/wall.frag

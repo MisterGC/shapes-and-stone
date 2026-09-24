@@ -102,9 +102,30 @@ PhysicsItem {
         opacity: 0.6
     }
 
+    // Life: breathing at rest, a bob while moving (visual only)
+    property real _lifeT: Math.random() * 10
+    NumberAnimation on _lifeT {
+        running: enemy._fx
+        from: enemy._lifeT; to: enemy._lifeT + 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+    readonly property real _speed: enemy.linearVelocity
+        ? Math.min(1, Math.sqrt(enemy.linearVelocity.x * enemy.linearVelocity.x
+                                + enemy.linearVelocity.y * enemy.linearVelocity.y) / 3) : 0
+    readonly property real _breath: Math.sin(_lifeT * 2.1) * (1 - _speed)
+    readonly property real _bob: Math.abs(Math.sin(_lifeT * 12)) * _speed
+
     // Visual
     Rectangle {
         id: visual
+        transform: [
+            Scale {
+                origin.x: visual.width / 2; origin.y: visual.height
+                xScale: enemy._fx ? 1 - 0.025 * enemy._breath + 0.03 * enemy._bob : 1
+                yScale: enemy._fx ? 1 + 0.035 * enemy._breath - 0.05 * enemy._bob : 1
+            },
+            Translate { y: enemy._fx ? -enemy._bob * visual.height * 0.06 : 0 }
+        ]
         anchors.centerIn: parent
         anchors.fill: parent
         radius: width * .5
@@ -125,6 +146,11 @@ PhysicsItem {
             return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
         }
         Behavior on color { ColorAnimation { duration: 100 } }
+
+        BodyShade {
+            visible: enemy._fx
+            baseColor: visual.color
+        }
 
         Canvas {
             id: goblinIcon
