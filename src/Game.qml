@@ -871,11 +871,14 @@ ClayWorld2d {
     QtObject {
         id: screenFxApi
         function hurt() {
-            screenFxItem.flash("#FF3020", 110, 0.35)
-            screenFxItem.pulse(0.45, 220)
+            // A faint tint only: the knight's own white flash and the
+            // fringe pulse carry the hit; a full red screen on every spit
+            // wears the player out
+            screenFxItem.flash("#FF3020", 90, 0.12)
+            screenFxItem.pulse(0.4, 200)
         }
         function parry() {
-            screenFxItem.flash("#FFF0B0", 90, 0.5)
+            screenFxItem.flash("#FFF0B0", 80, 0.3)
             screenFxItem.pulse(1.0, 320)
         }
     }
