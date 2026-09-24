@@ -30,6 +30,10 @@ ClayWorld2d {
     // Global mute
     property bool muted: true
 
+    // Atmosphere layer (lighting, procedural ground, screen effects).
+    // V toggles it for a before/after comparison.
+    property bool fx: true
+
     // Audio — switches based on levelType
     Music {
         id: dungeonAmbience
@@ -335,6 +339,11 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_V) {
+            fx = !fx
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_E) {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
@@ -1656,6 +1665,34 @@ ClayWorld2d {
         fightRoomActive = false
         clearDungeon()
         generateDungeon()
+    }
+
+    // --- Dojo scenarios: land a reload directly in the scene under test ---
+    // A fixed seed keeps the layout identical across reloads, so before/after
+    // captures compare the same room.
+    readonly property int scenarioSeed: 424242
+    function scenarios() { return ["dungeon", "village", "fight"] }
+    function applyScenario(name) {
+        muted = true
+        masterSeed = scenarioSeed
+        if (player) clearDungeon()
+        fightRoomActive = false
+        // Generate before leaving the title: with a player in place,
+        // _tryStartGame() does not build a second level on top.
+        if (name === "fight") {
+            enterFightRoom()
+        } else if (name === "village") {
+            levelIndex = 1
+            levelType = "village"
+            generateVillage()
+        } else {
+            levelIndex = 0
+            levelType = "dungeon"
+            generateDungeon()
+        }
+        screen = "game"
+        minimap.requestPaint()
+        world.forceActiveFocus()
     }
 
     // --- Seeded PRNG (mulberry32) ---
