@@ -47,7 +47,10 @@ Rectangle {
         visible: floor.fx
         fragmentShader: "shaders/floor.frag.qsb"
         property vector2d sizeWu: Qt.vector2d(floor.widthWu, floor.heightWu)
-        property real pixelsPerWu: 12
+        property real pixelsPerWu: 16
+        // Half a character across: at a whole unit a stone was as big as the
+        // knight and the floor read like a giant's hall
+        property real stoneWu: 0.5
         property real style: floor.style === "earth" ? 1 : 0
         property real seed: floor.seed
         property color baseColor: floor.color

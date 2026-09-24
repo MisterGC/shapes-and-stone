@@ -11,6 +11,7 @@ layout(std140, binding = 0) uniform buf {
     float qt_Opacity;
     vec2 sizeWu;       // floor size in world units
     float pixelsPerWu; // chunky pixel grid: detail snaps to 1/pixelsPerWu
+    float stoneWu;     // flagstone size (a wide stone is twice as long)
     float style;       // 0 = flagstones, 1 = earth
     float seed;
     vec4 baseColor;
@@ -35,10 +36,13 @@ float noise(vec2 p) {
 }
 
 vec3 flagstones(vec2 p) {
-    // Rows of 1 wu stones, every other row shifted by half a stone, with
-    // occasional double-length stones so the grid does not read as a grid.
-    float row = floor(p.y);
-    vec2 q = vec2(p.x + (mod(row, 2.0) == 0.0 ? 0.0 : 0.5), p.y);
+    // Rows of stones stoneWu wide, every other row shifted by half a stone,
+    // with occasional double-length stones so the grid does not read as a
+    // grid. The layout is worked out in stone units (s), so the stone size
+    // is one uniform.
+    vec2 s = p / ubuf.stoneWu;
+    float row = floor(s.y);
+    vec2 q = vec2(s.x + (mod(row, 2.0) == 0.0 ? 0.0 : 0.5), s.y);
     float wide = step(0.78, hash(vec2(floor(q.x * 0.5), row)));
     vec2 cellSize = vec2(1.0 + wide, 1.0);
     vec2 cell = floor(q / cellSize);
@@ -54,8 +58,10 @@ vec3 flagstones(vec2 p) {
 
     // Seams, with a one-pixel bevel: lit on the upper-left edge of a stone,
     // shaded on the lower-right, as if lit from the top of the screen.
-    float px = 1.0 / ubuf.pixelsPerWu;
-    float seam = 0.045;
+    // One chunky pixel, in stone units: the seam is exactly one pixel wide
+    // whatever the stone size, the bevel the pixel next to it.
+    float px = 1.0 / (ubuf.pixelsPerWu * ubuf.stoneWu);
+    float seam = px;
     float edgeL = f.x;
     float edgeR = cellSize.x - f.x;
     float edgeT = cellSize.y - f.y;
