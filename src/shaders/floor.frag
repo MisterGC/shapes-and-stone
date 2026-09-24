@@ -12,6 +12,7 @@ layout(std140, binding = 0) uniform buf {
     vec2 sizeWu;       // floor size in world units
     float pixelsPerWu; // chunky pixel grid: detail snaps to 1/pixelsPerWu
     float stoneWu;     // flagstone size (a wide stone is twice as long)
+    float seamPx;      // gap between stones, in chunky pixels (may be < 1)
     float style;       // 0 = flagstones, 1 = earth
     float seed;
     vec4 baseColor;
@@ -35,7 +36,7 @@ float noise(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-vec3 flagstones(vec2 p) {
+vec3 flagstones(vec2 p, vec2 rawP) {
     // Rows of stones stoneWu wide, every other row shifted by half a stone,
     // with occasional double-length stones so the grid does not read as a
     // grid. The layout is worked out in stone units (s), so the stone size
@@ -58,19 +59,27 @@ vec3 flagstones(vec2 p) {
 
     // Seams, with a one-pixel bevel: lit on the upper-left edge of a stone,
     // shaded on the lower-right, as if lit from the top of the screen.
-    // One chunky pixel, in stone units: the seam is exactly one pixel wide
-    // whatever the stone size, the bevel the pixel next to it.
+    // One chunky pixel, in stone units. The seam alone is finer than the
+    // grid: it is measured on the unsnapped position, seamPx pixels wide, so
+    // the gaps stay thin while stones, bevels and cracks keep the chunky
+    // look. The bevel is the first chunky pixel inside the stone.
     float px = 1.0 / (ubuf.pixelsPerWu * ubuf.stoneWu);
-    float seam = px;
+    vec2 rs = rawP / ubuf.stoneWu;
+    float rrow = floor(rs.y);
+    vec2 rq = vec2(rs.x + (mod(rrow, 2.0) == 0.0 ? 0.0 : 0.5), rs.y);
+    float rwide = step(0.78, hash(vec2(floor(rq.x * 0.5), rrow)));
+    vec2 rcell = vec2(1.0 + rwide, 1.0);
+    vec2 rf = fract(rq / rcell) * rcell;
+    float rEdge = min(min(rf.x, rcell.x - rf.x), min(rf.y, rcell.y - rf.y));
+    if (rEdge < px * ubuf.seamPx * 0.5)
+        return ubuf.seamColor.rgb;
     float edgeL = f.x;
     float edgeR = cellSize.x - f.x;
     float edgeT = cellSize.y - f.y;
     float edgeB = f.y;
-    if (min(min(edgeL, edgeR), min(edgeT, edgeB)) < seam)
-        return ubuf.seamColor.rgb;
-    if (edgeT < seam + px || edgeL < seam + px)
+    if (edgeT < px || edgeL < px)
         col *= 1.08;
-    else if (edgeB < seam + px || edgeR < seam + px)
+    else if (edgeB < px || edgeR < px)
         col *= 0.88;
 
     // A jagged crack across the odd stone: straight segments that change
@@ -110,8 +119,8 @@ vec3 earth(vec2 p) {
 
 void main() {
     // World position, y up like the world; snapped to the chunky pixel grid.
-    vec2 p = vec2(qt_TexCoord0.x, 1.0 - qt_TexCoord0.y) * ubuf.sizeWu;
-    p = (floor(p * ubuf.pixelsPerWu) + 0.5) / ubuf.pixelsPerWu;
-    vec3 col = ubuf.style < 0.5 ? flagstones(p) : earth(p);
+    vec2 rawP = vec2(qt_TexCoord0.x, 1.0 - qt_TexCoord0.y) * ubuf.sizeWu;
+    vec2 p = (floor(rawP * ubuf.pixelsPerWu) + 0.5) / ubuf.pixelsPerWu;
+    vec3 col = ubuf.style < 0.5 ? flagstones(p, rawP) : earth(p);
     fragColor = vec4(col, 1.0) * ubuf.qt_Opacity;
 }

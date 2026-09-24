@@ -51,6 +51,8 @@ Rectangle {
         // Half a character across: at a whole unit a stone was as big as the
         // knight and the floor read like a giant's hall
         property real stoneWu: 0.5
+        // Half a chunky pixel: a full one made the gaps as loud as the stones
+        property real seamPx: 0.5
         property real style: floor.style === "earth" ? 1 : 0
         property real seed: floor.seed
         property color baseColor: floor.color
