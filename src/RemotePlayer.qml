@@ -11,6 +11,7 @@ PhysicsItem {
     property real facingAngle: 0
     property int actionState: 0   // 0=idle, 1=atk, 2=block, 3=dash
     property int remoteHp: 120
+    property int rttMs: -1        // best round trip the network measured, -1 unknown
 
     widthWu: 1.0
     heightWu: 1.0
@@ -35,9 +36,16 @@ PhysicsItem {
         if (data.h !== undefined) remoteHp = data.h
     }
 
+    // The delay is the visible lag: at full speed (7.5 Wu/s) every 10 ms
+    // puts the avatar 0.075 Wu behind where the player really is. Game.qml
+    // sends a snapshot per physics step (~16 ms), so 50 ms covers three
+    // missed steps on a LAN. Over the internet the buffer has to absorb
+    // jitter we cannot measure directly, so the round trip widens it -
+    // a game-side stand-in until StateInterpolator adapts its delay itself
+    // (clayground issue linked from docs/multiplayer-sync.md).
     StateInterpolator {
         id: sync
-        delayMs: 120
+        delayMs: 50 + Math.min(100, Math.max(0, rp.rttMs))
         angleKeys: ["a"]
         onUpdated: {
             rp.xWu = value.x
