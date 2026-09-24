@@ -1,5 +1,4 @@
 import QtQuick
-import Clayground.Canvas
 
 Rectangle {
     id: floor
