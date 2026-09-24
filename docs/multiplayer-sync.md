@@ -40,9 +40,10 @@ to guess.
   6 kB/s per stream on the lossy channel.
 - `RemotePlayer.qml` renders 50 ms in the past plus the measured round
   trip (capped at 100 ms), so a LAN session gets 50 ms and an internet
-  session gets a buffer that survives its jitter. Deriving the delay from
-  observed jitter belongs in `StateInterpolator` (clayground #291); the
-  round-trip rule is the game-side stand-in until then.
+  session gets a buffer that survives its jitter. With a plugin that has
+  clayground #291 it switches on `autoDelay` instead and passes the
+  sender's timestamp (#290) into the interpolator; the round-trip rule
+  stays as the fallback for older plugins.
 - `MultiplayerLobby.qml` lets the host pick LAN or Internet signaling.
   Joiners need no switch, the plugin recognises LAN codes (`L…-…`) by
   their shape. The browser build hides the LAN option (the plugin does
@@ -127,7 +128,14 @@ the cloud mode at a self-hosted relay (`clay-dev-server` ships one).
 
 ## Clayground issues
 
-Filed in `MisterGC/clayground`, to be fixed on a branch off `release/v2026.8`:
+Filed in `MisterGC/clayground` and fixed together in
+[clayground PR #295](https://github.com/MisterGC/clayground/pull/295)
+(branch `net-sync-fixes` off `release/v2026.8`). With that plugin the game
+passes the sender's timestamp into the interpolator and switches on
+`autoDelay`; against an older plugin it keeps the round-trip rule. Bench
+against that build, per-frame sends, both signaling modes: 35 to 40 ms
+effective delay and 0.28 Wu mean error (fixed 50 ms: 0.38 Wu; the original
+120 ms: 0.90 Wu). Run it with `--auto` and the loader from that build.
 
 - [#290](https://github.com/MisterGC/clayground/issues/290) `StateInterpolator` stamps snapshots with arrival time, so a late burst makes the remote avatar jump (the spike in the table above)
 - [#291](https://github.com/MisterGC/clayground/issues/291) `StateInterpolator` should size its delay from observed jitter instead of a fixed `delayMs` (replaces the round-trip rule in `RemotePlayer.qml`)

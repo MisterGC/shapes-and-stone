@@ -90,6 +90,8 @@ def main():
     ap.add_argument("--interval", type=int, default=0,
                     help="broadcast period ms; 0 = every frame (the game's setting)")
     ap.add_argument("--delay", type=int, default=50, help="interpolator delayMs")
+    ap.add_argument("--auto", action="store_true",
+                    help="use StateInterpolator.autoDelay (clayground #291) instead of --delay")
     ap.add_argument("--seconds", type=float, default=10.0, help="measurement window")
     ap.add_argument("--json", help="append the result as one JSON line to this file")
     args = ap.parse_args()
@@ -107,7 +109,8 @@ def main():
     env.setdefault("QT_QPA_PLATFORM", "offscreen")
 
     procs = {}
-    result = {"mode": args.mode, "intervalMs": args.interval, "delayMs": args.delay}
+    result = {"mode": args.mode, "intervalMs": args.interval,
+              "delayMs": args.delay, "auto": args.auto}
     ok = False
     try:
         for n in ("host", "joiner"):
@@ -123,7 +126,8 @@ def main():
 
         local = "true" if args.mode == "local" else "false"
         for i in (H, J):
-            i.eval([f"configure({local}, {args.interval}, {args.delay})"])
+            auto = "true" if args.auto else "false"
+            i.eval([f"configure({local}, {args.interval}, {args.delay}, {auto})"])
 
         H.eval(["hostUp()"])
         if not wait_for(lambda: H.eval1("netId") not in (None, ""), 30):

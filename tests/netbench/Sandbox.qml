@@ -23,6 +23,7 @@ Item {
     property int sendIntervalMs: 0
     property alias delayMs: sync.delayMs   // RemotePlayer.qml: 120
     property bool useLocalSignaling: true
+    property bool autoDelay: false         // StateInterpolator.autoDelay (clayground #291)
 
     // ---- sender: clock-driven path, peak speed = Player.maxSpeed (7.5 Wu/s) ----
     // x = 10 + 8 sin(w t), y = 10 + 8 cos(w t), w = 7.5 / 8  -> |v| = 7.5 Wu/s
@@ -86,7 +87,7 @@ Item {
         onMessageReceived: (from, data) => {
             if (data.type === "t0") { bench.t0 = data.t0; sync.reset(); bench.samples = [] }
         }
-        onStateReceived: (from, data) => {
+        onStateReceived: (from, data, sentAt) => {
             if (from !== bench.trackedSender) return
             let now = Date.now()
             if (bench.lastArrival > 0) {
@@ -96,7 +97,7 @@ Item {
             }
             bench.lastArrival = now
             bench.stateCount++
-            sync.push(data)
+            sync.push(data, sentAt)   // sentAt is undefined on plugins before clayground #290
         }
     }
 
@@ -106,8 +107,10 @@ Item {
     readonly property var nodeList: net.nodes
     readonly property var netRef: net
 
-    function configure(local, intervalMs, delay) {
+    function configure(local, intervalMs, delay, auto) {
         useLocalSignaling = local; sendIntervalMs = intervalMs; delayMs = delay
+        autoDelay = auto === true
+        if ("autoDelay" in sync) sync.autoDelay = autoDelay
     }
     function hostUp() {
         net.signalingMode = useLocalSignaling ? Network.SignalingMode.Local
@@ -177,6 +180,8 @@ Item {
             dropped: stats.dropped !== undefined ? stats.dropped : -1,
             rttMs: peer.latency !== undefined ? peer.latency : net.latency,
             stateChannel: peer.stateChannel || "",
+            interpDelayMs: sync.effectiveDelayMs !== undefined ? sync.effectiveDelayMs : sync.delayMs,
+            clockOffsetMs: sync.clockOffsetMs !== undefined ? sync.clockOffsetMs : null,
             phaseTiming: net.phaseTiming
         }
     }

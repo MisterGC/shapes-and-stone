@@ -220,9 +220,9 @@ ClayWorld2d {
             }
         }
 
-        onStateReceived: (fromId, data) => {
+        onStateReceived: (fromId, data, sentAt) => {
             let rp = remotePlayers[fromId]
-            if (rp) rp.pushState(data)
+            if (rp) rp.pushState(data, sentAt)
         }
 
         onNodeLeft: (nodeId) => {
