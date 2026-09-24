@@ -836,7 +836,9 @@ ClayWorld2d {
         world: world
         active: world.fx && screen === "game"
         ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : "#0c0b12"
-        glow: 0.2
+        // Little additive glow: it washes colours towards white-grey; the
+        // light should reveal the shapes' own colours, not tint them
+        glow: 0.1
         falloff: 1.6
         shadowHardness: 2.5
     }
@@ -850,7 +852,7 @@ ClayWorld2d {
         enabled: world.fx && world.player !== null
         radius: levelType === "village" ? 5.5 : 7.5
         color: levelType === "village" ? "#FFC98A" : "#FFE2B8"
-        intensity: 0.95
+        intensity: 1.0
         flicker: 0.08
         castsShadows: true
     }
@@ -862,9 +864,14 @@ ClayWorld2d {
         vignetteColor: "#000000"
         // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
         temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15 : 0.12
-        saturation: world.fx ? 0.92 : 1
-        lowHealth: world.fx && player && player.hp < player.maxHp * 0.3
-                   ? 1 - player.hp / (player.maxHp * 0.3) : 0
+        // A touch more colour than flat: darkness already mutes everything
+        // outside the light, the lit shapes should stay vivid
+        saturation: world.fx ? 1.15 : 1
+        contrast: world.fx ? 1.05 : 1
+        // The heartbeat sets in below a quarter of the health and grows
+        // gently - a warning, not an alarm
+        lowHealth: world.fx && player && player.hp < player.maxHp * 0.25
+                   ? 0.8 * (1 - player.hp / (player.maxHp * 0.25)) : 0
     }
     // Screen-space hit feedback used by impact(); null with fx off
     property var screenFx: world.fx ? screenFxApi : null
