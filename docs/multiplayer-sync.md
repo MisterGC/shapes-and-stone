@@ -27,7 +27,7 @@ The transport itself is sound for this job: `broadcastState` goes over a
 dedicated unordered channel without retransmissions, every update carries
 a sequence number so stale ones are dropped, and receives reach QML as
 queued events with no polling. Two things in the plugin do contribute and
-are drafted as clayground issues below: snapshots are timestamped with
+are filed as clayground issues (listed at the end): snapshots are timestamped with
 their arrival time (a burst after a stall compresses the motion and the
 avatar jumps), and the interpolation delay is a fixed number the game has
 to guess.
@@ -41,7 +41,7 @@ to guess.
 - `RemotePlayer.qml` renders 50 ms in the past plus the measured round
   trip (capped at 100 ms), so a LAN session gets 50 ms and an internet
   session gets a buffer that survives its jitter. Deriving the delay from
-  observed jitter belongs in `StateInterpolator` (draft B below); the
+  observed jitter belongs in `StateInterpolator` (clayground #291); the
   round-trip rule is the game-side stand-in until then.
 - `MultiplayerLobby.qml` lets the host pick LAN or Internet signaling.
   Joiners need no switch, the plugin recognises LAN codes (`L…-…`) by
@@ -73,7 +73,7 @@ Reading it: error is speed times delay in every row, so the delay is the
 whole story on a loopback. The one outlier (send 16 ms, delay 50, max
 error 0.64) is a single 52 ms arrival gap: the late snapshots were
 stamped on arrival and the interpolator played 50 ms of motion in a few
-milliseconds. That is draft A. The last two rows are the game's shipped
+milliseconds. That is clayground #290. The last two rows are the game's shipped
 setting: 50 ms behind, 0.38 Wu mean error, identical over LAN and Cloud
 signaling.
 
@@ -117,7 +117,7 @@ while connected):
 
 ## Security note
 
-Draft D below is the concrete gap behind the "secure/robust foundation"
+clayground #293 is the concrete gap behind the "secure/robust foundation"
 question: a LAN code is the host's private IP and port in base36, the
 embedded signaling server accepts every offer over plain `ws://`, so
 anyone on the network who finds the port can join. The data channels are
@@ -125,46 +125,12 @@ DTLS-encrypted either way. The public PeerJS server is a dependency, not
 a security hole: room ids are random and `Network.signalingUrl` points
 the cloud mode at a self-hosted relay (`clay-dev-server` ships one).
 
-## Clayground issues to file
+## Clayground issues
 
-Filing them from the run was not permitted, so the drafts are here. Each
-belongs in `MisterGC/clayground`, on a branch off `release/v2026.8`.
+Filed in `MisterGC/clayground`, to be fixed on a branch off `release/v2026.8`:
 
-### `StateInterpolator` stamps snapshots with arrival time, so a late burst makes the remote avatar jump (bug)
-
-`push()` stamps every snapshot with the receiver's `Date.now()`, and the wire format `{t,q,d}` carries no send time. When a few state packets arrive bunched after a stall (a scheduling hiccup, wifi retry, a busy relay host) they get timestamps 1-2 ms apart although they represent 50 ms of motion, so the interpolated avatar sprints through that stretch and looks like it jumps. Seen in the shapes-and-stone net bench (`tests/netbench` there): a single 52 ms arrival gap turned a 0.02 Wu residual into a 0.64 Wu spike. Carry the sender's clock in the state envelope and let `StateInterpolator` place snapshots on the sender's timeline (offset estimated from the stream, no clock sync protocol needed).
-
-Done when:
-- [ ] `broadcastState` envelopes carry the sender's send time and `StateInterpolator` uses it for snapshot placement, with arrival time only as a fallback
-- [ ] the net gym pins it: a batch of snapshots delivered late in one burst does not move `value` faster than the sender moved
-
-### `StateInterpolator` should size its delay from observed jitter instead of a fixed `delayMs` (enhancement)
-
-A fixed `delayMs` cannot fit both cases: 50 ms is right on a LAN (shapes-and-stone measured 0.8 ms arrival jitter there) but starves over the internet, and the 120 ms that survives internet jitter drags a full body length behind on a LAN. The interpolator already sees every arrival, so it can size the buffer itself from the observed inter-arrival jitter (and a floor of the sender's period) instead of asking the game to guess. shapes-and-stone currently widens the delay by the measured round trip as a stand-in.
-
-Done when:
-- [ ] an auto mode (default or opt-in) derives the render delay from observed jitter, changing it smoothly rather than snapping
-- [ ] the gym checks it lands near the fixed-delay result on loopback and grows under injected arrival jitter
-
-### host writes `peers_` from the libdatachannel thread in `onDataChannel` (bug)
-
-`pc->onDataChannel` runs on libdatachannel's thread and `setupDataChannel` / `setupStateChannel` assign `peers_[peerId].dc` / `.dcState` right there, while the Qt thread reads and writes the same `QHash` (the other callbacks like `onOpen` and `onMessage` already hop over with `QMetaObject::invokeMethod`). Only the answerer side (the host) takes this path, and it happens once per join, so it is rare, but it is a data race on a `QHash`.
-
-Done when:
-- [ ] the channel bookkeeping of an incoming data channel runs on the Qt thread like the rest of the callbacks
-- [ ] `network_sync_gym` still passes
-
-### LAN join has no secret: the code is the host's IP and port, anyone on the network can join (enhancement)
-
-A LAN code is just base36 of the host's private IP and signaling port (`encodeLanCode`), the embedded signaling server accepts every websocket and relays every offer, and it speaks plain `ws://`. The data channels are still DTLS-encrypted, but nothing a joiner has to know is secret: a port scan on the LAN finds the host and anyone can drop into the session. This is the concrete gap behind the "secure foundation" question in shapes-and-stone#8; the PeerJS side is fine as a dependency (self-hostable via `signalingUrl`) and its 6-char room ids are at least random.
-
-Done when:
-- [ ] a LAN code carries a random secret the host's signaling server checks before it relays an offer or answer
-- [ ] the gym still connects three instances with the new codes
-
-### network docs disagree with the code: `peerStats` "when verbose", Cloud "requires internet", `LAN`/`Internet` names (bug)
-
-Three places where the network docs say something the code does not: the README lists `peerStats` and latency as "when verbose" while the ping timer and stats are always on; the qdoc says Cloud mode "requires internet connectivity" while the README documents `clay-dev-server` as an offline relay for it; and both docs call the modes `Internet` / `LAN` while the enum and every property say `Cloud` / `Local` (which is what shapes-and-stone#8 tripped over).
-
-Done when:
-- [ ] the three statements match the code, using the enum names
+- [#290](https://github.com/MisterGC/clayground/issues/290) `StateInterpolator` stamps snapshots with arrival time, so a late burst makes the remote avatar jump (the spike in the table above)
+- [#291](https://github.com/MisterGC/clayground/issues/291) `StateInterpolator` should size its delay from observed jitter instead of a fixed `delayMs` (replaces the round-trip rule in `RemotePlayer.qml`)
+- [#292](https://github.com/MisterGC/clayground/issues/292) host writes `peers_` from the libdatachannel thread in `onDataChannel`
+- [#293](https://github.com/MisterGC/clayground/issues/293) LAN join has no secret: the code is the host's IP and port, anyone on the network can join
+- [#294](https://github.com/MisterGC/clayground/issues/294) network docs disagree with the code: `peerStats` "when verbose", Cloud "requires internet", `LAN`/`Internet` names

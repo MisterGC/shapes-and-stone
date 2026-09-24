@@ -42,7 +42,7 @@ PhysicsItem {
     // missed steps on a LAN. Over the internet the buffer has to absorb
     // jitter we cannot measure directly, so the round trip widens it -
     // a game-side stand-in until StateInterpolator adapts its delay itself
-    // (clayground issue linked from docs/multiplayer-sync.md).
+    // (clayground #291).
     StateInterpolator {
         id: sync
         delayMs: 50 + Math.min(100, Math.max(0, rp.rttMs))
