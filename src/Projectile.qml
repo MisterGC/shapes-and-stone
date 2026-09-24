@@ -1,6 +1,7 @@
 import QtQuick
 import Box2D
 import Clayground.Physics
+import Clayground.World
 
 PhysicsItem {
     id: projectile
@@ -26,6 +27,16 @@ PhysicsItem {
     // Player sensor (detects hit without pushing)
     property alias sensorCategories: playerSensor.categories
     property alias sensorCollidesWith: playerSensor.collidesWith
+
+    // It lights its own way through the dark
+    Light2d {
+        offsetXWu: projectile.widthWu / 2
+        offsetYWu: -projectile.heightWu / 2
+        radius: 2.5
+        color: "#9ADD55"
+        intensity: 0.9
+        castsShadows: false
+    }
 
     // Visual: sickly green glowing orb
     Rectangle {
@@ -101,8 +112,7 @@ PhysicsItem {
             let sp = entity.getShieldWorldPos()
             if (gameWorld) {
                 gameWorld.playImpact()
-                gameWorld.shake(0.5)
-                gameWorld.spawnDeflectParticles(sp.x, sp.y)
+                gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
             }
             destroyed = true
             destroy()
@@ -110,7 +120,7 @@ PhysicsItem {
         }
         entity.takeDamage(damage, xWu, yWu)
         if (gameWorld) {
-            gameWorld.shake(1)
+            gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
             gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
         }
         die()
@@ -119,7 +129,7 @@ PhysicsItem {
     function die() {
         if (destroyed) return
         destroyed = true
-        if (gameWorld) gameWorld.spawnSpitParticles(xWu, yWu)
+        if (gameWorld) gameWorld.impact("projectileBurst", xWu, yWu, -dirX, -dirY)
         destroy()
     }
 }

@@ -118,6 +118,21 @@ PhysicsItem {
     // Healing state (set by Campfire)
     property bool isHealing: false
 
+    // Contact shadow: grounds the shape on the floor
+    Rectangle {
+        z: -1
+        visible: gameWorld ? gameWorld.fx : false
+        width: parent.width * 0.92
+        // Kept inside the body's bounds: a child reaching outside inflates
+        // childrenRect and skews the physics debug draw
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
+
     // Visual: Steel Blue circle (Knight)
     Rectangle {
         id: visual
@@ -191,6 +206,21 @@ PhysicsItem {
         SequentialAnimation {
             id: dashFlash
             PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
+        }
+
+        // Hurt flash: white for a few frames, then back
+        Rectangle {
+            id: hurtFlashRect
+            anchors.fill: parent
+            radius: parent.radius
+            color: "white"
+            opacity: 0
+        }
+        SequentialAnimation {
+            id: hurtFlash
+            PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0.95 }
+            PauseAnimation { duration: 50 }
+            NumberAnimation { target: hurtFlashRect; property: "opacity"; to: 0; duration: 140 }
         }
 
         // Parry glow
@@ -380,6 +410,25 @@ PhysicsItem {
             var startAngle = -swingRange / 2
             var currentAngle = startAngle + (swingProgress * swingRange)
 
+            // Smear: a crescent over the path the blade has covered, brightest
+            // just behind the blade, fading towards where the swing began.
+            if (gameWorld && gameWorld.fx) {
+                var segs = 10
+                var covered = currentAngle - startAngle
+                for (var sI = 0; sI < segs; sI++) {
+                    var a0 = startAngle + covered * sI / segs
+                    var a1 = startAngle + covered * (sI + 1) / segs + 0.01
+                    var k = (sI + 1) / segs
+                    var inner = innerRadius * 1.3 + (radius - innerRadius) * 0.35 * (1 - k)
+                    ctx.beginPath()
+                    ctx.arc(centerX, centerY, radius * (0.96 + 0.04 * k), a0, a1)
+                    ctx.arc(centerX, centerY, inner, a1, a0, true)
+                    ctx.closePath()
+                    ctx.fillStyle = "rgba(210, 236, 255, " + (swingOpacity * 0.55 * k * k) + ")"
+                    ctx.fill()
+                }
+            }
+
             // Draw motion trails (3 curved arcs = "cut air" effect)
             var arcSpan = 0.18  // ~10 degrees per arc
             for (var i = 3; i >= 1; i--) {
@@ -557,7 +606,10 @@ PhysicsItem {
                     parryGlow.restart()
                     if (gameWorld) {
                         gameWorld.playImpact()
-                        gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
+                        if (gameWorld.impact)
+                            gameWorld.impact("parry", enemy.xWu, enemy.yWu, enemy.xWu - xWu, enemy.yWu - yWu)
+                        else
+                            gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFD700")
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
                     }
@@ -620,8 +672,13 @@ PhysicsItem {
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
+        if (!blocked) hurtFlash.restart()
         if (gameWorld) {
-            gameWorld.shake(blocked ? 1 : 3)
+            if (gameWorld.impact)
+                gameWorld.impact(blocked ? "playerBlocked" : "playerHit", xWu, yWu,
+                                 xWu - attackerX, yWu - attackerY)
+            else
+                gameWorld.shake(blocked ? 1 : 3)
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
     }

@@ -1,6 +1,7 @@
 import QtQuick
 import Box2D
 import Clayground.Physics
+import Clayground.World
 
 RectBoxBody {
     id: campfire
@@ -18,6 +19,18 @@ RectBoxBody {
     property real healRate: 5.0  // HP per second
     property real healRadius: 3.0
     property bool _isHealing: false
+
+    // The camp's main light, burning restlessly
+    Light2d {
+        // xWu/yWu of a body are its top-left corner
+        offsetXWu: campfire.widthWu / 2
+        offsetYWu: -campfire.heightWu / 2
+        radius: 11
+        color: "#FF9440"
+        intensity: 1.1
+        flicker: 0.6
+        castsShadows: false
+    }
 
     // Warm glow with pulse
     Rectangle {

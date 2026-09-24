@@ -32,6 +32,21 @@ PhysicsItem {
     fixedRotation: true
     gravityScale: 0
 
+    // Contact shadow: grounds the shape on the floor
+    Rectangle {
+        z: -1
+        visible: gameWorld ? gameWorld.fx : false
+        width: parent.width * 0.92
+        // Kept inside the body's bounds: a child reaching outside inflates
+        // childrenRect and skews the physics debug draw
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
+
     // Visual: colored circle with icon
     Rectangle {
         id: visual

@@ -13,21 +13,44 @@ Rectangle {
     property real widthWu: 1
     property real heightWu: 1
 
+    // Procedural ground (see shaders/floor.frag); false shows the flat floor
+    property bool fx: true
+    // "stone" (dungeon flagstones) or "earth" (village ground)
+    property string style: "stone"
+    property real seed: 0
+
+    // Beneath stains, walls and everything that moves
+    z: -2
+
     // Convert world units to pixels (match PhysicsItem convention)
     x: xWu * pixelPerUnit
     y: parent ? parent.height - yWu * pixelPerUnit : 0
     width: widthWu * pixelPerUnit
     height: heightWu * pixelPerUnit
 
-    // Visual: Dark floor color
-    color: "#252538"
+    // Visual: dark floor colour. With fx on the stone is a neutral grey -
+    // the bluish tone turned salmon under warm torchlight.
+    color: fx ? "#2B2A2C" : "#252538"
 
     // Subtle grid pattern
     Rectangle {
         anchors.fill: parent
+        visible: !floor.fx
         color: "transparent"
         border.color: "#303050"
         border.width: 1
         opacity: 0.5
+    }
+
+    ShaderEffect {
+        anchors.fill: parent
+        visible: floor.fx
+        fragmentShader: "shaders/floor.frag.qsb"
+        property vector2d sizeWu: Qt.vector2d(floor.widthWu, floor.heightWu)
+        property real pixelsPerWu: 12
+        property real style: floor.style === "earth" ? 1 : 0
+        property real seed: floor.seed
+        property color baseColor: floor.color
+        property color seamColor: Qt.darker(floor.color, 1.45)
     }
 }
