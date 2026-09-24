@@ -8,6 +8,10 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../clayground clayground_build)
 
 include(clayapp)
 
+# Images and sounds, loaded relative to the QML ("assets/...") - without them
+# in the resources the native app has no cover art, no music and no sound.
+file(GLOB SNS_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS src/assets/*)
+
 clay_app(shapes_and_stone
 
     VERSION 0.1
@@ -31,4 +35,7 @@ clay_app(shapes_and_stone
         src/TitleScreen.qml
         src/MultiplayerLobby.qml
         src/RemotePlayer.qml
+
+    RES_FILES
+        ${SNS_ASSETS}
 )
