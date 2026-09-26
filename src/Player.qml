@@ -118,14 +118,58 @@ PhysicsItem {
     // Healing state (set by Campfire)
     property bool isHealing: false
 
+    // Contact shadow: grounds the shape on the floor
+    Rectangle {
+        z: -1
+        visible: gameWorld ? gameWorld.fx : false
+        width: parent.width * 0.92
+        // Kept inside the body's bounds: a child reaching outside inflates
+        // childrenRect and skews the physics debug draw
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
+
+    // Life: breathing at rest, a step bob and a lean while walking.
+    // Visual only - the body and its collider do not move.
+    readonly property bool _fx: gameWorld ? gameWorld.fx === true : false
+    readonly property real _moveAmount: Math.min(1, Math.sqrt(moveX * moveX + moveY * moveY))
+    property real _lifeT: 0
+    NumberAnimation on _lifeT {
+        running: player._fx
+        from: 0; to: 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+    readonly property real _breath: Math.sin(_lifeT * 2.4) * (1 - _moveAmount)
+    readonly property real _step: Math.abs(Math.sin(_lifeT * 11)) * _moveAmount
+
     // Visual: Steel Blue circle (Knight)
     Rectangle {
         id: visual
         anchors.centerIn: parent
         width: parent.width
         height: parent.height
+        transform: [
+            Scale {
+                origin.x: visual.width / 2; origin.y: visual.height
+                xScale: player._fx ? 1 - 0.02 * player._breath + 0.03 * player._step : 1
+                yScale: player._fx ? 1 + 0.03 * player._breath - 0.05 * player._step : 1
+            },
+            Translate {
+                x: player._fx ? player.moveX * visual.width * 0.04 : 0
+                y: player._fx ? -player._step * visual.height * 0.07 : 0
+            }
+        ]
         color: "#4A90A4"  // Steel Blue
         radius: width * .5
+
+        BodyShade {
+            visible: gameWorld ? gameWorld.fx : false
+            baseColor: visual.color
+        }
 
         // Healing shimmer
         Rectangle {
@@ -193,6 +237,21 @@ PhysicsItem {
             PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
         }
 
+        // Hurt flash: white for a few frames, then back
+        Rectangle {
+            id: hurtFlashRect
+            anchors.fill: parent
+            radius: parent.radius
+            color: "white"
+            opacity: 0
+        }
+        SequentialAnimation {
+            id: hurtFlash
+            PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0.95 }
+            PauseAnimation { duration: 50 }
+            NumberAnimation { target: hurtFlashRect; property: "opacity"; to: 0; duration: 140 }
+        }
+
         // Parry glow
         Rectangle {
             id: parryGlowRect
@@ -205,6 +264,53 @@ PhysicsItem {
         SequentialAnimation {
             id: parryGlow
             PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
+        }
+    }
+
+    // The lantern: carried in the off hand, a quarter turn from the facing
+    // direction, swinging a little with each step. The light around the
+    // knight has a source you can see.
+    Item {
+        id: lantern
+        visible: player._fx
+        readonly property real angleRad: (facingAngle + 100) * Math.PI / 180
+        readonly property real orbit: player.width * 0.62
+        readonly property real swing: Math.sin(player._lifeT * 5.5) * player._moveAmount * player.width * 0.05
+        width: player.width * 0.26
+        height: width * 1.25
+        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbit + swing
+        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbit
+        z: facingAngle > 0 && facingAngle < 180 ? -0.5 : 1
+        // Halo
+        Rectangle {
+            anchors.centerIn: glass
+            width: lantern.width * 2.2
+            height: width
+            radius: width / 2
+            color: "#FFD27A"
+            opacity: 0.18 + 0.05 * Math.sin(player._lifeT * 13)
+        }
+        // Handle, cage and the flame behind the glass
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: parent.width * 0.5; height: parent.height * 0.18
+            radius: height / 2
+            color: "transparent"
+            border.color: "#2A2420"; border.width: Math.max(1, width * 0.18)
+        }
+        Rectangle {
+            id: glass
+            y: parent.height * 0.14
+            width: parent.width; height: parent.height * 0.86
+            radius: width * 0.2
+            color: "#FFE8A8"
+            border.color: "#3A302A"; border.width: Math.max(1, width * 0.14)
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.34; height: parent.height * 0.42
+                radius: width / 2
+                color: "#FFFFFF"
+            }
         }
     }
 
@@ -379,6 +485,25 @@ PhysicsItem {
             var swingRange = Math.PI * 0.67
             var startAngle = -swingRange / 2
             var currentAngle = startAngle + (swingProgress * swingRange)
+
+            // Smear: a crescent over the path the blade has covered, brightest
+            // just behind the blade, fading towards where the swing began.
+            if (gameWorld && gameWorld.fx) {
+                var segs = 10
+                var covered = currentAngle - startAngle
+                for (var sI = 0; sI < segs; sI++) {
+                    var a0 = startAngle + covered * sI / segs
+                    var a1 = startAngle + covered * (sI + 1) / segs + 0.01
+                    var k = (sI + 1) / segs
+                    var inner = innerRadius * 1.3 + (radius - innerRadius) * 0.35 * (1 - k)
+                    ctx.beginPath()
+                    ctx.arc(centerX, centerY, radius * (0.96 + 0.04 * k), a0, a1)
+                    ctx.arc(centerX, centerY, inner, a1, a0, true)
+                    ctx.closePath()
+                    ctx.fillStyle = "rgba(210, 236, 255, " + (swingOpacity * 0.55 * k * k) + ")"
+                    ctx.fill()
+                }
+            }
 
             // Draw motion trails (3 curved arcs = "cut air" effect)
             var arcSpan = 0.18  // ~10 degrees per arc
@@ -557,7 +682,10 @@ PhysicsItem {
                     parryGlow.restart()
                     if (gameWorld) {
                         gameWorld.playImpact()
-                        gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
+                        if (gameWorld.impact)
+                            gameWorld.impact("parry", enemy.xWu, enemy.yWu, enemy.xWu - xWu, enemy.yWu - yWu)
+                        else
+                            gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFD700")
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
                     }
@@ -620,8 +748,13 @@ PhysicsItem {
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
+        if (!blocked) hurtFlash.restart()
         if (gameWorld) {
-            gameWorld.shake(blocked ? 1 : 3)
+            if (gameWorld.impact)
+                gameWorld.impact(blocked ? "playerBlocked" : "playerHit", xWu, yWu,
+                                 xWu - attackerX, yWu - attackerY)
+            else
+                gameWorld.shake(blocked ? 1 : 3)
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
     }
