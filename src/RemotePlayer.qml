@@ -11,6 +11,7 @@ PhysicsItem {
     property real facingAngle: 0
     property int actionState: 0   // 0=idle, 1=atk, 2=block, 3=dash
     property int remoteHp: 120
+    property int rttMs: -1        // best round trip the network measured, -1 unknown
 
     widthWu: 1.0
     heightWu: 1.0
@@ -29,16 +30,27 @@ PhysicsItem {
     // Snapshot-buffer interpolation: the avatar renders a small constant
     // delay in the past so it always blends between two received states.
     // (A Behavior on xWu/yWu is the wrong tool here - see clayground #139.)
-    function pushState(data) {
-        sync.push(data)
+    // sentAt is the sender's clock from Network.stateReceived (clayground
+    // #290); older plugins pass nothing and the interpolator falls back to
+    // the arrival time.
+    function pushState(data, sentAt) {
+        sync.push(data, sentAt)
         actionState = data.s !== undefined ? data.s : 0
         if (data.h !== undefined) remoteHp = data.h
     }
 
+    // The delay is the visible lag: at full speed (7.5 Wu/s) every 10 ms
+    // puts the avatar 0.075 Wu behind where the player really is. Game.qml
+    // sends a snapshot per physics step (~16 ms), so 50 ms covers three
+    // missed steps on a LAN. Over the internet the buffer has to absorb
+    // jitter: with a plugin that has clayground #291 the interpolator sizes
+    // the delay from the observed jitter itself; older plugins get the
+    // round trip added as a stand-in.
     StateInterpolator {
         id: sync
-        delayMs: 120
+        delayMs: 50 + Math.min(100, Math.max(0, rp.rttMs))
         angleKeys: ["a"]
+        Component.onCompleted: if ("autoDelay" in sync) sync.autoDelay = true
         onUpdated: {
             rp.xWu = value.x
             rp.yWu = value.y

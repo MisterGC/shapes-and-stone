@@ -389,9 +389,9 @@ ClayWorld2d {
             }
         }
 
-        onStateReceived: (fromId, data) => {
+        onStateReceived: (fromId, data, sentAt) => {
             let rp = remotePlayers[fromId]
-            if (rp) rp.pushState(data)
+            if (rp) rp.pushState(data, sentAt)
         }
 
         onNodeLeft: (nodeId) => {
@@ -411,12 +411,15 @@ ClayWorld2d {
         anchors.margins: 10
     }
 
-    // Player state broadcast (~20 Hz)
-    Timer {
-        interval: 50
-        repeat: true
-        running: screen === "game" && gameNetwork.connected && player !== null
-        onTriggered: {
+    // Player state broadcast: one snapshot per physics step (60 Hz), so the
+    // stream carries exactly the motion the simulation produced instead of a
+    // free-running timer sampling it. The lossy state channel makes the rate
+    // cheap; the payoff is that RemotePlayer can render only ~50 ms behind
+    // (see docs/multiplayer-sync.md for the measurements behind this).
+    Connections {
+        target: world.physics
+        enabled: screen === "game" && gameNetwork.connected && player !== null
+        function onStepped() {
             gameNetwork.broadcastState({
                 x: player.xWu,
                 y: player.yWu,
@@ -1570,6 +1573,7 @@ ClayWorld2d {
             yWu: py,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
+            rttMs: Qt.binding(() => gameNetwork.latency),
             fx: Qt.binding(() => world.fx)
         })
         if (rp) {

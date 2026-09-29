@@ -1,4 +1,5 @@
 import QtQuick
+import Clayground.Network
 import Clayground.Sound
 
 Item {
@@ -9,6 +10,14 @@ Item {
 
     property var network: null
     property string playerName: "Knight"
+
+    // Signaling: LAN runs the host's embedded signaling server (no internet,
+    // same network only, native builds only); Internet goes through the
+    // PeerJS cloud server and also reaches browser instances. Joiners need
+    // no switch: the plugin detects LAN codes ("L...-...") by their shape.
+    readonly property bool isBrowser: Qt.platform.os === "wasm"
+    property bool lanMode: false
+    function looksLikeLanCode(code) { return code.startsWith("L") && code.indexOf("-") > 0 }
 
     Sound {
         id: menuHoverSound
@@ -77,6 +86,47 @@ Item {
             }
         }
 
+        // Signaling mode (host side; hidden in the browser, which is Internet only)
+        Row {
+            visible: !isBrowser && !network.connected && network.status !== 1
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 8
+
+            Repeater {
+                model: [{label: "Internet", lan: false}, {label: "LAN", lan: true}]
+                delegate: Rectangle {
+                    width: 100; height: 28; radius: 4
+                    color: lobby.lanMode === modelData.lan ? "#444A90A4" : "#22FFFFFF"
+                    border.color: lobby.lanMode === modelData.lan ? "#4A90A4" : "#555555"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        color: lobby.lanMode === modelData.lan ? "#FFFFFF" : "#999999"
+                        font.pixelSize: 12
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (lobby.lanMode !== modelData.lan) menuHoverSound.play()
+                            lobby.lanMode = modelData.lan
+                        }
+                    }
+                }
+            }
+        }
+
+        Text {
+            visible: !isBrowser && !network.connected && network.status !== 1
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: lobby.lanMode ? "Same network, no internet needed, native players only"
+                                : "Works across the internet and with browser players"
+            color: "#777777"
+            font.pixelSize: 10
+        }
+
         // Host / Join buttons (pre-connection)
         Row {
             visible: !network.connected && network.status !== 1 // Not connecting
@@ -100,6 +150,8 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         menuConfirmSound.play()
+                        network.signalingMode = lobby.lanMode
+                            ? Network.SignalingMode.Local : Network.SignalingMode.Cloud
                         network.host()
                     }
                 }
@@ -122,8 +174,13 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         menuConfirmSound.play()
-                        if (codeInput.text.length > 0)
-                            network.join(codeInput.text)
+                        let code = codeInput.text.trim()
+                        if (code.length === 0) return
+                        if (isBrowser && looksLikeLanCode(code)) {
+                            statusText.text = "LAN codes only work in the native game"
+                            return
+                        }
+                        network.join(code)
                     }
                 }
             }
@@ -179,7 +236,8 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: "Code: " + network.networkId
+                text: (network.signalingMode === Network.SignalingMode.Local ? "LAN code: " : "Code: ")
+                      + network.networkId
                 color: "#4A90A4"
                 font.pixelSize: 16
                 font.bold: true
