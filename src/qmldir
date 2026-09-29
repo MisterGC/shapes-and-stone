@@ -4,6 +4,13 @@ Game 1.0 Game.qml
 Player 1.0 Player.qml
 Enemy 1.0 Enemy.qml
 Wall 1.0 Wall.qml
+WallFace 1.0 WallFace.qml
+Torch 1.0 Torch.qml
+Motes 1.0 Motes.qml
+FxParticle 1.0 FxParticle.qml
+Stain 1.0 Stain.qml
+BodyShade 1.0 BodyShade.qml
+ExitStairs 1.0 ExitStairs.qml
 Floor 1.0 Floor.qml
 Campfire 1.0 Campfire.qml
 Projectile 1.0 Projectile.qml

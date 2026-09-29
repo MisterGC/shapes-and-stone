@@ -74,6 +74,21 @@ PhysicsItem {
     property var _lastKnownTargetPos: null
     property real _pathRecalcTimer: 0
 
+    // Contact shadow: grounds the shape on the floor
+    Rectangle {
+        z: -1
+        visible: enemy._fx
+        width: parent.width * 0.92
+        // Kept inside the body's bounds: a child reaching outside inflates
+        // childrenRect and skews the physics debug draw
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
+
     // Tough enemy glow ring
     Rectangle {
         visible: tier === 2
@@ -87,9 +102,30 @@ PhysicsItem {
         opacity: 0.6
     }
 
+    // Life: breathing at rest, a bob while moving (visual only)
+    property real _lifeT: Math.random() * 10
+    NumberAnimation on _lifeT {
+        running: enemy._fx
+        from: enemy._lifeT; to: enemy._lifeT + 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+    readonly property real _speed: enemy.linearVelocity
+        ? Math.min(1, Math.sqrt(enemy.linearVelocity.x * enemy.linearVelocity.x
+                                + enemy.linearVelocity.y * enemy.linearVelocity.y) / 3) : 0
+    readonly property real _breath: Math.sin(_lifeT * 2.1) * (1 - _speed)
+    readonly property real _bob: Math.abs(Math.sin(_lifeT * 12)) * _speed
+
     // Visual
     Rectangle {
         id: visual
+        transform: [
+            Scale {
+                origin.x: visual.width / 2; origin.y: visual.height
+                xScale: enemy._fx ? 1 - 0.025 * enemy._breath + 0.03 * enemy._bob : 1
+                yScale: enemy._fx ? 1 + 0.035 * enemy._breath - 0.05 * enemy._bob : 1
+            },
+            Translate { y: enemy._fx ? -enemy._bob * visual.height * 0.06 : 0 }
+        ]
         anchors.centerIn: parent
         anchors.fill: parent
         radius: width * .5
@@ -110,6 +146,11 @@ PhysicsItem {
             return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
         }
         Behavior on color { ColorAnimation { duration: 100 } }
+
+        BodyShade {
+            visible: enemy._fx
+            baseColor: visual.color
+        }
 
         Canvas {
             id: goblinIcon
@@ -183,9 +224,72 @@ PhysicsItem {
         }
     }
 
+    // Squash on a hit, crouch while winding up, stretch into the lunge
+    property real _poseScale: !_fx ? 1
+        : aiState === "telegraph" || aiState === "shoot" ? 0.8
+        : aiState === "lunge" ? 1.15 : 1
+    Behavior on _poseScale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+    property real _squash: 1
+    SequentialAnimation {
+        id: hitSquash
+        NumberAnimation { target: enemy; property: "_squash"; to: 0.7; duration: 40 }
+        NumberAnimation { target: enemy; property: "_squash"; to: 1; duration: 220; easing.type: Easing.OutBack; easing.overshoot: 3 }
+    }
+    Binding { target: visual; property: "scale"; value: enemy._poseScale * enemy._squash }
+
+    // Eyes that glow in the dark: drawn above the darkness, so an enemy
+    // beyond the light is a pair of eyes coming closer. They sit on the
+    // icon's eyes and blink now and then.
+    Item {
+        id: glowEyes
+        parent: enemy._fx && gameWorld && gameWorld.glowParent ? gameWorld.glowParent() : enemy
+        visible: enemy._fx && enemy.aiState !== "stagger"
+        x: parent === enemy ? 0 : enemy.x
+        y: parent === enemy ? 0 : enemy.y
+        width: enemy.width
+        height: enemy.height
+        scale: visual.scale
+        readonly property bool spitter: enemy.enemyType === "spitter"
+        readonly property color eyeColor: spitter ? "#D8FF80"
+            : enemy.aiState === "telegraph" || enemy.aiState === "lunge" ? "#FFF2C0" : "#FFB040"
+        property real open: 1
+        SequentialAnimation on open {
+            loops: Animation.Infinite
+            PauseAnimation { duration: 2200 + Math.random() * 2600 }
+            NumberAnimation { to: 0.1; duration: 60 }
+            NumberAnimation { to: 1; duration: 90 }
+        }
+        Repeater {
+            model: glowEyes.spitter ? [0.5] : [0.381, 0.619]
+            Item {
+                required property var modelData
+                x: enemy.width * modelData
+                y: enemy.height * 0.44
+                // Halo, then the eye itself
+                Rectangle {
+                    width: enemy.width * (glowEyes.spitter ? 0.5 : 0.36)
+                    height: width * (0.4 + 0.6 * glowEyes.open)
+                    radius: width / 2
+                    x: -width / 2; y: -height / 2
+                    color: glowEyes.eyeColor
+                    opacity: 0.18
+                }
+                Rectangle {
+                    width: enemy.width * (glowEyes.spitter ? 0.18 : 0.13)
+                    height: width * glowEyes.open
+                    radius: width / 2
+                    x: -width / 2; y: -height / 2
+                    color: glowEyes.eyeColor
+                }
+            }
+        }
+    }
+
     Rectangle {
         id: hitFlash
         anchors.fill: visual
+        radius: visual.radius
+        scale: visual.scale
         color: "white"
         opacity: 0
         SequentialAnimation {
@@ -330,7 +434,41 @@ PhysicsItem {
         onTriggered: updateAI(interval / 1000.0)
     }
 
+    // Knockback: a shove along the blow that the AI does not steer against
+    // until it has died down (README: "push 0.25 tiles in hit direction").
+    readonly property bool _fx: gameWorld ? gameWorld.fx === true : false
+    property real _lastHitDx: 0
+    property real _lastHitDy: 0
+    property real _knockT: 0
+    property real _knockVx: 0
+    property real _knockVy: 0
+    readonly property real knockDuration: 0.12
+    function knockback(dx, dy, speed) {
+        let len = Math.sqrt(dx * dx + dy * dy)
+        if (len < 0.001) return
+        _knockVx = dx / len * speed
+        _knockVy = dy / len * speed
+        _knockT = knockDuration
+        followPath.running = false
+        hitSquash.restart()
+    }
+    Connections {
+        target: enemy.world
+        enabled: enemy._knockT > 0
+        function onStepped() {
+            let k = enemy._knockT / enemy.knockDuration
+            enemy.body.linearVelocity = Qt.point(enemy._knockVx * k, -enemy._knockVy * k)
+            enemy._knockT -= 1 / 60
+            if (enemy._knockT <= 0) {
+                enemy._knockT = 0
+                enemy.body.linearVelocity = Qt.point(0, 0)
+                followPath.running = (enemy.aiState === "patrol" || enemy.aiState === "chase")
+            }
+        }
+    }
+
     function updateAI(dt) {
+        if (_knockT > 0) return
         if (!target || !gameWorld) {
             aiState = "patrol"
             return
@@ -583,7 +721,17 @@ PhysicsItem {
         hp = Math.max(0, hp - finalDamage)
         console.log("[Enemy] Took", finalDamage, "damage, HP:", hp, blocked ? "(blocked)" : "")
         hitFlashAnimation.restart()
-        if (gameWorld) gameWorld.shake(blocked ? 0.5 : 1.5)
+        let hdx = attackerX !== undefined ? xWu - attackerX : 0
+        let hdy = attackerY !== undefined ? yWu - attackerY : 0
+        _lastHitDx = hdx
+        _lastHitDy = hdy
+        if (gameWorld) {
+            if (gameWorld.impact)
+                gameWorld.impact(blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
+            else
+                gameWorld.shake(blocked ? 0.5 : 1.5)
+        }
+        if (!blocked && hp > 0 && _fx) knockback(hdx, hdy, 7)
 
         // Guardian counter-attacks after blocking
         if (blocked && aiState !== "telegraph" && aiState !== "lunge") {
@@ -611,7 +759,10 @@ PhysicsItem {
     function die() {
         console.log("[Enemy] Died!")
         if (gameWorld) {
-            gameWorld.spawnDeathParticles(xWu, yWu)
+            if (gameWorld.impact)
+                gameWorld.impact("enemyDeath", xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
+            else
+                gameWorld.spawnDeathParticles(xWu, yWu)
             gameWorld.playDeathBurst()
         }
         destroyed = true
