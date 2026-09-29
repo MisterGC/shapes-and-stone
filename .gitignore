@@ -1,0 +1,5 @@
+# Shaders are baked from src/shaders/*.frag - by the dojo while developing,
+# by qt_add_shaders() in the build.
+*.qsb
+.clay/
+build*/

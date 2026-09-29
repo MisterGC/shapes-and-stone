@@ -30,6 +30,10 @@ ClayWorld2d {
     // Global mute
     property bool muted: true
 
+    // Atmosphere layer (lighting, procedural ground, screen effects).
+    // V toggles it for a before/after comparison.
+    property bool fx: true
+
     // Audio — switches based on levelType
     Music {
         id: dungeonAmbience
@@ -190,6 +194,171 @@ ClayWorld2d {
         _shakeIntensity = Math.max(_shakeIntensity, intensity)
     }
 
+    // --- Impact feedback --------------------------------------------------
+    // Every hit in the game reports here, so how a fight feels is tuned in
+    // one place. With fx off it falls back to the original shake only.
+    //   kind: enemyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //         parry, projectileHit, projectileDeflected, projectileBurst
+    //   (x, y): where it happened; (dx, dy): direction the blow travelled
+    //   color: the struck thing's colour (shards and stains)
+    function impact(kind, x, y, dx, dy, color) {
+        let len = Math.sqrt(dx * dx + dy * dy)
+        let nx = len > 0.001 ? dx / len : 0
+        let ny = len > 0.001 ? dy / len : 0
+        let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
+                           playerBlocked: 1, projectileHit: 1,
+                           projectileDeflected: 0.5}[kind] || 0
+        if (!fx) {
+            if (legacyShake > 0) shake(legacyShake)
+            if (kind === "enemyDeath") spawnDeathParticles(x, y)
+            else if (kind === "parry") spawnParryEffect(x, y)
+            else if (kind === "projectileDeflected") spawnDeflectParticles(x, y)
+            else if (kind === "projectileBurst") spawnSpitParticles(x, y)
+            return
+        }
+        switch (kind) {
+        case "enemyHit":
+            _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
+            spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, 7, "#FFE6A0")
+            spawnShards(x, y, nx, ny, 4, color, 0.2)
+            break
+        case "enemyBlocked":
+            _trauma(0.12); _freeze(30)
+            spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
+            break
+        case "enemyDeath":
+            _trauma(0.4); _kick(nx * 0.2, ny * 0.2); _freeze(90)
+            spawnShards(x, y, nx, ny, 12, color, 0.3)
+            spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
+            spawnRing(x, y, Qt.lighter(color, 1.4))
+            spawnStain(x, y, color)
+            break
+        case "playerHit":
+            _trauma(0.5); _kick(nx * 0.25, ny * 0.25); _freeze(75)
+            spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
+            if (screenFx) screenFx.hurt()
+            break
+        case "playerBlocked":
+            _trauma(0.18); _kick(nx * 0.08, ny * 0.08)
+            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            break
+        case "parry":
+            _trauma(0.3); _freeze(140, 0.12)
+            spawnSparks(x, y, nx, ny, 14, "#FFE066")
+            spawnRing(x, y, "#FFD700")
+            if (screenFx) screenFx.parry()
+            break
+        case "projectileHit":
+            // The player's own playerHit carries the shake; this is the splash
+            spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
+            break
+        case "projectileDeflected":
+            _trauma(0.12)
+            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            break
+        case "projectileBurst":
+            spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
+            break
+        }
+    }
+
+
+    function _trauma(t) {
+        if (gameCamera.addTrauma) gameCamera.addTrauma(t)
+        else shake(t * 6)
+    }
+    function _kick(dxWu, dyWu) {
+        if (gameCamera.kick) gameCamera.kick(dxWu, dyWu)
+    }
+    function _freeze(ms, scale) {
+        if (world.hitStop) world.hitStop(ms, scale === undefined ? 0 : scale)
+    }
+
+    Component { id: fxParticleComp; FxParticle {} }
+    Component { id: stainComp; Stain {} }
+
+    // Fragments of the struck shape, thrown along the blow
+    function spawnShards(x, y, nx, ny, count, color, sizeWu) {
+        for (let i = 0; i < count; i++) {
+            let a = Math.atan2(ny, nx) + (Math.random() - 0.5) * 2.2
+            let speed = 3 + Math.random() * 5
+            fxParticleComp.createObject(world.room, {
+                xWu: x, yWu: y,
+                velX: Math.cos(a) * speed, velY: Math.sin(a) * speed,
+                sizeWu: sizeWu * (0.6 + Math.random() * 0.8),
+                color: Qt.darker(color, 0.9 + Math.random() * 0.5),
+                lifetime: 420 + Math.random() * 300,
+                spin: (Math.random() - 0.5) * 720,
+                pixelPerUnit: world.pixelPerUnit
+            })
+        }
+    }
+
+    // Bright streaks flying off the point of contact
+    function spawnSparks(x, y, nx, ny, count, color) {
+        for (let i = 0; i < count; i++) {
+            let a = Math.atan2(ny, nx) + (Math.random() - 0.5) * 2.6
+            let speed = 6 + Math.random() * 7
+            fxParticleComp.createObject(glowParent(), {
+                xWu: x, yWu: y,
+                velX: Math.cos(a) * speed, velY: Math.sin(a) * speed,
+                sizeWu: 0.08, stretch: 4 + Math.random() * 4,
+                color: color, lifetime: 180 + Math.random() * 160,
+                shrinkTo: 0.1, z: 5,
+                pixelPerUnit: world.pixelPerUnit
+            })
+        }
+    }
+
+    Component {
+        id: ringComp
+        Rectangle {
+            id: _ring
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real rWu: 0.2
+            width: rWu * 2 * pixelPerUnit
+            height: width
+            radius: width / 2
+            x: xWu * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit - height / 2
+            color: "transparent"
+            border.width: Math.max(1, 0.08 * pixelPerUnit * (1 - opacity * 0.3))
+            z: 5
+            ParallelAnimation {
+                running: true
+                NumberAnimation { target: _ring; property: "rWu"; to: 1.6; duration: 280; easing.type: Easing.OutCubic }
+                NumberAnimation { target: _ring; property: "opacity"; from: 0.9; to: 0; duration: 280 }
+                onFinished: _ring.destroy()
+            }
+        }
+    }
+    function spawnRing(x, y, color) {
+        let r = ringComp.createObject(glowParent(), {
+            xWu: x, yWu: y, pixelPerUnit: world.pixelPerUnit
+        })
+        if (r) r.border.color = color
+    }
+
+    // Stains persist for the level; the oldest go once there are many
+    property var stains: []
+    function spawnStain(x, y, color) {
+        let s = stainComp.createObject(world.room, {
+            xWu: x, yWu: y,
+            color: Qt.darker(color, 1.7),
+            sizeWu: 0.8 + Math.random() * 0.5,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        stains.push(s)
+        dungeonObjects.push(s)
+        while (stains.length > 60) {
+            let old = stains.shift()
+            try { if (old) old.destroy() } catch (err) {}
+        }
+    }
+
     // Screen state: "title", "lobby", "game"
     property string screen: "title"
 
@@ -335,6 +504,11 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_V) {
+            fx = !fx
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_E) {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
@@ -645,12 +819,86 @@ ClayWorld2d {
     AnchoredMask {
         world: world
         target: player
-        enabled: levelType === "dungeon"
+        enabled: levelType === "dungeon" && !world.fx
         innerRadius: 4
         outerRadius: 18
         color: "#ffb060"
         darkness: "#000000"
         flicker: 0.15
+    }
+
+    // --- Atmosphere: light and screen treatment (fx on) ---------------------
+    // Coloured lights with wall shadows replace the single lantern mask. The
+    // ambient is how much of an unlit spot still shows: next to nothing deep
+    // in the dungeon, a moonlit dusk in the village.
+    LightLayer2d {
+        id: lighting
+        world: world
+        active: world.fx && screen === "game"
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : "#0c0b12"
+        // Little additive glow: it washes colours towards white-grey; the
+        // light should reveal the shapes' own colours, not tint them
+        glow: 0.1
+        falloff: 1.6
+        shadowHardness: 2.5
+    }
+
+    // The player's own lantern: small, steady, just enough to fight by
+    Light2d {
+        target: world.player
+        // xWu/yWu of a body are its top-left corner
+        offsetXWu: 0.5
+        offsetYWu: -0.5
+        enabled: world.fx && world.player !== null
+        radius: levelType === "village" ? 5.5 : 7.5
+        color: levelType === "village" ? "#FFC98A" : "#FFE2B8"
+        intensity: 1.0
+        flicker: 0.08
+        castsShadows: true
+    }
+
+    ScreenFx2d {
+        id: screenFxItem
+        world: world
+        vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
+        vignetteColor: "#000000"
+        // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
+        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15 : 0.12
+        // A touch more colour than flat: darkness already mutes everything
+        // outside the light, the lit shapes should stay vivid
+        saturation: world.fx ? 1.15 : 1
+        contrast: world.fx ? 1.05 : 1
+        // The heartbeat sets in below a quarter of the health and grows
+        // gently - a warning, not an alarm
+        lowHealth: world.fx && player && player.hp < player.maxHp * 0.25
+                   ? 0.8 * (1 - player.hp / (player.maxHp * 0.25)) : 0
+    }
+    // Screen-space hit feedback used by impact(); null with fx off
+    property var screenFx: world.fx ? screenFxApi : null
+    QtObject {
+        id: screenFxApi
+        function hurt() {
+            // A faint tint only: the knight's own white flash and the
+            // fringe pulse carry the hit; a full red screen on every spit
+            // wears the player out
+            screenFxItem.flash("#FF3020", 90, 0.12)
+            screenFxItem.pulse(0.4, 200)
+        }
+        function parry() {
+            screenFxItem.flash("#FFF0B0", 80, 0.3)
+            screenFxItem.pulse(1.0, 320)
+        }
+    }
+
+    // Where things that give off light go: above the darkness with fx on
+    function glowParent() {
+        return fx && lighting.emissive ? lighting.emissive : world.room
+    }
+
+    // Walls cast shadows: the occluder map mirrors the level grid
+    function updateOccluders() {
+        lighting.setOccluderGrid(gridWidth, gridHeight, cellSize,
+                                 (cx, cy) => grid[cy] && grid[cy][cx] === cellWall)
     }
 
     // Minimap with fog of war
@@ -708,6 +956,8 @@ ClayWorld2d {
 
     // Exit trigger sensor
     property var exitSensor: null
+    property var exitStairs: null
+    Component { id: exitStairsComponent; ExitStairs {} }
     property bool resetting: false
 
     CollisionTracker {
@@ -757,6 +1007,21 @@ ClayWorld2d {
     Component { id: playerComponent; Player {} }
     Component { id: enemyComponent; Enemy {} }
     Component { id: wallComponent; Wall {} }
+    Component { id: wallFaceComponent; WallFace {} }
+    Component { id: torchComponent; Torch {} }
+    Component { id: motesComponent; Motes {} }
+
+    function spawnMotes() {
+        // Fireflies glow on their own; dust only shows where light falls
+        let village = levelType === "village" && !fightRoomActive
+        let m = motesComponent.createObject(village ? glowParent() : world.room, {
+            widthWu: xWuMax, heightWu: yWuMax,
+            fireflies: village,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(m)
+    }
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
@@ -847,6 +1112,7 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -1063,7 +1329,10 @@ ClayWorld2d {
         // Create floor for entire dungeon area
         let floorObj = floorComponent.createObject(world.room, {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            fx: Qt.binding(() => world.fx),
+            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            seed: (levelIndex * 0.137) % 1
         })
         dungeonObjects.push(floorObj)
 
@@ -1072,6 +1341,10 @@ ClayWorld2d {
 
         // Create boundary walls
         createBoundaryWalls()
+        createWallFaces()
+        createWallRims()
+        updateOccluders()
+        spawnMotes()
 
         console.log("[Game] Built dungeon with", wallCount, "merged walls")
     }
@@ -1121,10 +1394,110 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             categories: catWall,
-            collidesWith: catPlayer | catEnemy | catProjectile
+            collidesWith: catPlayer | catEnemy | catProjectile,
+            fx: Qt.binding(() => world.fx)
         })
         dungeonObjects.push(wall)
         return wall
+    }
+
+    // Torches on the north wall of each room. Decoration draws from its own
+    // generator so the layout and enemies stay identical to a seed without it.
+    property var torches: []
+    function placeRoomTorches(decoRng) {
+        torches = []
+        for (let room of rooms) {
+            let gy = room.y + room.h
+            if (gy >= gridHeight) continue
+            let spots = []
+            for (let gx = room.x; gx < room.x + room.w; gx++)
+                if (grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                    spots.push(gx)
+            if (spots.length === 0) continue
+            let count = room.w >= 7 && spots.length >= 4 ? 2 : 1
+            for (let i = 0; i < count; i++) {
+                // Spread two torches across the wall, one sits near the middle
+                let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
+                t += (decoRng() - 0.5) * 0.15
+                let gx = spots[Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))]
+                placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75)
+            }
+        }
+    }
+
+    function placeTorch(wx, wy, color) {
+        let t = torchComponent.createObject(glowParent(), {
+            xWu: wx, yWu: wy,
+            flameColor: color || "#FF9A3C",
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(t)
+        torches.push(t)
+        return t
+    }
+
+    // A light rim on wall tops that border walkable ground to their north:
+    // the far edge of a wall, catching the same light as the faces.
+    Component {
+        id: wallRimComponent
+        Rectangle {
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real widthWu: 1
+            x: xWu * pixelPerUnit
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit
+            width: widthWu * pixelPerUnit
+            height: Math.max(2, pixelPerUnit / 12)
+            color: "#5A6A80"
+            opacity: 0.8
+        }
+    }
+    function createWallRims() {
+        for (let gy = 0; gy < gridHeight - 1; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                let isRim = grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall
+                if (!isRim) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall)
+                    gx++
+                let r = wallRimComponent.createObject(world.room, {
+                    xWu: startX * cellSize, yWu: (gy + 1) * cellSize,
+                    widthWu: (gx - startX) * cellSize,
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                })
+                dungeonObjects.push(r)
+            }
+        }
+    }
+
+    // Brick faces on every wall cell whose southern neighbour is walkable,
+    // merged into runs like the walls themselves.
+    readonly property real wallFaceWu: 0.7
+    function createWallFaces() {
+        for (let gy = 1; gy < gridHeight; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                let isFace = grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                if (!isFace) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                    gx++
+                let f = wallFaceComponent.createObject(world.room, {
+                    xWu: startX * cellSize,
+                    yWu: gy * cellSize + wallFaceWu,
+                    widthWu: (gx - startX) * cellSize,
+                    heightWu: wallFaceWu,
+                    color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                })
+                dungeonObjects.push(f)
+            }
+        }
     }
 
     function spawnPlayer(px, py) {
@@ -1196,7 +1569,8 @@ ClayWorld2d {
             xWu: px,
             yWu: py,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-            world: world.physics
+            world: world.physics,
+            fx: Qt.binding(() => world.fx)
         })
         if (rp) {
             remotePlayers[nodeId] = rp
@@ -1343,11 +1717,18 @@ ClayWorld2d {
         })
         exitSensor.opacity = 0
         dungeonObjects.push(exitSensor)
+        exitStairs = exitStairsComponent.createObject(world.room, {
+            xWu: wx, yWu: wy, widthWu: cellSize, heightWu: cellSize,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(exitStairs)
         console.log("[Game] Exit sensor placed at grid x=", exitGridX)
     }
 
     function clearDungeon() {
         exitSensor = null
+        exitStairs = null
 
         // Destroy enemies
         for (let e of enemies) {
@@ -1372,6 +1753,8 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        torches = []
+        stains = []
 
         grid = []
         rooms = []
@@ -1424,12 +1807,19 @@ ClayWorld2d {
         // Build walls and floor (cool blue palette)
         let floorObj = floorComponent.createObject(world.room, {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            fx: Qt.binding(() => world.fx),
+            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            seed: (levelIndex * 0.137) % 1
         })
         floorObj.color = "#2A3A4A"
         dungeonObjects.push(floorObj)
         createMergedWalls()
         createBoundaryWalls()
+        createWallFaces()
+        createWallRims()
+        updateOccluders()
+        spawnMotes()
 
         // Room center in world units
         let cx = (ox + roomSize / 2) * cellSize
@@ -1538,6 +1928,11 @@ ClayWorld2d {
         // Bottom wall (skip if entrance is south)
         if (entrance !== "south")
             createWallAt(x1, y1 + t, bw, t).color = wallColor
+        // Lanterns flanking the open front
+        if (entrance === "south") {
+            placeTorch(x1 + t / 2, y1 + 0.35, "#FFC870")
+            placeTorch(x2 - t / 2, y1 + 0.35, "#FFC870")
+        }
     }
 
     function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting) {
@@ -1596,11 +1991,20 @@ ClayWorld2d {
         // Build walls and floor
         let floorObj = floorComponent.createObject(world.room, {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            fx: Qt.binding(() => world.fx),
+            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            seed: (levelIndex * 0.137) % 1
         })
         dungeonObjects.push(floorObj)
         createMergedWalls()
         createBoundaryWalls()
+        createWallFaces()
+        createWallRims()
+        updateOccluders()
+        spawnMotes()
+        rooms = [{x: ox, y: oy, w: roomSize, h: roomSize}]
+        placeRoomTorches(createRng(7))
 
         // Spawn player at center
         let cx = (ox + roomSize / 2) * cellSize
@@ -1656,6 +2060,34 @@ ClayWorld2d {
         fightRoomActive = false
         clearDungeon()
         generateDungeon()
+    }
+
+    // --- Dojo scenarios: land a reload directly in the scene under test ---
+    // A fixed seed keeps the layout identical across reloads, so before/after
+    // captures compare the same room.
+    readonly property int scenarioSeed: 424242
+    function scenarios() { return ["dungeon", "village", "fight"] }
+    function applyScenario(name) {
+        muted = true
+        masterSeed = scenarioSeed
+        if (player) clearDungeon()
+        fightRoomActive = false
+        // Generate before leaving the title: with a player in place,
+        // _tryStartGame() does not build a second level on top.
+        if (name === "fight") {
+            enterFightRoom()
+        } else if (name === "village") {
+            levelIndex = 1
+            levelType = "village"
+            generateVillage()
+        } else {
+            levelIndex = 0
+            levelType = "dungeon"
+            generateDungeon()
+        }
+        screen = "game"
+        minimap.requestPaint()
+        world.forceActiveFocus()
     }
 
     // --- Seeded PRNG (mulberry32) ---

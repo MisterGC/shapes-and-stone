@@ -55,6 +55,22 @@ PhysicsItem {
     Timer { id: _attackFlash; interval: 250 }
     Timer { id: _dashFlash; interval: 150 }
 
+    // Atmosphere layer on/off (bound by Game.qml)
+    property bool fx: true
+
+    // Contact shadow, as on the local player
+    Rectangle {
+        z: -1
+        visible: rp.fx
+        width: parent.width * 0.92
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
+
     // Visual circle
     Rectangle {
         id: visual
@@ -64,6 +80,11 @@ PhysicsItem {
         color: playerColor
         radius: width * 0.5
         opacity: actionState === 3 || _dashFlash.running ? 0.5 : 1.0
+
+        BodyShade {
+            visible: rp.fx
+            baseColor: visual.color
+        }
 
         // Helmet icon (simplified, tinted)
         Canvas {

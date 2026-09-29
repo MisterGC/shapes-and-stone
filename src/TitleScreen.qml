@@ -28,7 +28,9 @@ Item {
         volume: 0.4
         loop: true
     }
-    Component.onCompleted: { titleMusic.play(); forceActiveFocus() }
+    // Deferred: Game and the canvas both take focus while they are created;
+    // grabbing it now would lose it to them and Enter would do nothing.
+    Component.onCompleted: { titleMusic.play(); Qt.callLater(forceActiveFocus) }
     Component.onDestruction: titleMusic.stop()
 
     // Background (fills area not covered by image)

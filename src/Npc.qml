@@ -32,12 +32,53 @@ PhysicsItem {
     fixedRotation: true
     gravityScale: 0
 
+    // Contact shadow: grounds the shape on the floor
+    Rectangle {
+        z: -1
+        visible: gameWorld ? gameWorld.fx : false
+        width: parent.width * 0.92
+        // Kept inside the body's bounds: a child reaching outside inflates
+        // childrenRect and skews the physics debug draw
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
+
+    // Life: breathing at rest, a bob while moving (visual only)
+    property real _lifeT: Math.random() * 10
+    NumberAnimation on _lifeT {
+        running: (gameWorld ? gameWorld.fx : false)
+        from: npc._lifeT; to: npc._lifeT + 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+    readonly property real _speed: npc.linearVelocity
+        ? Math.min(1, Math.sqrt(npc.linearVelocity.x * npc.linearVelocity.x
+                                + npc.linearVelocity.y * npc.linearVelocity.y) / 3) : 0
+    readonly property real _breath: Math.sin(_lifeT * 2.1) * (1 - _speed)
+    readonly property real _bob: Math.abs(Math.sin(_lifeT * 12)) * _speed
+
     // Visual: colored circle with icon
     Rectangle {
         id: visual
+        transform: [
+            Scale {
+                origin.x: visual.width / 2; origin.y: visual.height
+                xScale: (gameWorld ? gameWorld.fx : false) ? 1 - 0.025 * npc._breath + 0.03 * npc._bob : 1
+                yScale: (gameWorld ? gameWorld.fx : false) ? 1 + 0.035 * npc._breath - 0.05 * npc._bob : 1
+            },
+            Translate { y: (gameWorld ? gameWorld.fx : false) ? -npc._bob * visual.height * 0.06 : 0 }
+        ]
         anchors.fill: parent
         radius: width * 0.5
         color: npcColor
+
+        BodyShade {
+            visible: gameWorld ? gameWorld.fx : false
+            baseColor: visual.color
+        }
 
         Canvas {
             id: icon
