@@ -414,6 +414,7 @@ ClayWorld2d {
         player: world.player
         inGame: screen === "game"
         showLobby: screen === "lobby"
+        muted: world.muted
         onStarted: (seed) => {
             masterSeed = seed
             screen = "game"
@@ -2222,6 +2223,7 @@ ClayWorld2d {
         active: screen === "title"
         sourceComponent: Component {
             TitleScreen {
+                muted: world.muted
                 onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
                 onMultiplayerSelected: screen = "lobby"
             }

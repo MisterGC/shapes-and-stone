@@ -10,6 +10,7 @@ Item {
 
     property var network: null
     property string playerName: "Knight"
+    property bool muted: false
 
     // Signaling: LAN runs the host's embedded signaling server (no internet,
     // same network only, native builds only); Internet goes through the
@@ -22,12 +23,12 @@ Item {
     Sound {
         id: menuHoverSound
         source: "assets/menu_change.wav"
-        volume: 0.5
+        volume: muted ? 0 : 0.5
     }
     Sound {
         id: menuConfirmSound
         source: "assets/menu_confirm.wav"
-        volume: 0.6
+        volume: muted ? 0 : 0.6
     }
 
     Connections {
