@@ -75,11 +75,15 @@ PhysicsItem {
     property real _dashDirY: 0
 
     // Movement - set velocity every physics step so collision response
-    // doesn't permanently zero a component while the key is held
+    // doesn't permanently zero a component while the key is held.
+    // Dash and cooldowns count the time the step simulated: a pause, a
+    // single step or a hit stop holds them with the world (issue #33).
     Connections {
         target: player.world
         function onStepped() {
-            let dt = 1/60.0
+            let dt = player.world.timeStep
+            attackCooldown = Math.max(0, attackCooldown - dt)
+            dashCooldown = Math.max(0, dashCooldown - dt)
 
             if (fallen) {
                 player.body.linearVelocity = Qt.point(0, 0)
@@ -97,19 +101,6 @@ PhysicsItem {
                 player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
             }
             if (isAttacking) hitEnemiesInArc()
-        }
-    }
-
-    // Cooldown timer (attack + dash)
-    Timer {
-        id: cooldownTimer
-        interval: 50
-        repeat: true
-        running: attackCooldown > 0 || dashCooldown > 0
-        onTriggered: {
-            let dt = interval / 1000
-            attackCooldown = Math.max(0, attackCooldown - dt)
-            dashCooldown = Math.max(0, dashCooldown - dt)
         }
     }
 

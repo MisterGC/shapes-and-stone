@@ -430,8 +430,11 @@ PhysicsItem {
         }
     }
 
-    Timer {
+    // The AI thinks on the game clock: a pause, a single step or a hit stop
+    // holds a telegraph, a lunge or a cooldown with the world (issue #33)
+    PhysicsTimer {
         id: aiTimer
+        world: enemy.world
         interval: Balance.enemy.thinkInterval * 1000
         running: true
         repeat: true
@@ -462,7 +465,7 @@ PhysicsItem {
         function onStepped() {
             let k = enemy._knockT / enemy.knockDuration
             enemy.body.linearVelocity = Qt.point(enemy._knockVx * k, -enemy._knockVy * k)
-            enemy._knockT -= 1 / 60
+            enemy._knockT -= enemy.world.timeStep
             if (enemy._knockT <= 0) {
                 enemy._knockT = 0
                 enemy.body.linearVelocity = Qt.point(0, 0)
