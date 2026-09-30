@@ -85,6 +85,18 @@ with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
 ```
 
+Enemy AI, knockback and the knight's dash and cooldowns count the time the
+physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
+the dojo's pause, its single step and a hit stop hold them with the world.
+A new fight timing belongs on the same clock. The clock bench pauses the
+game, puts an enemy into its telegraph and the knight into its cooldowns,
+single-steps them on, hit-stops them, and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
+```
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```
