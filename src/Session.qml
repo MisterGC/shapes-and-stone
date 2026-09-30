@@ -130,6 +130,11 @@ Item {
             net.broadcast({type: "exitReached"})
     }
 
+    // Leave the session, e.g. for the title after the knight has fallen
+    function leave() {
+        net.leave()
+    }
+
     // Host: tell the joiners which level comes next
     function announceLevel(levelIndex) {
         net.broadcast({type: "levelChange", levelIndex: levelIndex})
