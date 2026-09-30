@@ -1,6 +1,11 @@
 # Shapes & Stone - A Minimalist Dungeon Crawler
 cmake_minimum_required(VERSION 3.20)
 
+# clay_app() registers the headless start check "testshapes_and_stone"
+# (QT_QPA_PLATFORM=minimal, any QML warning fails it); ctest only sees it
+# with testing enabled here at the top.
+enable_testing()
+
 # Include Clayground framework - the submodule at clayground/ pins the commit
 # the game builds against; moving the submodule is how to change it.
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/clayground/CMakeLists.txt)
