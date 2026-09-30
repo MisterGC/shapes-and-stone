@@ -28,6 +28,8 @@ Item {
     signal lobbyStartRequested()
     // The lobby was left without starting
     signal lobbyLeft()
+    // Another player hit or was hit; this screen draws the hit, no more
+    signal impactReceived(string kind, real x, real y, real dx, real dy, var color)
 
     property var remotePlayers: ({})
 
@@ -44,6 +46,8 @@ Item {
             } else if (data.type === "action") {
                 let rp = remotePlayers[fromId]
                 if (rp) rp.triggerAction(data.action)
+            } else if (data.type === "impact") {
+                session.impactReceived(data.kind, data.x, data.y, data.dx, data.dy, data.color)
             } else if (data.type === "levelChange") {
                 session.levelChanged(data.levelIndex)
             } else if (data.type === "exitReached") {
@@ -107,6 +111,13 @@ Item {
     function sendAction(action) {
         if (net.connected)
             net.broadcast({type: "action", action: action})
+    }
+
+    // A hit the local player landed or took, for the others to draw
+    function sendImpact(kind, x, y, dx, dy, color) {
+        if (net.connected && inGame)
+            net.broadcast({type: "impact", kind: kind, x: x, y: y, dx: dx, dy: dy,
+                           color: color === undefined ? undefined : String(color)})
     }
 
     // The local player reached the exit: the host advances, a joiner asks

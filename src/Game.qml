@@ -212,15 +212,19 @@ ClayWorld2d {
     //         parry, projectileHit, projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
+    //   local: false for another player's hit (default true)
     // Its world part (sparks, shards, rings, stains) belongs to the place
-    // of the hit; its screen part (shake, kick, hit-stop, flash) to the
-    // screen of whoever hit or was hit.
-    function impact(kind, x, y, dx, dy, color) {
+    // of the hit and shows on every screen; its screen part (shake, kick,
+    // hit-stop, flash) only on the screen of whoever hit or was hit. A local
+    // hit goes out to the others, who draw its world part only.
+    function impact(kind, x, y, dx, dy, color, local) {
         let len = Math.sqrt(dx * dx + dy * dy)
         let nx = len > 0.001 ? dx / len : 0
         let ny = len > 0.001 ? dy / len : 0
         _impactWorld(kind, x, y, nx, ny, color)
+        if (local === false) return
         _impactScreen(kind, nx, ny)
+        session.sendImpact(kind, x, y, dx, dy, color)
     }
 
     function _impactWorld(kind, x, y, nx, ny, color) {
@@ -418,7 +422,14 @@ ClayWorld2d {
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
+        onImpactReceived: (kind, x, y, dx, dy, color) => {
+            if (screen === "game") impact(kind, x, y, dx, dy, color, false)
+        }
     }
+
+    // The host simulates for everyone: its hit stop holds the picture and
+    // lets the simulation run on, so a hit never stalls the others
+    hitStopMode: session.connected && session.isHost ? "view" : "physics"
 
     // Game state
     property var player: null
