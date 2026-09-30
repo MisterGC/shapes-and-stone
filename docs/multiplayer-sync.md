@@ -84,7 +84,7 @@ It needs the Clayground live loader, which the game's own build does not
 produce (tools are off there). Build clayground out of tree with tools:
 
 ```
-cmake -S ../clayground -B build-claytools -G Ninja \
+cmake -S clayground -B build-claytools -G Ninja \
   -DCMAKE_PREFIX_PATH=$HOME/Qt/6.11.2/gcc_64 -DCMAKE_BUILD_TYPE=Release \
   -DCLAYGROUND_WITH_TOOLS=ON -DCLAYGROUND_WITH_EXAMPLES=OFF -DBUILD_TESTING=ON
 cmake --build build-claytools -j8
