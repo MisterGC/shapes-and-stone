@@ -434,8 +434,6 @@ ClayWorld2d {
             if (!player) return
             if (mouse.button === Qt.LeftButton) {
                 player.attack()
-                // Reliable event so remote clients show the swing crisply
-                if (player.isAttacking) session.sendAction("attack")
             }
             if (mouse.button === Qt.RightButton) player.isBlocking = true
         }
@@ -501,7 +499,6 @@ ClayWorld2d {
         onButtonBPressedChanged: {
             if (buttonBPressed && player) {
                 player.dash()
-                if (player.isDashing) session.sendAction("dash")
             }
         }
     }
@@ -753,6 +750,13 @@ ClayWorld2d {
                 onClicked: muted = !muted
             }
         }
+    }
+
+    // Reliable events so the other players see swings, dashes, parries and
+    // hits crisply, not only when the sampled state catches them
+    Connections {
+        target: player
+        function onActed(action) { session.sendAction(action) }
     }
 
     // Track player movement for minimap exploration

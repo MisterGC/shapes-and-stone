@@ -107,6 +107,10 @@ PhysicsItem {
         }
     }
 
+    // A moment others should see: "attack", "dash", "parry" or "hurt".
+    // Game.qml sends it to the other players, whose RemotePlayer shows it.
+    signal acted(string action)
+
     // Healing state (set by Campfire)
     property bool isHealing: false
 
@@ -241,6 +245,7 @@ PhysicsItem {
                     enemy.stagger()
                     attackCooldown = 0
                     view.parry()
+                    acted("parry")
                     if (gameWorld) {
                         gameWorld.playImpact()
                         if (gameWorld.impact)
@@ -309,7 +314,10 @@ PhysicsItem {
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
-        if (!blocked) view.hurt()
+        if (!blocked) {
+            view.hurt()
+            acted("hurt")
+        }
         if (gameWorld) {
             if (gameWorld.impact)
                 gameWorld.impact(blocked ? "playerBlocked" : "playerHit", xWu, yWu,
@@ -339,6 +347,7 @@ PhysicsItem {
         _dashTimer = dashDuration
         dashCooldown = dashCooldownTime
         view.dash(dashDuration * 1000)
+        acted("dash")
         if (gameWorld) gameWorld.playDash()
     }
 
@@ -348,6 +357,7 @@ PhysicsItem {
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
             view.swing()
+            acted("attack")
             if (!isDashing && gameWorld) gameWorld.playSwordSwing()
             console.log("[Player] Attack! Facing:", facingAngle.toFixed(0), "degrees")
         }

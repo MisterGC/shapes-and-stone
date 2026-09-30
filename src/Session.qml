@@ -138,7 +138,7 @@ Item {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             rttMs: Qt.binding(() => net.latency),
-            fx: Qt.binding(() => world.fx)
+            gameWorld: world
         })
         if (rp) {
             remotePlayers[nodeId] = rp
