@@ -62,6 +62,17 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
+At 0 HP the knight falls: the enemies stop and a screen shows how deep the
+run got, counted in dungeons from depth 0. Enter starts a new run from depth
+0 on a new seed, Esc returns to the title. In a session only Esc is offered,
+and it leaves the session. The fall bench brings the knight down twice, goes
+again with Enter and back to the title with Esc, and exits with the number
+of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fallen/fallen.qml
+```
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```
