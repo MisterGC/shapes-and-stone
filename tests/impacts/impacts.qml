@@ -6,8 +6,9 @@
 // Enemy and Projectile report them. The other side must draw the hit's
 // sparks and shards, and must neither shake, kick, flash nor hit-stop; the
 // side that landed it must. The host keeps its simulation at full speed for
-// its own hit stops too, since others see what it simulates. Prints one
-// PASS or FAIL line per check and exits with the number of failures.
+// its own hit stops too, and so does the joiner: in a session others see
+// what each node simulates. Prints one PASS or FAIL line per check and
+// exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/impacts/impacts.qml
 
@@ -146,7 +147,11 @@ Window {
 
     // Steps: [condition to wait for (or null), action]
     property var steps: [
-        [() => hostNet.networkId !== "", () => joinNet.join(hostNet.networkId)],
+        [() => hostNet.networkId !== "", () => {
+            // Not in a session yet: solo play keeps the physics hit stop
+            check(joiner.hitStopMode === "physics", "a game outside a session keeps the physics hit stop (" + joiner.hitStopMode + ")")
+            joinNet.join(hostNet.networkId)
+        }],
         [() => hostNet.connected && joinNet.connected && hostNet.nodeCount >= 2,
          () => host._startMultiplayerGame()],
         [() => host.player && joiner.player && host.screen === "game" && joiner.screen === "game"
@@ -155,11 +160,15 @@ Window {
          () => {
             console.log("[Impacts] both in game, host", hostNet.nodeId, "joiner", joinNet.nodeId)
             check(host.hitStopMode === "view", "the host's hit stop holds the picture, not the simulation (" + host.hitStopMode + ")")
-            check(joiner.hitStopMode === "physics", "the joiner's hit stop stays as it was (" + joiner.hitStopMode + ")")
+            check(joiner.hitStopMode === "view", "the joiner's hit stop holds the picture, not the simulation (" + joiner.hitStopMode + ")")
         }],
         // Let the level's start settle, then the joiner hits
         [1500, () => landHits(joiner, host)],
-        [600, () => report("the joiner", "the host")],
+        [600, () => {
+            report("the joiner", "the host")
+            // The joiner's own hit stop held the picture only
+            check(!sent.slowed, "the joiner keeps its simulation at full speed for its own hits")
+        }],
         [300, () => landHits(host, joiner)],
         [600, () => {
             report("the host", "the joiner")

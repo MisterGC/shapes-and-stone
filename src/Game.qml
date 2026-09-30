@@ -427,9 +427,10 @@ ClayWorld2d {
         }
     }
 
-    // The host simulates for everyone: its hit stop holds the picture and
-    // lets the simulation run on, so a hit never stalls the others
-    hitStopMode: session.connected && session.isHost ? "view" : "physics"
+    // In a session every node simulates something the others see (the host
+    // the world, each player its own knight): the hit stop holds the picture
+    // and lets the simulation run on, so a hit never stalls the others
+    hitStopMode: session.connected ? "view" : "physics"
 
     // Game state
     property var player: null
