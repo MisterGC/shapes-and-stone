@@ -663,6 +663,7 @@ ClayWorld2d {
 
     // Mute indicator (always visible when muted)
     Rectangle {
+        objectName: "muteIcon"
         anchors.top: minimap.bottom
         anchors.right: parent.right
         anchors.topMargin: 4
