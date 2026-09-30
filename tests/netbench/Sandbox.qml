@@ -1,6 +1,6 @@
 // Net bench - measures the game's player-sync path end to end.
 //
-// Mirrors Game.qml/RemotePlayer.qml exactly: the same Network settings,
+// Mirrors Session.qml/RemotePlayer.qml exactly: the same Network settings,
 // a 50 ms Timer sampling a frame-updated position into broadcastState,
 // and a StateInterpolator (120 ms) on the receiving side. The sender moves
 // on a path that is a pure function of the wall clock, so a receiver on
@@ -19,7 +19,7 @@ Item {
 
     // ---- knobs (set by the driver before host()/join()) ----
     // sendIntervalMs <= 0 sends one snapshot per rendered frame, which is
-    // what Game.qml does since it broadcasts on every physics step.
+    // what Session.qml does since it broadcasts on every physics step.
     property int sendIntervalMs: 0
     property alias delayMs: sync.delayMs   // RemotePlayer.qml: 120
     property bool useLocalSignaling: true
