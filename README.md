@@ -73,6 +73,18 @@ of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fallen/fallen.qml
 ```
 
+Every fight number - HP, damage, timings, cooldowns, spawn counts, the heal
+rate - sits in one table, `src/Balance.qml`; tuning the fight is an edit of
+that file. In the dojo's inspector, `eval JSON.stringify(Balance)` returns
+the whole table (a bare `eval Balance` returns `null`: the inspector does
+not turn objects into JSON). The balance bench checks that the knight, the
+enemies, the fight room and the campfire carry the table's values, and exits
+with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
+```
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```
