@@ -212,15 +212,19 @@ ClayWorld2d {
     //         parry, projectileHit, projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
+    // Its world part (sparks, shards, rings, stains) belongs to the place
+    // of the hit; its screen part (shake, kick, hit-stop, flash) to the
+    // screen of whoever hit or was hit.
     function impact(kind, x, y, dx, dy, color) {
         let len = Math.sqrt(dx * dx + dy * dy)
         let nx = len > 0.001 ? dx / len : 0
         let ny = len > 0.001 ? dy / len : 0
-        let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
-                           playerBlocked: 1, projectileHit: 1,
-                           projectileDeflected: 0.5}[kind] || 0
+        _impactWorld(kind, x, y, nx, ny, color)
+        _impactScreen(kind, nx, ny)
+    }
+
+    function _impactWorld(kind, x, y, nx, ny, color) {
         if (!fx) {
-            if (legacyShake > 0) shake(legacyShake)
             if (kind === "enemyDeath") spawnDeathParticles(x, y)
             else if (kind === "parry") spawnParryEffect(x, y)
             else if (kind === "projectileDeflected") spawnDeflectParticles(x, y)
@@ -229,47 +233,71 @@ ClayWorld2d {
         }
         switch (kind) {
         case "enemyHit":
-            _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
             spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, 7, "#FFE6A0")
             spawnShards(x, y, nx, ny, 4, color, 0.2)
             break
         case "enemyBlocked":
-            _trauma(0.12); _freeze(30)
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
         case "enemyDeath":
-            _trauma(0.4); _kick(nx * 0.2, ny * 0.2); _freeze(90)
             spawnShards(x, y, nx, ny, 12, color, 0.3)
             spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
             spawnRing(x, y, Qt.lighter(color, 1.4))
             spawnStain(x, y, color)
             break
         case "playerHit":
-            _trauma(0.5); _kick(nx * 0.25, ny * 0.25); _freeze(75)
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
+            break
+        case "playerBlocked":
+            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            break
+        case "parry":
+            spawnSparks(x, y, nx, ny, 14, "#FFE066")
+            spawnRing(x, y, "#FFD700")
+            break
+        case "projectileHit":
+        case "projectileBurst":
+            spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
+            break
+        case "projectileDeflected":
+            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            break
+        }
+    }
+
+    function _impactScreen(kind, nx, ny) {
+        if (!fx) {
+            let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
+                               playerBlocked: 1, projectileHit: 1,
+                               projectileDeflected: 0.5}[kind] || 0
+            if (legacyShake > 0) shake(legacyShake)
+            return
+        }
+        switch (kind) {
+        case "enemyHit":
+            _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
+            break
+        case "enemyBlocked":
+            _trauma(0.12); _freeze(30)
+            break
+        case "enemyDeath":
+            _trauma(0.4); _kick(nx * 0.2, ny * 0.2); _freeze(90)
+            break
+        case "playerHit":
+            _trauma(0.5); _kick(nx * 0.25, ny * 0.25); _freeze(75)
             if (screenFx) screenFx.hurt()
             break
         case "playerBlocked":
             _trauma(0.18); _kick(nx * 0.08, ny * 0.08)
-            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
             break
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
-            spawnSparks(x, y, nx, ny, 14, "#FFE066")
-            spawnRing(x, y, "#FFD700")
             if (screenFx) screenFx.parry()
-            break
-        case "projectileHit":
-            // The player's own playerHit carries the shake; this is the splash
-            spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
             break
         case "projectileDeflected":
             _trauma(0.12)
-            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
             break
-        case "projectileBurst":
-            spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
-            break
+        // projectileHit: the player's own playerHit carries the shake
         }
     }
 
