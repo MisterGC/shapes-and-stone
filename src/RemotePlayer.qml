@@ -14,6 +14,7 @@ PhysicsItem {
     property real facingAngle: 0
     property int actionState: 0   // 0=idle, 1=atk, 2=block, 3=dash
     property int remoteHp: 120
+    property bool remoteBlocking: false
     property int rttMs: -1        // best round trip the network measured, -1 unknown
 
     widthWu: 1.0
@@ -39,6 +40,8 @@ PhysicsItem {
     function pushState(data, sentAt) {
         sync.push(data, sentAt)
         actionState = data.s !== undefined ? data.s : 0
+        // A sender without b only has the block in s
+        remoteBlocking = data.b !== undefined ? data.b === 1 : actionState === 2
         if (data.h !== undefined) remoteHp = data.h
     }
 
@@ -117,7 +120,7 @@ PhysicsItem {
         facingAngle: rp.facingAngle
         moveX: rp._moveX
         moveAmount: rp._moveAmount
-        blocking: rp.actionState === 2
+        blocking: rp.remoteBlocking
         dashing: rp.actionState === 3
     }
 }

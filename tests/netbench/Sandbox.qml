@@ -41,7 +41,7 @@ Item {
     property real senderA: 0
     function sendSnapshot() {
         net.broadcastState({x: bench.senderX, y: bench.senderY,
-                            a: bench.senderA, s: 0, h: 120})
+                            a: bench.senderA, s: 0, b: 0, h: 120})
     }
     FrameAnimation {
         running: bench.t0 > 0 && net.connected
