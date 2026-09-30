@@ -86,11 +86,21 @@ PhysicsItem {
 
     // Reliable action events (broadcast) trigger crisp effects even when
     // the sampled action state misses the moment.
+    // Its sounds are the local knight's, quieter and fading with distance.
     function triggerAction(name) {
-        if (name === "attack") view.swing()
-        else if (name === "dash") view.dash(150)
-        else if (name === "parry") view.parry()
-        else if (name === "hurt") view.hurt()
+        let gain = gameWorld ? gameWorld.remoteGain(xWu, yWu) : 0
+        if (name === "attack") {
+            view.swing()
+            if (gameWorld && gain > 0 && actionState !== 3) gameWorld.playSwordSwing(gain)
+        } else if (name === "dash") {
+            view.dash(150)
+            if (gameWorld && gain > 0) gameWorld.playDash(gain)
+        } else if (name === "parry") {
+            view.parry()
+            if (gameWorld && gain > 0) gameWorld.playImpact(gain)
+        } else if (name === "hurt") {
+            view.hurt()
+        }
     }
     // A swing the event has not shown yet
     onActionStateChanged: if (actionState === 1 && !view.swinging) view.swing()

@@ -90,8 +90,9 @@ ClayWorld2d {
         volume: muted ? 0 : 0.6
     }
 
-    function playImpact() {
-        impactSound.play()
+    // gain (0..1) is for sounds of another player's knight, see remoteGain()
+    function playImpact(gain) {
+        impactSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
     Sound {
@@ -106,12 +107,23 @@ ClayWorld2d {
         volume: muted ? 0 : 0.5
     }
 
-    function playDash() {
-        dashSound.play()
+    function playDash(gain) {
+        dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
-    function playSwordSwing() {
-        swordSwingSound.play()
+    function playSwordSwing(gain) {
+        swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+
+    // How loud another knight is at xWu/yWu: never as loud as your own
+    // knight, and fading to silence about a screen away from you
+    readonly property real remoteMaxGain: 0.5
+    readonly property real remoteHearingWu: 14
+    function remoteGain(xWu, yWu) {
+        if (!player) return remoteMaxGain
+        let dx = xWu - player.xWu, dy = yWu - player.yWu
+        let d = Math.sqrt(dx * dx + dy * dy)
+        return remoteMaxGain * Math.max(0, 1 - d / remoteHearingWu)
     }
 
     function playDeathBurst() {
