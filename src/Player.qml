@@ -49,6 +49,10 @@ PhysicsItem {
     property int mana: 40
     property int maxMana: 40
 
+    // At 0 HP the knight has fallen: it stands still, takes no more hits
+    // and can neither swing nor dash
+    readonly property bool fallen: hp <= 0
+
     // Combat state
     property bool isAttacking: false
     property bool isBlocking: false
@@ -77,7 +81,9 @@ PhysicsItem {
         function onStepped() {
             let dt = 1/60.0
 
-            if (isDashing) {
+            if (fallen) {
+                player.body.linearVelocity = Qt.point(0, 0)
+            } else if (isDashing) {
                 let spd = isBlocking ? dashSpeed * blockSpeedMultiplier : dashSpeed
                 player.body.linearVelocity = Qt.point(_dashDirX * spd, _dashDirY * spd)
                 _dashTimer -= dt
@@ -306,6 +312,7 @@ PhysicsItem {
     }
 
     function takeDamage(amount, attackerX, attackerY) {
+        if (fallen) return
         if (isDashing) return  // Invulnerable during dash
         let finalDamage = Math.max(1, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
@@ -329,7 +336,7 @@ PhysicsItem {
     }
 
     function dash() {
-        if (dashCooldown > 0 || isDashing) return
+        if (fallen || dashCooldown > 0 || isDashing) return
         // Use movement direction, or facing direction if stationary
         let dirX = moveX
         let dirY = moveY
@@ -352,7 +359,7 @@ PhysicsItem {
     }
 
     function attack() {
-        if (attackCooldown <= 0 && !isAttacking) {
+        if (!fallen && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
