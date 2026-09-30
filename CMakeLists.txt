@@ -51,6 +51,7 @@ clay_app(shapes_and_stone
         src/TitleScreen.qml
         src/MultiplayerLobby.qml
         src/RemotePlayer.qml
+        src/Session.qml
 
     RES_FILES
         ${SNS_ASSETS}
