@@ -22,6 +22,13 @@ cmake --build build
 dependency of Clayground's networking plugin still predates. In an existing
 clone, `git submodule update --init --recursive` fetches Clayground.
 
+To start the game headless and fail on any QML warning while it loads - the
+check every PR runs (`.github/workflows/build.yml`):
+
+```
+ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
+```
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```
