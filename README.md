@@ -6,6 +6,32 @@
 
 ---
 
+## BUILD
+
+Clayground comes in as the git submodule `clayground/`; its commit is the
+Clayground the game builds against.
+
+```
+git clone --recursive https://github.com/MisterGC/shapes-and-stone.git
+cmake -S shapes-and-stone -B build -G Ninja -DCMAKE_PREFIX_PATH=<Qt>/6.11.1/macos \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake --build build
+```
+
+`CMAKE_POLICY_VERSION_MINIMUM` is needed with CMake 4, whose policies a
+dependency of Clayground's networking plugin still predates. In an existing
+clone, `git submodule update --init --recursive` fetches Clayground.
+
+To build against another Clayground commit, move the submodule and commit it:
+
+```
+git -C clayground checkout <commit>
+git -C clayground submodule update --init --recursive
+git add clayground
+```
+
+---
+
 ## CONCEPT
 
 A 2D top-down dungeon crawler where atmosphere triumphs over graphical complexity. Players navigate procedurally generated dungeons as geometric shapes — square knights, circular sorcerers, triangular hunters — fighting through stone corridors filled with danger and discovery. Simple visuals allow a solo developer to focus on tight gameplay, immersive audio, and satisfying progression. The world is built from basic primitives: axis-aligned rectangles form the walls, color sets the mood, particles bring it to life.

@@ -1,10 +1,14 @@
 # Shapes & Stone - A Minimalist Dungeon Crawler
 cmake_minimum_required(VERSION 3.20)
 
-# Include Clayground framework
+# Include Clayground framework - the submodule at clayground/ pins the commit
+# the game builds against; moving the submodule is how to change it.
+if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/clayground/CMakeLists.txt)
+    message(FATAL_ERROR "Clayground submodule missing - run: git submodule update --init --recursive")
+endif()
 set(CLAYGROUND_WITH_TOOLS OFF)
 set(CLAYGROUND_WITH_EXAMPLES OFF)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../clayground clayground_build)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/clayground clayground_build)
 
 include(clayapp)
 
