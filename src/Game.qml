@@ -792,20 +792,6 @@ ClayWorld2d {
         shadowHardness: 2.5
     }
 
-    // The player's own lantern: small, steady, just enough to fight by
-    Light2d {
-        target: world.player
-        // xWu/yWu of a body are its top-left corner
-        offsetXWu: 0.5
-        offsetYWu: -0.5
-        enabled: world.fx && world.player !== null
-        radius: levelType === "village" ? 5.5 : 7.5
-        color: levelType === "village" ? "#FFC98A" : "#FFE2B8"
-        intensity: 1.0
-        flicker: 0.08
-        castsShadows: true
-    }
-
     ScreenFx2d {
         id: screenFxItem
         world: world

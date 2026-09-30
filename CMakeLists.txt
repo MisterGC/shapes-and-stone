@@ -34,6 +34,7 @@ clay_app(shapes_and_stone
         src/Main.qml
         src/Game.qml
         src/Player.qml
+        src/KnightView.qml
         src/Enemy.qml
         src/Wall.qml
         src/WallFace.qml
