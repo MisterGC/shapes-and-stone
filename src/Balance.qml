@@ -98,7 +98,14 @@ QtObject {
         guardianChance: 0.15,
         guardianChanceTough: 0.4,
         spitterChance: 0.2,
-        // The village fight room fills up again this long after it is cleared
+        // The village fight room: who stands where, offset in wu from its
+        // centre, and how long after it is cleared it fills up again
+        fightRoom: [
+            { dx: 4, dy: 2, tier: 1, type: "grunt" },
+            { dx: -4, dy: 2, tier: 1, type: "grunt" },
+            { dx: 0, dy: 4, tier: 2, type: "guardian" },
+            { dx: -3, dy: -3, tier: 1, type: "spitter" }
+        ],
         fightRoomRespawn: 2.0
     })
 

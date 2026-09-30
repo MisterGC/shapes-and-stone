@@ -16,8 +16,8 @@ RectBoxBody {
 
     // Healing config
     property var gameWorld: null
-    property real healRate: 5.0  // HP per second
-    property real healRadius: 3.0
+    property real healRate: Balance.campfire.healPerSecond  // HP per second
+    property real healRadius: Balance.campfire.healRadius
     property bool _isHealing: false
 
     // The camp's main light, burning restlessly
@@ -133,7 +133,7 @@ RectBoxBody {
 
     // Proximity healing + feedback
     Timer {
-        running: true; repeat: true; interval: 200
+        running: true; repeat: true; interval: Balance.campfire.healTick * 1000
         onTriggered: {
             if (!gameWorld || !gameWorld.player) return
             let p = gameWorld.player
