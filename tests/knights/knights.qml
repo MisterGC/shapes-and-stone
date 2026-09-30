@@ -23,6 +23,7 @@ Window {
     property real remoteX: 0
     property real remoteY: 0
     property int remoteState: 0
+    property bool remoteBlock: false
 
     Component.onCompleted: {
         let c = Qt.createComponent(Qt.resolvedUrl("../../src/Game.qml"))
@@ -43,7 +44,7 @@ Window {
         onTriggered: bench.remote.pushState({
             x: bench.remoteX, y: bench.remoteY,
             a: bench.game.player ? bench.game.player.facingAngle : 0,
-            s: bench.remoteState, h: 120
+            s: bench.remoteState, b: bench.remoteBlock ? 1 : 0, h: 120
         })
     }
 
@@ -90,11 +91,15 @@ Window {
         }],
         [100, () => { game.player.attack(); remote.triggerAction("attack") }],
         [120, () => capture("2-swing")],
-        [600, () => { game.player.isBlocking = true; remoteState = 2 }],
+        [600, () => { game.player.isBlocking = true; remoteState = 2; remoteBlock = true }],
         [250, () => capture("3-block")],
+        // Swinging while blocking: the state's s says attack, b keeps the shield
+        [100, () => { game.player.attack(); remote.triggerAction("attack"); remoteState = 1 }],
+        [120, () => capture("3b-block-swing")],
+        [500, () => { remoteState = 2 }],
         [100, () => { let v = view(game.player); if (v) v.parry(); remote.triggerAction("parry") }],
         [40, () => capture("4-parry")],
-        [400, () => { game.player.isBlocking = false; remoteState = 0 }],
+        [400, () => { game.player.isBlocking = false; remoteState = 0; remoteBlock = false }],
         [300, () => { let v = view(game.player); if (v) v.hurt(); remote.triggerAction("hurt") }],
         [30, () => capture("5-hurt")],
         [600, () => {
