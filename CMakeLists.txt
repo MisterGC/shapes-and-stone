@@ -17,6 +17,11 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/clayground clayground_build)
 
 include(clayapp)
 
+# The balance table is one object every file reads (Balance.knight.hp, ...).
+# The files are looked up from their own directory, :/src, so the qmldir that
+# declares the singleton goes into the resources beside them.
+set_source_files_properties(src/Balance.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 # Images and sounds, loaded relative to the QML ("assets/...") - without them
 # in the resources the native app has no cover art, no music and no sound.
 file(GLOB SNS_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS src/assets/*)
@@ -32,6 +37,7 @@ clay_app(shapes_and_stone
 
     QML_FILES
         src/Main.qml
+        src/Balance.qml
         src/Game.qml
         src/Player.qml
         src/KnightView.qml
@@ -56,6 +62,7 @@ clay_app(shapes_and_stone
         src/Session.qml
 
     RES_FILES
+        src/qmldir
         ${SNS_ASSETS}
 )
 

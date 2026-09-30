@@ -40,14 +40,14 @@ PhysicsItem {
     // Screen Y is flipped (down = positive), so we use (playerScreenY - mouseScreenY)
     property real facingAngle: Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
-    // Stats from concept doc
-    readonly property real maxSpeed: 7.5  // World units per second
-    property int hp: 120
-    property int maxHp: 120
-    property int atk: 15
-    property int def: 5
-    property int mana: 40
-    property int maxMana: 40
+    // Stats, from the balance table
+    readonly property real maxSpeed: Balance.knight.moveSpeed
+    property int hp: Balance.knight.hp
+    property int maxHp: Balance.knight.hp
+    property int atk: Balance.knight.atk
+    property int def: Balance.knight.def
+    property int mana: Balance.knight.mana
+    property int maxMana: Balance.knight.mana
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
@@ -57,19 +57,19 @@ PhysicsItem {
     property bool isAttacking: false
     property bool isBlocking: false
     property real attackCooldown: 0
-    readonly property real blockSpeedMultiplier: 0.4
-    readonly property real pushForce: 20.0          // Knockback velocity for dash-push
-    readonly property real attackDuration: 0.25  // Visual swing duration
-    readonly property real attackCooldownTime: 0.5
-    readonly property real attackRange: 2.0  // World units
-    readonly property real attackArcAngle: 60  // Degrees from facing direction
+    readonly property real blockSpeedMultiplier: Balance.knight.blockSpeed
+    readonly property real pushForce: Balance.knight.pushSpeed  // Knockback velocity for dash-push
+    readonly property real attackDuration: Balance.knight.swingDuration
+    readonly property real attackCooldownTime: Balance.knight.attackCooldown
+    readonly property real attackRange: Balance.knight.attackRange
+    readonly property real attackArcAngle: Balance.knight.attackArc
 
     // Dash state
     property bool isDashing: false
     property real dashCooldown: 0
-    readonly property real dashSpeed: 40.0
-    readonly property real dashDuration: 0.15
-    readonly property real dashCooldownTime: 0.8
+    readonly property real dashSpeed: Balance.knight.dashSpeed
+    readonly property real dashDuration: Balance.knight.dashDuration
+    readonly property real dashCooldownTime: Balance.knight.dashCooldown
     property real _dashTimer: 0
     property real _dashDirX: 0
     property real _dashDirY: 0
@@ -193,7 +193,7 @@ PhysicsItem {
         // so this just needs to be a rough proximity envelope.
         Circle {
             id: attackSensor
-            radius: player.width * 1.5
+            radius: player.width * Balance.knight.attackSensor
             x: player.width / 2
             y: player.height / 2
             sensor: true
@@ -241,9 +241,9 @@ PhysicsItem {
         for (let enemy of enemiesInRange) {
             if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
                 let parried = enemy.parryWindow
-                let dmg = isBlocking ? Math.floor(atk * 0.85)
-                        : isDashing ? Math.floor(atk * 1.5) : atk
-                if (parried) dmg = atk * 2
+                let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
+                        : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
+                if (parried) dmg = atk * Balance.knight.parrySwing
                 enemy.takeDamage(dmg, xWu, yWu)
                 _hitThisSwing.add(enemy)
                 hitCount++
@@ -294,7 +294,7 @@ PhysicsItem {
         }
     }
 
-    readonly property real shieldArcAngle: 60  // ±60 degrees from facing
+    readonly property real shieldArcAngle: Balance.knight.shieldArc
 
     function isShieldFacing(attackerX, attackerY) {
         let dx = attackerX - xWu
@@ -314,10 +314,10 @@ PhysicsItem {
     function takeDamage(amount, attackerX, attackerY) {
         if (fallen) return
         if (isDashing) return  // Invulnerable during dash
-        let finalDamage = Math.max(1, amount - def)
+        let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
         if (blocked) {
-            finalDamage = Math.floor(finalDamage * 0.3)
+            finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)

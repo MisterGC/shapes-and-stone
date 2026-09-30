@@ -13,7 +13,7 @@ PhysicsItem {
     property color playerColor: "#A44A90"
     property real facingAngle: 0
     property int actionState: 0   // 0=idle, 1=atk, 2=block, 3=dash
-    property int remoteHp: 120
+    property int remoteHp: Balance.knight.hp
     property bool remoteBlocking: false
     property int rttMs: -1        // best round trip the network measured, -1 unknown
 

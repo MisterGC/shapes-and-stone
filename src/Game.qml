@@ -1043,7 +1043,7 @@ ClayWorld2d {
         if (resetting || newIndex === levelIndex) return
         resetting = true
         Qt.callLater(() => {
-            let savedHp = player ? player.hp : 120
+            let savedHp = player ? player.hp : Balance.knight.hp
             clearDungeon()
             levelIndex = newIndex
             levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
@@ -1787,7 +1787,7 @@ ClayWorld2d {
     }
 
     function resetDungeon() {
-        let savedHp = player ? player.hp : 120
+        let savedHp = player ? player.hp : Balance.knight.hp
         console.log("[Game] Resetting, preserving HP:", savedHp)
         clearDungeon()
         levelIndex++
