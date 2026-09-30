@@ -1577,15 +1577,10 @@ ClayWorld2d {
     function spawnEnemy(ex, ey, tier, type) {
         tier = tier || 1
         type = type || "grunt"
-        let tierData = [
-            { hp: 18, tint: "#6B2A2A" },  // weak: darker, desaturated
-            { hp: 30, tint: "" },           // normal: default colors
-            { hp: 42, tint: "#CC6644" }     // tough: brighter, warm glow
-        ]
-        let td = tierData[tier]
-        let ehp = td.hp + (type === "guardian" ? 10 : (type === "spitter" ? -6 : 0))
-        let eatk = type === "spitter" ? 8 : 10
-        let edef = type === "spitter" ? 0 : 2
+        let stats = Balance.enemy[type]
+        let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
+        let eatk = stats.atk
+        let edef = stats.def
         let enemy = enemyComponent.createObject(world.room, {
             xWu: ex, yWu: ey,
             hp: ehp, maxHp: ehp,
@@ -1626,7 +1621,7 @@ ClayWorld2d {
         let proj = projectileComponent.createObject(world.room, {
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
-            speed: 5.0,
+            speed: Balance.projectile.speed,
             damage: damage,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,

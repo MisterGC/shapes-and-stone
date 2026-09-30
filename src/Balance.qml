@@ -46,6 +46,11 @@ QtObject {
         grunt: { hpBonus: 0, atk: 10, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 10, atk: 10, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -6, atk: 8, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // How often an enemy decides, and how often a chase re-plans its path
+        thinkInterval: 0.1,
+        repathInterval: 1.0,
+        // Patrol waypoints lie this far from the spawn point
+        patrolRadius: 2,
         // Lunge: wind up backwards, then dash at the knight
         lungeRange: 2.0,
         windUpSpeed: 4.0,
