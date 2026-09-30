@@ -65,5 +65,6 @@ jobs:
     # Starts the game headless (QT_QPA_PLATFORM=minimal): any QML warning
     # while loading exits 1, Main.qml quits once it is up. Clayground's own
     # tests are its CI's job, so only the game's check runs here.
+    # -V prints its output on a pass too, so the log shows the game came up.
     - name: Headless start
-      run: ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure --timeout 120
+      run: ctest --test-dir build -R '^testshapes_and_stone$' -V --timeout 120
