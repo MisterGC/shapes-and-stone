@@ -61,8 +61,12 @@ QtObject {
         lungeDuration: 0.35,
         // A lunge hits when it ends this close to the knight
         lungeHitRange: 1.2,
-        // The last part of a lunge in which a swing parries it
-        parryWindow: 0.15,
+        // The last physics steps (1/60 s each) of a lunge in which a swing
+        // parries it
+        parryFrames: 9,
+        // No attack is telegraphed for less than this: a wind-up, a
+        // counter or a shot that would be shorter is drawn out to it
+        minTelegraph: 0.25,
         recovery: 0.8,
         stagger: 1.0,
         // Pushed back by a hit, not steering against it

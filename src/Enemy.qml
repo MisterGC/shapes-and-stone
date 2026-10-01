@@ -68,6 +68,7 @@ PhysicsItem {
     property real _dirToTargetX: 0
     property real _dirToTargetY: 0
     property bool parryWindow: false
+    property int _lungeSteps: 0     // physics steps until the lunge lands
 
     // AI state: patrol, chase, telegraph, lunge, stagger, recovery, kite, shoot
     property string aiState: "patrol"
@@ -474,6 +475,77 @@ PhysicsItem {
         }
     }
 
+    // An attack runs on the physics steps, not on the AI's think ticks: a
+    // telegraph lasts its wind-up to the step, and the parry window is open
+    // for exactly Balance.enemy.parryFrames steps (issue #35)
+    Connections {
+        target: enemy.world
+        enabled: !enemy.halted
+        function onStepped() { enemy._stepAttack(enemy.world.timeStep) }
+    }
+
+    // Seconds a telegraph of this length is drawn out to
+    function telegraphTime(seconds) {
+        return Math.max(Balance.enemy.minTelegraph, seconds)
+    }
+
+    function _stepAttack(dt) {
+        if (_knockT > 0) return
+        // Counted down per step; what is left of a step's rounding is none
+        if (_attackTimer > 0)
+            _attackTimer = _attackTimer - dt < 1e-6 ? 0 : _attackTimer - dt
+        switch (aiState) {
+        case "telegraph":
+            if (_attackTimer <= 0) _startLunge()
+            break
+        case "shoot":
+            if (_attackTimer <= 0) {
+                fireProjectile()
+                aiState = "kite"
+            }
+            break
+        case "lunge":
+            _stepLunge()
+            break
+        }
+    }
+
+    function _startLunge() {
+        if (!target) {
+            aiState = "chase"
+            return
+        }
+        // Lunge speed to reach the knight where it stands now
+        let lungeDx = target.xWu - xWu
+        let lungeDy = target.yWu - yWu
+        let lungeDist = Math.sqrt(lungeDx * lungeDx + lungeDy * lungeDy)
+        let len = Math.max(0.01, lungeDist)
+        _dirToTargetX = lungeDx / len
+        _dirToTargetY = lungeDy / len
+        _lungeSpeed = lungeDist / lungeDuration
+        _lungeSteps = Math.max(1, Math.round(lungeDuration / world.timeStep))
+        aiState = "lunge"
+        _stepLunge()
+    }
+
+    // Dash forward, the last parryFrames steps open to a parry, then land
+    function _stepLunge() {
+        // Negate Y for world-to-screen
+        body.linearVelocity = Qt.point(
+            _dirToTargetX * _lungeSpeed,
+            -_dirToTargetY * _lungeSpeed)
+        _lungeSteps--
+        if (_lungeSteps > 0) {
+            parryWindow = _lungeSteps <= Balance.enemy.parryFrames
+            return
+        }
+        parryWindow = false
+        body.linearVelocity = Qt.point(0, 0)
+        performAttack()
+        aiState = "recovery"
+        attackCooldown = Balance.enemy.recovery
+    }
+
     // The knight has fallen: drop the target, stand still and stop thinking.
     // A lunge or shot still winding up never lands.
     function halt() {
@@ -494,7 +566,6 @@ PhysicsItem {
         }
 
         if (attackCooldown > 0) attackCooldown -= dt
-        if (_attackTimer > 0) _attackTimer -= dt
         if (_shootTimer > 0) _shootTimer -= dt
         _pathRecalcTimer -= dt
 
@@ -532,7 +603,7 @@ PhysicsItem {
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
                     _dirToTargetY = dy / len
-                    _attackTimer = windUpDuration
+                    _attackTimer = telegraphTime(windUpDuration)
                     aiState = "telegraph"
                 } else if (_pathRecalcTimer <= 0) {
                     _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
@@ -570,7 +641,7 @@ PhysicsItem {
             // Shoot when cooldown ready
             if (_shootTimer <= 0 && dist <= shootRange) {
                 _shootTimer = shootCooldown
-                _attackTimer = Balance.enemy.shootWindUp  // Brief telegraph
+                _attackTimer = telegraphTime(Balance.enemy.shootWindUp)
                 let len = Math.max(0.01, dist)
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
@@ -579,46 +650,16 @@ PhysicsItem {
             break
 
         case "shoot":
-            // Brief telegraph then fire
+            // Holds still while the shot winds up; _stepAttack fires it
             body.linearVelocity = Qt.point(0, 0)
-            if (_attackTimer <= 0) {
-                fireProjectile()
-                aiState = "kite"
-            }
             break
 
         case "telegraph":
-            // Pull backward (wind-up) — negate Y for world-to-screen
+            // Pull backward (wind-up) — negate Y for world-to-screen;
+            // _stepAttack starts the lunge, which it also runs
             body.linearVelocity = Qt.point(
                 -_dirToTargetX * windUpSpeed,
                 _dirToTargetY * windUpSpeed)
-            if (_attackTimer <= 0) {
-                // Calculate lunge speed to reach the player
-                let lungeDx = target.xWu - xWu
-                let lungeDy = target.yWu - yWu
-                let lungeDist = Math.sqrt(lungeDx * lungeDx + lungeDy * lungeDy)
-                let len = Math.max(0.01, lungeDist)
-                _dirToTargetX = lungeDx / len
-                _dirToTargetY = lungeDy / len
-                _lungeSpeed = lungeDist / lungeDuration
-                _attackTimer = lungeDuration
-                aiState = "lunge"
-            }
-            break
-
-        case "lunge":
-            // Dash forward — negate Y for world-to-screen
-            body.linearVelocity = Qt.point(
-                _dirToTargetX * _lungeSpeed,
-                -_dirToTargetY * _lungeSpeed)
-            parryWindow = _attackTimer < Balance.enemy.parryWindow
-            if (_attackTimer <= 0) {
-                parryWindow = false
-                body.linearVelocity = Qt.point(0, 0)
-                performAttack()
-                aiState = "recovery"
-                attackCooldown = Balance.enemy.recovery
-            }
             break
 
         case "stagger":
@@ -762,7 +803,8 @@ PhysicsItem {
                 let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
-                _attackTimer = windUpDuration * Balance.enemy.counterWindUp  // Faster counter
+                // Faster counter, but no shorter than any telegraph
+                _attackTimer = telegraphTime(windUpDuration * Balance.enemy.counterWindUp)
                 aiState = "telegraph"
             }
         }
