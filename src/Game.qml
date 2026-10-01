@@ -635,7 +635,7 @@ ClayWorld2d {
 
         Text {
             anchors.centerIn: parent
-            text: player ? player.mana + " / " + player.maxMana : ""
+            text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
             color: "white"
             font.pixelSize: 10
             font.bold: true

@@ -34,6 +34,10 @@ QtObject {
         shieldArc: 60,
         blockedShare: 0.3,
         blockSpeed: 0.4,    // share of move and dash speed while blocking
+        // Mana a raised shield drains per second; at 0 the shield drops and
+        // does not rise again until a parry gives some back
+        blockDrain: 8,
+        parryMana: 10,
         // After a hit the shield did not stop, no damage taken for this long
         hurtGrace: 0.5,
         // Dash: no damage taken while it lasts
