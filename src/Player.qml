@@ -245,6 +245,7 @@ PhysicsItem {
                 _hitThisSwing.add(enemy)
                 hitCount++
                 if (parried) {
+                    if (gameWorld) gameWorld.countFight("parry")
                     enemy.stagger()
                     attackCooldown = 0
                     view.parry()
@@ -318,6 +319,10 @@ PhysicsItem {
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
+        if (gameWorld) {
+            gameWorld.countFight("taken", finalDamage)
+            if (blocked) gameWorld.countFight("block")
+        }
         if (!blocked) {
             view.hurt()
             acted("hurt")

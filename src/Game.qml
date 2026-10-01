@@ -834,8 +834,55 @@ ClayWorld2d {
         if (fallen || screen !== "game") return
         console.log("[Game] The knight has fallen at depth", depth)
         fallen = true
+        countFight("fall")
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
+        }
+    }
+
+    // --- Fight record ---
+    // How the fight went, counted where it happens: the damage the knight
+    // dealt and took, its parries, the attacks its shield stopped, the
+    // enemies killed, its falls, and the simulated seconds since the record
+    // started and until no enemy stood (-1 while one does). Each new knight
+    // starts a fresh record; the fight bench reads it (issue #34).
+    readonly property QtObject fightRecord: QtObject {
+        property int damageDealt: 0
+        property int damageTaken: 0
+        property int parries: 0
+        property int blocks: 0
+        property int kills: 0
+        property int deaths: 0
+        property real seconds: 0
+        property real clearSeconds: -1
+    }
+    function resetFightRecord() {
+        let r = fightRecord
+        r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
+        r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
+    }
+    // what: dealt, taken (with the damage), parry, block, kill or fall
+    function countFight(what, amount) {
+        let r = fightRecord
+        switch (what) {
+        case "dealt": r.damageDealt += amount; break
+        case "taken": r.damageTaken += amount; break
+        case "parry": r.parries++; break
+        case "block": r.blocks++; break
+        case "fall": r.deaths++; break
+        case "kill":
+            r.kills++
+            if (r.clearSeconds < 0 && !enemies.some(e => e && e.destroyed === false))
+                r.clearSeconds = r.seconds
+            break
+        }
+    }
+    // The record's clock is the physics: a pause or a hit stop holds it
+    Connections {
+        target: world.physics
+        function onStepped() {
+            if (world.player && !world.fallen)
+                world.fightRecord.seconds += world.physics.timeStep
         }
     }
 
@@ -1555,6 +1602,7 @@ ClayWorld2d {
 
     function spawnPlayer(px, py) {
         console.log("[Game] spawnPlayer at", px, py)
+        resetFightRecord()
         player = playerComponent.createObject(world.room, {
             xWu: px, yWu: py,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),

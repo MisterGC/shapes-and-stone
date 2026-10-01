@@ -114,6 +114,7 @@ PhysicsItem {
             if (gameWorld) {
                 gameWorld.playImpact()
                 gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
+                gameWorld.countFight("block")
             }
             destroyed = true
             destroy()
