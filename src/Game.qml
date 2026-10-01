@@ -445,8 +445,13 @@ ClayWorld2d {
     property string levelType: "dungeon"  // "dungeon" or "village"
     property var rng: null
     // How deep the run got: the dungeons behind the knight, 0 for the first
-    // (a village comes after each dungeon, so two levels make one depth)
-    readonly property int depth: Math.floor(levelIndex / 2)
+    readonly property int depth: depthOf(levelIndex)
+    // Two levels make one depth: the dungeon at depth d is level 2d, the
+    // village after it level 2d + 1. The rule lives only here, so the depth
+    // shown and kept comes from the same rule as the level entered.
+    function depthOf(index) { return Math.floor(index / 2) }
+    function levelTypeOf(index) { return index % 2 === 1 ? "village" : "dungeon" }
+    function levelIndexOf(d, type) { return 2 * d + (type === "village" ? 1 : 0) }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
     property bool fallen: false
@@ -1103,7 +1108,7 @@ ClayWorld2d {
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "and mana:", carried.mana)
         clearDungeon()
         levelIndex = newIndex
-        levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
+        levelType = levelTypeOf(newIndex)
         if (levelType === "village")
             generateVillage()
         else
@@ -2179,19 +2184,15 @@ ClayWorld2d {
         fightRoomActive = false
         // Generate before leaving the title: with a player in place,
         // _tryStartGame() does not build a second level on top.
-        if (name === "fight") {
-            levelIndex = 2 * d
-            levelType = "dungeon"
+        let type = name === "village" ? "village" : "dungeon"
+        levelIndex = levelIndexOf(d, type)
+        levelType = type
+        if (name === "fight")
             enterFightRoom()
-        } else if (name === "village") {
-            levelIndex = 2 * d + 1
-            levelType = "village"
+        else if (name === "village")
             generateVillage()
-        } else {
-            levelIndex = 2 * d
-            levelType = "dungeon"
+        else
             generateDungeon()
-        }
         screen = "game"
         minimap.requestPaint()
         world.forceActiveFocus()
