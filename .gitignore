@@ -3,3 +3,5 @@
 *.qsb
 .clay/
 build*/
+# Python bytecode, written when a bench imports run_fightbench.py
+__pycache__/
