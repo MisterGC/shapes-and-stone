@@ -85,6 +85,16 @@ with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
 ```
 
+Deeper is harder. Each dungeon is a depth, counted from 0, and the table's
+`depth` group says what each depth adds to the dungeon: two more enemies
+(up to `depth.enemiesCap`), fewer weak and more tough ones, more guardians
+and spitters, and half an attack point per enemy, rounded. A dungeon's
+tier mix is dealt, not rolled: `spawn.weakChance` of its enemies are weak
+and those above `spawn.normalChance` tough, so the mix follows the depth on
+every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
+in the dungeon at depth 4 (the village and the fight room take a depth the
+same way), and the balance bench checks depth 0, 2 and 4 against the table.
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
@@ -125,13 +135,15 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry] [--depth 0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
 attack: `mix` (the default) parries or blocks as the seed rolls, `block`
-always blocks, `parry` always parries. It exits 0 once the room is cleared
-or the knight has fallen. A fight takes about a minute of wall clock.
+always blocks, `parry` always parries. `--depth` puts the fight room at a
+depth: the lineup stays the table's, the enemies hit as hard as there. It
+exits 0 once the room is cleared or the knight has fallen. A fight takes
+about a minute of wall clock.
 
 To build against another Clayground commit, move the submodule and commit it:
 
