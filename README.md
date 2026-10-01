@@ -104,7 +104,9 @@ steps of a lunge are open to a parry. A hit the shield does not stop gives
 the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
 white for as long, and a lunge or a shot in it plays no hit. The shield is
 not free: raised, it drains `knight.blockDrain` mana per second, drops at
-0 and cannot be raised again until a parry gives `knight.parryMana` back.
+0 and cannot be raised again until a parry gives `knight.parryMana` back
+or the campfire refills it at `campfire.manaPerSecond`; mana does not come
+back on its own.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
