@@ -144,7 +144,7 @@ def main():
         # in one go; the pause after it gives that Timer the time to fire
         # once more, so the enemies re-aim after every batch, as often as a
         # running game at 60 steps per second does. Workaround until MoveTo
-        # counts steps.
+        # counts steps: clayground#340.
         max_steps = int(args.max_seconds * 60)
         steps = 0
         while True:
