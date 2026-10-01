@@ -30,8 +30,10 @@ Item {
     property bool healing: false
     property real dashCooldownProgress: 1   // 0 just dashed, 1 ready
 
-    property real swingDuration: 0.25   // seconds, wind up plus follow through
-    readonly property real swingFade: 0.1   // seconds the arc fades after it
+    // Seconds, from the balance table: wind up plus follow through, and
+    // the fade of the arc after it
+    property real swingDuration: Balance.knight.swingDuration
+    readonly property real swingFade: Balance.knight.swingFade
     readonly property bool swinging: attackAnimation.running
 
     // The swing animation ended (fade included)

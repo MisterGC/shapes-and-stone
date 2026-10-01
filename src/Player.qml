@@ -363,7 +363,7 @@ PhysicsItem {
     function attack() {
         if (!fallen && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
-            _swingTimer = attackDuration + view.swingFade
+            _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
             view.swing()

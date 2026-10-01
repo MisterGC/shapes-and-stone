@@ -22,6 +22,9 @@ QtObject {
         // Radius of the circle that finds melee candidates, in knight widths
         attackSensor: 1.5,
         swingDuration: 0.25,
+        // The arc fades this long after the swing; the swing hits until
+        // the fade is over
+        swingFade: 0.1,
         attackCooldown: 0.5,
         // Damage of a swing, as a multiple of atk
         blockingSwing: 0.85,
