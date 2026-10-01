@@ -97,6 +97,23 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
 ```
 
+The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
+damage dealt and taken, parries, attacks the shield stopped, kills, falls
+and the simulated seconds until no enemy stands. The fight bench plays the
+`fight` scenario with a scripted knight, stepping the paused game through
+the dojo's inspector, and prints the record as JSON; the same seed gives the
+same numbers on every run, so a tuning change shows in them. It needs
+Clayground's live loader, which the build makes when asked:
+
+```
+cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
+cmake --build build --target clayliveloader
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--json out.json]
+```
+
+It exits 0 once the room is cleared or the knight has fallen. A fight takes
+about a minute of wall clock.
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```
