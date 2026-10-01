@@ -5,6 +5,7 @@ import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
 import Clayground.Sound
+import Clayground.Storage
 
 ClayWorld2d {
     id: world
@@ -457,6 +458,30 @@ ClayWorld2d {
     property bool fallen: false
     components: []
 
+    // The run so far, for the fallen screen: the enemies killed and the
+    // simulated seconds since it started (a pause holds them)
+    property int runKills: 0
+    property real runSeconds: 0
+    // The deepest any run got on this machine (-1 before the first), kept
+    // with Clayground.Storage; runStartBest is what it was when this run
+    // started, so the fallen screen can tell a new best
+    property int bestDepth: -1
+    property int runStartBest: -1
+    // A bench keeps its record apart from the player's with its own name
+    property string recordStoreName: "ShapesAndStone"
+    KeyValueStore { id: records; name: world.recordStoreName }
+    function _startRunRecord() {
+        runKills = 0
+        runSeconds = 0
+        runStartBest = bestDepth
+    }
+    function _keepBest() {
+        if (depth <= bestDepth) return
+        bestDepth = depth
+        records.set("bestDepth", String(bestDepth))
+    }
+    onDepthChanged: _keepBest()
+
     // Collision categories
     readonly property int catWall: Box.Category1
     readonly property int catPlayer: Box.Category2
@@ -465,6 +490,9 @@ ClayWorld2d {
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
+        bestDepth = parseInt(records.get("bestDepth", "-1"))
+        runStartBest = bestDepth
+        console.log("[Game] Best depth so far:", bestDepth)
         forceActiveFocus()
     }
 
@@ -645,6 +673,24 @@ ClayWorld2d {
             font.pixelSize: 10
             font.bold: true
         }
+    }
+
+    // How deep the knight is, under the bars
+    Text {
+        objectName: "hudDepth"
+        anchors.top: manaHud.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: 6
+        z: 1000
+        visible: player !== null
+        text: "Depth " + depth
+        color: "#DDDDDD"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
     }
 
     // Crosshair at mouse position
@@ -839,6 +885,7 @@ ClayWorld2d {
         if (fallen || screen !== "game") return
         console.log("[Game] The knight has fallen at depth", depth)
         fallen = true
+        _keepBest()
         countFight("fall")
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
@@ -877,6 +924,7 @@ ClayWorld2d {
         case "fall": r.deaths++; break
         case "kill":
             r.kills++
+            runKills++
             if (r.clearSeconds < 0 && !enemies.some(e => e && e.destroyed === false))
                 r.clearSeconds = r.seconds
             break
@@ -886,8 +934,10 @@ ClayWorld2d {
     Connections {
         target: world.physics
         function onStepped() {
-            if (world.player && !world.fallen)
+            if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
+                world.runSeconds += world.physics.timeStep
+            }
         }
     }
 
@@ -904,6 +954,7 @@ ClayWorld2d {
         fightRoomActive = false
         levelIndex = 0
         levelType = "dungeon"
+        _startRunRecord()
         generateDungeon()
         minimap.requestPaint()
         world.forceActiveFocus()
@@ -921,6 +972,7 @@ ClayWorld2d {
         masterSeed = -1
         levelIndex = 0
         levelType = "dungeon"
+        _startRunRecord()
         dungeonAmbience.stop()
         dungeonMusic.stop()
         villageAmbience.stop()
@@ -2187,6 +2239,7 @@ ClayWorld2d {
         let type = name === "village" ? "village" : "dungeon"
         levelIndex = levelIndexOf(d, type)
         levelType = type
+        _startRunRecord()
         if (name === "fight")
             enterFightRoom()
         else if (name === "village")
@@ -2364,6 +2417,10 @@ ClayWorld2d {
         sourceComponent: Component {
             FallenScreen {
                 depth: world.depth
+                kills: world.runKills
+                seconds: world.runSeconds
+                bestDepth: world.bestDepth
+                newBest: world.depth > world.runStartBest
                 canGoAgain: !session.connected
                 onGoAgain: world.newRun()
                 onBackToTitle: world.backToTitle()
