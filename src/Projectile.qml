@@ -120,8 +120,8 @@ PhysicsItem {
             destroy()
             return
         }
-        entity.takeDamage(damage, xWu, yWu)
-        if (gameWorld) {
+        // A shot the knight ignores bursts without a hit
+        if (entity.takeDamage(damage, xWu, yWu) !== "ignored" && gameWorld) {
             gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
             gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
         }

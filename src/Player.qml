@@ -323,10 +323,13 @@ PhysicsItem {
         return { x: xWu + Math.cos(rad) * 0.5, y: yWu + Math.sin(rad) * 0.5 }
     }
 
+    // Returns what became of the blow: "hit", "blocked" by the shield, or
+    // "ignored" - fallen, dashing or in the grace after a hit. Only a blow
+    // that was not ignored should look and sound like one.
     function takeDamage(amount, attackerX, attackerY) {
-        if (fallen) return
-        if (isDashing) return  // Invulnerable during dash
-        if (graceLeft > 0) return  // and for a moment after a hit
+        if (fallen) return "ignored"
+        if (isDashing) return "ignored"  // Invulnerable during dash
+        if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
         if (blocked) {
@@ -351,6 +354,7 @@ PhysicsItem {
                 gameWorld.shake(blocked ? 1 : 3)
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
+        return blocked ? "blocked" : "hit"
     }
 
     function dash() {
