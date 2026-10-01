@@ -29,6 +29,8 @@ Item {
     property bool dashing: false
     property bool healing: false
     property real dashCooldownProgress: 1   // 0 just dashed, 1 ready
+    // Seconds left of the grace after a hit: the knight flickers white
+    property real graceLeft: 0
 
     // Seconds, from the balance table: wind up plus follow through, and
     // the fade of the arc after it
@@ -208,6 +210,15 @@ Item {
             PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0.95 }
             PauseAnimation { duration: 50 }
             NumberAnimation { target: hurtFlashRect; property: "opacity"; to: 0; duration: 140 }
+        }
+
+        // Grace after a hit: flickers white until no hit can land again
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: "white"
+            opacity: view.graceLeft <= 0 ? 0
+                : Math.floor(view.graceLeft / 0.05) % 2 === 0 ? 0.6 : 0.1
         }
 
         // Parry glow

@@ -34,6 +34,8 @@ QtObject {
         shieldArc: 60,
         blockedShare: 0.3,
         blockSpeed: 0.4,    // share of move and dash speed while blocking
+        // After a hit the shield did not stop, no damage taken for this long
+        hurtGrace: 0.5,
         // Dash: no damage taken while it lasts
         dashSpeed: 40.0,
         dashDuration: 0.15,

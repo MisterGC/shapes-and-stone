@@ -103,8 +103,20 @@ PhysicsItem {
             if (gameWorld && gain > 0) gameWorld.playImpact(gain)
         } else if (name === "hurt") {
             view.hurt()
+            _grace.restart()
         }
     }
+    // The grace after a hit, on this screen's clock: the other knight
+    // counts it on its own physics steps
+    NumberAnimation {
+        id: _grace
+        target: view
+        property: "graceLeft"
+        from: Balance.knight.hurtGrace
+        to: 0
+        duration: Balance.knight.hurtGrace * 1000
+    }
+
     // A swing the event has not shown yet
     onActionStateChanged: if (actionState === 1 && !view.swinging) view.swing()
 
