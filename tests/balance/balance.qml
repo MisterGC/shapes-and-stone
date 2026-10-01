@@ -3,7 +3,8 @@
 // Reads the whole table the way the inspector does, then builds a dungeon,
 // the fight room and the village and checks that the knight, every enemy,
 // the fight room lineup and the campfire carry the table's values; the
-// campfire refills a dry knight's mana, away from it nothing does. Last it
+// campfire refills a dry knight's mana, away from it nothing does, and the
+// next level, either way it is reached, keeps the knight's HP and mana. Last it
 // changes a value in the table and checks the next knight has it. Prints
 // one PASS or FAIL line per check and exits with the number of failures.
 //
@@ -63,6 +64,7 @@ Window {
     }
 
     property var campfire: null
+    property var _left: null    // the knight of the level just left
     property int hpBefore: 0
 
     property var steps: [
@@ -141,6 +143,23 @@ Window {
             check(refilled >= wantMana - 2 * tick && refilled <= wantMana + tick,
                   "two seconds at the fire refill " + refilled.toFixed(1)
                   + " mana, the table says " + wantMana)
+            // The next level keeps what the knight had
+            game.player.hp = 70
+            game.player.mana = 7
+            _left = game.player
+            game._applyLevelChange(game.levelIndex + 1)
+        }],
+        [() => game.player && game.player !== _left && !game.resetting, () => {
+            check(game.levelType === "dungeon" && game.player.hp === 70 && game.player.mana === 7,
+                  "the next level keeps the knight's HP and mana (" + game.player.hp
+                  + " HP, " + game.player.mana + " mana)")
+            game.player.hp = 80
+            game.player.mana = 3
+            _left = game.player
+            game.resetDungeon()
+            check(game.player !== _left && game.player.hp === 80 && game.player.mana === 3,
+                  "a reset to the next level keeps them too (" + game.player.hp
+                  + " HP, " + game.player.mana + " mana)")
             // A tuned table reaches the next knight
             Balance.knight.hp = 150
             game.applyScenario("dungeon")
