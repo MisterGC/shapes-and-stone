@@ -1239,15 +1239,14 @@ ClayWorld2d {
         // Step 9: Spawn enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            let sb = Balance.spawn
+            let sb = spawnRolls(depth)
             let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
+            let tiers = dealTiers(numEnemies, sb, rng)
             for (let i = 0; i < numEnemies; i++) {
                 let room = spawnRooms[i % spawnRooms.length]
                 let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
                 let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
-                // Tier: 0=weak, 1=normal, 2=tough
-                let roll = rng()
-                let tier = roll < sb.weakChance ? 0 : (roll < sb.normalChance ? 1 : 2)
+                let tier = tiers[i]
                 // Enemy type: guardian, spitter, else grunt
                 let typeRoll = rng()
                 let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
@@ -1631,13 +1630,50 @@ ClayWorld2d {
         }
     }
 
+    // The spawn table at a depth: Balance.spawn with Balance.depth added
+    // once per depth, each number within its cap
+    function spawnRolls(d) {
+        let sb = Balance.spawn, bd = Balance.depth
+        let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
+        let more = Math.floor(d * bd.enemies)
+        return {
+            enemiesMin: Math.min(bd.enemiesCap, sb.enemiesMin + more),
+            enemiesMax: Math.min(bd.enemiesCap, sb.enemiesMax + more),
+            weakChance: Math.max(0, sb.weakChance + d * bd.weakChance),
+            normalChance: 1 - tough,
+            guardianChance: Math.min(bd.typeCap, sb.guardianChance + d * bd.guardianChance),
+            guardianChanceTough: Math.min(bd.typeCap, sb.guardianChanceTough + d * bd.guardianChance),
+            spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance)
+        }
+    }
+
+    // The tiers of n enemies (0=weak, 1=normal, 2=tough) in the table's
+    // mix, shuffled: the mix of a dungeon is the table's, not a roll's luck
+    function dealTiers(n, sb, rand) {
+        let weak = Math.round(n * sb.weakChance)
+        let tough = Math.min(n - weak, Math.round(n * (1 - sb.normalChance)))
+        let tiers = []
+        for (let i = 0; i < n; i++)
+            tiers.push(i < weak ? 0 : i < n - tough ? 1 : 2)
+        for (let i = n - 1; i > 0; i--) {
+            let j = Math.floor(rand() * (i + 1))
+            let t = tiers[i]; tiers[i] = tiers[j]; tiers[j] = t
+        }
+        return tiers
+    }
+
+    // An enemy's attack at a depth
+    function enemyAtk(type, d) {
+        return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
+    }
+
     function spawnEnemy(ex, ey, tier, type) {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
         let stats = Balance.enemy[type]
         let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
-        let eatk = stats.atk
+        let eatk = enemyAtk(type, depth)
         let edef = stats.def
         let enemy = enemyComponent.createObject(world.room, {
             xWu: ex, yWu: ey,
@@ -2132,7 +2168,10 @@ ClayWorld2d {
     // captures compare the same room.
     readonly property int scenarioSeed: 424242
     function scenarios() { return ["dungeon", "village", "fight"] }
-    function applyScenario(name) {
+    // depth (0 when left out) is the depth the dungeon, the village or the
+    // fight room is at, e.g. applyScenario("dungeon", 4) through eval
+    function applyScenario(name, atDepth) {
+        let d = Math.max(0, Math.floor(atDepth || 0))
         muted = true
         masterSeed = scenarioSeed
         if (player) clearDungeon()
@@ -2141,13 +2180,15 @@ ClayWorld2d {
         // Generate before leaving the title: with a player in place,
         // _tryStartGame() does not build a second level on top.
         if (name === "fight") {
+            levelIndex = 2 * d
+            levelType = "dungeon"
             enterFightRoom()
         } else if (name === "village") {
-            levelIndex = 1
+            levelIndex = 2 * d + 1
             levelType = "village"
             generateVillage()
         } else {
-            levelIndex = 0
+            levelIndex = 2 * d
             levelType = "dungeon"
             generateDungeon()
         }

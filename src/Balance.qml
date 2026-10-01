@@ -101,10 +101,11 @@ QtObject {
     })
 
     readonly property var spawn: ({
-        // Enemies per dungeon, rolled evenly from min to max
+        // Enemies per dungeon at depth 0, rolled evenly from min to max
         enemiesMin: 5,
         enemiesMax: 8,
-        // Tier rolls: below weak is weak, below normal is normal, else tough
+        // Tier mix of a dungeon, dealt not rolled: weakChance of its enemies
+        // (rounded) are weak, those above normalChance tough, the rest normal
         weakChance: 0.2,
         normalChance: 0.8,
         // Type rolls: guardian first, then spitter, else grunt
@@ -120,6 +121,27 @@ QtObject {
             { dx: -3, dy: -3, tier: 1, type: "spitter" }
         ],
         fightRoomRespawn: 2.0
+    })
+
+    // Deeper is harder: each depth (counted in dungeons from 0) adds these
+    // to the spawn rolls and the enemies' attack, up to the caps
+    readonly property var depth: ({
+        // More enemies: added to enemiesMin and enemiesMax, never above the
+        // cap; at 2 a dungeon two depths down holds more than the one above
+        enemies: 2,
+        enemiesCap: 14,
+        // Fewer weak: weakChance falls by this, not below 0
+        weakChance: -0.05,
+        // More tough: the tough share (above normalChance) grows by this
+        toughChance: 0.08,
+        toughCap: 0.6,
+        // More guardians and spitters: added to their chances (a tough
+        // guardian's too), each up to the cap
+        guardianChance: 0.03,
+        spitterChance: 0.03,
+        typeCap: 0.45,
+        // Harder blows: added to every enemy's atk, rounded to whole points
+        atk: 0.5
     })
 
     readonly property var campfire: ({
