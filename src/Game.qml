@@ -1632,7 +1632,8 @@ ClayWorld2d {
     }
 
     function spawnEnemy(ex, ey, tier, type) {
-        tier = tier || 1
+        // A rolled tier 0 is the weak tier, not a missing one
+        tier = tier === undefined ? 1 : tier
         type = type || "grunt"
         let stats = Balance.enemy[type]
         let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
