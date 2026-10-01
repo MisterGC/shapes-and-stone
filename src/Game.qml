@@ -1090,18 +1090,25 @@ ClayWorld2d {
         if (resetting || newIndex === levelIndex) return
         resetting = true
         Qt.callLater(() => {
-            let savedHp = player ? player.hp : Balance.knight.hp
-            let savedMana = player ? player.mana : Balance.knight.mana
-            clearDungeon()
-            levelIndex = newIndex
-            levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
-            if (levelType === "village")
-                generateVillage()
-            else
-                generateDungeon()
-            if (player) { player.hp = savedHp; player.mana = savedMana }
+            _enterLevel(newIndex)
             resetting = false
         })
+    }
+
+    // The one way to the next level: what the knight carries (its HP and
+    // mana) goes with it, a village follows each dungeon
+    function _enterLevel(newIndex) {
+        let carried = player ? { hp: player.hp, mana: player.mana }
+                             : { hp: Balance.knight.hp, mana: Balance.knight.mana }
+        console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "and mana:", carried.mana)
+        clearDungeon()
+        levelIndex = newIndex
+        levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
+        if (levelType === "village")
+            generateVillage()
+        else
+            generateDungeon()
+        if (player) { player.hp = carried.hp; player.mana = carried.mana }
     }
 
     // Component factories
@@ -1832,18 +1839,7 @@ ClayWorld2d {
     }
 
     function resetDungeon() {
-        let savedHp = player ? player.hp : Balance.knight.hp
-        let savedMana = player ? player.mana : Balance.knight.mana
-        console.log("[Game] Resetting, preserving HP:", savedHp, "and mana:", savedMana)
-        clearDungeon()
-        levelIndex++
-        // Alternate: dungeon → village → dungeon → ...
-        levelType = (levelType === "dungeon") ? "village" : "dungeon"
-        if (levelType === "village")
-            generateVillage()
-        else
-            generateDungeon()
-        if (player) { player.hp = savedHp; player.mana = savedMana }
+        _enterLevel(levelIndex + 1)
         resetting = false
     }
 
