@@ -1091,6 +1091,7 @@ ClayWorld2d {
         resetting = true
         Qt.callLater(() => {
             let savedHp = player ? player.hp : Balance.knight.hp
+            let savedMana = player ? player.mana : Balance.knight.mana
             clearDungeon()
             levelIndex = newIndex
             levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
@@ -1098,7 +1099,7 @@ ClayWorld2d {
                 generateVillage()
             else
                 generateDungeon()
-            if (player) player.hp = savedHp
+            if (player) { player.hp = savedHp; player.mana = savedMana }
             resetting = false
         })
     }
@@ -1832,7 +1833,8 @@ ClayWorld2d {
 
     function resetDungeon() {
         let savedHp = player ? player.hp : Balance.knight.hp
-        console.log("[Game] Resetting, preserving HP:", savedHp)
+        let savedMana = player ? player.mana : Balance.knight.mana
+        console.log("[Game] Resetting, preserving HP:", savedHp, "and mana:", savedMana)
         clearDungeon()
         levelIndex++
         // Alternate: dungeon → village → dungeon → ...
@@ -1841,7 +1843,7 @@ ClayWorld2d {
             generateVillage()
         else
             generateDungeon()
-        if (player) player.hp = savedHp
+        if (player) { player.hp = savedHp; player.mana = savedMana }
         resetting = false
     }
 
