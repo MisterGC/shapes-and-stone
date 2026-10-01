@@ -17,6 +17,7 @@ RectBoxBody {
     // Healing config
     property var gameWorld: null
     property real healRate: Balance.campfire.healPerSecond  // HP per second
+    property real manaRate: Balance.campfire.manaPerSecond  // mana per second
     property real healRadius: Balance.campfire.healRadius
     property bool _isHealing: false
 
@@ -131,7 +132,7 @@ RectBoxBody {
         }
     }
 
-    // Proximity healing + feedback
+    // Proximity healing and mana refill + feedback
     Timer {
         running: true; repeat: true; interval: Balance.campfire.healTick * 1000
         onTriggered: {
@@ -141,13 +142,18 @@ RectBoxBody {
             let dy = p.yWu - campfire.yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
             let wasHealing = _isHealing
-            _isHealing = dist < healRadius && !p.fallen && p.hp < p.maxHp
-            if (_isHealing) {
+            let near = dist < healRadius && !p.fallen
+            let heals = near && p.hp < p.maxHp
+            let refills = near && p.mana < p.maxMana
+            _isHealing = heals || refills
+            if (heals) {
                 let healed = Math.round(healRate * interval / 1000)
                 p.hp = Math.min(p.maxHp, p.hp + healed)
                 if (gameWorld.spawnDamageNumber)
                     gameWorld.spawnDamageNumber(p.xWu, p.yWu, "+" + healed, "#44CC44")
             }
+            if (refills)
+                p.mana = Math.min(p.maxMana, p.mana + manaRate * interval / 1000)
             if (p.isHealing !== undefined)
                 p.isHealing = _isHealing
         }

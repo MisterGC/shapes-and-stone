@@ -124,6 +124,8 @@ QtObject {
 
     readonly property var campfire: ({
         healPerSecond: 5.0,
+        // Mana comes back here, and only here or from a parry
+        manaPerSecond: 5.0,
         healRadius: 3.0,
         healTick: 0.2
     })
