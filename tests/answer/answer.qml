@@ -7,8 +7,11 @@
 // minTelegraph, and a lunge is open to a parry for exactly parryFrames
 // steps. A hit the shield does not stop gives the knight hurtGrace seconds
 // in which no damage lands, and its view flickers for as long; a blocked
-// hit gives none. Prints one PASS or FAIL line per check and exits with
-// the number of failures.
+// hit gives none. A lunge or a shot that lands in the grace plays no hit.
+// A raised shield drains knight.blockDrain mana per second and drops at
+// 0, cannot be raised again without mana, and a parry gives
+// knight.parryMana back. Prints one PASS or FAIL line per check and exits
+// with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
 
@@ -174,6 +177,85 @@ Window {
             p.takeDamage(20, p.xWu + 1, p.yWu)
             check(p.graceLeft === 0, "a blocked hit gives no grace")
             p.isBlocking = false
+
+            // In the grace a lunge and a shot play no hit. A stand-in for the
+            // game records what the attacker would show and play.
+            let shown = []
+            let fake = {
+                fx: false,
+                playImpact: () => shown.push("impact sound"),
+                impact: (kind) => shown.push(kind),
+                spawnDamageNumber: () => shown.push("damage number")
+            }
+            let g = game.enemies.find(x => x.enemyType === "grunt" && !x.destroyed)
+            let realWorld = g.gameWorld
+            g.xWu = p.xWu + 0.5
+            g.yWu = p.yWu
+            g.target = p
+            g.gameWorld = fake
+            g.performAttack()
+            check(shown.length === 1 && shown[0] === "impact sound" && p.graceLeft > 0,
+                  "a lunge that lands plays its hit (" + shown.join(", ") + ")")
+            shown = []
+            let hp = p.hp
+            g.performAttack()
+            g.gameWorld = realWorld
+            g.target = null
+            check(p.hp === hp && shown.length === 0,
+                  "a lunge in the grace plays no hit (" + (shown.join(", ") || "nothing") + ")")
+            game.spawnProjectile(p.xWu + 20, p.yWu, -1, 0, 8)
+            let shots = game.room.children.filter(o => o.objectName === "projectile" && !o.destroyed)
+            let shot = shots[shots.length - 1]
+            shot.gameWorld = fake
+            shot.onHitPlayer({ getBody: () => ({ target: p }) })
+            check(p.hp === hp && shown.length === 1 && shown[0] === "projectileBurst",
+                  "a shot in the grace bursts and plays no hit (" + shown.join(", ") + ")")
+            Clayground.physicsStep(graceSteps)
+
+            // A raised shield drains mana and drops when it runs dry
+            let drain = Balance.knight.blockDrain
+            p.mana = p.maxMana
+            p.isBlocking = true
+            Clayground.physicsStep(60)
+            check(Math.abs(p.mana - (p.maxMana - drain)) < 1e-3 && p.isBlocking,
+                  "a second of shield drains " + (p.maxMana - p.mana).toFixed(3)
+                  + " mana, the table says " + drain)
+            let held = 60
+            while (p.isBlocking && held < 6000) {
+                Clayground.physicsStep(1)
+                held++
+            }
+            let dry = Math.round(p.maxMana / drain / stepS)
+            check(!p.isBlocking && p.mana === 0 && held === dry,
+                  "the shield drops at 0 mana after " + held + " steps, " + dry + " expected")
+            p.isBlocking = true
+            check(!p.isBlocking, "without mana the shield cannot be raised")
+            p.facingAngle = 180
+            p.takeDamage(20, p.xWu - 1, p.yWu)
+            check(p.graceLeft > 0, "with the shield dropped a hit from the front lands")
+            Clayground.physicsStep(graceSteps)
+
+            // A parry gives mana back, and the shield can be raised again
+            let pr = only("grunt")
+            pr.xWu = p.xWu + 1.5
+            pr.yWu = p.yWu
+            pr.aiState = "chase"
+            let parried = stepUntil(pr, "telegraph")
+            while (parried && !pr.parryWindow && pr.aiState !== "recovery") {
+                p.facingAngle = Math.atan2(pr.yWu - p.yWu, pr.xWu - p.xWu) * 180 / Math.PI
+                Clayground.physicsStep(1)
+            }
+            let parries = game.fightRecord.parries
+            p.facingAngle = Math.atan2(pr.yWu - p.yWu, pr.xWu - p.xWu) * 180 / Math.PI
+            p.attackCooldown = 0
+            p.attack()
+            Clayground.physicsStep(1)
+            check(game.fightRecord.parries === parries + 1 && p.mana === Balance.knight.parryMana,
+                  "a parry gives " + p.mana + " mana back, the table says " + Balance.knight.parryMana)
+            p.isBlocking = true
+            check(p.isBlocking, "with mana back the shield rises again")
+            p.isBlocking = false
+            for (let o of game.enemies) o.target = null
             Clayground.paused = false
             console.log("[Answer] done,", failures, "failed")
         }],
