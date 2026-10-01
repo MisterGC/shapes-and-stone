@@ -102,8 +102,11 @@ steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
 steps of a lunge are open to a parry. A hit the shield does not stop gives
 the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
-white for as long. The answer bench single-steps the paused fight room,
-counts each of these in steps and exits with the number of failed checks:
+white for as long, and a lunge or a shot in it plays no hit. The shield is
+not free: raised, it drains `knight.blockDrain` mana per second, drops at
+0 and cannot be raised again until a parry gives `knight.parryMana` back.
+The answer bench single-steps the paused fight room, counts each of these
+in steps and exits with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
@@ -120,11 +123,13 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry] [--json out.json]
 ```
 
-It exits 0 once the room is cleared or the knight has fallen. A fight takes
-about a minute of wall clock.
+`--answer` is how the scripted knight meets a grunt's or a guardian's
+attack: `mix` (the default) parries or blocks as the seed rolls, `block`
+always blocks, `parry` always parries. It exits 0 once the room is cleared
+or the knight has fallen. A fight takes about a minute of wall clock.
 
 To build against another Clayground commit, move the submodule and commit it:
 
