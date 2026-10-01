@@ -143,7 +143,9 @@ Window {
             check(refilled >= wantMana - 2 * tick && refilled <= wantMana + tick,
                   "two seconds at the fire refill " + refilled.toFixed(1)
                   + " mana, the table says " + wantMana)
-            // The next level keeps what the knight had
+            // The next level keeps what the knight had; away from the fire,
+            // whose next tick would heal it before the level changes
+            game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4
             game.player.hp = 70
             game.player.mana = 7
             _left = game.player
