@@ -73,6 +73,21 @@ of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fallen/fallen.qml
 ```
 
+The HUD shows "Depth N" under the bars; a village counts as the depth of
+the dungeon before it. The fallen screen adds the run's kills and its time
+(simulated, so a pause holds it) and the best depth any run got. The best
+depth is kept with `Clayground.Storage` (`KeyValueStore` "ShapesAndStone",
+key `bestDepth`) as soon as a run gets deeper, not only when it falls. In
+the browser it does not survive a reload yet: Clayground's `KeyValueStore`
+keeps nothing across a reload there (#37 has the details). The depth bench runs twice, as
+two processes, so the best depth crosses a restart; each run exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- first
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- second
+```
+
 Every fight number - HP, damage, timings, cooldowns, spawn counts, the heal
 rate - sits in one table, `src/Balance.qml`; tuning the fight is an edit of
 that file. In the dojo's inspector, `eval JSON.stringify(Balance)` returns
