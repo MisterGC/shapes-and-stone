@@ -59,9 +59,10 @@ Item {
     // Another knight's HP changed or its node left: the party may be down
     // now
     signal partyChanged()
-    // A node joined the run under way; its knight is already made on this
-    // screen
+    // A node joined the run under way, or left it; its knight is already
+    // made or gone on this screen
     signal playerJoined(string nodeId)
+    signal playerLeft(string nodeId)
     // Another player's knight was made on this screen
     signal remotePlayerSpawned(string nodeId, var knight)
     // The run is over for everyone: on a joiner when the host ends it, on
@@ -152,6 +153,7 @@ Item {
                 delete remotePlayers[nodeId]
             }
             delete lastStates[nodeId]
+            session.playerLeft(nodeId)
             session.partyChanged()
         }
 

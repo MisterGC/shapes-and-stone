@@ -621,6 +621,22 @@ PhysicsItem {
         body.linearVelocity = Qt.point(0, 0)
     }
 
+    // Its knight's player left the session: the knight is gone, and so is
+    // an attack wound up against it. The next think picks the nearest
+    // knight still there
+    function dropTarget() {
+        target = null
+        targetId = ""
+        parryWindow = false
+        _attackTimer = 0
+        if (["telegraph", "lunge", "shoot", "chase", "kite"].indexOf(aiState) >= 0) {
+            aiState = "patrol"
+            followPath.running = false
+            followPath.wpsWu = []
+            if (_knockT <= 0) body.linearVelocity = Qt.point(0, 0)
+        }
+    }
+
     function updateAI(dt) {
         if (halted) return
         if (_knockT > 0) return

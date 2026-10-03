@@ -444,6 +444,7 @@ ClayWorld2d {
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
         onPartyChanged: _checkPartyDown()
         onRunEnded: _endPartyRun()
+        onPlayerLeft: (nodeId) => _dropKnight(nodeId)
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
@@ -577,6 +578,13 @@ ClayWorld2d {
         if (!session.connected || !session.isHost || enemy.objectId === "") return false
         session.despawnEnemy(enemy.objectId)
         return true
+    }
+    // Host: a player left, its knight is gone; no enemy goes for it any more
+    function _dropKnight(nodeId) {
+        if (!session.isHost) return
+        for (let e of enemies) {
+            if (e && !e.destroyed && !e.remote && e.targetId === nodeId) e.dropTarget()
+        }
     }
     function _dropEnemy(objectId) {
         let e = _enemyById[objectId]
