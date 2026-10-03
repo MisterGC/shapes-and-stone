@@ -21,6 +21,8 @@ enemy of the host's, and each answer is checked on both screens:
   times: it holds its shield up, dashes into the shot, stands. The shot is
   blocked, dodged, hits; the host receives each result, and the shot with
   its id goes on the host's screen when the result arrives
+- the other way round, the host's knight blocks a shot of that spitter: the
+  joiner receives the result, and its shot of that id goes then
 - it raises its shield and dashes into the enemy right after the host
   killed a third enemy in its reach: the host receives the push and its
   enemy is shoved at least 1 Wu away
@@ -481,9 +483,62 @@ def shot_answers(H, J, s, settle, check):
     # enemy's blow puts the knight into its grace after a hit
     H.eval(["hold(true)"])
     try:
-        return _shot_answers(H, J, s, jid, res, settle, check)
+        _shot_answers(H, J, s, jid, res, settle, check)
+        res["host"] = _host_shot(H, J, s, settle, check)
+        return res
     finally:
         H.eval(["hold(false)"])
+
+
+def _host_shot(H, J, s, settle, check):
+    """The host's knight holds its shield up toward spitter s, which spits at
+    it: the host's screen judges the shot blocked and reports it, and the
+    joiner's shot of that id goes when the result arrives"""
+    r = {"tries": 0}
+    hid = H.eval1("nodeId")
+    end = None
+    # The joiner's knight stood where the host's will stand: on the joiner's
+    # screen the shot would meet it first (one shot may hit two knights
+    # within the network delay). It waits beside another, halted, enemy
+    others = [i for i in sorted(J.json("enemies()") or {}) if i != s]
+    if others:
+        J.eval([f"placeBeside('{others[0]}')"])
+    for _ in range(3):
+        r["tries"] += 1
+        if not H.eval1(f"standOff('{s}', 4, 2.5)") or not H.eval1(f"guard('{s}', 'block')"):
+            settle(lambda: False, 0.5)
+            continue
+        settle(lambda: False, 0.4)
+        settle(lambda: H.eval1("graceLeft()") == 0, 2)
+        sid = H.eval1(f"spit('{s}', true)")
+        got = settle(lambda: any(x[1] == sid for x in (H.json("shotEnds") or [])), 3)
+        H.eval(["guard('', '')"])
+        if got:
+            end = [x for x in H.json("shotEnds") if x[1] == sid][0]
+            break
+    r["host"] = end
+    check(end is not None and end[3] is True and end[2] == "blocked",
+          f"the host's screen judges a shot of {s} blocked as the host's knight holds its shield "
+          f"({end[1] + ' ' + end[2] + ', knight ' + json.dumps(end[4]) if end else 'no shot met the knight'}, "
+          f"tries {r['tries']})")
+    if not end:
+        return r
+    sid = end[1]
+    got = settle(lambda: any(x[1] == sid for x in (J.json("shotEnds") or [])), 1.0)
+    jend = [x for x in (J.json("shotEnds") or []) if x[1] == sid]
+    rep = [x for x in (J.json("reports") or []) if x[1] == hid and x[2] == "shot" and x[3] == sid]
+    seen = (J.json("shotSeen") or {}).get(sid)
+    flying = J.eval1(f"shots()['{sid}'] !== undefined")
+    r.update({"joiner": jend[0] if jend else None, "reported": [x[4] for x in rep],
+              "joinerLastShown": seen, "flying": flying})
+    ok = got and jend[0][2] == end[2] and jend[0][3] is False and rep and not flying
+    shown = seen is not None and jend and jend[0][0] - 60 <= seen <= jend[0][0] + 40
+    check(bool(ok and shown),
+          f"the joiner receives the {end[2]} for {sid} and its shot goes then: last shown "
+          f"{(seen - jend[0][0]) if (seen and jend) else '?'} ms from the report, which came "
+          f"{(jend[0][0] - end[0]) if jend else '?'} ms after the host judged it"
+          + ("" if not flying else "; still flying on the joiner"))
+    return r
 
 
 def _shot_answers(H, J, s, jid, res, settle, check):
@@ -807,6 +862,8 @@ def run(args, loader, tmp, procs, result, check):
         spitters = [i for i in sorted(H.json("enemies()") or {})
                     if i not in (a, b) and H.eval1(f"typeOf('{i}')") == "spitter"]
         result["shots"] = shot_answers(H, J, spitters[0] if spitters else "", settle, check)
+        # The host's knight met a shot by the spitter: back beside its enemy
+        H.eval([f"placeBeside('{a}')"])
         result["push"] = push(H, J, a, b, host_rec, settle, check)
         result["kills"] = kills(H, J, a, b, settle, check)
 

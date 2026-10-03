@@ -131,7 +131,7 @@ Item {
     // Every shot that met a knight on this screen, as [wall clock, shot id,
     // result, local, knight] (Game.shotEnded); knight is this node's knight
     // then: {blocking, dashing, grace, facing, spitter: the angle to the
-    // guarded enemy}
+    // guarded enemy, shot: the angle to the shot, on this screen's own}
     property var shotEnds: []
     Connections {
         target: game
@@ -139,10 +139,13 @@ Item {
             bench.reports.push([Date.now(), nodeId, source, id, result])
         }
         function onShotEnded(shotId, result, local) {
-            let p = game.player, e = bench._byId()[bench.guardId]
+            let p = game.player, e = bench._byId()[bench.guardId], s = game._shotById[shotId]
             let k = p ? {blocking: p.isBlocking, dashing: p.isDashing, grace: bench.r3(p.graceLeft),
                          facing: bench.r3(p.facingAngle),
-                         spitter: e ? bench.r3(bench._angleTo(p, e)) : null}
+                         spitter: e ? bench.r3(bench._angleTo(p, e)) : null,
+                         shot: local && s ? bench.r3(bench._angleTo(p, s)) : null,
+                         at: [bench.r3(p.xWu), bench.r3(p.yWu)], from: e ? [bench.r3(e.xWu), bench.r3(e.yWu)] : null,
+                         shotAt: s ? [bench.r3(s.xWu), bench.r3(s.yWu)] : null}
                       : null
             bench.shotEnds.push([Date.now(), shotId, result, local, k])
         }
@@ -178,11 +181,11 @@ Item {
             }
         }
     }
-    // Host: enemy id spits at the other node's knight; the shot's id, ""
-    // without either
-    function spit(id) {
-        let e = _byId()[id], k = null
-        for (let n in session.remotePlayers) k = session.remotePlayers[n]
+    // Host: enemy id spits at the other node's knight, or at its own with
+    // own; the shot's id, "" without either
+    function spit(id, own) {
+        let e = _byId()[id], k = own ? game.player : null
+        if (!own) for (let n in session.remotePlayers) k = session.remotePlayers[n]
         if (!e || !k) return ""
         let dx = k.xWu - e.xWu, dy = k.yWu - e.yWu
         let len = Math.max(0.01, Math.hypot(dx, dy))
