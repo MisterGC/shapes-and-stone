@@ -50,6 +50,10 @@ Item {
     signal enemyKillReceived(var kill)
     // A spitter of the host's fired (x, y, dx, dy, damage)
     signal shotReceived(var shot)
+    // Another node judged an attack on its own knight: report.source is
+    // "lunge" (id: the enemy's), report.result what became of it
+    // (Game.knightStruck)
+    signal struckReported(string fromId, var report)
 
     property var remotePlayers: ({})
 
@@ -76,6 +80,8 @@ Item {
                 session.enemyKillReceived(data)
             } else if (data.type === "shot") {
                 session.shotReceived(data)
+            } else if (data.type === "struck") {
+                session.struckReported(fromId, data)
             } else if (data.type === "levelChange") {
                 session.levelChanged(data.levelIndex)
             } else if (data.type === "exitReached") {
@@ -192,6 +198,10 @@ Item {
     // Host: a spitter fired, every node flies the shot
     function sendShot(shot) {
         net.broadcast(Object.assign({type: "shot"}, shot))
+    }
+    // This node judged an attack on its own knight, for every other node
+    function reportStruck(report) {
+        net.broadcast(Object.assign({type: "struck"}, report))
     }
 
     // Host: tell the joiners which level comes next

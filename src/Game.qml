@@ -450,6 +450,9 @@ ClayWorld2d {
             _flyShot(shot.x, shot.y, shot.dx, shot.dy, shot.damage)
             playSpitShot()
         }
+        onStruckReported: (fromId, report) => {
+            world.struckReported(fromId, report.source, report.id, report.result)
+        }
     }
 
     // --- Enemies in a session (issue #13) ---
@@ -499,8 +502,17 @@ ClayWorld2d {
     // physics steps, as the enemy's attack runs (issue #35); the hold is
     // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
-    // "ignored", "out of reach" or "parried".
+    // "dodged", "ignored", "out of reach" or "parried". This screen judges
+    // it by its knight's own state, and reports it to the others
+    // (issue #18).
     signal knightStruck(string enemyId, string result)
+    // Another node's knight met a host's enemy's attack and its node judged
+    // it: source "lunge" (id: the enemy's)
+    signal struckReported(string nodeId, string source, string id, string result)
+    function _struck(enemyId, result) {
+        knightStruck(enemyId, result)
+        if (session.connected) session.reportStruck({source: "lunge", id: enemyId, result: result})
+    }
     // The physics steps since the game came up, the clock of the parry window
     property int _physicsSteps: 0
     property var _parriedAt: ({})
@@ -532,17 +544,18 @@ ClayWorld2d {
         if (!player) return
         let at = _parriedAt[blow.id]
         if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
-            knightStruck(blow.id, "parried")
+            _struck(blow.id, "parried")
             return
         }
+        // A dash that carried the knight past the enemy dodged it all the same
         let dx = player.xWu - blow.x, dy = player.yWu - blow.y
         if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) {
-            knightStruck(blow.id, "out of reach")
+            _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
         let result = player.takeDamage(blow.atk, blow.x, blow.y)
-        if (result !== "ignored") playImpact()
-        knightStruck(blow.id, result)
+        if (result === "hit" || result === "blocked") playImpact()
+        _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
     function reportKill(nodeId, enemy, dx, dy, color) {
