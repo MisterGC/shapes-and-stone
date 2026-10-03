@@ -94,11 +94,12 @@ Item {
         // the host sets them when the run starts and the level at each
         // level, and a node that joins late gets both with its welcome
         // (clayground#306). Numbers each: an object as a session property
-        // reaches the joiners as null at the clayground pin
+        // reaches the joiners as null at the clayground pin - a workaround
+        // that waits on clayground#375
         onSessionPropertyChanged: (name, value) => {
             if (net.isHost || (name !== "seed" && name !== "level")) return
             // Kept from the signal: Network.sessionProperties follows only
-            // after it
+            // after it (the same workaround, clayground#375)
             let run = session._run
             run[name] = value
             if (run.seed === undefined || run.level === undefined) return
@@ -176,6 +177,9 @@ Item {
             }
         }
     }
+    // Why the host was lost is read from the error's text, and the error
+    // comes after connected turned false, so it is waited for 50 ms: a
+    // workaround that waits on clayground#376, a machine-readable reason
     Timer {
         id: _hostLostCheck
         interval: 50
