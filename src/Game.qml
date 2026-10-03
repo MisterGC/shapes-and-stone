@@ -2162,6 +2162,9 @@ ClayWorld2d {
             try { e.destroy() } catch(err) {}
         }
         enemies = enemies.filter(e => e && !e.destroyed && e.remote && session.connected)
+        let kept = {}
+        for (let e of enemies) kept[e.objectId] = e
+        _enemyById = kept
 
         // Destroy remote players
         session.clearRemotePlayers()
@@ -2186,6 +2189,8 @@ ClayWorld2d {
 
         grid = []
         rooms = []
+        // The minimap paints what is explored of the grid, and the grid is gone
+        exploredCells = []
     }
 
     function resetDungeon() {
