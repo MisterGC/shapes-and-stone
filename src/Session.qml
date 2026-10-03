@@ -48,11 +48,11 @@ Item {
     // This node's knight dealt the blow that killed an enemy of the host's
     // (id, x, y, dx, dy, color)
     signal enemyKillReceived(var kill)
-    // A spitter of the host's fired (x, y, dx, dy, damage)
+    // A spitter of the host's fired (id, x, y, dx, dy, damage)
     signal shotReceived(var shot)
     // Another node judged an attack on its own knight: report.source is
-    // "lunge" (id: the enemy's), report.result what became of it
-    // (Game.knightStruck)
+    // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
+    // what became of it (Game.knightStruck)
     signal struckReported(string fromId, var report)
 
     property var remotePlayers: ({})

@@ -447,10 +447,11 @@ ClayWorld2d {
         }
         onShotReceived: (shot) => {
             if (screen !== "game") return
-            _flyShot(shot.x, shot.y, shot.dx, shot.dy, shot.damage)
+            _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
             playSpitShot()
         }
         onStruckReported: (fromId, report) => {
+            if (report.source === "shot") _endShot(report.id, report.result)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
     }
@@ -507,7 +508,7 @@ ClayWorld2d {
     // (issue #18).
     signal knightStruck(string enemyId, string result)
     // Another node's knight met a host's enemy's attack and its node judged
-    // it: source "lunge" (id: the enemy's)
+    // it: source "lunge" (id: the enemy's) or "shot" (id: the shot's)
     signal struckReported(string nodeId, string source, string id, string result)
     function _struck(enemyId, result) {
         knightStruck(enemyId, result)
@@ -1943,14 +1944,36 @@ ClayWorld2d {
     }
 
     // In a session the host's spitter fires on every node: each node flies
-    // the shot, and it hurts only that node's knight
+    // the shot under the host's id for it, and it hurts only that node's
+    // knight. That node judges it by its knight's own state - hit, blocked,
+    // dodged - and reports it, and the shot goes on every screen
+    // (issue #18). One that meets no knight bursts on each screen alone.
+    property int _shotCount: 0
+    property var _shotById: ({})
+    // A shot met a knight: this node's (local) or another's, which reported
+    // it; result as Player.takeDamage's, "blocked" for a deflected one
+    signal shotEnded(string shotId, string result, bool local)
     function spawnProjectile(px, py, dirX, dirY, damage) {
+        let id = "shot" + (++_shotCount)
         if (session.connected && session.isHost)
-            session.sendShot({x: px, y: py, dx: dirX, dy: dirY, damage: damage})
-        _flyShot(px, py, dirX, dirY, damage)
+            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage})
+        _flyShot(id, px, py, dirX, dirY, damage)
     }
-    function _flyShot(px, py, dirX, dirY, damage) {
+    // This node's knight met shot id
+    function shotLanded(id, result) {
+        shotEnded(id, result, true)
+        if (session.connected) session.reportStruck({source: "shot", id: id, result: result})
+    }
+    // Another node's knight met shot id: it goes here too, its impact is
+    // the other node's
+    function _endShot(id, result) {
+        let proj = _shotById[id]
+        if (proj && !proj.destroyed) proj.vanish()
+        shotEnded(id, result, false)
+    }
+    function _flyShot(id, px, py, dirX, dirY, damage) {
         let proj = projectileComponent.createObject(world.room, {
+            shotId: id,
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
             speed: Balance.projectile.speed,
@@ -1965,8 +1988,11 @@ ClayWorld2d {
             sensorCategories: catProjectile,
             sensorCollidesWith: catPlayer
         })
-        if (proj)
-            console.log("[Game] Projectile spawned at", px.toFixed(1), py.toFixed(1))
+        if (proj) {
+            _shotById[id] = proj
+            proj.gone.connect(() => { if (world._shotById[id] === proj) delete world._shotById[id] })
+            console.log("[Game] Projectile", id, "spawned at", px.toFixed(1), py.toFixed(1))
+        }
     }
 
     function spawnSpitParticles(wx, wy) {
@@ -2118,6 +2144,7 @@ ClayWorld2d {
         // A blow held for the last level's enemy does not land in the next
         _heldBlows = []
         _parriedAt = {}
+        _shotById = {}
 
         grid = []
         rooms = []

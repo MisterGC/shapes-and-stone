@@ -8,11 +8,15 @@ PhysicsItem {
     objectName: "projectile"
 
     property var gameWorld: null
+    // The host's id for this shot, the same on every node
+    property string shotId: ""
     property real dirX: 0
     property real dirY: 0
     property real speed: Balance.projectile.speed
     property int damage: Balance.enemy.spitter.atk
     property bool destroyed: false
+    // It went, on this screen
+    signal gone()
 
     widthWu: 0.3
     heightWu: 0.3
@@ -123,24 +127,34 @@ PhysicsItem {
                 gameWorld.playImpact()
                 gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
                 gameWorld.countFight("block")
+                if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, "blocked")
             }
-            destroyed = true
-            destroy()
+            vanish()
             return
         }
         // A shot the knight dodges or ignores bursts without a hit
         let result = entity.takeDamage(damage, fromX, fromY)
-        if ((result === "hit" || result === "blocked") && gameWorld) {
-            gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
-            gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
+        if (gameWorld) {
+            if (result === "hit" || result === "blocked") {
+                gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
+                gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
+            }
+            if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, result)
         }
         die()
     }
 
     function die() {
         if (destroyed) return
-        destroyed = true
         if (gameWorld) gameWorld.impact("projectileBurst", xWu, yWu, -dirX, -dirY)
+        vanish()
+    }
+
+    // Gone without an impact of its own
+    function vanish() {
+        if (destroyed) return
+        destroyed = true
+        gone()
         destroy()
     }
 }
