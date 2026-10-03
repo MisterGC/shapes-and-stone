@@ -227,7 +227,17 @@ and applied by the host, once:
   and every screen shows the host's HP
 - a parry: the same, plus `stagger`; the host's enemy staggers
 - a shield push: `push`, and `stagger` on a guardian; the host shoves its
-  enemy
+  enemy. A shove runs as a knockback (`Enemy.shove`): a velocity set once
+  lasted only until the AI's next think, which stops an enemy in
+  `recovery` or `stagger`, so the same push went anywhere from 0 to 2 Wu,
+  for the host's knight as for a joiner's. Now it goes about 1.3 Wu
+  (`knight.pushSpeed` over `enemy.knockbackDuration`).
+  An enemy that died in the knight's reach could stay in its reach
+  (`Player.enemiesInRange`): its body's end of contact can come without its
+  item, so the sensor cannot tell whom to drop. First in the reach, it made
+  the push throw before it reached the enemy being pushed, and no `push`
+  was sent. The knight now drops dead enemies from its reach before a
+  swing or a push.
 - a kill: the host's enemy dies and is despawned on every screen; the
   killer's screen counts the kill and draws the death, stain included, and
   the others draw it from its `impact`
@@ -249,27 +259,39 @@ sleeps, the enemy walks into its reach, and one swing lowers the enemy's HP
 by the same amount on both screens; the host's enemies lose what the
 joiner's screen dealt. It parries that enemy from the sixth frame of the
 window it shows, when the host's lunge has landed and its blow is on its
-way: the host's enemy staggers and no blow of it lands on the knight. It
-shield-pushes the enemy, which moves away from it on the host. Then it
+way: the host's enemy staggers and no blow of that lunge lands on the
+knight. The knight goes to a third enemy, which the host kills there, then
+stands 4 to 8 Wu from the first and shield-pushes it once it comes: the
+host receives the push and its enemy moves at least 1 Wu away from the
+knight. Then it
 kills that enemy while the host's knight kills another: both are gone on
 both screens, the host's and the joiner's kill records grow by their own
 kills, and every death leaves one stain on each screen, in the same place.
 
-Nine runs against clayground `issue-369` @ acffb2d (the submodule), three
-with Local and six with Cloud signaling. In every run the joiner's knight
-slept before its swing and the swing landed with the first try: HP 52 to
-49 on both screens, and the 16 its screen dealt (the swing also caught a
-second enemy) was what the host's enemies lost. Every late parry staggered
-the host's enemy, and the one blow of that lunge was dropped as parried.
-The shield push moved the host's enemy 0.32 to 2.16 Wu. Both kills went on
-both screens with matching stains (two or three deaths per run: a swing
-also kills what else is in its arc). Eight runs exited 0, with a worst
-position error of 0.040 to 0.050 Wu. One Cloud run exited 1: the worst
-position error was 0.284 Wu, over the 0.25 tolerance, on an enemy the
-scripted steps did not touch, in `recovery`; the three Cloud runs after it,
-with `--dump`, did not show it again, so its cause is not known. With the
-parry's drop switched off, the parry check fails: the blow lands. With
-`--fault stale` the run exits 7.
+Eight runs against clayground `issue-369` @ acffb2d (the submodule), five
+with Local and three with Cloud signaling, all exited 0 with 23 checks
+passed. In every run the joiner's knight slept before its swing and the
+swing landed with the first try: HP 52 to 49 on both screens, and the 16
+its screen dealt (the swing also caught a second enemy) was what the host's
+enemies lost. Every late parry staggered the host's enemy, and the one
+blow of that lunge was dropped as parried. Every push reached the host
+(`push` and `stagger`) and moved its enemy 1.30 to 1.36 Wu; in seven of
+the eight a dead enemy was first in the knight's reach at the push. Both
+kills went on both screens with matching stains (two or three deaths per
+run: a swing also kills what else is in its arc). The worst position error
+was 0.045 to 0.245 Wu, mostly on an enemy in a lunge at the knight.
+
+Each fix is proven by switching it off. Without the parry's drop the parry
+check fails: the blow lands. With the knight's old loops and a dead enemy
+first in its reach, the push throws, the host receives nothing and its
+enemy moves 0.00 Wu. Before the shove ran as a knockback, a push the host
+received moved its enemy 0.30 to 0.32 Wu in some runs, 1.2 to 2.2 in
+others. With `--fault stale` the run exits 7.
+
+The position check fails now and then on an enemy the scripted steps do
+not touch, in `recovery` or a lunge: 0.253 to 0.286 Wu against the 0.25
+tolerance, in about one run of five while these steps were built. That
+check and its tolerance are #14's.
 
 ## Security note
 
