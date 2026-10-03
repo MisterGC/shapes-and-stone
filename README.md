@@ -53,6 +53,23 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
 ```
 
+In a session the host runs every enemy: it spawns them as Clayground
+replicated objects (`Network.spawn`, type `"enemy"`), runs their AI and
+sends their position, AI state, HP and target. Every other screen shows
+the host's enemies 50 ms in the past plus the round trip and runs no AI
+of its own. An enemy goes for the nearest knight still standing, on
+every screen the same one. A knight's blow on an enemy is drawn and
+counted on its own screen and applied by the host; an enemy's lunge or
+shot hurts only on the screen of the knight it hits. The enemy bench
+starts a host and a joiner in one process, joins them over LAN, puts a
+knight at each of two enemies, compares every enemy on both screens for
+five seconds, kills one from the joiner and lets the joiner's knight
+fall, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/enemies/enemies.qml
+```
+
 The game starts with its sound on, except in the dojo, and M mutes and
 unmutes it. The sound bench starts the game the way a native build does,
 enters the dungeon, presses M twice and exits with the number of failed

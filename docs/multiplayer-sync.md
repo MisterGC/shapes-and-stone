@@ -116,6 +116,45 @@ while connected):
    channel, which lags under loss. In the browser the plugin uses PeerJS
    data connections, so the lossy channel is PeerJS's `reliable: false`.
 
+## Enemies (issue #13)
+
+The host runs every enemy; the others show it. An enemy is a replicated
+object of type `"enemy"` that the host spawns (clayground #306): its
+`ReplicatedObject` sends `xWu`, `yWu`, `aiState`, `facingAngle`, `hp`,
+`parryWindow` and `targetId` whenever one changes, and a joiner makes a
+remote enemy per object - a kinematic body without AI - also for objects
+spawned before it joined. A knight's blow on a remote enemy goes to the
+host as a message (`enemyBlow`); the host's enemy hits another node's
+knight with one (`knightBlow`), which that node checks against where the
+knight really is; a spitter's shot is broadcast and flown on every node.
+
+Two settings of the remote enemy's interpolation are not the defaults:
+
+- A fixed delay of 50 ms plus the round trip (capped at 100 ms) instead
+  of `autoDelay`. An enemy at rest sends nothing, and `autoDelay` counts
+  that gap into the sender's update period: after a rest it rendered the
+  enemy about 80 ms behind and glided back to 40 ms over seconds. At a
+  lunge's 5.6 to 8 Wu/s that is up to 0.65 Wu.
+- `settleMs: 30` instead of 200. An enemy stops dead when a lunge lands;
+  its position stops changing, so nothing is sent until the settle, and
+  meanwhile the interpolator extrapolates the lunge (up to
+  `maxExtrapolationMs`, 200). With 200 the remote enemy overshot by up to
+  1.2 Wu and snapped back.
+
+Both are behaviour of clayground's `StateInterpolator` and
+`ReplicatedObject` that any object which rests or stops would meet, filed
+as [clayground #366](https://github.com/MisterGC/clayground/issues/366)
+(`autoDelay` after a rest) and
+[clayground #367](https://github.com/MisterGC/clayground/issues/367)
+(the overshoot until the settle); the two settings are workarounds until
+those are fixed.
+
+`tests/enemies` measures it: host and joiner in one process over LAN,
+five seconds of two knights fighting, every enemy compared every 16 ms.
+Five runs against clayground `issue-306` @ 6eefb29: max error 0.375 to
+0.397 Wu (during a lunge), mean 0.070 Wu, no AI state or target on the
+joiner that the host had not had in the 300 ms before.
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"

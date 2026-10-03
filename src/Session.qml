@@ -1,9 +1,10 @@
 import QtQuick
 import Clayground.Network
 
-// The co-op session: owns the Network, the lobby-to-game flow and the
-// registry of remote players. Game.qml calls into it and reacts to its
-// signals; it never touches the Network itself.
+// The co-op session: owns the Network, the lobby-to-game flow, the
+// registry of remote players and the host's enemies as replicated objects.
+// Game.qml calls into it and reacts to its signals; it never touches the
+// Network itself (only an enemy's ReplicatedObject is given it).
 Item {
     id: session
     anchors.fill: parent
@@ -17,6 +18,9 @@ Item {
 
     readonly property bool connected: net.connected
     readonly property bool isHost: net.isHost
+    readonly property string nodeId: net.nodeId
+    // The Network itself, only for the ReplicatedObject in each enemy
+    readonly property var network: net
 
     // The host started the game (also emitted on the host itself)
     signal started(int seed)
@@ -31,6 +35,21 @@ Item {
     signal lobbyLeft()
     // Another player hit or was hit; this screen draws the hit, no more
     signal impactReceived(string kind, real x, real y, real dx, real dy, var color)
+    // The host runs every enemy as a replicated object of type "enemy"; it
+    // came to life or went on this node - a joiner's too, also one that
+    // joins late (issue #13)
+    signal enemySpawned(string objectId, var props)
+    signal enemyDespawned(string objectId)
+    // Host: another player's knight struck an enemy; blow.kind is "damage"
+    // (amount, x, y), "stagger" or "push" (dx, dy, speed)
+    signal enemyBlowReceived(string fromId, var blow)
+    // An enemy of the host's lunged at this node's knight (atk, x, y)
+    signal knightBlowReceived(var blow)
+    // This node's knight dealt the blow that killed an enemy of the host's
+    // (id, x, y, dx, dy, color)
+    signal enemyKillReceived(var kill)
+    // A spitter of the host's fired (x, y, dx, dy, damage)
+    signal shotReceived(var shot)
 
     property var remotePlayers: ({})
 
@@ -49,6 +68,14 @@ Item {
                 if (rp) rp.triggerAction(data.action)
             } else if (data.type === "impact") {
                 session.impactReceived(data.kind, data.x, data.y, data.dx, data.dy, data.color)
+            } else if (data.type === "enemyBlow") {
+                if (net.isHost) session.enemyBlowReceived(fromId, data)
+            } else if (data.type === "knightBlow") {
+                session.knightBlowReceived(data)
+            } else if (data.type === "enemyKill") {
+                session.enemyKillReceived(data)
+            } else if (data.type === "shot") {
+                session.shotReceived(data)
             } else if (data.type === "levelChange") {
                 session.levelChanged(data.levelIndex)
             } else if (data.type === "exitReached") {
@@ -61,6 +88,13 @@ Item {
         onStateReceived: (fromId, data, sentAt) => {
             let rp = remotePlayers[fromId]
             if (rp) rp.pushState(data, sentAt)
+        }
+
+        onObjectSpawned: (id, type, owner, props) => {
+            if (type === "enemy") session.enemySpawned(id, props)
+        }
+        onObjectDespawned: (id, type) => {
+            if (type === "enemy") session.enemyDespawned(id)
         }
 
         onNodeLeft: (nodeId) => {
@@ -133,6 +167,31 @@ Item {
     // Leave the session, e.g. for the title after the knight has fallen
     function leave() {
         net.leave()
+    }
+
+    // Host: an enemy for every node; the host owns it and runs its AI
+    function spawnEnemy(props) {
+        return net.spawn("enemy", props)
+    }
+    // Host: the enemy is gone, on every node
+    function despawnEnemy(objectId) {
+        net.despawn(objectId)
+    }
+    // Joiner: this node's knight struck an enemy, for the host to apply
+    function strikeEnemy(objectId, blow) {
+        net.sendTo(net.hostId, Object.assign({type: "enemyBlow", id: objectId}, blow))
+    }
+    // Host: an enemy lunged at another node's knight
+    function strikeKnight(nodeId, blow) {
+        net.sendTo(nodeId, Object.assign({type: "knightBlow"}, blow))
+    }
+    // Host: the blow of another node's knight killed an enemy
+    function reportKill(nodeId, kill) {
+        net.sendTo(nodeId, Object.assign({type: "enemyKill"}, kill))
+    }
+    // Host: a spitter fired, every node flies the shot
+    function sendShot(shot) {
+        net.broadcast(Object.assign({type: "shot"}, shot))
     }
 
     // Host: tell the joiners which level comes next

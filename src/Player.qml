@@ -294,9 +294,7 @@ PhysicsItem {
                 let dy = enemy.yWu - yWu
                 let len = Math.sqrt(dx * dx + dy * dy)
                 if (len < 0.01) continue
-                enemy.body.linearVelocity = Qt.point(
-                    (dx / len) * pushForce,
-                    -(dy / len) * pushForce)  // Negate Y for screen coords
+                enemy.shove(dx, dy, pushForce)
                 _hitThisSwing.add(enemy)
                 // Shield-push breaks guardian guard
                 if (enemy.enemyType === "guardian") enemy.stagger()
