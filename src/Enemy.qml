@@ -529,16 +529,16 @@ PhysicsItem {
         }
     }
 
-    // A shove along (dx, dy) at speed, from the knight's shield push
+    // A shove along (dx, dy) at speed, from the knight's shield push. It
+    // runs as a knockback: a velocity set once lasted only until the AI's
+    // next think, which stops an enemy in recovery or stagger, so the
+    // shove went anywhere from 0 to 2 Wu
     function shove(dx, dy, speed) {
         if (remote) {
             if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "push", dx: dx, dy: dy, speed: speed})
             return
         }
-        let len = Math.sqrt(dx * dx + dy * dy)
-        if (len < 0.001) return
-        // Negate Y for world-to-screen
-        body.linearVelocity = Qt.point(dx / len * speed, -dy / len * speed)
+        knockback(dx, dy, speed)
     }
 
     // An attack runs on the physics steps, not on the AI's think ticks: a
