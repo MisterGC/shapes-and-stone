@@ -442,11 +442,13 @@ Item {
         let s = {t: Date.now(), e: e}
         let d = renderDelayMs()
         if (d >= 0) s.d = d
+        let dd = renderDelays()
+        if (Object.keys(dd).length > 0) s.dd = dd
         _samples.push(s)
     }
     // The samples since the last take, as [{t, e: _recordFrame's}]; a joiner's
-    // also carry d, the delay in ms its enemies are rendered with (50 ms
-    // plus the round trip, Enemy.qml)
+    // also carry d, the delay in ms its enemies are rendered with, and dd,
+    // each enemy's own by id (autoDelay sizes it per enemy, Enemy.qml)
     function take() {
         let s = _samples
         _samples = []
@@ -471,10 +473,18 @@ Item {
             if (game._shotById[id] && !game._shotById[id].destroyed) shotSeen[id] = now
     }
 
-    // The delay a joiner's enemies are rendered with; -1 without one
+    // The delay a joiner's enemies are rendered with, in whole ms; -1
+    // without one
     function renderDelayMs() {
-        let r = _replicaOf(game.enemies.find(e => e && !e.destroyed && e.remote))
-        return r ? r.interpolator.delayMs : -1
+        let e = game.enemies.find(e => e && !e.destroyed && e.remote)
+        return e ? Math.round(e.renderDelayMs) : -1
+    }
+    // Each remote enemy's render delay in whole ms, by object id
+    function renderDelays() {
+        let out = {}
+        for (let e of game.enemies)
+            if (e && !e.destroyed && e.remote) out[e.objectId] = Math.round(e.renderDelayMs)
+        return out
     }
     function _replicaOf(e) {
         if (!e) return null

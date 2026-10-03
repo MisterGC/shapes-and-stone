@@ -33,9 +33,10 @@ enemy of the host's, and each answer is checked on both screens:
 Then both knights fight for a few seconds. Every frame each instance records
 every enemy it shows: object id, position, HP and AI state.
 
-The comparison. The joiner renders the host's enemies a fixed delay in the
-past, 50 ms plus the round trip (Enemy.qml, docs/multiplayer-sync.md), and
-each of its records carries that delay. An enemy's position on the joiner
+The comparison. The joiner renders the host's enemies a delay in the past
+that its interpolator sizes per enemy (autoDelay, Enemy.qml,
+docs/multiplayer-sync.md), and each of its records carries each enemy's
+delay. An enemy's position on the joiner
 has to be within --tolerance Wu of the host's at that delay, give or take
 --slack ms (the host's position between its two frames around that
 moment). Its id, HP and AI state have to be ones the host had in the --lag
@@ -223,10 +224,12 @@ def compare(host, joiner, lag_ms, slack_ms, skew_ms=20):
             i += 1
         if not window:
             continue
-        d = js.get("d", 50)
-        delays.add(d)
-        shifts = range(d - slack_ms, d + slack_ms + 1, 4)
         for eid, je in js["e"].items():
+            # The delay this enemy was rendered with: its own, else the
+            # record's (a record from before dd), else 50
+            d = round(js.get("dd", {}).get(eid, js.get("d", 50)))
+            delays.add(d)
+            shifts = range(d - slack_ms, d + slack_ms + 1, 4)
             seen = [w[eid] for w in window if eid in w]
             res["judged"] += 1
             if not seen:
@@ -299,7 +302,7 @@ def judge(host_rec, join_rec, args, check):
           f"only, {cmp['missingIds']} on the host only)")
     check(np > 0 and cmp["maxErrWu"] <= args.tolerance,
           f"every enemy's position is within {args.tolerance} Wu of the host's {delay} ms "
-          f"(50 + rtt) +-{args.slack} ms before (max {cmp['maxErrWu']:.3f} at "
+          f"(autoDelay) +-{args.slack} ms before (max {cmp['maxErrWu']:.3f} at "
           f"{cmp['maxErrAt']}, mean {cmp['meanErrWu']:.3f}, {np} judged)")
     check(n > 0 and cmp["hpMiss"] == 0,
           f"every enemy's HP agrees within {args.lag} ms ({cmp['hpMiss']} misses, "
