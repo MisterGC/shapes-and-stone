@@ -111,13 +111,24 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 
 At 0 HP the knight falls: the enemies stop and a screen shows how deep the
 run got, counted in dungeons from depth 0. Enter starts a new run from depth
-0 on a new seed, Esc returns to the title. In a session only Esc is offered,
-and it leaves the session. The fall bench brings the knight down twice, goes
-again with Enter and back to the title with Esc, and exits with the number
-of failed checks:
+0 on a new seed, Esc returns to the title. The fall bench brings the knight
+down twice, goes again with Enter and back to the title with Esc, and exits
+with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fallen/fallen.qml
+```
+
+In a session a knight at 0 HP is down, drawn slumped and dark on every
+screen, and the run goes on while another knight stands: the downed
+player's screen says "You are down" and offers only Esc, which leaves the
+session. When every knight is down the host ends the run and every screen
+returns to the title. The downed bench starts a host and a joiner in one
+process, joins them over LAN, brings down first one knight and then the
+other, twice in turn, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
 ```
 
 The HUD shows "Depth N" under the bars; a village counts as the depth of

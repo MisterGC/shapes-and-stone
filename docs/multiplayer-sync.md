@@ -128,26 +128,48 @@ host as a message (`enemyBlow`); the host's enemy hits another node's
 knight with one (`knightBlow`), which that node checks against where the
 knight really is; a spitter's shot is broadcast and flown on every node.
 
-Two settings of the remote enemy's interpolation are not the defaults:
-
-- A fixed delay of 50 ms plus the round trip (capped at 100 ms) instead
-  of `autoDelay`. An enemy at rest sends nothing, and `autoDelay` counts
-  that gap into the sender's update period: after a rest it rendered the
-  enemy about 80 ms behind and glided back to 40 ms over seconds. At a
-  lunge's 5.6 to 8 Wu/s that is up to 0.65 Wu.
-- `settleMs: 30` instead of 200. An enemy stops dead when a lunge lands;
-  its position stops changing, so nothing is sent until the settle, and
-  meanwhile the interpolator extrapolates the lunge (up to
-  `maxExtrapolationMs`, 200). With 200 the remote enemy overshot by up to
-  1.2 Wu and snapped back.
-
-Both are behaviour of clayground's `StateInterpolator` and
-`ReplicatedObject` that any object which rests or stops would meet, filed
+One setting of the remote enemy's interpolation is not the default: a
+fixed delay of 50 ms plus the round trip (capped at 100 ms) instead of
+`autoDelay`. Until issue #19 it had a second one, `settleMs: 30`: an enemy
+that stops dead (a lunge lands) sent nothing until the settle, and the
+interpolator carried the lunge on, up to 1.2 Wu past the stop. Both were
+behaviour of clayground any object that rests or stops would meet, filed
 as [clayground #366](https://github.com/MisterGC/clayground/issues/366)
 (`autoDelay` after a rest) and
 [clayground #367](https://github.com/MisterGC/clayground/issues/367)
-(the overshoot until the settle); the two settings are workarounds until
-those are fixed.
+(the overshoot until the settle).
+
+Against clayground `issue-366` @ e003cf9, which carries both fixes, the
+same-world bench (below) ran three ways, each five times with Local and
+five times with Cloud signaling; the setting kept ran ten times more on
+the branch's head:
+
+| enemy settings | runs | exit 0 | worst position error, Wu | position misses | render delay, ms | AI state misses |
+|---|---|---|---|---|---|---|
+| fixed delay, `settleMs: 30` (before #19) | 10 | 6 | 0.103 - 0.306 | 3 | 50 - 52 | 0 |
+| fixed delay, default `settleMs` (now) | 20 | 14 | 0.045 - 0.262 | 2 | 50 - 52 | 0 |
+| `autoDelay`, default `settleMs` | 10 | 6 | 0.047 - 0.213 | 0 | 35 - 359 | 3 (Cloud) |
+
+- `settleMs` is the default again: #367 sends a stopped object's state
+  once more right after the stop. The miss issue #19 was asked about, a
+  remote enemy in `recovery` just over 0.25 Wu off, got rarer but did not
+  go: 2 of 20 runs (0.256 and 0.262 Wu) against 3 of 10 with
+  `settleMs: 30` (0.252, 0.270 and 0.306 Wu), every one in `recovery`.
+  The tolerance stays 0.25 Wu.
+- The fixed delay stays. With `autoDelay` each enemy gets the delay its
+  own send intervals ask for, and some enemies were rendered up to 359 ms
+  behind: three Cloud runs failed the AI state check with a joiner state
+  the host had left more than 300 ms before (e.g. `patrol` on the joiner
+  where the host had `idle`). Widening the check's 300 ms is not the
+  answer; an enemy shown 360 ms late also lunges 360 ms late on that
+  screen. It stays a workaround until clayground #366 also covers an
+  object that sends seldom.
+- The other failures are not the position or the state check, and come
+  with every setting: the block phase, where the first lunge was judged
+  `ignored` (the knight was in the grace after another hit, so every blow
+  of that enemy counted `ignored`) or once `hit`, in 1 run with
+  `settleMs: 30`, 3 with the default and 2 with `autoDelay`; and once a
+  shield push that moved the enemy 0.93 Wu, under the 1.0 Wu asked.
 
 `tests/enemies` measures it: host and joiner in one process over LAN,
 five seconds of two knights fighting, every enemy compared every 16 ms.
@@ -171,8 +193,9 @@ position, HP and AI state.
 
 The joiner renders the host's enemies 50 ms plus the round trip (capped
 at 100 ms) in the past, the delay `Enemy.qml` gives their interpolator.
-Each joiner record carries the delay it was rendered with, and is judged
-against the host's records:
+Each joiner record carries the delay each enemy was rendered with (its
+interpolator's `effectiveDelayMs`, so an enemy on `autoDelay` is judged
+by its own), and is judged against the host's records:
 
 - position: within 0.25 Wu (`--tolerance`) of the host's position at that
   delay, give or take 20 ms (`--slack`), the host's position taken between
@@ -374,6 +397,46 @@ that the other screen receives the result fail, and the shots fly on. With
 the joiner ignoring the host's results only (`_endShot` returning on a
 joiner) it exits 1, on the joiner's check alone. With `--fault stale` it
 exited 9 (run before the host's shot was added).
+
+## A downed knight, and the end of a co-op run (issue #19)
+
+A knight at 0 HP is down, on every screen: `KnightView.downed` flattens
+and darkens it, hides its aim and dims its lantern. The local knight is
+down when its HP is 0 (`Player.fallen`); another player's knight when the
+HP its state carries is 0 (`RemotePlayer.remoteHp`, sent with every state,
+60 per second). A down knight takes no blow (`ignored`), the campfire does
+not heal it, and it stays down through a level change, for the rest of the
+run.
+
+In a session the fall does not end the run while another knight stands.
+The downed player's screen says "You are down", keeps the dungeon in sight
+under a light shade and offers only Esc, which leaves the session; the
+enemies go for the knights still standing (issue #13).
+
+The host ends the run: whenever its own knight falls, another knight's
+HP changes (`Session.partyChanged`) or a node leaves, it checks whether
+its knight and every other one are at 0 HP. If so it broadcasts
+`runEnd`; each joiner goes to the title and leaves the session on it, and
+the host follows once every joiner has left, or after
+`Session.endRunWaitMs` (2 s), so its leaving cannot cut the message off.
+The best depth is kept as on any fall; the fallen screen's summary is not
+shown in a session.
+
+`tests/downed/downed.qml` checks it with a host and a joiner in one
+process, over LAN, in two sessions. In the first the joiner's knight
+falls first: both screens draw it down, its screen says "You are down"
+and offers only Esc, the host's knight stands, the run goes on and no
+enemy stops. Then the host's knight falls, and both screens must be on the
+title, out of the session, within 3 s. In the second the host's knight
+falls first and the joiner's last, so the host learns of the last fall
+through the joiner's state.
+
+Five runs against clayground `issue-366` @ e003cf9 (the submodule) all
+exited 0 with 28 checks passed. A fall was drawn down on both screens
+19 to 46 ms after it, and both screens were on the title 64 to 95 ms after
+the last knight fell. With the host's `runEnd` broadcast taken out the
+bench exits 100, waiting for the title; with `RemotePlayer` drawing no
+knight down it exits 100, waiting for the fall on the other screen.
 
 ## Security note
 
