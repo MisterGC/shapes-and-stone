@@ -10,8 +10,8 @@ PhysicsItem {
     property var gameWorld: null
     property real dirX: 0
     property real dirY: 0
-    property real speed: 5.0
-    property int damage: 8
+    property real speed: Balance.projectile.speed
+    property int damage: Balance.enemy.spitter.atk
     property bool destroyed: false
 
     widthWu: 0.3
@@ -88,10 +88,10 @@ PhysicsItem {
         }
     }
 
-    // Auto-destroy after 3 seconds
+    // Burst when its lifetime is over
     Timer {
         running: true
-        interval: 3000
+        interval: Balance.projectile.lifetime * 1000
         onTriggered: projectile.die()
     }
 

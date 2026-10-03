@@ -1,5 +1,6 @@
 module shapes_and_stone
 Main 1.0 Main.qml
+singleton Balance 1.0 Balance.qml
 Game 1.0 Game.qml
 Player 1.0 Player.qml
 KnightView 1.0 KnightView.qml

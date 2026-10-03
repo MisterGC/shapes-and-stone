@@ -38,27 +38,28 @@ PhysicsItem {
     property int tier: 1
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
     property real facingAngle: 0          // Guardian tracks player direction
-    readonly property real shieldArc: 60  // ±60 degrees frontal shield
-    readonly property real shieldRotSpeed: 120  // Degrees per second
+    readonly property real shieldArc: Balance.enemy.shieldArc
+    readonly property real shieldRotSpeed: Balance.enemy.shieldTurnSpeed
 
-    // Stats
-    readonly property real chaseSpeed: enemyType === "spitter" ? 2.4 : 4.0
-    readonly property real patrolSpeed: enemyType === "spitter" ? 0.9 : 1.5
+    // Stats, from the balance table; hp, atk and def are set on spawn
+    readonly property var _typeStats: Balance.enemy[enemyType] || Balance.enemy.grunt
+    readonly property real chaseSpeed: _typeStats.chaseSpeed
+    readonly property real patrolSpeed: _typeStats.patrolSpeed
     property real _lungeSpeed: 0  // Calculated per attack
-    readonly property real windUpSpeed: 4.0
-    readonly property real windUpDuration: 0.3
-    readonly property real lungeDuration: 0.35
-    readonly property real lungeRange: 2.0
-    property int hp: 30
-    property int maxHp: 30
-    property int atk: 10
-    property int def: 2
+    readonly property real windUpSpeed: Balance.enemy.windUpSpeed
+    readonly property real windUpDuration: Balance.enemy.windUp
+    readonly property real lungeDuration: Balance.enemy.lungeDuration
+    readonly property real lungeRange: Balance.enemy.lungeRange
+    property int hp: Balance.enemy.tierHp[1]
+    property int maxHp: Balance.enemy.tierHp[1]
+    property int atk: Balance.enemy.grunt.atk
+    property int def: Balance.enemy.grunt.def
 
     // Spitter-specific
-    readonly property real preferredDist: 5.0   // Distance to maintain from player
-    readonly property real shootRange: 8.0      // Max range to start shooting
-    readonly property real kiteSpeed: 3.0       // Retreat speed
-    readonly property real shootCooldown: 1.2
+    readonly property real preferredDist: Balance.enemy.preferredDist
+    readonly property real shootRange: Balance.enemy.shootRange
+    readonly property real kiteSpeed: Balance.enemy.kiteSpeed
+    readonly property real shootCooldown: Balance.enemy.shootCooldown
     property real _shootTimer: 0
 
     // Combat state
@@ -431,7 +432,7 @@ PhysicsItem {
 
     Timer {
         id: aiTimer
-        interval: 100
+        interval: Balance.enemy.thinkInterval * 1000
         running: true
         repeat: true
         onTriggered: updateAI(interval / 1000.0)
@@ -445,7 +446,7 @@ PhysicsItem {
     property real _knockT: 0
     property real _knockVx: 0
     property real _knockVy: 0
-    readonly property real knockDuration: 0.12
+    readonly property real knockDuration: Balance.enemy.knockbackDuration
     function knockback(dx, dy, speed) {
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
@@ -519,7 +520,7 @@ PhysicsItem {
                     aiState = "kite"
                 } else if (_pathRecalcTimer <= 0) {
                     _recalcChasePath()
-                    _pathRecalcTimer = 1.0
+                    _pathRecalcTimer = Balance.enemy.repathInterval
                 }
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
@@ -533,7 +534,7 @@ PhysicsItem {
                 } else if (_pathRecalcTimer <= 0) {
                     _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
                     _recalcChasePath()
-                    _pathRecalcTimer = 1.0
+                    _pathRecalcTimer = Balance.enemy.repathInterval
                 }
             }
             break
@@ -549,11 +550,11 @@ PhysicsItem {
                 let len = Math.max(0.01, dist)
                 let ndx = dx / len
                 let ndy = dy / len
-                if (dist < preferredDist * 0.7) {
+                if (dist < preferredDist * Balance.enemy.tooClose) {
                     // Too close — retreat
                     body.linearVelocity = Qt.point(
                         -ndx * kiteSpeed, ndy * kiteSpeed)
-                } else if (dist > preferredDist * 1.3) {
+                } else if (dist > preferredDist * Balance.enemy.tooFar) {
                     // Too far — approach
                     body.linearVelocity = Qt.point(
                         ndx * chaseSpeed, -ndy * chaseSpeed)
@@ -566,7 +567,7 @@ PhysicsItem {
             // Shoot when cooldown ready
             if (_shootTimer <= 0 && dist <= shootRange) {
                 _shootTimer = shootCooldown
-                _attackTimer = 0.3  // Brief telegraph
+                _attackTimer = Balance.enemy.shootWindUp  // Brief telegraph
                 let len = Math.max(0.01, dist)
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
@@ -607,13 +608,13 @@ PhysicsItem {
             body.linearVelocity = Qt.point(
                 _dirToTargetX * _lungeSpeed,
                 -_dirToTargetY * _lungeSpeed)
-            parryWindow = _attackTimer < 0.15
+            parryWindow = _attackTimer < Balance.enemy.parryWindow
             if (_attackTimer <= 0) {
                 parryWindow = false
                 body.linearVelocity = Qt.point(0, 0)
                 performAttack()
                 aiState = "recovery"
-                attackCooldown = 0.8
+                attackCooldown = Balance.enemy.recovery
             }
             break
 
@@ -658,11 +659,12 @@ PhysicsItem {
 
     function _setupPatrol() {
         // Patrol near spawn point: 2-3 waypoints in a small area
+        let r = Balance.enemy.patrolRadius
         let offsets = [
-            Qt.point(_spawnXWu - 2, _spawnYWu),
-            Qt.point(_spawnXWu + 2, _spawnYWu),
-            Qt.point(_spawnXWu, _spawnYWu + 2),
-            Qt.point(_spawnXWu, _spawnYWu - 2)
+            Qt.point(_spawnXWu - r, _spawnYWu),
+            Qt.point(_spawnXWu + r, _spawnYWu),
+            Qt.point(_spawnXWu, _spawnYWu + r),
+            Qt.point(_spawnXWu, _spawnYWu - r)
         ]
         // Pick 2 random reachable offsets
         let wps = []
@@ -687,7 +689,7 @@ PhysicsItem {
             let dx = target.xWu - xWu
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < 1.2) {
+            if (dist < Balance.enemy.lungeHitRange) {
                 target.takeDamage(atk, xWu, yWu)
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
@@ -705,7 +707,7 @@ PhysicsItem {
 
     function stagger() {
         parryWindow = false
-        _attackTimer = 1.0
+        _attackTimer = Balance.enemy.stagger
         aiState = "stagger"
         staggerWobble.restart()
     }
@@ -723,13 +725,13 @@ PhysicsItem {
     }
 
     function takeDamage(amount, attackerX, attackerY) {
-        let finalDamage = Math.max(1, amount - def)
+        let finalDamage = Math.max(Balance.minDamage, amount - def)
 
         // Guardian frontal shield
         let blocked = false
         if (enemyType === "guardian" && aiState !== "stagger"
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
-            finalDamage = Math.floor(finalDamage * 0.3)
+            finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
         }
 
@@ -746,7 +748,7 @@ PhysicsItem {
             else
                 gameWorld.shake(blocked ? 0.5 : 1.5)
         }
-        if (!blocked && hp > 0 && _fx) knockback(hdx, hdy, 7)
+        if (!blocked && hp > 0 && _fx) knockback(hdx, hdy, Balance.enemy.knockbackSpeed)
 
         // Guardian counter-attacks after blocking
         if (blocked && aiState !== "telegraph" && aiState !== "lunge") {
@@ -756,7 +758,7 @@ PhysicsItem {
                 let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
-                _attackTimer = windUpDuration * 0.5  // Faster counter
+                _attackTimer = windUpDuration * Balance.enemy.counterWindUp  // Faster counter
                 aiState = "telegraph"
             }
         }

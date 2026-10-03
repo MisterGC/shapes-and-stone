@@ -1043,7 +1043,7 @@ ClayWorld2d {
         if (resetting || newIndex === levelIndex) return
         resetting = true
         Qt.callLater(() => {
-            let savedHp = player ? player.hp : 120
+            let savedHp = player ? player.hp : Balance.knight.hp
             clearDungeon()
             levelIndex = newIndex
             levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
@@ -1181,22 +1181,23 @@ ClayWorld2d {
         // Step 8: Place exit trigger sensor at the north edge
         placeExitSensor()
 
-        // Step 9: Spawn 10-20 enemies across non-start rooms with tier variation
+        // Step 9: Spawn enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            let numEnemies = 5 + Math.floor(rng() * 4)
+            let sb = Balance.spawn
+            let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
             for (let i = 0; i < numEnemies; i++) {
                 let room = spawnRooms[i % spawnRooms.length]
                 let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
                 let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
-                // Tier: 0=weak(20%), 1=normal(60%), 2=tough(20%)
+                // Tier: 0=weak, 1=normal, 2=tough
                 let roll = rng()
-                let tier = roll < 0.2 ? 0 : (roll < 0.8 ? 1 : 2)
-                // Enemy type: ~20% guardian, ~20% spitter, rest grunt
+                let tier = roll < sb.weakChance ? 0 : (roll < sb.normalChance ? 1 : 2)
+                // Enemy type: guardian, spitter, else grunt
                 let typeRoll = rng()
-                let guardianChance = tier === 2 ? 0.4 : 0.15
+                let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
                 let type = typeRoll < guardianChance ? "guardian"
-                    : typeRoll < guardianChance + 0.2 ? "spitter" : "grunt"
+                    : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
                 spawnEnemy(ex, ey, tier, type)
             }
         }
@@ -1577,15 +1578,10 @@ ClayWorld2d {
     function spawnEnemy(ex, ey, tier, type) {
         tier = tier || 1
         type = type || "grunt"
-        let tierData = [
-            { hp: 18, tint: "#6B2A2A" },  // weak: darker, desaturated
-            { hp: 30, tint: "" },           // normal: default colors
-            { hp: 42, tint: "#CC6644" }     // tough: brighter, warm glow
-        ]
-        let td = tierData[tier]
-        let ehp = td.hp + (type === "guardian" ? 10 : (type === "spitter" ? -6 : 0))
-        let eatk = type === "spitter" ? 8 : 10
-        let edef = type === "spitter" ? 0 : 2
+        let stats = Balance.enemy[type]
+        let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
+        let eatk = stats.atk
+        let edef = stats.def
         let enemy = enemyComponent.createObject(world.room, {
             xWu: ex, yWu: ey,
             hp: ehp, maxHp: ehp,
@@ -1626,7 +1622,7 @@ ClayWorld2d {
         let proj = projectileComponent.createObject(world.room, {
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
-            speed: 5.0,
+            speed: Balance.projectile.speed,
             damage: damage,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
@@ -1787,7 +1783,7 @@ ClayWorld2d {
     }
 
     function resetDungeon() {
-        let savedHp = player ? player.hp : 120
+        let savedHp = player ? player.hp : Balance.knight.hp
         console.log("[Game] Resetting, preserving HP:", savedHp)
         clearDungeon()
         levelIndex++
@@ -2050,14 +2046,14 @@ ClayWorld2d {
             gameCamera.target = player
         }
 
-        // Spawn test enemies: 2 grunts + 1 guardian
+        // Spawn the fight room's enemies
         _spawnFightRoomEnemies()
     }
 
     // Auto-respawn enemies in fight room when all dead
     Timer {
         id: fightRoomRespawn
-        interval: 2000
+        interval: Balance.spawn.fightRoomRespawn * 1000
         repeat: true
         running: fightRoomActive
         onTriggered: {
@@ -2073,12 +2069,8 @@ ClayWorld2d {
     }
 
     function _spawnFightRoomEnemies() {
-        let cx = _fightRoomCx
-        let cy = _fightRoomCy
-        spawnEnemy(cx + 4, cy + 2, 1, "grunt")
-        spawnEnemy(cx - 4, cy + 2, 1, "grunt")
-        spawnEnemy(cx, cy + 4, 2, "guardian")
-        spawnEnemy(cx - 3, cy - 3, 1, "spitter")
+        for (let e of Balance.spawn.fightRoom)
+            spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 
     function exitFightRoom() {
