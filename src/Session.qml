@@ -22,8 +22,10 @@ Item {
     // The Network itself, only for the ReplicatedObject in each enemy
     readonly property var network: net
 
-    // The host started the game (also emitted on the host itself)
-    signal started(int seed)
+    // The run is on: the host started it, or this node joined one under
+    // way (also emitted on the host itself). levelIndex is the level the
+    // host plays, 0 at the start
+    signal started(int seed, int levelIndex)
     // Every client applies this level; the host is the level authority
     signal levelChanged(int levelIndex)
     // Host only: a player reached the exit, the host decides to advance
@@ -57,6 +59,9 @@ Item {
     // Another knight's HP changed or its node left: the party may be down
     // now
     signal partyChanged()
+    // A node joined the run under way; its knight is already made on this
+    // screen
+    signal playerJoined(string nodeId)
     // Another player's knight was made on this screen
     signal remotePlayerSpawned(string nodeId, var knight)
     // The run is over for everyone: on a joiner when the host ends it, on
@@ -68,6 +73,8 @@ Item {
     // made (a level being built, a run not yet joined): a knight made
     // starts from it, a downed one downed
     property var lastStates: ({})
+    // The host's run as far as its session properties have come
+    property var _run: ({})
 
     Network {
         id: net
@@ -76,10 +83,24 @@ Item {
         signalingMode: Network.SignalingMode.Cloud
         autoRelay: true
 
+        // The run is two session properties, its seed and the level played:
+        // the host sets them when the run starts and the level at each
+        // level, and a node that joins late gets both with its welcome
+        // (clayground#306). Numbers each: an object as a session property
+        // reaches the joiners as null at the clayground pin
+        onSessionPropertyChanged: (name, value) => {
+            if (net.isHost || (name !== "seed" && name !== "level")) return
+            // Kept from the signal: Network.sessionProperties follows only
+            // after it
+            let run = session._run
+            run[name] = value
+            if (run.seed === undefined || run.level === undefined) return
+            if (!session.inGame) session.started(run.seed, run.level)
+            else if (name === "level") session.levelChanged(run.level)
+        }
+
         onMessageReceived: (fromId, data) => {
-            if (data.type === "gameStart") {
-                session.started(data.seed)
-            } else if (data.type === "action") {
+            if (data.type === "action") {
                 let rp = remotePlayers[fromId]
                 if (rp) rp.triggerAction(data.action)
             } else if (data.type === "impact") {
@@ -96,8 +117,6 @@ Item {
                 session.struckReported(fromId, data)
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
-            } else if (data.type === "levelChange") {
-                session.levelChanged(data.levelIndex)
             } else if (data.type === "exitReached") {
                 // Host is level authority: any player reaching the exit
                 // advances the whole session
@@ -118,6 +137,15 @@ Item {
             if (type === "enemy") session.enemyDespawned(id)
         }
 
+        // A node that joins a run under way gets its knight here; the
+        // joiner makes the others' when it builds the level
+        onNodeJoined: (nodeId) => {
+            if (!session.inGame || !session._levelUp() || remotePlayers[nodeId]) return
+            let p = session.player
+            session._spawnRemotePlayer(nodeId, session._colorOf(nodeId), p.xWu, p.yWu)
+            session.playerJoined(nodeId)
+        }
+
         onNodeLeft: (nodeId) => {
             if (remotePlayers[nodeId]) {
                 remotePlayers[nodeId].destroy()
@@ -130,6 +158,7 @@ Item {
         onConnectedChanged: {
             if (!net.connected) {
                 session.lastStates = ({})
+                session._run = ({})
             }
         }
     }
@@ -167,8 +196,9 @@ Item {
 
     // Host: start the game for everyone with this seed
     function start(seed) {
-        net.broadcast({type: "gameStart", seed: seed})
-        started(seed)
+        net.setSessionProperty("seed", seed)
+        net.setSessionProperty("level", 0)
+        started(seed, 0)
     }
 
     // Reliable event so remote clients show an action crisply
@@ -251,19 +281,28 @@ Item {
         }
     }
 
-    // Host: tell the joiners which level comes next
+    // Host: tell the joiners which level comes next, and every node that
+    // joins later which one is played
     function announceLevel(levelIndex) {
-        net.broadcast({type: "levelChange", levelIndex: levelIndex})
+        net.setSessionProperty("level", levelIndex)
     }
 
     Component { id: remotePlayerComponent; RemotePlayer {} }
 
     function spawnRemotePlayers(px, py) {
         if (!net.connected) return
-        let colors = ["#A44A90", "#90A44A", "#A4904A"]
         for (let i = 0; i < net.nodes.length; i++)
-            _spawnRemotePlayer(net.nodes[i], colors[i % colors.length], px, py)
+            _spawnRemotePlayer(net.nodes[i], _colorOf(net.nodes[i]), px, py)
     }
+
+    function _colorOf(nodeId) {
+        let colors = ["#A44A90", "#90A44A", "#A4904A"]
+        return colors[Math.max(0, net.nodes.indexOf(nodeId)) % colors.length]
+    }
+    // The level is built: this node's knight stands in it. While one is
+    // built, the knights of every node are made with it
+    function _levelUp() { return player !== null }
+
 
     function _spawnRemotePlayer(nodeId, color, px, py) {
         // Where the knight is comes with its next state; its HP is the

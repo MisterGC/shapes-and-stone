@@ -416,8 +416,12 @@ ClayWorld2d {
         inGame: screen === "game"
         showLobby: screen === "lobby"
         muted: world.muted
-        onStarted: (seed) => {
+        // The host's run, from its start or, on a node that joins late,
+        // at the level the host plays
+        onStarted: (seed, level) => {
             masterSeed = seed
+            world.levelIndex = level
+            world.levelType = levelTypeOf(level)
             screen = "game"
             world.forceActiveFocus()
         }
@@ -660,6 +664,11 @@ ClayWorld2d {
         if (screen === "game" && width > 0 && height > 0 && !player) {
             console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
+            // A node that joins a session late may start in a village
+            if (levelType === "village") {
+                generateVillage()
+                return
+            }
             dungeonAmbience.play()
             dungeonMusic.play()
             generateDungeon()
