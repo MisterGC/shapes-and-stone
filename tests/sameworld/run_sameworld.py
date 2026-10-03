@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 """Same-world bench - proves both screens of a session show the same enemies
-(issue #14).
+(issue #14), and that a hit on an enemy counts once, whoever lands it
+(issue #17).
 
 Starts tests/sameworld/Sandbox.qml twice in Clayground's live loader, as two
 processes (a host and a joiner), connects them over Local or Cloud signaling
-and starts the game on a fixed seed. Then it puts each knight beside an
-enemy, lets the joiner's knight land a scripted hit and checks the host
-takes it, and lets both knights fight for a few seconds. Every frame each
-instance records every enemy it shows: object id, position, HP and AI state.
+and starts the game on a fixed seed. Then the joiner's knight answers one
+enemy of the host's, and each answer is checked on both screens:
+
+- it stands until it sleeps, the enemy walks into its reach, and its one
+  swing lowers the enemy's HP by the same amount on both screens
+  (clayground#369: a sleeping knight saw no enemy walk in)
+- it parries the enemy late in the parry window it shows: the host's enemy
+  staggers, and the lunge's blow, on its way by then, does not land
+- it raises its shield and dashes into the enemy: the host's enemy is
+  shoved away
+- it kills that enemy while the host's knight kills another: each dies on
+  both screens, counts once for its killer, and leaves one stain on both
+  screens, in the same place
+
+Then both knights fight for a few seconds. Every frame each instance records
+every enemy it shows: object id, position, HP and AI state.
 
 The comparison. The joiner renders the host's enemies a fixed delay in the
 past, 50 ms plus the round trip (Enemy.qml, docs/multiplayer-sync.md), and
@@ -36,9 +49,6 @@ HP is a number, and Clayground blends every number of a replicated object
 between the two. Until the clayground pin carries the fix such a value
 counts as within tolerance and is counted (hpBlended); right after the
 scripted hit and once the fight is over the HPs have to agree exactly.
-The scripted hit walks the knight into the enemy instead of swinging from
-a standstill: a resting knight on the joiner never registers a host's
-enemy (clayground#369).
 
 Whatever ends the run - its end, an exception, Ctrl-C - both loaders are
 stopped and the temp dir is removed; it is kept, with the loaders' logs,
@@ -291,6 +301,164 @@ def judge(host_rec, join_rec, args, check):
     return cmp
 
 
+def standing_hit(H, J, b, settle, check):
+    """The joiner's knight stands in sight of enemy b until it sleeps, the
+    enemy walks into its reach and the knight swings once: the host takes
+    the blow, and both screens lower b's HP by the damage the joiner dealt
+    (clayground#369: a sleeping knight saw no enemy walk in)"""
+    res = {"enemy": b, "tries": 0}
+    for _ in range(3):
+        res["tries"] += 1
+        hp0, jhp0 = H.eval1(f"hpOf('{b}')"), J.eval1(f"hpOf('{b}')")
+        dealt0, all0 = J.json("knight()")["dealt"], H.json("enemies()") or {}
+        if not J.eval1(f"standOff('{b}', 8)") or not J.eval1(f"guard('{b}', 'swing')"):
+            continue
+        if not settle(lambda: J.json("guardLog").get("done"), 8):
+            J.eval(["guard('', '')"])
+            continue
+        log = J.json("guardLog")
+        landed = settle(lambda: H.eval1(f"hpOf('{b}')") < hp0, 1.0)
+        if not landed:
+            res["missed"] = log
+            continue
+        settle(lambda: J.eval1(f"hpOf('{b}')") == H.eval1(f"hpOf('{b}')"), 2.0)
+        hp1, jhp1 = H.eval1(f"hpOf('{b}')"), J.eval1(f"hpOf('{b}')")
+        # A swing hits every enemy in its arc: what the joiner dealt is what
+        # all enemies lost on the host (the host's knight stands meanwhile)
+        dealt = J.json("knight()")["dealt"] - dealt0
+        all1 = H.json("enemies()") or {}
+        lost = sum(v[2] - (all1[i][2] if i in all1 else 0) for i, v in all0.items())
+        res.update({"hostHp": [hp0, hp1], "joinerHp": [jhp0, jhp1], "dealt": dealt, "lost": lost,
+                    "slept": log["slept"], "swing": log["swing"]})
+        break
+    swing = res.get("swing", {})
+    check("swing" in res and res["slept"] and swing.get("awake") is False,
+          f"the joiner's knight slept and stood still until it swung at {b} "
+          f"(slept {res.get('slept')}, awake at the swing {swing.get('awake')}, "
+          f"{swing.get('dist')} Wu off, tries {res['tries']})")
+    check("hostHp" in res, f"the standing knight's swing on {b} lands on the host "
+          + (f"(HP {res['hostHp'][0]} -> {res['hostHp'][1]})" if "hostHp" in res
+             else f"(missed: {res.get('missed')})"))
+    if "hostHp" in res:
+        dh = res["hostHp"][0] - res["hostHp"][1]
+        dj = res["joinerHp"][0] - res["joinerHp"][1]
+        check(dh == dj > 0 and res["hostHp"][1] == res["joinerHp"][1],
+              f"the hit lowers {b}'s HP by the same amount on both screens "
+              f"(host -{dh}, joiner -{dj}, HP host {res['hostHp'][1]}, joiner {res['joinerHp'][1]})")
+        check(res["dealt"] == res["lost"],
+              f"the host's enemies lost what the joiner's swing dealt, once "
+              f"(dealt {res['dealt']}, lost {res['lost']})")
+    return res
+
+
+def parry(H, J, b, settle, check, late=6):
+    """The joiner's knight swings only into enemy b's parry window, as the
+    joiner shows it, from its late-th frame on: by then the host's lunge has
+    landed and its blow is on its way. The host's enemy staggers, and the
+    parried lunge does not land on the joiner's knight"""
+    res = {"enemy": b}
+    staggers0 = (H.json("staggers") or {}).get(b, 0)
+    if not J.eval1(f"guard('{b}', 'parry', {late})"):
+        check(False, f"the joiner's knight parries {b} ({b} is gone)")
+        return res
+    parried = settle(lambda: J.json("guardLog").get("done"), 15)
+    log = J.json("guardLog")
+    J.eval(["guard('', '')"])
+    res["log"] = log
+    check(parried and "parry" in log,
+          f"the joiner's knight parries {b} ({log.get('swings', 0)} swings into its window)")
+    if not parried or "parry" not in log:
+        return res
+    staggered = settle(lambda: (H.json("staggers") or {}).get(b, 0) > staggers0, 1.0)
+    res["hostState"] = H.eval1(f"enemies()['{b}'] ? enemies()['{b}'][3] : ''")
+    check(staggered, f"the parry staggers the host's {b} "
+          f"({(H.json('staggers') or {}).get(b, 0) - staggers0} staggers)")
+    # The blows of b on the joiner's knight from its last parry window
+    # before the parry until 600 ms after: none may land
+    time.sleep(0.6)
+    settle(lambda: True, 0)
+    t = log["parry"]["t"]
+    near = [r for r in (J.json("blows") or []) if r[1] == b and t - 150 <= r[0] <= t + 600]
+    landed = [r for r in near if r[2] in ("hit", "blocked")]
+    res["blows"] = near
+    check(not landed and near, f"the parried lunge does not land on the joiner's knight "
+          f"({len(landed)} landed, {sum(r[2] == 'parried' for r in near)} dropped as parried, "
+          f"{len(near)} blows of {b} from 150 ms before the parry to 600 ms after)")
+    return res
+
+
+def push(H, J, b, host_rec, settle, check):
+    """The joiner's knight raises its shield and dashes into enemy b: the
+    host's enemy is shoved away from the knight"""
+    res = {"enemy": b}
+    if not J.eval1(f"standOff('{b}', 2)") or not J.eval1(f"guard('{b}', 'push')"):
+        check(False, f"the joiner's shield push moves the host's {b} ({b} is gone)")
+        return res
+    pushed = settle(lambda: J.json("guardLog").get("done"), 10)
+    log = J.json("guardLog")
+    J.eval(["guard('', '')"])
+    settle(lambda: False, 0.6)
+    res["log"] = log
+    if not pushed or "push" not in log:
+        check(False, f"the joiner's knight shield-pushes {b} (no push in 10 s)")
+        return res
+    w = log["push"]
+    ux, uy = w["ex"] - w["x"], w["ey"] - w["y"]
+    n = math.hypot(ux, uy) or 1
+    ux, uy = ux / n, uy / n
+    # Along the push, from the host's position at the push to its farthest
+    # in the 400 ms after
+    at = [s["e"][b] for s in host_rec if b in s["e"] and w["t"] - 20 <= s["t"] <= w["t"] + 400]
+    moved = 0.0
+    if at:
+        moved = max((p[0] - at[0][0]) * ux + (p[1] - at[0][1]) * uy for p in at)
+    res["movedWu"] = round(moved, 3)
+    check(moved >= 0.3, f"the joiner's shield push moves the host's {b} {moved:.2f} Wu "
+          f"away from the knight in 400 ms (at least 0.3)")
+    return res
+
+
+def kills(H, J, a, b, settle, check):
+    """The joiner's knight kills enemy b, the host's enemy a: each dies on
+    both screens, each kill counts once, for the knight that landed it, and
+    each death leaves one stain on both screens, in the same place"""
+    res = {}
+    st_h0, st_j0 = H.json("stains()") or [], J.json("stains()") or []
+    n0 = len(H.json("enemies()") or {})
+    k_h0, k_j0 = H.json("knight()")["kills"], J.json("knight()")["kills"]
+    J.eval([f"hunt('{b}')"])
+    H.eval([f"hunt('{a}')"])
+    gone = settle(lambda: all(i not in (H.json("enemies()") or {}) for i in (a, b)), 30)
+    J.eval(["hunt('')"])
+    H.eval(["hunt('')"])
+    settle(lambda: all(i not in (J.json("enemies()") or {}) for i in (a, b)), 1.0)
+    he, je = H.json("enemies()") or {}, J.json("enemies()") or {}
+    res["goneHost"] = [i for i in (a, b) if i not in he]
+    res["goneJoiner"] = [i for i in (a, b) if i not in je]
+    check(gone and len(res["goneJoiner"]) == 2,
+          f"{b} killed by the joiner and {a} by the host are gone on both screens "
+          f"(host: {res['goneHost']}, joiner: {res['goneJoiner']})")
+    # A swing hits every enemy in its arc: more than a and b may have died
+    he1, je1 = set(H.json("enemies()") or {}), set(J.json("enemies()") or {})
+    res["kills"] = {"host": H.json("knight()")["kills"] - k_h0,
+                    "joiner": J.json("knight()")["kills"] - k_j0}
+    res["died"] = n0 - len(he1)
+    check(res["kills"]["host"] >= 1 and res["kills"]["joiner"] >= 1
+          and res["kills"]["host"] + res["kills"]["joiner"] == res["died"] and he1 == je1,
+          f"each kill counts once, for the knight that landed it (host {res['kills']['host']}, "
+          f"joiner {res['kills']['joiner']}, {res['died']} enemies died)")
+    settle(lambda: len(J.json("stains()") or []) >= len(st_j0) + res["died"]
+           and len(H.json("stains()") or []) >= len(st_h0) + res["died"], 1.0)
+    new_h = (H.json("stains()") or [])[len(st_h0):]
+    new_j = (J.json("stains()") or [])[len(st_j0):]
+    res["stains"] = {"host": new_h, "joiner": new_j}
+    same = len(new_h) == len(new_j) == res["died"] and all(
+        min(dist(p, q) for q in new_j) < 0.01 for p in new_h)
+    check(same, f"each death leaves one stain on both screens, in the same place "
+          f"(host {new_h}, joiner {new_j})")
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--loader", help="path to clayliveloader")
@@ -421,11 +589,13 @@ def run(args, loader, tmp, procs, result, check):
         check(all(not v[4] for v in he.values()) and all(v[4] for v in je.values()),
               "the host runs every enemy, the joiner shows them")
 
-        # The host's knight at one enemy, the joiner's at the one farthest from it
+        # The host's knight at one enemy, the joiner's in sight of the one
+        # farthest from it that walks up to a knight (not a spitter)
         ids = sorted(he)
-        a, b = max(((x, y) for x in ids for y in ids), key=lambda p: dist(he[p[0]], he[p[1]]))
+        walkers = [i for i in ids if H.eval1(f"typeOf('{i}')") != "spitter"] or ids
+        a, b = max(((x, y) for x in ids for y in walkers if x != y),
+                   key=lambda p: dist(he[p[0]], he[p[1]]))
         H.eval([f"placeBeside('{a}')"])
-        J.eval([f"placeBeside('{b}')"])
         H.eval(["record(true)"])
         J.eval(["record(true)"])
         host_rec, join_rec = [], []
@@ -434,27 +604,15 @@ def run(args, loader, tmp, procs, result, check):
             host_rec.extend(H.json("take()") or [])
             join_rec.extend(J.json("take()") or [])
 
-        # The scripted hit: the joiner's knight walks into enemy b and
-        # strikes it (walks: clayground#369); the host applies the blow,
-        # the joiner shows the host's HP
-        hp0 = H.eval1(f"hpOf('{b}')")
-        landed = False
-        deadline = time.time() + 5
-        swings = 0
-        while time.time() < deadline and not landed:
-            J.eval([f"strike('{b}')"])
-            swings += 1
-            landed = wait_for(lambda: H.eval1(f"hpOf('{b}')") < hp0, 0.8, 0.05)
+        def settle(cond, timeout):
+            ok = wait_for(cond, timeout, 0.05)
             pull()
-        hp1 = H.eval1(f"hpOf('{b}')")
-        knight_at = f"knightAt('{b}')"
-        result["hit"] = {"enemy": b, "hpBefore": hp0, "hpAfter": hp1, "swings": swings}
-        check(landed, f"the joiner's scripted hit on {b} lands on the host (HP {hp0} -> {hp1})"
-              + ("" if landed else f", the joiner's knight: {J.json(knight_at)}"))
-        same_hp = wait_for(lambda: J.eval1(f"hpOf('{b}')") == H.eval1(f"hpOf('{b}')"), 2, 0.05)
-        hp_h, hp_j = H.eval1(f"hpOf('{b}')"), J.eval1(f"hpOf('{b}')")
-        check(same_hp, f"the joiner shows the host's HP of {b} after the hit "
-              f"(joiner {hp_j}, host {hp_h})")
+            return ok
+
+        result["hit"] = standing_hit(H, J, b, settle, check)
+        result["parry"] = parry(H, J, b, settle, check)
+        result["push"] = push(H, J, b, host_rec, settle, check)
+        result["kills"] = kills(H, J, a, b, settle, check)
 
         # The fight
         H.eval(["fight(true)"])
