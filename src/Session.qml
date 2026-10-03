@@ -54,6 +54,12 @@ Item {
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
     signal struckReported(string fromId, var report)
+    // Another knight's HP changed or its node left: the party may be down
+    // now
+    signal partyChanged()
+    // The run is over for everyone: on a joiner when the host ends it, on
+    // the host once the joiners have left or endRunWaitMs has passed
+    signal runEnded()
 
     property var remotePlayers: ({})
 
@@ -82,6 +88,8 @@ Item {
                 session.shotReceived(data)
             } else if (data.type === "struck") {
                 session.struckReported(fromId, data)
+            } else if (data.type === "runEnd") {
+                if (!net.isHost) session.runEnded()
             } else if (data.type === "levelChange") {
                 session.levelChanged(data.levelIndex)
             } else if (data.type === "exitReached") {
@@ -108,6 +116,7 @@ Item {
                 remotePlayers[nodeId].destroy()
                 delete remotePlayers[nodeId]
             }
+            session.partyChanged()
         }
     }
 
@@ -204,6 +213,30 @@ Item {
         net.broadcast(Object.assign({type: "struck"}, report))
     }
 
+    // Host: every knight is down, the run ends for everyone. The joiners
+    // leave when the message arrives; the host leaves after them, so its
+    // leaving cannot cut the message off.
+    readonly property int endRunWaitMs: 2000
+    function endRun() {
+        if (!net.isHost || _endWait.running) return
+        net.broadcast({type: "runEnd"})
+        _endWait.waited = 0
+        _endWait.start()
+    }
+    Timer {
+        id: _endWait
+        property int waited: 0
+        interval: 50
+        repeat: true
+        onTriggered: {
+            waited += interval
+            if (Object.keys(session.remotePlayers).length > 0 && waited < session.endRunWaitMs)
+                return
+            stop()
+            session.runEnded()
+        }
+    }
+
     // Host: tell the joiners which level comes next
     function announceLevel(levelIndex) {
         net.broadcast({type: "levelChange", levelIndex: levelIndex})
@@ -230,6 +263,7 @@ Item {
             gameWorld: world
         })
         if (rp) {
+            rp.remoteHpChanged.connect(session.partyChanged)
             remotePlayers[nodeId] = rp
             console.log("[Session] Remote player created for", nodeId, "color:", color)
         }

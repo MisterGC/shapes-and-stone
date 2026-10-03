@@ -438,6 +438,8 @@ ClayWorld2d {
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
+        onPartyChanged: _checkPartyDown()
+        onRunEnded: backToTitle()
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
@@ -1040,10 +1042,26 @@ ClayWorld2d {
         _keepBest()
         countFight("fall")
         // In a session the enemies go for the knights still standing
-        if (session.connected) return
+        if (session.connected) {
+            _checkPartyDown()
+            return
+        }
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
         }
+    }
+
+    // Host: when its own knight and every other knight of the session are
+    // down, the run ends for everyone and each screen goes to the title
+    function _checkPartyDown() {
+        if (!session.connected || !session.isHost || screen !== "game" || !player || !player.fallen)
+            return
+        for (let id in session.remotePlayers) {
+            let rp = session.remotePlayers[id]
+            if (rp && rp.remoteHp > 0) return
+        }
+        console.log("[Game] Every knight is down at depth", depth, "- the run ends")
+        session.endRun()
     }
 
     // --- Fight record ---
