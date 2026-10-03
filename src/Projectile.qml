@@ -88,8 +88,9 @@ PhysicsItem {
         }
     }
 
-    // Burst when its lifetime is over
-    Timer {
+    // Burst when its lifetime of simulated time is over
+    PhysicsTimer {
+        world: projectile.world
         running: true
         interval: Balance.projectile.lifetime * 1000
         onTriggered: projectile.die()
@@ -113,6 +114,7 @@ PhysicsItem {
             if (gameWorld) {
                 gameWorld.playImpact()
                 gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
+                gameWorld.countFight("block")
             }
             destroyed = true
             destroy()

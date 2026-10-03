@@ -55,6 +55,7 @@ PhysicsItem {
 
     // Combat state
     property bool isAttacking: false
+    property real _swingTimer: 0
     property bool isBlocking: false
     property real attackCooldown: 0
     readonly property real blockSpeedMultiplier: Balance.knight.blockSpeed
@@ -76,7 +77,7 @@ PhysicsItem {
 
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held.
-    // Dash and cooldowns count the time the step simulated: a pause, a
+    // Dash, swing and cooldowns count the time the step simulated: a pause, a
     // single step or a hit stop holds them with the world (issue #33).
     Connections {
         target: player.world
@@ -84,6 +85,12 @@ PhysicsItem {
             let dt = player.world.timeStep
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
+            // A swing hits until its arc has faded, as long as the view
+            // draws it, but counted in steps
+            if (isAttacking) {
+                _swingTimer -= dt
+                if (_swingTimer <= 0) isAttacking = false
+            }
 
             if (fallen) {
                 player.body.linearVelocity = Qt.point(0, 0)
@@ -124,7 +131,6 @@ PhysicsItem {
         healing: player.isHealing
         dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
         swingDuration: player.attackDuration
-        onSwingFinished: player.isAttacking = false
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -239,6 +245,7 @@ PhysicsItem {
                 _hitThisSwing.add(enemy)
                 hitCount++
                 if (parried) {
+                    if (gameWorld) gameWorld.countFight("parry")
                     enemy.stagger()
                     attackCooldown = 0
                     view.parry()
@@ -312,6 +319,10 @@ PhysicsItem {
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
+        if (gameWorld) {
+            gameWorld.countFight("taken", finalDamage)
+            if (blocked) gameWorld.countFight("block")
+        }
         if (!blocked) {
             view.hurt()
             acted("hurt")
@@ -352,6 +363,7 @@ PhysicsItem {
     function attack() {
         if (!fallen && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
+            _swingTimer = attackDuration + view.swingFade
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
             view.swing()

@@ -739,6 +739,7 @@ PhysicsItem {
         }
 
         hp = Math.max(0, hp - finalDamage)
+        if (gameWorld) gameWorld.countFight("dealt", finalDamage)
         console.log("[Enemy] Took", finalDamage, "damage, HP:", hp, blocked ? "(blocked)" : "")
         hitFlashAnimation.restart()
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
@@ -786,6 +787,7 @@ PhysicsItem {
             gameWorld.playDeathBurst()
         }
         destroyed = true
+        if (gameWorld) gameWorld.countFight("kill")
         destroy()
     }
 }

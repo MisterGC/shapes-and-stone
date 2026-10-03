@@ -31,6 +31,7 @@ Item {
     property real dashCooldownProgress: 1   // 0 just dashed, 1 ready
 
     property real swingDuration: 0.25   // seconds, wind up plus follow through
+    readonly property real swingFade: 0.1   // seconds the arc fades after it
     readonly property bool swinging: attackAnimation.running
 
     // The swing animation ended (fade included)
@@ -520,7 +521,7 @@ Item {
                 property: "swingOpacity"
                 from: 0.9
                 to: 0
-                duration: 100
+                duration: view.swingFade * 1000
             }
 
             ScriptAction {

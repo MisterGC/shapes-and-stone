@@ -11,7 +11,11 @@ enable_testing()
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/clayground/CMakeLists.txt)
     message(FATAL_ERROR "Clayground submodule missing - run: git submodule update --init --recursive")
 endif()
-set(CLAYGROUND_WITH_TOOLS OFF)
+# The tools stay out unless asked for: the fight bench (tests/fightbench)
+# needs Clayground's live loader, -DCLAYGROUND_WITH_TOOLS=ON builds it.
+if(NOT DEFINED CLAYGROUND_WITH_TOOLS)
+    set(CLAYGROUND_WITH_TOOLS OFF)
+endif()
 set(CLAYGROUND_WITH_EXAMPLES OFF)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/clayground clayground_build)
 
