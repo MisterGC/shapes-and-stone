@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Same-world bench - proves both screens of a session show the same enemies
-(issue #14), and that a hit on an enemy counts once, whoever lands it
-(issue #17).
+(issue #14), that a hit on an enemy counts once, whoever lands it
+(issue #17), and that an attack on a knight is judged by that knight's own
+screen (issue #18).
 
 Starts tests/sameworld/Sandbox.qml twice in Clayground's live loader, as two
 processes (a host and a joiner), connects them over Local or Cloud signaling
@@ -13,6 +14,13 @@ enemy of the host's, and each answer is checked on both screens:
   (clayground#369: a sleeping knight saw no enemy walk in)
 - it parries the enemy late in the parry window it shows: the host's enemy
   staggers, and the lunge's blow, on its way by then, does not land
+- it holds its shield toward the enemy, then dashes at it late in the parry
+  window it shows: the lunge is blocked, then dodged, as the joiner judges
+  it; the host receives each result, and shows the joiner's knight's HP
+- it stands in sight of a spitter, which the host makes spit at it three
+  times: it holds its shield up, dashes into the shot, stands. The shot is
+  blocked, dodged, hits; the host receives each result, and the shot with
+  its id goes on the host's screen when the result arrives
 - it raises its shield and dashes into the enemy right after the host
   killed a third enemy in its reach: the host receives the push and its
   enemy is shoved at least 1 Wu away
@@ -388,6 +396,162 @@ def parry(H, J, b, settle, check, late=6):
     return res
 
 
+def now_ms():
+    return int(time.time() * 1000)
+
+
+def lunge_answers(H, J, b, settle, check):
+    """The joiner's knight holds its shield toward enemy b, then dashes at it
+    late in the parry window it shows: the joiner's screen judges the lunge
+    blocked, then dodged, by its knight's own state, applies its HP and
+    reports; the host receives the report and shows the joiner's HP"""
+    res = {}
+    jid = J.eval1("nodeId")
+    for mode, expect in (("block", "blocked"), ("dodge", "dodged")):
+        r = res[mode] = {"blows": [], "tries": 0}
+        blow = None
+        for _ in range(3):
+            r["tries"] += 1
+            t0 = now_ms()
+            if not J.eval1(f"guard('{b}', '{mode}', 5)"):
+                break
+            # The first blow of b judged after t0 that reached the knight
+            got = settle(lambda: any(x[1] == b and x[0] >= t0 for x in (J.json("blows") or [])), 15)
+            if mode == "dodge":
+                settle(lambda: J.json("guardLog").get("done"), 1)
+            log = J.json("guardLog")
+            J.eval(["guard('', '')"])
+            if not got:
+                continue
+            settle(lambda: False, 0.3)
+            new = [x for x in (J.json("blows") or []) if x[1] == b and x[0] >= t0]
+            r["blows"] += [x[2] for x in new]
+            # A dodge answers the first blow after the dash
+            if mode == "dodge":
+                new = [x for x in new if "dodge" in log and x[0] >= log["dodge"]["t"]]
+            reached = [x for x in new if x[2] != "out of reach"]
+            if reached:
+                blow = reached[0]
+                r["log"] = log.get("dodge")
+                break
+        r["result"] = blow[2] if blow else ""
+        check(blow is not None and blow[2] == expect,
+              f"the joiner's screen judges {b}'s lunge {expect} as the joiner's knight "
+              f"{'holds its shield' if mode == 'block' else 'dashes'} ({r['result'] or 'no blow'}; "
+              f"blows {r['blows']}, tries {r['tries']})")
+        if not blow:
+            continue
+        got = settle(lambda: any(x[1] == jid and x[2] == "lunge" and x[3] == b and x[0] >= blow[0] - 50
+                                 for x in (H.json("reports") or [])), 1.0)
+        rep = [x for x in (H.json("reports") or []) if x[1] == jid and x[2] == "lunge"
+               and x[3] == b and x[0] >= blow[0] - 50]
+        r["reported"] = [x[4] for x in rep]
+        r["reportMs"] = rep[0][0] - blow[0] if rep else None
+        check(got and rep[0][4] == blow[2],
+              f"the host receives the joiner's {blow[2]} for {b}'s lunge "
+              f"({r['reported']}, {r['reportMs']} ms after the joiner judged it)")
+        # The enemies go on striking the knight: the host shows an HP the
+        # joiner's knight had in the lag before
+        settle(lambda: False, 0.3)
+        t, hhp = H.json("remoteHp()")
+        log = J.json("hpLog") or []
+        # The HPs it took in the 300 ms, and the one it held when they began
+        had = {h for (u, h) in log if t - 300 <= u <= t}
+        had.update([h for (u, h) in log if u < t - 300][-1:])
+        lost = blow[4]
+        r["hp"] = {"after": blow[3], "lost": lost, "hostShows": hhp, "joinerHad": sorted(had)}
+        check(hhp in had and ((lost == 0) if expect == "dodged" else (lost > 0)),
+              f"the joiner's knight loses {lost} HP to the {expect} lunge (HP {blow[3]} after it), "
+              f"and the host shows an HP it had in the 300 ms before (host {hhp}, joiner {sorted(had)})")
+    return res
+
+
+def shot_answers(H, J, s, settle, check):
+    """The joiner's knight stands in sight of spitter s, and the host makes s
+    spit at it: with the shield up, dashing into the shot, standing. The
+    joiner's screen judges each shot blocked, dodged, hit, and reports it;
+    the host receives the result, and its shot of that id goes then"""
+    res = {}
+    jid = J.eval1("nodeId")
+    if not s:
+        check(False, "the joiner's knight meets a spitter's shots (no spitter in the dungeon)")
+        return res
+    # The host's enemies stop thinking meanwhile: the spitter stays where
+    # the knight stands off it and spits only when told, and no other
+    # enemy's blow puts the knight into its grace after a hit
+    H.eval(["hold(true)"])
+    try:
+        return _shot_answers(H, J, s, jid, res, settle, check)
+    finally:
+        H.eval(["hold(false)"])
+
+
+def _shot_answers(H, J, s, jid, res, settle, check):
+    for mode, expect in (("block", "blocked"), ("dodgeShot", "dodged"), ("stand", "hit")):
+        r = res[mode] = {"tries": 0}
+        end = None
+        for _ in range(5):
+            r["tries"] += 1
+            if s not in (J.json("enemies()") or {}):
+                r["stop"] = f"{s} is gone on the joiner"
+                break
+            if not J.eval1(f"standOff('{s}', 4, 2.5)") or not J.eval1(f"guard('{s}', '{mode}')"):
+                r["stop"] = f"no spot 2.5 to 4 Wu in sight of {s}"
+                settle(lambda: False, 0.5)
+                continue
+            r.pop("stop", None)
+            # The host's view of the knight catches up with the move, and
+            # the knight's grace after a hit is over
+            settle(lambda: False, 0.4)
+            settle(lambda: J.eval1("graceLeft()") == 0, 2)
+            sid = H.eval1(f"spit('{s}')")
+            if not sid:
+                r["stop"] = f"{s} is gone on the host"
+                break
+            if mode == "dodgeShot":
+                J.eval([f"shotToDodge = '{sid}'"])
+            got = settle(lambda: any(x[1] == sid for x in (J.json("shotEnds") or [])), 3)
+            J.eval(["guard('', '')"])
+            if got:
+                end = [x for x in J.json("shotEnds") if x[1] == sid][0]
+                r.setdefault("met", []).append(end[2:])
+                # A shot that meets the knight in the grace after another
+                # hit (the spitter's own shots, the enemy's lunges) is
+                # ignored by the knight's state: one more try
+                if end[2] == "ignored" and end[4] and end[4]["grace"] > 0:
+                    end = None
+                    settle(lambda: False, 0.6)
+                    continue
+                break
+        r["joiner"] = end
+        check(end is not None and end[3] is True and end[2] == expect,
+              f"the joiner's screen judges a shot of {s} {expect} as the joiner's knight "
+              f"{ {'block': 'holds its shield', 'dodgeShot': 'dashes into it', 'stand': 'stands'}[mode]} "
+              f"({end[1] + ' ' + end[2] + ', knight ' + json.dumps(end[4]) if end else 'no shot met the knight'}, "
+              f"tries {r['tries']}: {[m[0] for m in r.get('met', [])]}"
+              + (f"; {r['stop']}" if "stop" in r else "") + ")")
+        if not end:
+            continue
+        sid = end[1]
+        got = settle(lambda: any(x[1] == sid for x in (H.json("shotEnds") or [])), 1.0)
+        hend = [x for x in (H.json("shotEnds") or []) if x[1] == sid]
+        rep = [x for x in (H.json("reports") or []) if x[1] == jid and x[2] == "shot" and x[3] == sid]
+        seen = (H.json("shotSeen") or {}).get(sid)
+        jseen = (J.json("shotSeen") or {}).get(sid)
+        r.update({"host": hend[0] if hend else None, "reported": [x[4] for x in rep],
+                  "hostLastShown": seen, "joinerLastShown": jseen,
+                  "flying": H.eval1(f"shots()['{sid}'] !== undefined")})
+        ok = got and hend[0][2] == end[2] and hend[0][3] is False and rep and not r["flying"]
+        # Shown on the host until the report came, gone from the next frame
+        shown = seen is not None and hend and hend[0][0] - 60 <= seen <= hend[0][0] + 40
+        check(bool(ok and shown),
+              f"the host receives the {end[2]} for {sid} and its shot goes then: last shown "
+              f"{(seen - hend[0][0]) if (seen and hend) else '?'} ms from the report, which came "
+              f"{(hend[0][0] - end[0]) if hend else '?'} ms after the joiner judged it; on the joiner "
+              f"last shown {(jseen - end[0]) if jseen else '?'} ms from it")
+    return res
+
+
 def push(H, J, a, b, host_rec, settle, check):
     """The joiner's knight raises its shield and dashes into enemy b: the
     host receives the push and its enemy is shoved at least 1 Wu away from
@@ -639,6 +803,10 @@ def run(args, loader, tmp, procs, result, check):
 
         result["hit"] = standing_hit(H, J, b, settle, check)
         result["parry"] = parry(H, J, b, settle, check)
+        result["lunges"] = lunge_answers(H, J, b, settle, check)
+        spitters = [i for i in sorted(H.json("enemies()") or {})
+                    if i not in (a, b) and H.eval1(f"typeOf('{i}')") == "spitter"]
+        result["shots"] = shot_answers(H, J, spitters[0] if spitters else "", settle, check)
         result["push"] = push(H, J, a, b, host_rec, settle, check)
         result["kills"] = kills(H, J, a, b, settle, check)
 
