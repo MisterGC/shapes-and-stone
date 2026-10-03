@@ -127,10 +127,27 @@ leaves the session and shows how far the party got, as the fall screen does
 for one knight, and Enter or Esc goes to the title. The downed bench starts
 a host and a joiner in one process, joins them over LAN, brings down first
 one knight and then the other, twice in turn, and exits with the number of
-failed checks:
+failed checks. Between the two falls the host goes down two levels, and the
+other screen must make the downed knight downed in each, not standing until
+its next state:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
+```
+
+A session takes players in and lets them go while a run is under way. The
+host keeps the run's seed and level as Clayground session properties, so a
+player who joins late starts in the host's level, on its seed, with the
+host's enemies as they are, and every screen draws the newcomer's knight.
+A player who leaves is gone from every screen, and no enemy goes for its
+knight any more. A joiner whose host leaves or goes silent is taken to the
+title, which says so. The join and leave bench starts a host, a joiner and
+a late joiner in one process, joins them over LAN, brings the joiner's knight
+down and the host two levels deeper, lets the late joiner in, out again, and
+then the host leave, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/joinleave/joinleave.qml
 ```
 
 The HUD shows "Depth N" under the bars; a village counts as the depth of

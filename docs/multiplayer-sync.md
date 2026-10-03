@@ -444,6 +444,76 @@ no knight down it exits 100, waiting for the fall on the other screen;
 with Enter doing nothing on the summary it exits 100, waiting for the
 title.
 
+## Joining late, leaving and losing the host (issue #20)
+
+The run is two Clayground session properties, `seed` and `level`, which the
+host sets when it starts the run and `level` again at each level
+(clayground#306). A node that joins gets both with its welcome, after every
+live enemy: it builds the host's level on the host's seed, a village or a
+dungeon, and makes a remote enemy for each of the host's. The `gameStart`
+and `levelChange` messages are gone; the lobby's start and a level change
+reach the joiners in the game the same way. Two things in Clayground
+shaped this:
+
+- a session property whose value is an object (`{seed, level}`) reached
+  the joiners as `null`; numbers arrive. `setSessionProperty` takes a
+  `QVariant`, and a JS object in it is a `QJSValue`, which
+  `QJsonObject::fromVariantMap` turns into null when the host sends it
+  (read in the source, not traced)
+- `sessionPropertyChanged` comes before `sessionProperties` has the new
+  value, so `Session.qml` keeps the two values from the signal itself
+
+Every node that is in the run when a node joins makes a knight for it.
+Another player's knight is made with the HP of the last state its node
+sent, also when the level is built again, so a downed knight is never drawn
+standing until its next state. Without a state yet - a node that just
+joined, or every other knight on the screen of the node that did - the
+knight is not drawn (`RemotePlayer.known`), and no enemy goes for it.
+
+A node that leaves says goodbye (clayground#299): every screen removes its
+knight, and the host's enemies that went for it drop it
+(`Enemy.dropTarget`): an attack wound up against it does not go on, and
+the next think picks the nearest knight still there. A joiner whose session
+ends without its leaving - the host left, crashed or lost its connection -
+goes to the title, which says "The host left the game" or "Lost the
+connection to the host".
+
+`tests/joinleave/joinleave.qml` checks it with a host, a joiner and a late
+joiner in one process, over LAN. The joiner's knight goes down and the
+host goes down two levels, to the dungeon at depth 1; then the late joiner
+joins. It must play the host's seed and level, have the host's rooms and
+live enemies (each within 1 Wu of the host's), never draw the joiner's
+downed knight standing, and its knight must show on the host's and the
+joiner's screens where it stands. Its knight then stands at the host's
+enemy farthest from the host's knight until an enemy chases it, and it
+leaves: within 1.5 s no enemy of the host's goes for it, both other
+screens have dropped it, and a second later still none does. Last the host
+leaves: within 2 s the joiner is on the title, saying "The host left the
+game", out of the session with its run cleared. `tests/downed` adds the
+level change: while one knight is down the host goes down two levels, and
+the other screen must make that knight downed in the village and in the
+dungeon.
+
+Against clayground e003cf9, five runs of the join and
+leave bench exited 0 with 18 checks passed: the late joiner was in the run
+176 to 1093 ms after it joined, the host's enemies dropped the knight 36 to
+50 ms after its player left and the joiner's screen 39 to 66 ms after, and
+the joiner was on the title 93 to 111 ms after the host left. Three runs of
+the downed bench exited 0 with 50 checks passed. Each part fails when
+switched off: with `nodeLeft` ignored the join and leave bench times out
+waiting for the enemies to drop the knight, without the host lost signal
+it times out waiting for the title, and without the HP from the last state
+the downed bench exits 4, on the four level change checks. The same-world
+bench, whose session now starts through the session properties, ran four
+times with Local signaling, all exited 0 with 37 checks passed, and four
+times with Cloud: two exited 0, one failed the block phase (the first
+lunge judged `ignored`) and one the position check (0.278 Wu, an enemy in
+`recovery`, shapes-and-stone #64), the two misses issue #19 recorded.
+With the host's explicit drop switched off the enemies still dropped the
+knight, 115 ms after: once the knight is gone from the session the next
+think picks another. The drop only makes it immediate, and cancels an
+attack wound up against that knight.
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"
