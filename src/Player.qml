@@ -225,7 +225,8 @@ PhysicsItem {
 
     // Track enemies currently in attack range. An enemy that dies in range
     // stays in it: its body's end of contact comes without its item, so the
-    // sensor cannot tell whom to drop. _inRange() drops it.
+    // sensor cannot tell whom to drop. _inRange() drops it: a workaround
+    // until MisterGC/clayground#371 is fixed.
     property var enemiesInRange: new Set()
     // The enemies in range that still stand
     function _inRange() {

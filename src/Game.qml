@@ -495,20 +495,24 @@ ClayWorld2d {
     // parry of that enemy from its last parry window before the blow arrived
     // until then answers that lunge, and the blow is dropped. Without the
     // hold, a parry in the window's last render delay on this screen came
-    // after the blow of the lunge it parried.
+    // after the blow of the lunge it parried. The window is counted in
+    // physics steps, as the enemy's attack runs (issue #35); the hold is
+    // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
     // "ignored", "out of reach" or "parried".
     signal knightStruck(string enemyId, string result)
+    // The physics steps since the game came up, the clock of the parry window
+    property int _physicsSteps: 0
     property var _parriedAt: ({})
     property var _heldBlows: []
     // This node's knight parried a host's enemy
     function parried(enemy) {
-        if (enemy.remote) _parriedAt[enemy.objectId] = Date.now()
+        if (enemy.remote) _parriedAt[enemy.objectId] = _physicsSteps
     }
     function _holdKnightBlow(blow) {
         let e = _enemyById[blow.id]
         let hold = e ? e.renderDelayMs : 0
-        _heldBlows.push(Object.assign({due: Date.now() + hold, hold: hold}, blow))
+        _heldBlows.push(Object.assign({due: Date.now() + hold, arrived: _physicsSteps}, blow))
         _heldBlowTimer.start()
     }
     Timer {
@@ -526,8 +530,8 @@ ClayWorld2d {
     function _landKnightBlow(blow) {
         // The reach is checked here, against where this knight really is
         if (!player) return
-        let since = Date.now() - (_parriedAt[blow.id] || 0)
-        if (since <= blow.hold + Balance.enemy.parryFrames * world.physics.timeStep * 1000) {
+        let at = _parriedAt[blow.id]
+        if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
             knightStruck(blow.id, "parried")
             return
         }
@@ -1069,6 +1073,7 @@ ClayWorld2d {
     Connections {
         target: world.physics
         function onStepped() {
+            world._physicsSteps++
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
                 world.runSeconds += world.physics.timeStep
