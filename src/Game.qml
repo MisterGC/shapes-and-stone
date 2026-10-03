@@ -821,6 +821,19 @@ ClayWorld2d {
             event.accepted = true
             return
         }
+        // 1 and 2 buy what the dialogue panel offers; without wares 1
+        // drinks a potion
+        if (event.key === Qt.Key_1 || event.key === Qt.Key_2) {
+            let i = event.key - Qt.Key_1
+            if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
+                if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
+                event.accepted = true
+            } else if (event.key === Qt.Key_1) {
+                drinkPotion()
+                event.accepted = true
+            }
+            return
+        }
         if (event.key === Qt.Key_E) {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
@@ -972,6 +985,24 @@ ClayWorld2d {
         visible: player !== null
         text: "Gold " + (player ? player.gold : 0)
         color: "#E8B83A"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The knight's potions, and the key that drinks one
+    Text {
+        objectName: "hudPotions"
+        anchors.top: hudGold.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: 2
+        z: 1000
+        visible: player !== null && player.potions > 0
+        text: "Potions " + (player ? player.potions : 0) + "  [1]"
+        color: "#66CC66"
         style: Text.Outline
         styleColor: "#000000"
         font.pixelSize: 14
@@ -1474,13 +1505,15 @@ ClayWorld2d {
         })
     }
 
-    // The one way to the next level: what the knight carries (its HP, mana
-    // and gold) goes with it, a village follows each dungeon
+    // The one way to the next level: what the knight carries (its HP, mana,
+    // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon
     function _enterLevel(newIndex) {
-        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold }
-                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0 }
+        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
+                                 potions: player.potions, upgrade: player.upgrade }
+                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
+                                 potions: 0, upgrade: "" }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
-                    "and gold:", carried.gold)
+                    "gold:", carried.gold, "potions:", carried.potions, "upgrade:", carried.upgrade)
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
@@ -1488,7 +1521,14 @@ ClayWorld2d {
             generateVillage()
         else
             generateDungeon()
-        if (player) { player.hp = carried.hp; player.mana = carried.mana; player.gold = carried.gold }
+        if (player) {
+            // The upgrade first: it raises max HP, which the HP is held to
+            player.upgrade = carried.upgrade
+            player.hp = carried.hp
+            player.mana = carried.mana
+            player.gold = carried.gold
+            player.potions = carried.potions
+        }
     }
 
     // Component factories
@@ -1517,10 +1557,45 @@ ClayWorld2d {
     Component { id: goldDropComponent; GoldDrop {} }
 
     // Dialogue panel (bottom-center, hidden by default)
-    DialoguePanel { id: dialoguePanel; parent: world }
+    DialoguePanel { id: dialoguePanel; parent: world; gold: player ? player.gold : 0 }
 
-    function openDialogue(name, color, lines) {
-        dialoguePanel.open(name, color, lines)
+    function openDialogue(name, color, lines, wares) {
+        dialoguePanel.open(name, color, lines, _offered(wares || []))
+    }
+    // The smith's upgrade is one per run: once bought, the smith offers
+    // neither
+    function _offered(wares) {
+        return wares.filter(w => w.id === "potion" || (player && player.upgrade === ""))
+    }
+
+    // --- The village's wares (issue #38) ---
+    // Bought with this node's knight's own gold. A potion is kept for key 1;
+    // the smith's upgrade ("atk" or "hp") lasts the run
+    function buyWare(ware) {
+        if (!player || player.fallen) return false
+        if (player.gold < ware.price) {
+            dialoguePanel.note = "You'll need " + ware.price + " gold for that."
+            return false
+        }
+        player.gold -= ware.price
+        if (ware.id === "potion") {
+            player.potions++
+            dialoguePanel.note = "One potion. Drink it when it counts."
+        } else {
+            player.upgrade = ware.id
+            if (ware.id === "hp") player.hp += Balance.shop.hpUpgrade
+            dialoguePanel.note = ware.id === "atk" ? "There. That edge will bite deeper."
+                                                   : "There. That mail will take a few more blows."
+        }
+        dialoguePanel.wares = _offered(dialoguePanel.wares)
+        console.log("[Game] Bought", ware.id, "for", ware.price, "gold,", player.gold, "left")
+        return true
+    }
+    function drinkPotion() {
+        if (!player) return 0
+        let healed = player.drinkPotion()
+        if (healed > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
+        return healed
     }
 
     // Death particle
@@ -2412,8 +2487,11 @@ ClayWorld2d {
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
+            "For the road, a potion. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
-        ], "assets/innkeeper_greeting.wav")
+        ], "assets/innkeeper_greeting.wav", [
+            { id: "potion", label: "Health potion", price: Balance.shop.potionPrice }
+        ])
 
         // Blacksmith building (top-right) — entrance facing south
         _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
@@ -2426,9 +2504,14 @@ ClayWorld2d {
             { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "I could sharpen that for you... if I had the right stone.",
-            "Bring me materials from below and I'll forge something proper."
-        ], "assets/blacksmith_greeting.wav")
+            "I can hone that edge or thicken your mail - one of the two, for this descent.",
+            "Bring gold from below and it's yours."
+        ], "assets/blacksmith_greeting.wav", [
+            { id: "atk", label: "Hone the blade (+" + Balance.shop.atkUpgrade + " damage)",
+              price: Balance.shop.upgradePrice },
+            { id: "hp", label: "Thicken the mail (+" + Balance.shop.hpUpgrade + " max HP)",
+              price: Balance.shop.upgradePrice }
+        ])
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {
@@ -2503,7 +2586,7 @@ ClayWorld2d {
         }
     }
 
-    function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting) {
+    function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting, wares) {
         let npc = npcComponent.createObject(world.room, {
             xWu: wx, yWu: wy,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
@@ -2518,7 +2601,8 @@ ClayWorld2d {
             npcName: name || "",
             routine: routine || [],
             dialogueLines: dialogue || [],
-            greetingSound: greeting || ""
+            greetingSound: greeting || "",
+            wares: wares || []
         })
         dungeonObjects.push(npc)
     }

@@ -152,6 +152,17 @@ QtObject {
         pickupRange: 0.8
     })
 
+    // The village's wares, in gold: the innkeeper's potions, drunk with
+    // key 1, and the smith's one upgrade of the run, either damage or max HP
+    readonly property var shop: ({
+        potionPrice: 15,
+        potionHeal: 50,
+        upgradePrice: 30,
+        // Added to the knight's atk, or to its max HP (and its HP)
+        atkUpgrade: 5,
+        hpUpgrade: 30
+    })
+
     readonly property var campfire: ({
         healPerSecond: 5.0,
         // Mana comes back here, and only here or from a parry

@@ -43,14 +43,18 @@ PhysicsItem {
     // Stats, from the balance table
     readonly property real maxSpeed: Balance.knight.moveSpeed
     property int hp: Balance.knight.hp
-    property int maxHp: Balance.knight.hp
-    property int atk: Balance.knight.atk
+    property int maxHp: Balance.knight.hp + (upgrade === "hp" ? Balance.shop.hpUpgrade : 0)
+    property int atk: Balance.knight.atk + (upgrade === "atk" ? Balance.shop.atkUpgrade : 0)
     property int def: Balance.knight.def
     // A raised shield drains mana, a parry gives some back
     property real mana: Balance.knight.mana
     property int maxMana: Balance.knight.mana
     // Gold picked up this run, for the village's wares
     property int gold: 0
+    // Health potions bought from the innkeeper, drunk with key 1
+    property int potions: 0
+    // The smith's one upgrade of the run: "atk", "hp" or "" before it
+    property string upgrade: ""
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
@@ -382,6 +386,16 @@ PhysicsItem {
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
         return blocked ? "blocked" : "hit"
+    }
+
+    // A potion heals up to max HP; none is wasted on a knight that is
+    // unhurt or has fallen. Returns the HP it healed, 0 when none was drunk
+    function drinkPotion() {
+        if (potions <= 0 || fallen || hp >= maxHp) return 0
+        let healed = Math.min(Balance.shop.potionHeal, maxHp - hp)
+        potions--
+        hp += healed
+        return healed
     }
 
     function dash() {
