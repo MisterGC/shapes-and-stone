@@ -10,6 +10,10 @@
 // party's summary - depth, kills, time and best depth - until a key, Enter
 // on one and Esc on the other, takes each to the title. In the second session the host's knight falls first and the
 // joiner's last, so the host learns of the last fall over the network.
+// In both, while one knight is down the host goes down two levels, to a
+// village and to the next dungeon: on the other screen the downed knight
+// must be made downed in each, not drawn standing until its next state
+// (issue #20).
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -71,6 +75,8 @@ Window {
             return
         }
         hostNet.signalingMode = Network.SignalingMode.Local
+        watchMade(host)
+        watchMade(joiner)
         script.start()
     }
 
@@ -132,13 +138,41 @@ Window {
 
     // The knights out of the enemies' reach while the bench sets things up:
     // a lunge on the knight still standing must not end the run early
-    function standUp() {
-        host.player.hp = 100000
-        joiner.player.hp = 100000
+    function standUp(only) {
+        for (let g of only ? [only] : [host, joiner]) g.player.hp = 100000
     }
 
     property real fellAt: 0
     property real endedAt: 0
+
+    // Whether each knight of another node was downed when this screen made
+    // it, by node id; filled while a level is built
+    property var madeDowned: ({})
+    function watchMade(game) {
+        session(game).remotePlayerSpawned.connect((nodeId, knight) => {
+            let v = viewOf(knight)
+            madeDowned[nodeId] = v !== null && v.downed === true
+        })
+    }
+    // The level after the next one: the downed knight goes through a
+    // village into a dungeon, where the enemies are
+    function goDown(level, f, l, firstName, lastName) {
+        return [
+            [() => true, () => {
+                madeDowned = {}
+                host._hostAdvanceLevel()
+            }],
+            [() => host.levelIndex === level && joiner.levelIndex === level && bothInGame()
+                   && madeDowned[network(f()).nodeId] !== undefined, () => {
+                check(madeDowned[network(f()).nodeId] === true,
+                      "level " + level + ": the " + lastName + "'s screen makes the " + firstName
+                      + "'s knight downed, before its first state there")
+                check(downedOn(f(), network(f()).nodeId) && f().player.hp === 0,
+                      "level " + level + ": the " + firstName + "'s knight is still down on its own screen")
+                standUp(l())
+            }]
+        ]
+    }
 
     function sessionSteps(first, last, firstName, lastName) {
         return [
@@ -178,6 +212,9 @@ Window {
                 check(fallenScreen(l) === null && !l.fallen && l.player.hp > 0,
                       "the " + lastName + "'s knight stands and its screen shows no fallen screen")
             }],
+        ].concat(goDown(1, first, last, firstName, lastName))
+         .concat(goDown(2, first, last, firstName, lastName))
+         .concat([
             // A second for the run to go on
             [1000, () => {
                 let f = first(), l = last()
@@ -220,7 +257,7 @@ Window {
                       && fallenScreen(host) === null && fallenScreen(joiner) === null,
                       "no fallen screen is left on either")
             }]
-        ]
+        ])
     }
 
     property var steps: []
