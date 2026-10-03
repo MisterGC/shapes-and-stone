@@ -428,6 +428,94 @@ ClayWorld2d {
         onImpactReceived: (kind, x, y, dx, dy, color) => {
             if (screen === "game") impact(kind, x, y, dx, dy, color, false)
         }
+        onEnemySpawned: (objectId, props) => _makeEnemy(props, objectId)
+        onEnemyDespawned: (objectId) => _dropEnemy(objectId)
+        onEnemyBlowReceived: (fromId, blow) => {
+            let e = _enemyById[blow.id]
+            if (!e || e.destroyed) return
+            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId)
+            else if (blow.kind === "stagger") e.stagger()
+            else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
+        }
+        onKnightBlowReceived: (blow) => {
+            // The reach is checked here, against where this knight really is
+            if (!player) return
+            let dx = player.xWu - blow.x, dy = player.yWu - blow.y
+            if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) return
+            if (player.takeDamage(blow.atk, blow.x, blow.y) !== "ignored") playImpact()
+        }
+        onEnemyKillReceived: (kill) => {
+            let e = _enemyById[kill.id]
+            if (e) e.destroyed = true
+            impact("enemyDeath", kill.x, kill.y, kill.dx, kill.dy, kill.color)
+            playDeathBurst()
+            countFight("kill")
+        }
+        onShotReceived: (shot) => {
+            if (screen !== "game") return
+            _flyShot(shot.x, shot.y, shot.dx, shot.dy, shot.damage)
+            playSpitShot()
+        }
+    }
+
+    // --- Enemies in a session (issue #13) ---
+    // The host runs every enemy: it spawns them as replicated objects,
+    // runs their AI and sends their state; every other node makes a
+    // remote enemy per object that shows the host's and passes its own
+    // knight's blows to the host. Without a session the game runs its
+    // enemies itself, as it always did.
+    property var _enemyById: ({})
+    // In a session an enemy goes for the nearest knight still standing;
+    // alone it keeps the target it was given
+    readonly property bool enemiesChooseTarget: session.connected
+    // The nearest knight at (x, y) that has not fallen, this node's or
+    // another player's, or null
+    function nearestKnight(x, y) {
+        let knights = [player]
+        for (let id in session.remotePlayers) knights.push(session.remotePlayers[id])
+        let best = null, bestD = Infinity
+        for (let k of knights) {
+            if (!k || (k === player ? player.fallen : k.remoteHp <= 0)) continue
+            let dx = k.xWu - x, dy = k.yWu - y
+            let d = dx * dx + dy * dy
+            if (d < bestD) { bestD = d; best = k }
+        }
+        return best
+    }
+    // The node a knight belongs to
+    function knightIdOf(knight) {
+        if (!knight) return ""
+        return knight === player ? session.nodeId : knight.nodeId
+    }
+    // Joiner: this node's knight struck an enemy the host runs
+    function strikeEnemy(enemy, blow) {
+        if (session.connected && enemy.objectId !== "") session.strikeEnemy(enemy.objectId, blow)
+    }
+    // Host: an enemy lunged at another node's knight
+    function strikeKnight(knight, atk, x, y) {
+        if (session.connected) session.strikeKnight(knight.nodeId, {atk: atk, x: x, y: y})
+    }
+    // Host: another node's knight killed an enemy
+    function reportKill(nodeId, enemy, dx, dy, color) {
+        if (session.connected)
+            session.reportKill(nodeId, {id: enemy.objectId, x: enemy.xWu, y: enemy.yWu,
+                                        dx: dx, dy: dy, color: color})
+    }
+    // Host: a replicated enemy goes on every node, its item with it; false
+    // when it is not one
+    function despawnEnemy(enemy) {
+        if (!session.connected || !session.isHost || enemy.objectId === "") return false
+        session.despawnEnemy(enemy.objectId)
+        return true
+    }
+    function _dropEnemy(objectId) {
+        let e = _enemyById[objectId]
+        if (!e) return
+        delete _enemyById[objectId]
+        enemies = enemies.filter(x => x !== e)
+        e.destroyed = true
+        try { e.destroy() } catch (err) {}
+        minimap.requestPaint()
     }
 
     // In a session every node simulates something the others see (the host
@@ -887,6 +975,8 @@ ClayWorld2d {
         fallen = true
         _keepBest()
         countFight("fall")
+        // In a session the enemies go for the knights still standing
+        if (session.connected) return
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
         }
@@ -1732,19 +1822,30 @@ ClayWorld2d {
         let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
         let eatk = enemyAtk(type, depth)
         let edef = stats.def
-        _makeEnemy({
+        let props = {
             xWu: ex, yWu: ey,
             hp: ehp, maxHp: ehp,
             atk: eatk, def: edef,
             tier: tier,
             enemyType: type
-        })
+        }
+        // In a session only the host spawns, for every node
+        if (!session.connected)
+            _makeEnemy(props)
+        else if (session.isHost)
+            session.spawnEnemy(props)
     }
 
     // An enemy item from what it is (props: where it stands, its stats,
-    // tier and type)
-    function _makeEnemy(props) {
+    // tier and type); objectId is its replicated object in a session
+    function _makeEnemy(props, objectId) {
+        objectId = objectId || ""
+        if (objectId !== "" && _enemyById[objectId]) return _enemyById[objectId]
+        let remote = objectId !== "" && !session.isHost
         let enemy = enemyComponent.createObject(world.room, Object.assign({}, props, {
+            objectId: objectId,
+            network: objectId !== "" ? session.network : null,
+            remote: remote,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
@@ -1752,9 +1853,11 @@ ClayWorld2d {
             collidesWith: catWall | catPlayer
         }))
         if (enemy) {
-            console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp)
-            enemy.target = player
+            console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp,
+                        objectId !== "" ? (remote ? "shown for " : "run as ") + objectId : "")
+            if (!remote) enemy.target = player
             enemies.push(enemy)
+            if (objectId !== "") _enemyById[objectId] = enemy
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
         }
@@ -1776,7 +1879,14 @@ ClayWorld2d {
         }
     }
 
+    // In a session the host's spitter fires on every node: each node flies
+    // the shot, and it hurts only that node's knight
     function spawnProjectile(px, py, dirX, dirY, damage) {
+        if (session.connected && session.isHost)
+            session.sendShot({x: px, y: py, dx: dirX, dy: dirY, damage: damage})
+        _flyShot(px, py, dirX, dirY, damage)
+    }
+    function _flyShot(px, py, dirX, dirY, damage) {
         let proj = projectileComponent.createObject(world.room, {
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
@@ -1913,11 +2023,18 @@ ClayWorld2d {
         exitSensor = null
         exitStairs = null
 
-        // Destroy enemies
-        for (let e of enemies) {
-            try { if (e && !e.destroyed) e.destroy() } catch(err) {}
+        // Destroy enemies. In a session the host despawns its enemies on
+        // every node; a joiner's go when the host's do, which may already
+        // be the next level's
+        for (let e of enemies.slice()) {
+            if (!e || e.destroyed) continue
+            if (e.objectId !== "" && session.connected) {
+                if (session.isHost) session.despawnEnemy(e.objectId)
+                continue
+            }
+            try { e.destroy() } catch(err) {}
         }
-        enemies = []
+        enemies = enemies.filter(e => e && !e.destroyed && e.remote && session.connected)
 
         // Destroy remote players
         session.clearRemotePlayers()

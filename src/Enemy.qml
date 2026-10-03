@@ -2,6 +2,7 @@ import QtQuick
 import Box2D
 import Clayground.Physics
 import Clayground.Behavior
+import Clayground.Network
 
 PhysicsItem {
     id: enemy
@@ -17,10 +18,40 @@ PhysicsItem {
 
     property bool destroyed: false
 
+    // In a session the host runs every enemy and the other nodes show it
+    // (issue #13): objectId is its replicated object, network the session's
+    // Network, and remote is true where another node runs its AI. A remote
+    // enemy is moved by the host's states and passes this node's knight's
+    // blows on to the host.
+    property string objectId: ""
+    property var network: null
+    property bool remote: false
+    // The AI thinks here: only where the enemy is not remote
+    readonly property bool thinks: aiTimer.running
+
+    // The host sends a state when one of these changes; a remote enemy
+    // renders them 50 ms in the past plus the round trip (capped at
+    // 100 ms), the rule RemotePlayer falls back to. Not autoDelay: it
+    // takes an enemy's rests, in which nothing is sent, for its send
+    // period and renders it up to twice as far behind after one. An
+    // enemy stops dead (a lunge lands, a stagger): its last state goes
+    // out again after settleMs, before the remote one is rendered past
+    // it, so it does not extrapolate on through the stop.
+    ReplicatedObject {
+        id: replica
+        network: enemy.network
+        objectId: enemy.objectId
+        properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId"]
+        interpolate: true
+        settleMs: 30
+        interpolator.delayMs: 50 + Math.min(100, Math.max(0, enemy.network ? enemy.network.latency : 0))
+        interpolator.angleKeys: ["facingAngle"]
+    }
+
     widthWu: 0.8
     heightWu: 0.8
 
-    bodyType: Body.Dynamic
+    bodyType: remote ? Body.Kinematic : Body.Dynamic
     fixedRotation: true
     gravityScale: 0
 
@@ -30,6 +61,9 @@ PhysicsItem {
 
     // AI target
     property var target: null
+    // The node whose knight the target is, the same on every screen; ""
+    // without a session or a target
+    property string targetId: ""
 
     // Set by halt() when the knight has fallen: the AI stays idle for good
     property bool halted: false
@@ -407,7 +441,24 @@ PhysicsItem {
     // FollowPath for both patrol and chase navigation
     // Manage FollowPath.running imperatively — a declarative binding gets
     // broken by FollowPath's internal "running = false" on path completion.
-    onAiStateChanged: followPath.running = (aiState === "patrol" || aiState === "chase")
+    onAiStateChanged: {
+        followPath.running = !remote && (aiState === "patrol" || aiState === "chase")
+        // A remote enemy wobbles while the host's staggers
+        if (remote) {
+            if (aiState === "stagger") staggerWobble.restart()
+            else if (staggerWobble.running) { staggerWobble.stop(); rotation = 0 }
+        }
+    }
+    // A remote enemy flashes when the host's loses HP, unless this node's
+    // knight struck it a moment ago and it flashes already
+    property int _shownHp: hp
+    onHpChanged: {
+        if (remote && hp < _shownHp && !hitFlashAnimation.running) {
+            hitFlashAnimation.restart()
+            if (_fx) hitSquash.restart()
+        }
+        _shownHp = hp
+    }
     onEnemyTypeChanged: goblinIcon.requestPaint()
 
     FollowPath {
@@ -437,7 +488,7 @@ PhysicsItem {
         id: aiTimer
         world: enemy.world
         interval: Balance.enemy.thinkInterval * 1000
-        running: true
+        running: !enemy.remote
         repeat: true
         onTriggered: updateAI(interval / 1000.0)
     }
@@ -477,6 +528,10 @@ PhysicsItem {
 
     // A shove along (dx, dy) at speed, from the knight's shield push
     function shove(dx, dy, speed) {
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "push", dx: dx, dy: dy, speed: speed})
+            return
+        }
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
         // Negate Y for world-to-screen
@@ -488,7 +543,7 @@ PhysicsItem {
     // for exactly Balance.enemy.parryFrames steps (issue #35)
     Connections {
         target: enemy.world
-        enabled: !enemy.halted
+        enabled: !enemy.halted && !enemy.remote
         function onStepped() { enemy._stepAttack(enemy.world.timeStep) }
     }
 
@@ -568,6 +623,13 @@ PhysicsItem {
     function updateAI(dt) {
         if (halted) return
         if (_knockT > 0) return
+        // In a session it goes for the nearest knight still standing; an
+        // attack under way stays on the knight it wound up against
+        if (gameWorld && gameWorld.enemiesChooseTarget
+            && aiState !== "telegraph" && aiState !== "lunge" && aiState !== "shoot") {
+            target = gameWorld.nearestKnight(xWu, yWu)
+            targetId = gameWorld.knightIdOf(target)
+        }
         if (!target || !gameWorld) {
             aiState = "patrol"
             return
@@ -737,6 +799,11 @@ PhysicsItem {
     }
 
     function performAttack() {
+        // Another node's knight: that node checks the reach and takes the hit
+        if (target && !target.takeDamage && target.nodeId !== undefined) {
+            if (gameWorld) gameWorld.strikeKnight(target, atk, xWu, yWu)
+            return
+        }
         if (target && target.takeDamage) {
             let dx = target.xWu - xWu
             let dy = target.yWu - yWu
@@ -758,6 +825,10 @@ PhysicsItem {
     }
 
     function stagger() {
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger"})
+            return
+        }
         parryWindow = false
         _attackTimer = Balance.enemy.stagger
         aiState = "stagger"
@@ -776,9 +847,10 @@ PhysicsItem {
         return Math.abs(angleDiff) <= shieldArc
     }
 
-    function takeDamage(amount, attackerX, attackerY) {
+    // What a blow of amount from (attackerX, attackerY) does: the damage
+    // and whether a guardian's shield took it
+    function _blow(amount, attackerX, attackerY) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
-
         // Guardian frontal shield
         let blocked = false
         if (enemyType === "guardian" && aiState !== "stagger"
@@ -786,16 +858,50 @@ PhysicsItem {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
         }
+        return {damage: finalDamage, blocked: blocked}
+    }
+
+    // This node's knight struck the enemy
+    function takeDamage(amount, attackerX, attackerY) {
+        if (!remote) {
+            _takeBlow(amount, attackerX, attackerY, "")
+            return
+        }
+        // Remote: the hit looks and counts here, the host applies it
+        let b = _blow(amount, attackerX, attackerY)
+        let hdx = attackerX !== undefined ? xWu - attackerX : 0
+        let hdy = attackerY !== undefined ? yWu - attackerY : 0
+        if (gameWorld) {
+            gameWorld.countFight("dealt", b.damage)
+            gameWorld.impact(b.blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
+            gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY})
+        }
+        hitFlashAnimation.restart()
+        if (_fx) hitSquash.restart()
+    }
+
+    // Host: the knight of node byId struck the enemy; that node drew the
+    // hit and counted it
+    function takeRemoteBlow(amount, attackerX, attackerY, byId) {
+        _takeBlow(amount, attackerX, attackerY, byId)
+    }
+
+    // A blow from this node's knight (byId "") or another node's
+    function _takeBlow(amount, attackerX, attackerY, byId) {
+        let b = _blow(amount, attackerX, attackerY)
+        let finalDamage = b.damage
+        let blocked = b.blocked
+        let own = byId === ""
 
         hp = Math.max(0, hp - finalDamage)
-        if (gameWorld) gameWorld.countFight("dealt", finalDamage)
+        if (gameWorld && own) gameWorld.countFight("dealt", finalDamage)
         console.log("[Enemy] Took", finalDamage, "damage, HP:", hp, blocked ? "(blocked)" : "")
         hitFlashAnimation.restart()
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
         let hdy = attackerY !== undefined ? yWu - attackerY : 0
         _lastHitDx = hdx
         _lastHitDy = hdy
-        if (gameWorld) {
+        if (gameWorld && own) {
             if (gameWorld.impact)
                 gameWorld.impact(blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
             else
@@ -824,12 +930,14 @@ PhysicsItem {
             _recalcChasePath()
         }
 
-        if (hp <= 0) die()
+        if (hp <= 0) die(byId)
     }
 
-    function die() {
+    // byId: the node whose knight killed it, "" for this node's
+    function die(byId) {
         console.log("[Enemy] Died!")
-        if (gameWorld) {
+        let own = !byId
+        if (gameWorld && own) {
             if (gameWorld.impact)
                 gameWorld.impact("enemyDeath", xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
             else
@@ -837,7 +945,13 @@ PhysicsItem {
             gameWorld.playDeathBurst()
         }
         destroyed = true
-        if (gameWorld) gameWorld.countFight("kill")
+        if (gameWorld) {
+            // The killer's node draws the death and counts the kill
+            if (own) gameWorld.countFight("kill")
+            else gameWorld.reportKill(byId, enemy, _lastHitDx, _lastHitDy, String(visual.color))
+        }
+        // A replicated enemy goes on every node; Game destroys this item
+        if (objectId !== "" && gameWorld && gameWorld.despawnEnemy(enemy)) return
         destroy()
     }
 }
