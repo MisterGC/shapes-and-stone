@@ -27,26 +27,24 @@ PhysicsItem {
     property var network: null
     property bool remote: false
     // How far in the past a remote enemy is shown, in ms
-    readonly property real renderDelayMs: replica.interpolator.delayMs
+    readonly property real renderDelayMs: replica.interpolator.effectiveDelayMs
     // The AI thinks here: only where the enemy is not remote
     readonly property bool thinks: aiTimer.running
 
     // The host sends a state when one of these changes; a remote enemy
     // renders them 50 ms in the past plus the round trip (capped at
-    // 100 ms), the rule RemotePlayer falls back to. Not autoDelay: it
-    // takes an enemy's rests, in which nothing is sent, for its send
-    // period and renders it up to twice as far behind after one
-    // (workaround until clayground#366). An enemy stops dead (a lunge
-    // lands, a stagger): its last state goes out again after settleMs,
-    // before the remote one is rendered past it, so it does not
-    // extrapolate on through the stop (workaround until clayground#367).
+    // 100 ms), the rule RemotePlayer falls back to. Not autoDelay: in the
+    // same-world bench it rendered some enemies up to 359 ms behind, and
+    // the joiner showed AI states the host had left over 300 ms before
+    // (workaround, clayground#366 did not settle it). An enemy that stops
+    // dead (a lunge lands, a stagger) stops in place on the other screens:
+    // clayground sends its last state once more right after the stop.
     ReplicatedObject {
         id: replica
         network: enemy.network
         objectId: enemy.objectId
         properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId"]
         interpolate: true
-        settleMs: 30
         interpolator.delayMs: 50 + Math.min(100, Math.max(0, enemy.network ? enemy.network.latency : 0))
         interpolator.angleKeys: ["facingAngle"]
     }
