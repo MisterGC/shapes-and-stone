@@ -161,7 +161,10 @@ Item {
         }
         if (shot) {
             _blockLeft = 0.3
-            face(p, shot.xWu, shot.yWu)
+            // Towards the shot's centre, as the knight's shield measures it
+            // (Projectile.qml): its corner sits 0.35 Wu off at the knight's size
+            face(p, shot.xWu + shot.widthWu / 2 - p.widthWu / 2,
+                 shot.yWu - shot.heightWu / 2 + p.heightWu / 2)
         }
         if (_blockLeft > 0) {
             _blockLeft -= dt
