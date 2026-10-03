@@ -2,7 +2,9 @@
 //
 // Reads the whole table the way the inspector does, then builds a dungeon,
 // the fight room and the village and checks that the knight, every enemy,
-// the fight room lineup and the campfire carry the table's values; the
+// the fight room lineup and the campfire carry the table's values; at
+// depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix and
+// harder blows, as the table's depth group says; the
 // campfire refills a dry knight's mana, away from it nothing does, and the
 // next level, either way it is reached, keeps the knight's HP and mana. Last it
 // changes a value in the table and checks the next knight has it. Prints
@@ -55,7 +57,8 @@ Window {
     function checkEnemy(e) {
         let t = Balance.enemy[e.enemyType]
         let hp = Balance.enemy.tierHp[e.tier] + t.hpBonus
-        return e.maxHp === hp && e.atk === t.atk && e.def === t.def
+        let atk = t.atk + Math.round(game.depth * Balance.depth.atk)
+        return e.maxHp === hp && e.atk === atk && e.def === t.def
             && near(e.chaseSpeed, t.chaseSpeed) && near(e.patrolSpeed, t.patrolSpeed)
             && near(e.lungeRange, Balance.enemy.lungeRange)
             && near(e.windUpDuration, Balance.enemy.windUp)
@@ -66,11 +69,31 @@ Window {
     property var campfire: null
     property var _left: null    // the knight of the level just left
     property int hpBefore: 0
+    property var byDepth: []    // [depth, enemies, average tier, grunt atk]
+
+    // The dungeon at depth d holds the table's count and tier mix there
+    function checkDepth(d) {
+        let es = game.enemies, n = es.length, sb = game.spawnRolls(d)
+        let weak = es.filter(e => e.tier === 0).length
+        let tough = es.filter(e => e.tier === 2).length
+        let avg = es.reduce((s, e) => s + e.tier, 0) / n
+        byDepth.push([d, n, avg, game.enemyAtk("grunt", d)])
+        check(game.depth === d && n >= sb.enemiesMin && n <= sb.enemiesMax,
+              "at depth " + d + " the dungeon spawns " + n + " enemies, within "
+              + sb.enemiesMin + " to " + sb.enemiesMax)
+        check(weak === Math.round(n * sb.weakChance)
+              && tough === Math.min(n - weak, Math.round(n * (1 - sb.normalChance))),
+              "at depth " + d + " its tier mix is the table's (" + weak + " weak, "
+              + tough + " tough, average tier " + avg.toFixed(2) + ")")
+        let wrong = es.filter(e => !checkEnemy(e))
+        check(wrong.length === 0, "at depth " + d + " every enemy carries the table's stats ("
+              + wrong.map(e => e.enemyType + "/" + e.tier + " atk " + e.atk).join(", ") + ")")
+    }
 
     property var steps: [
         [() => game.screen === "title", () => {
             let json = JSON.parse(JSON.stringify(Balance))
-            let groups = ["knight", "enemy", "projectile", "spawn", "campfire"]
+            let groups = ["knight", "enemy", "projectile", "spawn", "depth", "campfire"]
             check(groups.every(g => json[g] !== undefined) && json.minDamage === 1,
                   "JSON.stringify(Balance) returns the whole table ("
                   + leaves(json, "", []).length + " values)")
@@ -97,6 +120,24 @@ Window {
             let wrong = game.enemies.filter(e => !checkEnemy(e))
             check(wrong.length === 0, "every enemy's HP, attack, defense and timings come from the table ("
                   + wrong.map(e => e.enemyType + "/" + e.tier + " hp " + e.maxHp).join(", ") + ")")
+            let weak = game.enemies.filter(e => e.tier === 0)
+            check(weak.length > 0 && weak.every(e => e.maxHp === Balance.enemy.tierHp[0]
+                                                    + Balance.enemy[e.enemyType].hpBonus),
+                  "a weak enemy spawns weak (" + weak.length + " with the weak tier's HP)")
+            checkDepth(0)
+            game.applyScenario("dungeon", 2)
+        }],
+        [() => game.player && game.depth === 2 && game.enemies.length > 0, () => {
+            checkDepth(2)
+            game.applyScenario("dungeon", 4)
+        }],
+        [() => game.player && game.depth === 4 && game.enemies.length > 0, () => {
+            checkDepth(4)
+            let rising = byDepth.every((r, i) => i === 0
+                || (r[1] > byDepth[i - 1][1] && r[2] > byDepth[i - 1][2] && r[3] > byDepth[i - 1][3]))
+            check(rising, "deeper is harder: enemies, average tier and attack rise from depth 0 to 2 to 4 ("
+                  + byDepth.map(r => "depth " + r[0] + ": " + r[1] + " enemies, tier "
+                                + r[2].toFixed(2) + ", grunt atk " + r[3]).join("; ") + ")")
             game.applyScenario("fight")
         }],
         [() => game.fightRoomActive && game.enemies.length > 0, () => {
@@ -143,7 +184,9 @@ Window {
             check(refilled >= wantMana - 2 * tick && refilled <= wantMana + tick,
                   "two seconds at the fire refill " + refilled.toFixed(1)
                   + " mana, the table says " + wantMana)
-            // The next level keeps what the knight had
+            // The next level keeps what the knight had; away from the fire,
+            // whose next tick would heal it before the level changes
+            game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4
             game.player.hp = 70
             game.player.mana = 7
             _left = game.player

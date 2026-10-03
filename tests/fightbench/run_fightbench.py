@@ -10,12 +10,13 @@ every step, so the same seed gives the same numbers on every run.
 
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
-                    [--answer mix|block|parry]
+                    [--answer mix|block|parry] [--depth 0]
                     [--max-seconds 180] [--json out.json]
 
 --answer is how the scripted knight meets a grunt's or a guardian's attack:
 "mix" parries or blocks as the seed rolls, "block" always blocks, "parry"
-always parries.
+always parries. --depth is the depth the fight room is at: the lineup
+stays, the enemies hit as hard as at that depth.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -107,6 +108,8 @@ def main():
                     help="seed of the scripted knight's choices")
     ap.add_argument("--answer", choices=("mix", "block", "parry"), default="mix",
                     help="how the scripted knight meets an attack")
+    ap.add_argument("--depth", type=int, default=0,
+                    help="depth the fight room is at")
     ap.add_argument("--max-seconds", type=float, default=180.0,
                     help="simulated seconds before the fight counts as not finished")
     ap.add_argument("--batch", type=int, default=6,
@@ -140,7 +143,7 @@ def main():
         if not bench.wait_phase("ready"):
             print("FAIL the sandbox did not load; logs in", tmp, file=sys.stderr)
             return finish(proc, tmp, False)
-        if bench.eval1(f"begin({args.seed}, '{args.answer}')") is not True:
+        if bench.eval1(f"begin({args.seed}, '{args.answer}', {args.depth})") is not True:
             print("FAIL the fight room did not start; logs in", tmp, file=sys.stderr)
             return finish(proc, tmp, False)
         # Let what the scene sets up on its first frames settle before step 1

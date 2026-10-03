@@ -8,7 +8,7 @@
 // The numbers are the game's own fight record (Game.qml).
 //
 // Driven by run_fightbench.py (clayliveloader --sbx Sandbox.qml), which
-// calls begin(seed, answer), steps and reads report().
+// calls begin(seed, answer, depth), steps and reads report().
 
 import QtQuick
 import Clayground.Common
@@ -26,25 +26,28 @@ Item {
 
     // The dojo's scenario menu reaches the game through the bench
     function scenarios() { return game.scenarios() }
-    function applyScenario(name) { game.applyScenario(name) }
+    function applyScenario(name, depth) { game.applyScenario(name, depth) }
 
     // ---- driver API ----
     property int seed: 0
     property string answer: "mix"
+    property int depth: 0
     property int steps: 0
     property var _rng: null
 
     // Pauses the world and enters the fight room; the driver steps from here.
-    // answer is how the knight meets an attack: "mix", "block" or "parry".
-    function begin(s, a) {
+    // answer is how the knight meets an attack: "mix", "block" or "parry";
+    // depth is the depth the fight room is at.
+    function begin(s, a, d) {
         Clayground.paused = true
         seed = s
         answer = a === undefined ? "mix" : a
+        depth = d === undefined ? 0 : d
         steps = 0
         _rng = game.createRng(s)
         _plans = new Map()
         _blockLeft = 0
-        game.applyScenario("fight")
+        game.applyScenario("fight", depth)
         return game.player !== null
     }
 
@@ -59,6 +62,7 @@ Item {
         return {
             seed: seed,
             answer: answer,
+            depth: game.depth,
             outcome: cleared ? "cleared" : fallen ? "fallen" : "running",
             steps: steps,
             seconds: round3(r.seconds),
