@@ -97,6 +97,18 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
 ```
 
+Every enemy attack can be read and answered. An attack runs on the physics
+steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
+lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
+steps of a lunge are open to a parry. A hit the shield does not stop gives
+the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
+white for as long. The answer bench single-steps the paused fight room,
+counts each of these in steps and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
+```
+
 The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
 damage dealt and taken, parries, attacks the shield stopped, kills, falls
 and the simulated seconds until no enemy stands. The fight bench plays the

@@ -82,6 +82,11 @@ Window {
                   && near(p.dashSpeed, k.dashSpeed) && near(p.dashDuration, k.dashDuration)
                   && near(p.dashCooldownTime, k.dashCooldown) && near(p.shieldArcAngle, k.shieldArc),
                   "the knight's speed, reach, cooldowns and dash come from the table")
+            let v = null
+            for (let i = 0; i < p.children.length; i++)
+                if (typeof p.children[i].parry === "function") v = p.children[i]
+            check(v && near(v.swingDuration, k.swingDuration) && near(v.swingFade, k.swingFade),
+                  "the swing and the fade of its arc, which it hits until, come from the table")
             let n = game.enemies.length
             check(n >= Balance.spawn.enemiesMin && n <= Balance.spawn.enemiesMax,
                   "the dungeon spawns " + n + " enemies, within the table's "

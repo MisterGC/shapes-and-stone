@@ -22,6 +22,9 @@ QtObject {
         // Radius of the circle that finds melee candidates, in knight widths
         attackSensor: 1.5,
         swingDuration: 0.25,
+        // The arc fades this long after the swing; the swing hits until
+        // the fade is over
+        swingFade: 0.1,
         attackCooldown: 0.5,
         // Damage of a swing, as a multiple of atk
         blockingSwing: 0.85,
@@ -31,6 +34,8 @@ QtObject {
         shieldArc: 60,
         blockedShare: 0.3,
         blockSpeed: 0.4,    // share of move and dash speed while blocking
+        // After a hit the shield did not stop, no damage taken for this long
+        hurtGrace: 0.5,
         // Dash: no damage taken while it lasts
         dashSpeed: 40.0,
         dashDuration: 0.15,
@@ -58,8 +63,12 @@ QtObject {
         lungeDuration: 0.35,
         // A lunge hits when it ends this close to the knight
         lungeHitRange: 1.2,
-        // The last part of a lunge in which a swing parries it
-        parryWindow: 0.15,
+        // The last physics steps (1/60 s each) of a lunge in which a swing
+        // parries it
+        parryFrames: 9,
+        // No attack is telegraphed for less than this: a wind-up, a
+        // counter or a shot that would be shorter is drawn out to it
+        minTelegraph: 0.25,
         recovery: 0.8,
         stagger: 1.0,
         // Pushed back by a hit, not steering against it

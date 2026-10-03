@@ -75,6 +75,9 @@ PhysicsItem {
     property real _dashDirX: 0
     property real _dashDirY: 0
 
+    // Seconds left of the grace after a hit, in which no damage is taken
+    property real graceLeft: 0
+
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held.
     // Dash, swing and cooldowns count the time the step simulated: a pause, a
@@ -85,6 +88,7 @@ PhysicsItem {
             let dt = player.world.timeStep
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
+            if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt
             // A swing hits until its arc has faded, as long as the view
             // draws it, but counted in steps
             if (isAttacking) {
@@ -131,6 +135,7 @@ PhysicsItem {
         healing: player.isHealing
         dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
         swingDuration: player.attackDuration
+        graceLeft: player.graceLeft
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -312,6 +317,7 @@ PhysicsItem {
     function takeDamage(amount, attackerX, attackerY) {
         if (fallen) return
         if (isDashing) return  // Invulnerable during dash
+        if (graceLeft > 0) return  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
         if (blocked) {
@@ -324,6 +330,7 @@ PhysicsItem {
             if (blocked) gameWorld.countFight("block")
         }
         if (!blocked) {
+            graceLeft = Balance.knight.hurtGrace
             view.hurt()
             acted("hurt")
         }
@@ -363,7 +370,7 @@ PhysicsItem {
     function attack() {
         if (!fallen && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
-            _swingTimer = attackDuration + view.swingFade
+            _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
             view.swing()

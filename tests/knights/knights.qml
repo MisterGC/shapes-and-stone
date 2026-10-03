@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Window
+import "../../src"
 
 Window {
     id: bench
@@ -100,8 +101,13 @@ Window {
         [100, () => { let v = view(game.player); if (v) v.parry(); remote.triggerAction("parry") }],
         [40, () => capture("4-parry")],
         [400, () => { game.player.isBlocking = false; remoteState = 0; remoteBlock = false }],
-        [300, () => { let v = view(game.player); if (v) v.hurt(); remote.triggerAction("hurt") }],
+        [300, () => {
+            let v = view(game.player); if (v) v.hurt(); remote.triggerAction("hurt")
+            game.player.graceLeft = Balance.knight.hurtGrace
+        }],
         [30, () => capture("5-hurt")],
+        // The grace after the hit: both knights flicker until it is over
+        [220, () => capture("5b-grace")],
         [600, () => {
             game.player.dash(); remote.triggerAction("dash"); remoteState = 3
             dashMove.start()
