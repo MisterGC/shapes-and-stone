@@ -475,6 +475,14 @@ PhysicsItem {
         }
     }
 
+    // A shove along (dx, dy) at speed, from the knight's shield push
+    function shove(dx, dy, speed) {
+        let len = Math.sqrt(dx * dx + dy * dy)
+        if (len < 0.001) return
+        // Negate Y for world-to-screen
+        body.linearVelocity = Qt.point(dx / len * speed, -dy / len * speed)
+    }
+
     // An attack runs on the physics steps, not on the AI's think ticks: a
     // telegraph lasts its wind-up to the step, and the parry window is open
     // for exactly Balance.enemy.parryFrames steps (issue #35)

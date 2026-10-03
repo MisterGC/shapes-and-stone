@@ -1732,25 +1732,33 @@ ClayWorld2d {
         let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
         let eatk = enemyAtk(type, depth)
         let edef = stats.def
-        let enemy = enemyComponent.createObject(world.room, {
+        _makeEnemy({
             xWu: ex, yWu: ey,
             hp: ehp, maxHp: ehp,
             atk: eatk, def: edef,
             tier: tier,
-            enemyType: type,
+            enemyType: type
+        })
+    }
+
+    // An enemy item from what it is (props: where it stands, its stats,
+    // tier and type)
+    function _makeEnemy(props) {
+        let enemy = enemyComponent.createObject(world.room, Object.assign({}, props, {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
             categories: catEnemy,
             collidesWith: catWall | catPlayer
-        })
+        }))
         if (enemy) {
-            console.log("[Game] Enemy created -", type, "tier:", tier, "hp:", ehp)
+            console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp)
             enemy.target = player
             enemies.push(enemy)
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
         }
+        return enemy
     }
 
     function spawnDeathParticles(wx, wy) {
