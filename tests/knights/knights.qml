@@ -1,5 +1,5 @@
 // Knight bench - the local and a remote knight side by side, doing the same
-// thing at the same moment, captured to PNGs.
+// thing at the same moment, captured to PNGs, and both down at the end.
 //
 // Loads the real game in the dungeon scenario, spawns a RemotePlayer next
 // to the player and drives it the way Session.qml does (pushState and
@@ -25,6 +25,7 @@ Window {
     property real remoteY: 0
     property int remoteState: 0
     property bool remoteBlock: false
+    property int remoteHp: 120
 
     Component.onCompleted: {
         let c = Qt.createComponent(Qt.resolvedUrl("../../src/Game.qml"))
@@ -45,7 +46,7 @@ Window {
         onTriggered: bench.remote.pushState({
             x: bench.remoteX, y: bench.remoteY,
             a: bench.game.player ? bench.game.player.facingAngle : 0,
-            s: bench.remoteState, b: bench.remoteBlock ? 1 : 0, h: 120
+            s: bench.remoteState, b: bench.remoteBlock ? 1 : 0, h: bench.remoteHp
         })
     }
 
@@ -120,6 +121,16 @@ Window {
             remoteY = game.player.yWu
         }],
         [900, () => capture("7-apart")],
+        // Both down, side by side: the remote at 0 HP as its state says,
+        // the local knight's view told directly (a fall would bring the
+        // fallen screen up over it)
+        [100, () => {
+            remoteX = game.player.xWu + 1.6
+            remoteY = game.player.yWu
+            remoteHp = 0
+            let v = view(game.player); if (v) v.downed = true
+        }],
+        [500, () => capture("8-downed")],
         [500, () => { console.log("[Knights] done"); Qt.exit(0) }]
     ]
 
