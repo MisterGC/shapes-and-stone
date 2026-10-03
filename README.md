@@ -60,7 +60,8 @@ the host's enemies 50 ms in the past plus the round trip and runs no AI
 of its own. An enemy goes for the nearest knight still standing, on
 every screen the same one. A knight's blow on an enemy is drawn and
 counted on its own screen and applied by the host; an enemy's lunge or
-shot hurts only on the screen of the knight it hits. The enemy bench
+shot hurts only on the screen of the knight it hits, and a lunge's blow
+lands when that screen shows the lunge land, so a parry there answers it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
 five seconds, kills one from the joiner and lets the joiner's knight
@@ -73,8 +74,12 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/enemies/enemies.qml
 The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
 connected over Local (LAN) or Cloud signaling and started on a fixed seed.
-The joiner's knight lands a scripted hit, then both knights fight for eight
-seconds while each screen records every enemy it shows - its id, position,
+The joiner's knight answers one of the host's enemies: it stands until the
+enemy walks into its reach and swings, parries it, shield-pushes it and
+kills it while the host's knight kills another. Each answer counts once,
+on both screens: the same HP, the stagger, the shove, the death and its
+stain, and a parried lunge that does not land. Then both knights fight for
+eight seconds while each screen records every enemy it shows - its id, position,
 HP and AI state - every frame. It exits with the number of failed checks;
 `--fault stale` makes the joiner apply none of the host's enemy states, and
 the run fails. It needs the live loader (`-DCLAYGROUND_WITH_TOOLS=ON`, see

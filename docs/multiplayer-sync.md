@@ -162,10 +162,10 @@ processes of Clayground's live loader (`clayliveloader --instance host`
 and `--instance joiner`), each with the whole game, connected over Local
 or Cloud signaling and driven through the inspector protocol. The host
 starts the game on seed 424242. The host's knight goes to one enemy and
-the joiner's to the enemy farthest from it. The joiner's knight walks
-into its enemy and swings, and the bench checks that the host takes the
-hit and that the joiner then shows the host's HP. After that both knights
-fight the nearest enemy for eight seconds. Every frame each process
+the joiner's in sight of the enemy farthest from it. The joiner's knight
+answers that enemy (issue #17, below), and the bench checks that the host
+takes each answer and that the joiner then shows the host's HP. After
+that both knights fight the nearest enemy for eight seconds. Every frame each process
 records every enemy it shows, with the wall-clock time: object id,
 position, HP and AI state.
 
@@ -211,14 +211,65 @@ joiner 200 ms late all failed the position check, with a worst error of
 8.0 Wu), AI state (1760 misses), HP during the fight (617 misses) and HP
 after the hit (joiner 52, host 39) failed.
 
-On the joiner a knight that stands still does not see a host's enemy
-walk into its reach: its swing misses. Box2D lets a body that is at rest
-fall asleep, and a sleeping body takes part in no new contact. A host's
-enemy on the joiner is a kinematic body that is moved only by setting
-its position (`SetTransform`), and that wakes nothing. So the knight's
-swing sensor never adds the enemy (clayground#369). Until that is fixed
-the bench's scripted hit walks the knight in instead of swinging from a
-standstill.
+On the joiner a knight that stood still did not see a host's enemy walk
+into its reach: Box2D lets a body at rest fall asleep, a host's enemy on
+the joiner is moved only by setting its position, and that woke nothing
+(clayground#369). The clayground pin carries the fix since issue #17, and
+the bench's knight stands.
+
+## A hit counts once, whoever lands it (issue #17)
+
+A knight's answer to a host's enemy is judged on the knight's own screen
+and applied by the host, once:
+
+- a swing: the attacker's screen draws the hit, counts the damage it dealt
+  and sends the blow (`enemyBlow`, kind `damage`); the host lowers the HP,
+  and every screen shows the host's HP
+- a parry: the same, plus `stagger`; the host's enemy staggers
+- a shield push: `push`, and `stagger` on a guardian; the host shoves its
+  enemy
+- a kill: the host's enemy dies and is despawned on every screen; the
+  killer's screen counts the kill and draws the death, stain included, and
+  the others draw it from its `impact`
+
+The other way round, a host's enemy that lunges at a joiner's knight sends
+the blow (`knightBlow`) with the enemy's id. The joiner holds it until its
+screen shows the lunge land, the enemy's render delay (50 ms plus the
+round trip) after it arrived. Without the hold, a parry in the last 50 ms
+of the parry window as the joiner shows it came after the blow of the
+very lunge it parried: the knight was hurt and parried at once. A parry of
+that enemy from its last parry window (`enemy.parryFrames` steps) before
+the blow arrived until the hold ends answers the lunge, and the blow is
+dropped. `Game.knightStruck` says what became of each blow: `hit`,
+`blocked`, `ignored`, `out of reach` or `parried`.
+
+`tests/sameworld/run_sameworld.py` checks each of these between a host and
+a joiner process. The joiner's knight stands in sight of an enemy until it
+sleeps, the enemy walks into its reach, and one swing lowers the enemy's HP
+by the same amount on both screens; the host's enemies lose what the
+joiner's screen dealt. It parries that enemy from the sixth frame of the
+window it shows, when the host's lunge has landed and its blow is on its
+way: the host's enemy staggers and no blow of it lands on the knight. It
+shield-pushes the enemy, which moves away from it on the host. Then it
+kills that enemy while the host's knight kills another: both are gone on
+both screens, the host's and the joiner's kill records grow by their own
+kills, and every death leaves one stain on each screen, in the same place.
+
+Nine runs against clayground `issue-369` @ acffb2d (the submodule), three
+with Local and six with Cloud signaling. In every run the joiner's knight
+slept before its swing and the swing landed with the first try: HP 52 to
+49 on both screens, and the 16 its screen dealt (the swing also caught a
+second enemy) was what the host's enemies lost. Every late parry staggered
+the host's enemy, and the one blow of that lunge was dropped as parried.
+The shield push moved the host's enemy 0.32 to 2.16 Wu. Both kills went on
+both screens with matching stains (two or three deaths per run: a swing
+also kills what else is in its arc). Eight runs exited 0, with a worst
+position error of 0.040 to 0.050 Wu. One Cloud run exited 1: the worst
+position error was 0.284 Wu, over the 0.25 tolerance, on an enemy the
+scripted steps did not touch, in `recovery`; the three Cloud runs after it,
+with `--dump`, did not show it again, so its cause is not known. With the
+parry's drop switched off, the parry check fails: the blow lands. With
+`--fault stale` the run exits 7.
 
 ## Security note
 
