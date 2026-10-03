@@ -150,6 +150,28 @@ then the host leave, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/joinleave/joinleave.qml
 ```
 
+A killed enemy drops gold where it fell, by its tier (`loot` in the balance
+table); the fight room drops none. The first knight to reach a drop picks
+it up, whoever dealt the killing blow, and the HUD shows "Gold N" under the
+depth. In a session the host owns the drops as it owns the enemies: it
+spawns each as a Clayground replicated object (type `"gold"`), a node
+claims the drops its own knight reaches, and the host gives each to the
+first claim it gets and despawns it, so a drop is picked up once, by one
+knight; each knight's gold is its own node's. In the village the
+innkeeper sells a health potion and the smith one upgrade for the run,
+more damage or more max HP, through the dialogue panel: E talks, 1 and 2
+buy what the panel offers. Outside the panel, 1 drinks a potion. The
+campfire stays the healer. Gold, potions and the upgrade go with the
+knight to the next level; a new run starts without them. Prices and
+effects are the table's `shop` group. The gold bench brings one knight to
+a drop, to the innkeeper and the smith, then a host and a joiner joined
+over LAN to three drops, one with both knights on it, and exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gold/gold.qml
+```
+
 The HUD shows "Depth N" under the bars; a village counts as the depth of
 the dungeon before it. The fallen screen adds the run's kills and its time
 (simulated, so a pause holds it) and the best depth any run got. The best
@@ -166,8 +188,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- second
 ```
 
 Every fight number - HP, damage, timings, cooldowns, spawn counts, the heal
-rate - sits in one table, `src/Balance.qml`; tuning the fight is an edit of
-that file. In the dojo's inspector, `eval JSON.stringify(Balance)` returns
+rate, the gold a kill drops and the village's prices - sits in one table,
+`src/Balance.qml`; tuning the fight is an edit of that file. In the dojo's inspector, `eval JSON.stringify(Balance)` returns
 the whole table (a bare `eval Balance` returns `null`: the inspector does
 not turn objects into JSON). The balance bench checks that the knight, the
 enemies, the fight room and the campfire carry the table's values, and exits

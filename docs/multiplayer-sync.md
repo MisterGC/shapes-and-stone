@@ -514,6 +514,30 @@ knight, 115 ms after: once the knight is gone from the session the next
 think picks another. The drop only makes it immediate, and cancels an
 attack wound up against that knight.
 
+## Gold drops, picked up once (issue #38)
+
+The host owns the gold as it owns the enemies. A host's enemy that dies
+drops its gold (`Game.dropGold`): the host spawns it as a replicated
+object of type `"gold"` with its place and amount, and every node makes a
+`GoldDrop` of it, a node that joins late too. Whose blow killed the enemy
+does not matter: issue #17's rules credit the kill to the killer's screen
+(its fight record and run kills), and the gold goes to whichever knight
+reaches the drop first. Each node checks every physics step whether its
+own knight stands on a drop and claims it (`goldClaim`, sent to the host;
+the host's own claim is answered at once). The host takes the first claim
+it gets for a drop, despawns the drop on every node and tells the
+claimer's node the amount (`goldGrant`); a later claim finds no drop and
+gets nothing. The gold, the potions and the smith's upgrade are each
+knight's own and live on its own node, as its HP does; the others never
+see them. A drop the host leaves behind at a level change is despawned
+with the level, as its enemies are.
+
+The gold bench joins a host and a joiner over LAN and puts both knights on
+the same drop in the same frame: one of them got it, once. It also checks
+that a drop of the joiner's kill goes to the host's knight that picks it
+up, and the other way round, and that a claim the joiner sends after the
+drop was taken gives no gold.
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"
