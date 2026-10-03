@@ -9,6 +9,8 @@ Item {
 
     property bool muted: false
     property int _selectedIndex: 0
+    // Why the game came back here, e.g. the host was lost; "" for none
+    property string message: ""
 
     // Menu sounds
     Sound {
@@ -64,6 +66,16 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: parent.height * 0.08
         spacing: 12
+
+        Text {
+            objectName: "titleMessage"
+            visible: titleScreen.message !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.message
+            color: "#E0B060"
+            font.pixelSize: 14
+            font.bold: true
+        }
 
         Repeater {
             model: ["Single Player", "Multiplayer"]

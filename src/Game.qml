@@ -406,6 +406,9 @@ ClayWorld2d {
 
     // Screen state: "title", "lobby", "game"
     property string screen: "title"
+    // Why the title is up, when it was not the player's choice (the host
+    // was lost); gone once the title is left
+    property string titleMessage: ""
 
     // Co-op: the connection, the lobby and the remote players
     Session {
@@ -445,6 +448,11 @@ ClayWorld2d {
         onPartyChanged: _checkPartyDown()
         onRunEnded: _endPartyRun()
         onPlayerLeft: (nodeId) => _dropKnight(nodeId)
+        onHostLost: (message) => {
+            console.log("[Game]", message, "- back to the title")
+            backToTitle()
+            titleMessage = message
+        }
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
@@ -667,7 +675,10 @@ ClayWorld2d {
 
     // Wait for valid size + game screen before generating dungeon
     onWidthChanged: _tryStartGame()
-    onScreenChanged: _tryStartGame()
+    onScreenChanged: {
+        if (screen !== "title") titleMessage = ""
+        _tryStartGame()
+    }
     function _tryStartGame() {
         if (screen === "game" && width > 0 && height > 0 && !player) {
             console.log("[Game] Starting game - width:", width, "height:", height)
@@ -2716,6 +2727,7 @@ ClayWorld2d {
         sourceComponent: Component {
             TitleScreen {
                 muted: world.muted
+                message: world.titleMessage
                 onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
                 onMultiplayerSelected: screen = "lobby"
             }

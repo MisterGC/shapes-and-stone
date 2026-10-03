@@ -65,6 +65,9 @@ Item {
     signal playerLeft(string nodeId)
     // Another player's knight was made on this screen
     signal remotePlayerSpawned(string nodeId, var knight)
+    // A joiner's session ended without its leaving: the host left, crashed
+    // or lost its connection. message says which, for the title
+    signal hostLost(string message)
     // The run is over for everyone: on a joiner when the host ends it, on
     // the host once the joiners have left or endRunWaitMs has passed
     signal runEnded()
@@ -74,6 +77,9 @@ Item {
     // made (a level being built, a run not yet joined): a knight made
     // starts from it, a downed one downed
     property var lastStates: ({})
+    // This node is leaving on its own: its session ending is no lost host
+    property bool _leaving: false
+    property string _lastError: ""
     // The host's run as far as its session properties have come
     property var _run: ({})
 
@@ -157,11 +163,27 @@ Item {
             session.partyChanged()
         }
 
+        onErrorOccurred: (message) => session._lastError = message
         onConnectedChanged: {
-            if (!net.connected) {
+            if (net.connected) {
+                session._leaving = false
+                session._lastError = ""
+            } else {
                 session.lastStates = ({})
                 session._run = ({})
+                // The error that says why comes with the end or right after it
+                if (session.inGame && !session._leaving) _hostLostCheck.restart()
             }
+        }
+    }
+    Timer {
+        id: _hostLostCheck
+        interval: 50
+        onTriggered: {
+            if (net.connected || session._leaving || !session.inGame) return
+            session.hostLost(session._lastError.indexOf("left") >= 0
+                             ? "The host left the game"
+                             : "Lost the connection to the host")
         }
     }
 
@@ -227,6 +249,7 @@ Item {
 
     // Leave the session, e.g. for the title after the knight has fallen
     function leave() {
+        _leaving = true
         net.leave()
     }
 
@@ -304,7 +327,6 @@ Item {
     // The level is built: this node's knight stands in it. While one is
     // built, the knights of every node are made with it
     function _levelUp() { return player !== null }
-
 
     function _spawnRemotePlayer(nodeId, color, px, py) {
         // Where the knight is comes with its next state; its HP is the
