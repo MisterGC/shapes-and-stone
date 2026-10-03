@@ -329,10 +329,15 @@ from the knight's top-left corner to the shot's. The knight is 1.0 Wu, the
 shot 0.3 Wu, so the shot's corner sits 0.35 Wu off its centre at that size,
 and a shot from the left or from above came in at the edge of the 60 degree
 arc or beyond it: with the shield up and facing the spitter the knight took
-the hit. The shot now measures from its centre moved by the knight's half
-size. The fight bench's scripted knight aimed its shield the old way; it
-now faces the shot's centre, and its record is the same as before the fix
-(seed 424242, `mix`: 4 blocks, 4 damage taken, 116 HP left).
+the hit. The shield is now measured in one place: `Player.isShieldFacing`
+takes the attacker's corner and its size and compares the two centres.
+A shot passes its 0.3 Wu, a lunge the enemy's 0.8 Wu (the host sends it in
+`knightBlow` as `size`); the reach of a lunge stays corner to corner, as
+the host's own check. The benches' scripted knights face a thing centre to
+centre too. The fight bench (seed 424242) before and after: `mix` and
+`parry` unchanged (175 dealt, 4 taken, 4 blocks, 116 HP; 170 dealt, 0
+taken, 4 parries, 120 HP), `block` still falls with 10 blocks and 120
+taken, now dealing 61 instead of 68 and killing 1 enemy instead of 0.
 
 `tests/sameworld/run_sameworld.py` checks it between a host and a joiner
 process, after the parry of issue #17:
@@ -350,17 +355,25 @@ process, after the parry of issue #17:
   screen judges `blocked`, `dodged`, `hit`, each with the knight's state at
   that moment in the log; the host receives each result, and its shot of
   that id was shown until the result came and is gone after
+- the other way round, the joiner's knight waits beside another enemy, and
+  the host's knight holds its shield toward the spitter, which spits at it:
+  the host's screen judges `blocked`, the joiner receives it, and its shot
+  of that id goes then. (On the spot the joiner's knight had just stood
+  on, the joiner's screen met the shot with its own knight first: the
+  known trade-off above.)
 
 Six runs against clayground `issue-369` @ acffb2d (the submodule), three
-with Local and three with Cloud signaling: five exited 0 with 35 checks
-passed, one (Local) exited 1 on the position check of issue #14 (0.257 Wu
-on an enemy in `recovery`, against 0.25). In all six every new check passed
-on its first try: each lunge blocked (1 HP lost) and dodged (0 lost), each
-shot blocked, dodged and hit. The host received every result 0 to 2 ms
-after the joiner judged it, and its shot of that id was last drawn 0 to
-11 ms before the result arrived. With the joiner sending no `struck` the
-run exits 5: the five checks that the host receives the result fail, and
-its shots fly on. With `--fault stale` it exits 9.
+with Local and three with Cloud signaling, all exited 0 with 37 checks
+passed. In all six every new check passed on its first try: each lunge
+blocked and dodged, each shot on the joiner blocked, dodged and hit, the
+shot on the host blocked. Each result reached the other screen 0 to 2 ms
+after the judging screen decided, and its shot of that id was last drawn 0
+to 6 ms before the result arrived. The worst position error was 0.089 to
+0.223 Wu. With no node sending `struck` the run exits 6: the six checks
+that the other screen receives the result fail, and the shots fly on. With
+the joiner ignoring the host's results only (`_endShot` returning on a
+joiner) it exits 1, on the joiner's check alone. With `--fault stale` it
+exited 9 (run before the host's shot was added).
 
 ## Security note
 
