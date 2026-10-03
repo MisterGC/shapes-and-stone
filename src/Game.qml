@@ -439,7 +439,7 @@ ClayWorld2d {
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
         onPartyChanged: _checkPartyDown()
-        onRunEnded: backToTitle()
+        onRunEnded: _endPartyRun()
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
@@ -610,6 +610,9 @@ ClayWorld2d {
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
     property bool fallen: false
+    // A session's run ended with every knight down: the session is left,
+    // the fallen screen shows the run's summary and a key goes to the title
+    property bool partyFallen: false
     components: []
 
     // The run so far, for the fallen screen: the enemies killed and the
@@ -1052,7 +1055,7 @@ ClayWorld2d {
     }
 
     // Host: when its own knight and every other knight of the session are
-    // down, the run ends for everyone and each screen goes to the title
+    // down, the run ends for everyone and each screen shows its summary
     function _checkPartyDown() {
         if (!session.connected || !session.isHost || screen !== "game" || !player || !player.fallen)
             return
@@ -1062,6 +1065,20 @@ ClayWorld2d {
         }
         console.log("[Game] Every knight is down at depth", depth, "- the run ends")
         session.endRun()
+    }
+
+    // The host ended the run: out of the session, the enemies stop, and the
+    // fallen screen shows how far the party got
+    function _endPartyRun() {
+        if (screen !== "game") return
+        console.log("[Game] The party has fallen at depth", depth)
+        if (session.connected) session.leave()
+        for (let e of enemies) {
+            try { if (e && e.halt) e.halt() } catch(err) {}
+        }
+        _keepBest()
+        partyFallen = true
+        fallen = true
     }
 
     // --- Fight record ---
@@ -1123,6 +1140,7 @@ ClayWorld2d {
         console.log("[Game] New run, seed:", masterSeed)
         clearDungeon()
         fallen = false
+        partyFallen = false
         resetting = false
         fightRoomActive = false
         levelIndex = 0
@@ -1140,6 +1158,7 @@ ClayWorld2d {
         clearDungeon()
         if (session.connected) session.leave()
         fallen = false
+        partyFallen = false
         resetting = false
         fightRoomActive = false
         masterSeed = -1
@@ -2658,8 +2677,9 @@ ClayWorld2d {
                 seconds: world.runSeconds
                 bestDepth: world.bestDepth
                 newBest: world.depth > world.runStartBest
-                canGoAgain: !session.connected
-                partyFights: session.connected
+                canGoAgain: !session.connected && !world.partyFallen
+                partyFights: session.connected && !world.partyFallen
+                partyFallen: world.partyFallen
                 onGoAgain: world.newRun()
                 onBackToTitle: world.backToTitle()
             }

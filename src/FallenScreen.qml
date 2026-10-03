@@ -3,8 +3,9 @@ import QtQuick
 // Shown when the knight falls: how deep the run got, its kills and time,
 // the best depth kept between runs, Enter to go again, Esc back to the
 // title. In a session whose other knights still fight it says the knight
-// is down, keeps the dungeon in sight and offers only Esc, which leaves.
-// Takes the keyboard focus and every click.
+// is down, keeps the dungeon in sight and offers only Esc, which leaves;
+// once every knight is down it shows the party's run, and Enter or Esc go
+// to the title. Takes the keyboard focus and every click.
 Item {
     id: fallenScreen
     objectName: "fallenScreen"
@@ -25,10 +26,13 @@ Item {
     // Another knight of the session still stands: this one is down, the
     // run goes on, and the dungeon stays in sight
     property bool partyFights: false
+    // Every knight of the session is down and the run is over
+    property bool partyFallen: false
 
     // Deferred like the title screen's: the game may still take focus in
     // the same frame
     Component.onCompleted: Qt.callLater(forceActiveFocus)
+    onPartyFallenChanged: if (partyFallen) shadeIn.restart()
 
     MouseArea {
         anchors.fill: parent
@@ -41,7 +45,9 @@ Item {
         anchors.fill: parent
         color: "#000000"
         opacity: 0
+        // Darker once the party has fallen
         NumberAnimation on opacity {
+            id: shadeIn
             to: fallenScreen.partyFights ? 0.3 : 0.75
             duration: 900
             easing.type: Easing.OutQuad
@@ -57,7 +63,8 @@ Item {
         Text {
             objectName: "fallenTitle"
             anchors.horizontalCenter: parent.horizontalCenter
-            text: fallenScreen.partyFights ? "You are down" : "You have fallen"
+            text: fallenScreen.partyFights ? "You are down"
+                  : fallenScreen.partyFallen ? "Your party has fallen" : "You have fallen"
             color: "#CC4444"
             font.pixelSize: 42
             font.bold: true
@@ -101,7 +108,9 @@ Item {
                   ? "Enter to go again • Esc to the title"
                   : fallenScreen.partyFights
                     ? "Your party fights on • Esc to leave the session"
-                    : "Esc to leave the session"
+                    : fallenScreen.partyFallen
+                      ? "Enter or Esc to the title"
+                      : "Esc to leave the session"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
@@ -113,6 +122,9 @@ Item {
         // knight ignores the rest
         if (canGoAgain && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
             goAgain()
+            event.accepted = true
+        } else if (partyFallen && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            backToTitle()
             event.accepted = true
         } else if (event.key === Qt.Key_Escape) {
             backToTitle()
