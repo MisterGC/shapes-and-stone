@@ -330,13 +330,17 @@ def main():
         hp0 = H.eval1(f"hpOf('{b}')")
         landed = False
         deadline = time.time() + 5
+        swings = 0
         while time.time() < deadline and not landed:
             J.eval([f"strike('{b}')"])
+            swings += 1
             landed = wait_for(lambda: H.eval1(f"hpOf('{b}')") < hp0, 0.8, 0.05)
             pull()
         hp1 = H.eval1(f"hpOf('{b}')")
-        result["hit"] = {"enemy": b, "hpBefore": hp0, "hpAfter": hp1}
-        check(landed, f"the joiner's scripted hit on {b} lands on the host (HP {hp0} -> {hp1})")
+        knight_at = f"knightAt('{b}')"
+        result["hit"] = {"enemy": b, "hpBefore": hp0, "hpAfter": hp1, "swings": swings}
+        check(landed, f"the joiner's scripted hit on {b} lands on the host (HP {hp0} -> {hp1})"
+              + ("" if landed else f", the joiner's knight: {J.json(knight_at)}"))
         same_hp = wait_for(lambda: J.eval1(f"hpOf('{b}')") == H.eval1(f"hpOf('{b}')"), 2, 0.05)
         hp_h, hp_j = H.eval1(f"hpOf('{b}')"), J.eval1(f"hpOf('{b}')")
         check(same_hp, f"the joiner shows the host's HP of {b} after the hit "

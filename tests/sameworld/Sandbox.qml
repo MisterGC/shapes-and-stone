@@ -99,12 +99,30 @@ Item {
         _face(p, e)
         return true
     }
-    // The scripted hit: a step beside enemy id, facing it, one swing
+    // This node's knight against enemy id, for a hit that did not land
+    function knightAt(id) {
+        let e = _byId()[id], p = game.player
+        if (!p) return {}
+        return {x: r3(p.xWu), y: r3(p.yWu), facing: r3(p.facingAngle), attacking: p.isAttacking,
+                cooldown: r3(p.attackCooldown), inRange: e ? p.enemiesInRange.has(e) : false,
+                dist: e ? r3(Math.hypot(e.xWu - p.xWu, e.yWu - p.yWu)) : -1,
+                enemyState: e ? e.aiState : ""}
+    }
+    // The scripted hit: a step beside enemy id, walking into it, one swing.
+    // Walking, not standing: a knight at rest sleeps in Box2D, and a
+    // joiner's enemy, moved by its position only, does not wake it, so the
+    // swing sensor would not see it
     function strike(id) {
         if (!placeBeside(id)) return false
-        game.player.attack()
+        let p = game.player, e = _byId()[id]
+        // moveY is screen down, world y is up
+        p.moveX = (e.xWu - p.xWu) > 0 ? 1 : -1
+        p.moveY = 0
+        p.attack()
+        _strikeStop.restart()
         return true
     }
+    Timer { id: _strikeStop; interval: 300; onTriggered: if (game.player && !bench.fighting) bench._stand(game.player) }
 
     // ---- the fight: each knight goes for the nearest enemy ----
     property bool fighting: false
