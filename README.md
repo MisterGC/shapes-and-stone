@@ -60,8 +60,12 @@ the host's enemies 50 ms in the past plus the round trip and runs no AI
 of its own. An enemy goes for the nearest knight still standing, on
 every screen the same one. A knight's blow on an enemy is drawn and
 counted on its own screen and applied by the host; an enemy's lunge or
-shot hurts only on the screen of the knight it hits, and a lunge's blow
-lands when that screen shows the lunge land, so a parry there answers it. The enemy bench
+shot is judged on the screen of the knight it goes for, by that knight's
+shield, parry and dash as that screen has them, which applies the HP and
+tells the others what became of it. A lunge's blow lands when that screen
+shows the lunge land, so a parry there answers it; a shot carries the
+host's id, and goes on every screen once the knight's screen has judged
+it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
 five seconds, kills one from the joiner and lets the joiner's knight
@@ -75,10 +79,13 @@ The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
 connected over Local (LAN) or Cloud signaling and started on a fixed seed.
 The joiner's knight answers one of the host's enemies: it stands until the
-enemy walks into its reach and swings, parries it, shield-pushes it and
+enemy walks into its reach and swings, parries it, blocks and dodges its
+lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
 kills it while the host's knight kills another. Each answer counts once,
 on both screens: the same HP, the stagger, the shove, the death and its
-stain, and a parried lunge that does not land. Then both knights fight for
+stain, a parried lunge that does not land, each lunge and shot judged by
+the joiner's knight and reported to the host, and a shot that goes on the
+host's screen when the report arrives. Then both knights fight for
 eight seconds while each screen records every enemy it shows - its id, position,
 HP and AI state - every frame. It exits with the number of failed checks;
 `--fault stale` makes the joiner apply none of the host's enemy states, and

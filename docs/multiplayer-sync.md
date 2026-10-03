@@ -293,6 +293,73 @@ not touch, in `recovery` or a lunge: 0.253 to 0.286 Wu against the 0.25
 tolerance, in about one run of five while these steps were built. That
 check and its tolerance are #14's.
 
+## An attack on a knight is judged by its own screen (issue #18)
+
+A block, a parry and a dash depend on the knight's facing and state, which
+only its own screen has exactly. So the host announces an enemy's attack,
+and the screen of the knight it goes for decides, applies that knight's HP
+and tells the others (`struck`, broadcast):
+
+- a lunge: the host sends the blow (`knightBlow`, issue #17); the knight's
+  screen holds it for the enemy's render delay and judges it `parried`,
+  `blocked`, `dodged`, `hit`, `ignored` (fallen, or in the grace after a
+  hit) or `out of reach`. A dash that carried the knight past the enemy
+  counts as `dodged`. The result goes to every node as
+  `{source: "lunge", id: <enemy>, result}`; `Game.struckReported` says it
+  on the others. The knight's HP reaches them with its state as before.
+- a shot: the host gives it an id (`shot1`, `shot2`, ... per game) and sends
+  it with the shot. Every node flies it under that id; it hurts only that
+  node's knight. The node whose knight it meets judges it - `blocked` by
+  the shield, `dodged` in a dash, `hit` or `ignored` - and sends
+  `{source: "shot", id, result}`. Every other node removes the shot of that
+  id without an impact of its own (the knight's screen sends the hit or
+  the deflection as before). A shot that meets no knight bursts on each
+  screen on its own, at its wall or the end of its life.
+  `Game.shotEnded` says what became of each shot on this screen.
+
+The parry window of a held blow is counted in physics steps (the blow's
+arrival step minus `enemy.parryFrames`), as the enemy's attack runs, not in
+wall-clock milliseconds; the hold itself stays wall clock, since the screen
+renders the enemy by it.
+
+Building the bench showed a game bug: the shield check for a shot measured
+from the knight's top-left corner to the shot's. The knight is 1.0 Wu, the
+shot 0.3 Wu, so the shot's corner sits 0.35 Wu off its centre at that size,
+and a shot from the left or from above came in at the edge of the 60 degree
+arc or beyond it: with the shield up and facing the spitter the knight took
+the hit. The shot now measures from its centre moved by the knight's half
+size. The fight bench's scripted knight aimed its shield the old way; it
+now faces the shot's centre, and its record is the same as before the fix
+(seed 424242, `mix`: 4 blocks, 4 damage taken, 116 HP left).
+
+`tests/sameworld/run_sameworld.py` checks it between a host and a joiner
+process, after the parry of issue #17:
+
+- the joiner's knight holds its shield toward the enemy, which lunges: the
+  joiner's screen judges the blow `blocked`, the knight loses HP for it, the
+  host receives `blocked` and shows an HP the joiner's knight had in the
+  300 ms before
+- it dashes at the enemy from the fifth frame of the parry window it shows:
+  `dodged`, no HP lost, the host receives `dodged`
+- it stands 2.5 to 4 Wu from a spitter while the host's enemies stop
+  thinking (so the spitter spits only when told, and no other blow puts the
+  knight into its grace), and the host makes the spitter spit at it three
+  times: with the shield up, dashing into the shot, standing. The joiner's
+  screen judges `blocked`, `dodged`, `hit`, each with the knight's state at
+  that moment in the log; the host receives each result, and its shot of
+  that id was shown until the result came and is gone after
+
+Six runs against clayground `issue-369` @ acffb2d (the submodule), three
+with Local and three with Cloud signaling: five exited 0 with 35 checks
+passed, one (Local) exited 1 on the position check of issue #14 (0.257 Wu
+on an enemy in `recovery`, against 0.25). In all six every new check passed
+on its first try: each lunge blocked (1 HP lost) and dodged (0 lost), each
+shot blocked, dodged and hit. The host received every result 0 to 2 ms
+after the joiner judged it, and its shot of that id was last drawn 0 to
+11 ms before the result arrived. With the joiner sending no `struck` the
+run exits 5: the five checks that the host receives the result fail, and
+its shots fly on. With `--fault stale` it exits 9.
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"
