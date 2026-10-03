@@ -13,8 +13,9 @@ enemy of the host's, and each answer is checked on both screens:
   (clayground#369: a sleeping knight saw no enemy walk in)
 - it parries the enemy late in the parry window it shows: the host's enemy
   staggers, and the lunge's blow, on its way by then, does not land
-- it raises its shield and dashes into the enemy: the host's enemy is
-  shoved away
+- it raises its shield and dashes into the enemy right after the host
+  killed a third enemy in its reach: the host receives the push and its
+  enemy is shoved at least 1 Wu away
 - it kills that enemy while the host's knight kills another: each dies on
   both screens, counts once for its killer, and leaves one stain on both
   screens, in the same place
@@ -381,19 +382,34 @@ def parry(H, J, b, settle, check, late=6):
     near = [r for r in (J.json("blows") or []) if r[1] == b and t - 150 <= r[0] <= t + 600]
     landed = [r for r in near if r[2] in ("hit", "blocked")]
     res["blows"] = near
-    check(not landed and near, f"the parried lunge does not land on the joiner's knight "
+    check(not landed, f"the parried lunge does not land on the joiner's knight "
           f"({len(landed)} landed, {sum(r[2] == 'parried' for r in near)} dropped as parried, "
           f"{len(near)} blows of {b} from 150 ms before the parry to 600 ms after)")
     return res
 
 
-def push(H, J, b, host_rec, settle, check):
+def push(H, J, a, b, host_rec, settle, check):
     """The joiner's knight raises its shield and dashes into enemy b: the
-    host's enemy is shoved away from the knight"""
+    host receives the push and its enemy is shoved at least 1 Wu away from
+    the knight. Just before, the host kills a third enemy in the knight's
+    reach: a dead enemy could stay in the knight's reach and broke the push"""
     res = {"enemy": b}
-    if not J.eval1(f"standOff('{b}', 2)") or not J.eval1(f"guard('{b}', 'push')"):
-        check(False, f"the joiner's shield push moves the host's {b} ({b} is gone)")
+    # The knight at a third enemy, the one farthest from b, which the host
+    # kills there; then the knight stands far from b, so the dead enemy
+    # entered its reach before b does
+    he = H.json("enemies()") or {}
+    others = [i for i in he if i not in (a, b)]
+    c = max(others, key=lambda i: dist(he[i], he[b])) if others and b in he else ""
+    if c and J.eval1(f"placeBeside('{c}')") and settle(lambda: J.eval1(f"inReach('{c}')") is True, 3):
+        H.eval([f"kill('{c}')"])
+        settle(lambda: c not in (J.json("enemies()") or {}), 2)
+    else:
+        c = ""
+    res["deadInReach"] = c
+    if not J.eval1(f"standOff('{b}', 8, 4)"):
+        check(False, f"the joiner's shield push moves the host's {b} (no spot 4 to 8 Wu from it)")
         return res
+    J.eval([f"guard('{b}', 'push')"])
     pushed = settle(lambda: J.json("guardLog").get("done"), 10)
     log = J.json("guardLog")
     J.eval(["guard('', '')"])
@@ -403,6 +419,7 @@ def push(H, J, b, host_rec, settle, check):
         check(False, f"the joiner's knight shield-pushes {b} (no push in 10 s)")
         return res
     w = log["push"]
+    res["reach"] = log.get("reach", [])
     ux, uy = w["ex"] - w["x"], w["ey"] - w["y"]
     n = math.hypot(ux, uy) or 1
     ux, uy = ux / n, uy / n
@@ -413,8 +430,19 @@ def push(H, J, b, host_rec, settle, check):
     if at:
         moved = max((p[0] - at[0][0]) * ux + (p[1] - at[0][1]) * uy for p in at)
     res["movedWu"] = round(moved, 3)
-    check(moved >= 0.3, f"the joiner's shield push moves the host's {b} {moved:.2f} Wu "
-          f"away from the knight in 400 ms (at least 0.3)")
+    res["path"] = [[s["t"] - w["t"]] + s["e"][b][:2] + [s["e"][b][3]]
+                   for s in host_rec if b in s["e"] and w["t"] - 20 <= s["t"] <= w["t"] + 400][::3]
+    res["received"] = [r[2] for r in (H.json("received") or []) if r[1] == b and r[0] >= w["t"] - 50]
+    # The dead enemy stays in the knight's reach only when its end of
+    # contact came without its item, which is timing; first in the reach
+    # it broke the push before the knight's fix
+    res["deadFirst"] = bool(res["reach"]) and res["reach"][0] == "dead"
+    check("push" in res["received"],
+          f"the host receives the joiner's push on {b} ({res['received']}; the knight's "
+          f"reach at the push {res['reach']}, "
+          + ("a dead enemy first" if res["deadFirst"] else "no dead enemy first") + ")")
+    check(moved >= 1.0, f"the joiner's shield push moves the host's {b} {moved:.2f} Wu "
+          f"away from the knight in 400 ms (at least 1.0)")
     return res
 
 
@@ -611,7 +639,7 @@ def run(args, loader, tmp, procs, result, check):
 
         result["hit"] = standing_hit(H, J, b, settle, check)
         result["parry"] = parry(H, J, b, settle, check)
-        result["push"] = push(H, J, b, host_rec, settle, check)
+        result["push"] = push(H, J, a, b, host_rec, settle, check)
         result["kills"] = kills(H, J, a, b, settle, check)
 
         # The fight

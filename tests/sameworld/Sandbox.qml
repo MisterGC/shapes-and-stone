@@ -101,6 +101,13 @@ Item {
         target: game
         function onKnightStruck(enemyId, result) { bench.blows.push([Date.now(), enemyId, result]) }
     }
+    // Host: every blow another node's knight sent, as [wall clock, enemy
+    // id, kind] (Session.enemyBlowReceived)
+    property var received: []
+    Connections {
+        target: bench.session
+        function onEnemyBlowReceived(fromId, blow) { bench.received.push([Date.now(), blow.id, blow.kind]) }
+    }
     // How often each enemy entered "stagger" since record(true)
     property var staggers: ({})
 
@@ -114,6 +121,27 @@ Item {
         _face(p, e)
         return true
     }
+    // Host: enemy id dies as if this node's knight killed it
+    function kill(id) {
+        let e = _byId()[id]
+        if (!e) return false
+        e.hp = 0
+        e.die("")
+        return true
+    }
+    // This node's knight's reach, by its sensor: [enemy id or "dead", ...]
+    // in the order it entered
+    function reach() {
+        let p = game.player, out = []
+        if (!p) return out
+        for (let e of p.enemiesInRange) out.push(e && e.destroyed === false ? e.objectId : "dead")
+        return out
+    }
+    // Whether enemy id is in this node's knight's reach, by its sensor
+    function inReach(id) {
+        let e = _byId()[id], p = game.player
+        return !!(e && p && p.enemiesInRange.has(e))
+    }
     // The type of enemy id: grunt, guardian or spitter; "" without it
     function typeOf(id) { let e = _byId()[id]; return e ? e.enemyType : "" }
     // This node's knight as {x, y, hp, awake} plus its fight record's damage
@@ -125,11 +153,12 @@ Item {
                 dealt: r.damageDealt, parries: r.parries, kills: r.kills}
     }
     // The knight standing as far from enemy id as the enemy sees, up to
-    // d Wu and no nearer than 2 Wu, facing it; false where it sees no spot
-    function standOff(id, d) {
+    // d Wu and no nearer than near Wu (2 without), facing it; false where it
+    // sees no spot
+    function standOff(id, d, near) {
         let e = _byId()[id], p = game.player
         if (!e || !p) return false
-        for (let r = d; r >= 2; r -= 0.5) {
+        for (let r = d; r >= (near || 2); r -= 0.5) {
             for (let k = 0; k < 8; k++) {
                 let a = k * Math.PI / 4
                 let x = e.xWu + Math.cos(a) * r, y = e.yWu + Math.sin(a) * r
@@ -195,11 +224,17 @@ Item {
         } else if (guardMode === "push" && p.dashCooldown <= 0 && inRange && d <= 1.6
                    && e.aiState !== "lunge" && e.aiState !== "telegraph") {
             log.push = what
+            log.reach = reach()
+            log.dash = []
             p.mana = p.maxMana
             p.isBlocking = true
             p.dash()
-            guardMode = ""
+            guardMode = "pushing"
             _shieldDown.restart()
+        } else if (guardMode === "pushing") {
+            // What the knight does while the dash lasts
+            log.dash.push([what.t, p.isDashing, p.isBlocking, inRange, what.dist])
+            if (!p.isDashing) guardMode = ""
         }
         log.done = guardMode === ""
         guardLog = log
