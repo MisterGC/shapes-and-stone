@@ -141,7 +141,7 @@ RectBoxBody {
             let dy = p.yWu - campfire.yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
             let wasHealing = _isHealing
-            _isHealing = dist < healRadius && p.hp < p.maxHp
+            _isHealing = dist < healRadius && !p.fallen && p.hp < p.maxHp
             if (_isHealing) {
                 let healed = Math.round(healRate * interval / 1000)
                 p.hp = Math.min(p.maxHp, p.hp + healed)

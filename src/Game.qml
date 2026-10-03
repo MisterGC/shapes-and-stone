@@ -444,6 +444,12 @@ ClayWorld2d {
     property int levelIndex: 0
     property string levelType: "dungeon"  // "dungeon" or "village"
     property var rng: null
+    // How deep the run got: the dungeons behind the knight, 0 for the first
+    // (a village comes after each dungeon, so two levels make one depth)
+    readonly property int depth: Math.floor(levelIndex / 2)
+    // The knight is at 0 HP: the enemies stand still and the fallen screen
+    // offers a new run or the title
+    property bool fallen: false
     components: []
 
     // Collision categories
@@ -817,6 +823,57 @@ ClayWorld2d {
     Connections {
         target: player
         function onActed(action) { session.sendAction(action) }
+    }
+
+    Connections {
+        target: player
+        function onHpChanged() { if (player.hp <= 0) _fall() }
+    }
+
+    function _fall() {
+        if (fallen || screen !== "game") return
+        console.log("[Game] The knight has fallen at depth", depth)
+        fallen = true
+        for (let e of enemies) {
+            try { if (e && e.halt) e.halt() } catch(err) {}
+        }
+    }
+
+    // Enter on the fallen screen: a new run from depth 0 on a new seed
+    function newRun() {
+        let oldSeed = masterSeed
+        do {
+            masterSeed = Math.floor(Math.random() * 2147483647)
+        } while (masterSeed === oldSeed)
+        console.log("[Game] New run, seed:", masterSeed)
+        clearDungeon()
+        fallen = false
+        resetting = false
+        fightRoomActive = false
+        levelIndex = 0
+        levelType = "dungeon"
+        generateDungeon()
+        minimap.requestPaint()
+        world.forceActiveFocus()
+    }
+
+    // Esc on the fallen screen: leave the run (and a session) for the title,
+    // where the next start rolls a new seed
+    function backToTitle() {
+        console.log("[Game] Back to the title")
+        clearDungeon()
+        if (session.connected) session.leave()
+        fallen = false
+        resetting = false
+        fightRoomActive = false
+        masterSeed = -1
+        levelIndex = 0
+        levelType = "dungeon"
+        dungeonAmbience.stop()
+        dungeonMusic.stop()
+        villageAmbience.stop()
+        villageMusic.stop()
+        screen = "title"
     }
 
     // Track player movement for minimap exploration
@@ -2040,6 +2097,7 @@ ClayWorld2d {
         muted = true
         masterSeed = scenarioSeed
         if (player) clearDungeon()
+        fallen = false
         fightRoomActive = false
         // Generate before leaving the title: with a player in place,
         // _tryStartGame() does not build a second level on top.
@@ -2216,6 +2274,21 @@ ClayWorld2d {
     }
 
     // --- Screen Overlays ---
+
+    // Fallen screen (over the dungeon, under the title)
+    Loader {
+        anchors.fill: parent
+        z: 4500
+        active: fallen && screen === "game"
+        sourceComponent: Component {
+            FallenScreen {
+                depth: world.depth
+                canGoAgain: !session.connected
+                onGoAgain: world.newRun()
+                onBackToTitle: world.backToTitle()
+            }
+        }
+    }
 
     // Title screen (covers everything when active)
     Loader {

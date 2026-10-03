@@ -31,6 +31,9 @@ PhysicsItem {
     // AI target
     property var target: null
 
+    // Set by halt() when the knight has fallen: the AI stays idle for good
+    property bool halted: false
+
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
@@ -467,7 +470,19 @@ PhysicsItem {
         }
     }
 
+    // The knight has fallen: drop the target, stand still and stop thinking.
+    // A lunge or shot still winding up never lands.
+    function halt() {
+        halted = true
+        target = null
+        aiState = "idle"
+        staggerWobble.stop()
+        rotation = 0
+        body.linearVelocity = Qt.point(0, 0)
+    }
+
     function updateAI(dt) {
+        if (halted) return
         if (_knockT > 0) return
         if (!target || !gameWorld) {
             aiState = "patrol"
