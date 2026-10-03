@@ -85,7 +85,8 @@ python3 tests/sameworld/run_sameworld.py --mode local
 python3 tests/sameworld/run_sameworld.py --mode cloud
 ```
 
-`docs/multiplayer-sync.md` says what is compared and with what tolerance.
+`docs/multiplayer-sync.md` says what is compared and with what tolerance;
+`--dump` and `--judge <file> --late-ms 200` show a joiner 200 ms late fail.
 
 The game starts with its sound on, except in the dojo, and M mutes and
 unmutes it. The sound bench starts the game the way a native build does,
