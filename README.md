@@ -70,6 +70,23 @@ fall, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/enemies/enemies.qml
 ```
 
+The same-world bench checks the same over the network, as a real session
+has it: two processes of Clayground's live loader, a host and a joiner,
+connected over Local (LAN) or Cloud signaling and started on a fixed seed.
+The joiner's knight lands a scripted hit, then both knights fight for eight
+seconds while each screen records every enemy it shows - its id, position,
+HP and AI state - every frame. It exits with the number of failed checks;
+`--fault stale` makes the joiner apply none of the host's enemy states, and
+the run fails. It needs the live loader (`-DCLAYGROUND_WITH_TOOLS=ON`, see
+the fight bench below):
+
+```
+python3 tests/sameworld/run_sameworld.py --mode local
+python3 tests/sameworld/run_sameworld.py --mode cloud
+```
+
+`docs/multiplayer-sync.md` says what is compared and with what tolerance.
+
 The game starts with its sound on, except in the dojo, and M mutes and
 unmutes it. The sound bench starts the game the way a native build does,
 enters the dungeon, presses M twice and exits with the number of failed

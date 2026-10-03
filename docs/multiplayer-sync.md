@@ -155,6 +155,57 @@ Five runs against clayground `issue-306` @ 6eefb29: max error 0.375 to
 0.397 Wu (during a lunge), mean 0.070 Wu, no AI state or target on the
 joiner that the host had not had in the 300 ms before.
 
+## The same world on both screens (issue #14)
+
+`tests/sameworld/run_sameworld.py` runs a session as it is played: two
+processes of Clayground's live loader (`clayliveloader --instance host`
+and `--instance joiner`), each with the whole game, connected over Local
+or Cloud signaling and driven through the inspector protocol. The host
+starts the game on seed 424242. The host's knight goes to one enemy and
+the joiner's to the enemy farthest from it. The joiner's knight walks
+into its enemy and swings, and the bench checks that the host takes the
+hit and that the joiner then shows the host's HP. After that both knights
+fight the nearest enemy for eight seconds. Every frame each process
+records every enemy it shows, with the wall-clock time: object id,
+position, HP and AI state.
+
+The joiner shows the host's enemies 50 ms plus the round trip in the
+past, so each of its records is judged against the host's records of the
+300 ms before it (`--lag`):
+
+- id: an enemy on the joiner is one the host had then, and an enemy on
+  the host shows up on the joiner within 300 ms
+- position: within 0.5 Wu (`--tolerance`) of a position the host had then
+- AI state: one the host had then
+- HP: one the host had then, or one between two HPs the host had then.
+  Clayground's `StateInterpolator` blends every number it gets, `hp` too,
+  so between two of the host's states the joiner shows an HP that
+  neither of them had (`hpBlended` counts these). Once the fight is over,
+  and right after the scripted hit, the HPs have to agree exactly.
+
+It exits with the number of failed checks. `--fault stale` makes the
+joiner apply none of the host's enemy states, which proves the checks
+can fail. `--dump` writes both processes' raw records to a file.
+
+Ten runs against clayground `issue-306` @ 6eefb29 (the submodule), five
+with Local and five with Cloud signaling, all exited 0. Each run judged
+5100 to 6050 enemy records of the joiner. The worst position error was
+0.034 to 0.049 Wu and the mean error 0.003 to 0.005 Wu. No run had an id,
+AI state or HP outside the host's last 300 ms; 2 to 5 HPs per run were
+blended. The scripted hit landed with the first swing in every run. With
+`--fault stale` the run exited 4: position (max 7.6 Wu), AI state (1705
+misses), HP during the fight (623 misses) and HP after the hit (joiner
+52, host 39) failed.
+
+On the joiner a knight that stands still does not see a host's enemy
+walk into its reach: its swing misses. Box2D lets a body that is at rest
+fall asleep, and a sleeping body takes part in no new contact. A host's
+enemy on the joiner is a kinematic body that is moved only by setting
+its position (`SetTransform`), and that wakes nothing. So the knight's
+swing sensor never adds the enemy. This is why the bench's scripted hit
+walks the knight in instead of swinging from a standstill. The bug is
+reported on issue #14.
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"
