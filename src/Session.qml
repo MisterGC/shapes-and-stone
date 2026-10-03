@@ -52,6 +52,14 @@ Item {
     signal enemyKillReceived(var kill)
     // A spitter of the host's fired (id, x, y, dx, dy, damage)
     signal shotReceived(var shot)
+    // The host owns every gold drop as a replicated object of type "gold",
+    // as it owns the enemies; it came to life or went on this node
+    signal goldSpawned(string objectId, var props)
+    signal goldDespawned(string objectId)
+    // Host: a node's knight reached a drop and asks for it
+    signal goldClaimed(string fromId, string objectId)
+    // The host gave this node's knight a drop (id, amount)
+    signal goldGranted(var grant)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -119,6 +127,10 @@ Item {
                 session.knightBlowReceived(data)
             } else if (data.type === "enemyKill") {
                 session.enemyKillReceived(data)
+            } else if (data.type === "goldClaim") {
+                if (net.isHost) session.goldClaimed(fromId, data.id)
+            } else if (data.type === "goldGrant") {
+                session.goldGranted(data)
             } else if (data.type === "shot") {
                 session.shotReceived(data)
             } else if (data.type === "struck") {
@@ -140,9 +152,11 @@ Item {
 
         onObjectSpawned: (id, type, owner, props) => {
             if (type === "enemy") session.enemySpawned(id, props)
+            else if (type === "gold") session.goldSpawned(id, props)
         }
         onObjectDespawned: (id, type) => {
             if (type === "enemy") session.enemyDespawned(id)
+            else if (type === "gold") session.goldDespawned(id)
         }
 
         // A node that joins a run under way gets its knight here; the
@@ -276,6 +290,24 @@ Item {
     // Host: the blow of another node's knight killed an enemy
     function reportKill(nodeId, kill) {
         net.sendTo(nodeId, Object.assign({type: "enemyKill"}, kill))
+    }
+    // Host: gold where an enemy died, for every node
+    function spawnGold(props) {
+        return net.spawn("gold", props)
+    }
+    // Host: the drop is gone, on every node
+    function despawnGold(objectId) {
+        net.despawn(objectId)
+    }
+    // This node's knight reached a drop: the host gives it to the first
+    // node that claims it. The host's own claim is answered at once
+    function claimGold(objectId) {
+        if (net.isHost) goldClaimed(net.nodeId, objectId)
+        else net.sendTo(net.hostId, {type: "goldClaim", id: objectId})
+    }
+    // Host: the drop goes to that node's knight
+    function grantGold(nodeId, grant) {
+        net.sendTo(nodeId, Object.assign({type: "goldGrant"}, grant))
     }
     // Host: a spitter fired, every node flies the shot
     function sendShot(shot) {

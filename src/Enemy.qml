@@ -963,6 +963,8 @@ PhysicsItem {
             gameWorld.playDeathBurst()
         }
         destroyed = true
+        // Gold where it fell; in a session only the host's enemies die here
+        if (gameWorld && gameWorld.dropGold && !remote) gameWorld.dropGold(xWu, yWu, tier)
         if (gameWorld) {
             // The killer's node draws the death and counts the kill
             if (own) gameWorld.countFight("kill")

@@ -49,6 +49,8 @@ PhysicsItem {
     // A raised shield drains mana, a parry gives some back
     property real mana: Balance.knight.mana
     property int maxMana: Balance.knight.mana
+    // Gold picked up this run, for the village's wares
+    property int gold: 0
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash

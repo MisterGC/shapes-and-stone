@@ -144,6 +144,14 @@ QtObject {
         atk: 0.5
     })
 
+    // Gold: what a killed enemy drops where it fell, for a knight to pick up
+    readonly property var loot: ({
+        // By tier: weak, normal, tough. The fight room drops none
+        goldByTier: [3, 5, 8],
+        // A knight this close to a drop picks it up
+        pickupRange: 0.8
+    })
+
     readonly property var campfire: ({
         healPerSecond: 5.0,
         // Mana comes back here, and only here or from a parry

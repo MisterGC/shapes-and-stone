@@ -460,6 +460,10 @@ ClayWorld2d {
             playDeathBurst()
             countFight("kill")
         }
+        onGoldSpawned: (objectId, props) => _makeGoldDrop(props, objectId)
+        onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
+        onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
+        onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -602,6 +606,83 @@ ClayWorld2d {
         e.destroyed = true
         try { e.destroy() } catch (err) {}
         minimap.requestPaint()
+    }
+
+    // --- Gold (issue #38) ---
+    // A killed enemy drops gold where it fell; the first knight to reach it
+    // picks it up, whoever dealt the killing blow. In a session the host
+    // owns every drop as it owns the enemies: it spawns them as replicated
+    // objects, each node claims the drops its own knight reaches, and the
+    // host gives a drop to the first claim it gets and despawns it, so a
+    // drop is picked up once, by one knight. Each knight's gold is its own
+    // node's.
+    property var goldDrops: []
+    property var _goldById: ({})
+    // Where an enemy died: gold for its tier, none in the fight room
+    function dropGold(x, y, tier) {
+        if (fightRoomActive) return
+        let amount = Balance.loot.goldByTier[tier] || 0
+        if (amount <= 0) return
+        let props = {xWu: x, yWu: y, amount: amount}
+        if (!session.connected)
+            _makeGoldDrop(props)
+        else if (session.isHost)
+            session.spawnGold(props)
+    }
+    function _makeGoldDrop(props, objectId) {
+        objectId = objectId || ""
+        if (objectId !== "" && _goldById[objectId]) return _goldById[objectId]
+        let drop = goldDropComponent.createObject(world.room, Object.assign({}, props, {
+            objectId: objectId,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        }))
+        if (!drop) return null
+        goldDrops.push(drop)
+        if (objectId !== "") _goldById[objectId] = drop
+        return drop
+    }
+    function _removeGoldDrop(objectId) {
+        let drop = _goldById[objectId]
+        if (!drop) return
+        delete _goldById[objectId]
+        _forgetGoldDrop(drop)
+    }
+    function _forgetGoldDrop(drop) {
+        goldDrops = goldDrops.filter(d => d !== drop)
+        try { drop.destroy() } catch (err) {}
+    }
+    // Each step: the drops this node's knight stands on are its, or
+    // claimed from the host in a session
+    function _pickUpGold() {
+        if (!player || player.fallen || goldDrops.length === 0) return
+        let range = Balance.loot.pickupRange
+        for (let drop of goldDrops.slice()) {
+            if (!drop || drop.claimed) continue
+            let dx = drop.xWu - player.xWu, dy = drop.yWu - player.yWu
+            if (dx * dx + dy * dy > range * range) continue
+            if (drop.objectId === "") {
+                _collectGold(drop.amount, drop.xWu, drop.yWu)
+                _forgetGoldDrop(drop)
+            } else if (session.connected) {
+                drop.claimed = true
+                session.claimGold(drop.objectId)
+            }
+        }
+    }
+    // Host: a node's knight reached a drop; the first claim takes it, a
+    // later one finds it gone
+    function _giveGold(nodeId, objectId) {
+        let drop = _goldById[objectId]
+        if (!drop || !session.isHost) return
+        let grant = {id: objectId, amount: drop.amount, x: drop.xWu, y: drop.yWu}
+        session.despawnGold(objectId)
+        if (nodeId === session.nodeId) _collectGold(grant.amount, grant.x, grant.y)
+        else session.grantGold(nodeId, grant)
+    }
+    function _collectGold(amount, x, y) {
+        if (!player) return
+        player.gold += amount
+        spawnDamageNumber(x, y, "+" + amount, "#E8B83A")
     }
 
     // In a session every node simulates something the others see (the host
@@ -862,6 +943,7 @@ ClayWorld2d {
 
     // How deep the knight is, under the bars
     Text {
+        id: hudDepth
         objectName: "hudDepth"
         anchors.top: manaHud.bottom
         anchors.left: parent.left
@@ -871,6 +953,25 @@ ClayWorld2d {
         visible: player !== null
         text: "Depth " + depth
         color: "#DDDDDD"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The knight's gold, under the depth
+    Text {
+        id: hudGold
+        objectName: "hudGold"
+        anchors.top: hudDepth.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: 2
+        z: 1000
+        visible: player !== null
+        text: "Gold " + (player ? player.gold : 0)
+        color: "#E8B83A"
         style: Text.Outline
         styleColor: "#000000"
         font.pixelSize: 14
@@ -1152,6 +1253,7 @@ ClayWorld2d {
         target: world.physics
         function onStepped() {
             world._physicsSteps++
+            world._pickUpGold()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
                 world.runSeconds += world.physics.timeStep
@@ -1372,12 +1474,13 @@ ClayWorld2d {
         })
     }
 
-    // The one way to the next level: what the knight carries (its HP and
-    // mana) goes with it, a village follows each dungeon
+    // The one way to the next level: what the knight carries (its HP, mana
+    // and gold) goes with it, a village follows each dungeon
     function _enterLevel(newIndex) {
-        let carried = player ? { hp: player.hp, mana: player.mana }
-                             : { hp: Balance.knight.hp, mana: Balance.knight.mana }
-        console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "and mana:", carried.mana)
+        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold }
+                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0 }
+        console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
+                    "and gold:", carried.gold)
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
@@ -1385,7 +1488,7 @@ ClayWorld2d {
             generateVillage()
         else
             generateDungeon()
-        if (player) { player.hp = carried.hp; player.mana = carried.mana }
+        if (player) { player.hp = carried.hp; player.mana = carried.mana; player.gold = carried.gold }
     }
 
     // Component factories
@@ -1411,6 +1514,7 @@ ClayWorld2d {
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
     Component { id: npcComponent; Npc {} }
+    Component { id: goldDropComponent; GoldDrop {} }
 
     // Dialogue panel (bottom-center, hidden by default)
     DialoguePanel { id: dialoguePanel; parent: world }
@@ -2193,6 +2297,19 @@ ClayWorld2d {
         let kept = {}
         for (let e of enemies) kept[e.objectId] = e
         _enemyById = kept
+
+        // Gold drops go as the enemies do: the host's on every node with
+        // their despawn, a joiner's when that arrives
+        for (let d of goldDrops.slice()) {
+            if (!d) continue
+            if (d.objectId !== "" && session.connected) {
+                if (session.isHost) session.despawnGold(d.objectId)
+                continue
+            }
+            try { d.destroy() } catch(err) {}
+        }
+        goldDrops = goldDrops.filter(d => d && d.objectId !== "" && session.connected
+                                     && _goldById[d.objectId] === d)
 
         // Destroy remote players
         session.clearRemotePlayers()
