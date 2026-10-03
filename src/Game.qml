@@ -475,7 +475,7 @@ ClayWorld2d {
         for (let id in session.remotePlayers) knights.push(session.remotePlayers[id])
         let best = null, bestD = Infinity
         for (let k of knights) {
-            if (!k || (k === player ? player.fallen : k.remoteHp <= 0)) continue
+            if (!k || (k === player ? player.fallen : !k.known || k.remoteHp <= 0)) continue
             let dx = k.xWu - x, dy = k.yWu - y
             let d = dx * dx + dy * dy
             if (d < bestD) { bestD = d; best = k }

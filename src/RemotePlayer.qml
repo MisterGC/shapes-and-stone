@@ -16,6 +16,10 @@ PhysicsItem {
     property int remoteHp: Balance.knight.hp
     property bool remoteBlocking: false
     property int rttMs: -1        // best round trip the network measured, -1 unknown
+    // Its node's state has come: until then where the knight is and
+    // whether it is down are not known, and it is not drawn
+    property bool known: false
+    visible: known
 
     widthWu: 1.0
     heightWu: 1.0
@@ -38,6 +42,7 @@ PhysicsItem {
     // #290); older plugins pass nothing and the interpolator falls back to
     // the arrival time.
     function pushState(data, sentAt) {
+        known = true
         sync.push(data, sentAt)
         actionState = data.s !== undefined ? data.s : 0
         // A sender without b only has the block in s

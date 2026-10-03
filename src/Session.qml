@@ -57,11 +57,17 @@ Item {
     // Another knight's HP changed or its node left: the party may be down
     // now
     signal partyChanged()
+    // Another player's knight was made on this screen
+    signal remotePlayerSpawned(string nodeId, var knight)
     // The run is over for everyone: on a joiner when the host ends it, on
     // the host once the joiners have left or endRunWaitMs has passed
     signal runEnded()
 
     property var remotePlayers: ({})
+    // The last state each other node sent, also while its knight is not
+    // made (a level being built, a run not yet joined): a knight made
+    // starts from it, a downed one downed
+    property var lastStates: ({})
 
     Network {
         id: net
@@ -100,6 +106,7 @@ Item {
         }
 
         onStateReceived: (fromId, data, sentAt) => {
+            lastStates[fromId] = data
             let rp = remotePlayers[fromId]
             if (rp) rp.pushState(data, sentAt)
         }
@@ -116,7 +123,14 @@ Item {
                 remotePlayers[nodeId].destroy()
                 delete remotePlayers[nodeId]
             }
+            delete lastStates[nodeId]
             session.partyChanged()
+        }
+
+        onConnectedChanged: {
+            if (!net.connected) {
+                session.lastStates = ({})
+            }
         }
     }
 
@@ -252,11 +266,18 @@ Item {
     }
 
     function _spawnRemotePlayer(nodeId, color, px, py) {
+        // Where the knight is comes with its next state; its HP is the
+        // last one it sent, so a downed knight is never drawn standing.
+        // Without one (a node that just joined, or this node did) it is
+        // drawn from its first state on
+        let last = lastStates[nodeId]
         let rp = remotePlayerComponent.createObject(world.room, {
             nodeId: nodeId,
             playerColor: color,
             xWu: px,
             yWu: py,
+            remoteHp: last && last.h !== undefined ? last.h : Balance.knight.hp,
+            known: last !== undefined,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             rttMs: Qt.binding(() => net.latency),
@@ -265,7 +286,9 @@ Item {
         if (rp) {
             rp.remoteHpChanged.connect(session.partyChanged)
             remotePlayers[nodeId] = rp
-            console.log("[Session] Remote player created for", nodeId, "color:", color)
+            console.log("[Session] Remote player created for", nodeId, "color:", color,
+                        "HP:", rp.remoteHp)
+            remotePlayerSpawned(nodeId, rp)
         }
     }
 
