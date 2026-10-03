@@ -155,6 +155,71 @@ Five runs against clayground `issue-306` @ 6eefb29: max error 0.375 to
 0.397 Wu (during a lunge), mean 0.070 Wu, no AI state or target on the
 joiner that the host had not had in the 300 ms before.
 
+## The same world on both screens (issue #14)
+
+`tests/sameworld/run_sameworld.py` runs a session as it is played: two
+processes of Clayground's live loader (`clayliveloader --instance host`
+and `--instance joiner`), each with the whole game, connected over Local
+or Cloud signaling and driven through the inspector protocol. The host
+starts the game on seed 424242. The host's knight goes to one enemy and
+the joiner's to the enemy farthest from it. The joiner's knight walks
+into its enemy and swings, and the bench checks that the host takes the
+hit and that the joiner then shows the host's HP. After that both knights
+fight the nearest enemy for eight seconds. Every frame each process
+records every enemy it shows, with the wall-clock time: object id,
+position, HP and AI state.
+
+The joiner renders the host's enemies 50 ms plus the round trip (capped
+at 100 ms) in the past, the delay `Enemy.qml` gives their interpolator.
+Each joiner record carries the delay it was rendered with, and is judged
+against the host's records:
+
+- position: within 0.25 Wu (`--tolerance`) of the host's position at that
+  delay, give or take 20 ms (`--slack`), the host's position taken between
+  its two frames around that moment
+- id: an enemy on the joiner is one the host had in the 300 ms before
+  (`--lag`), and an enemy on the host shows up on the joiner within 300 ms
+- AI state: one the host had in the 300 ms before. A host record also
+  holds the states an enemy passed through since the record before: a
+  lunge that lands and a blow that staggers in one frame make a
+  `recovery` that no frame shows, but that is sent and shown
+- HP: one the host had in the 300 ms before, or one between two of them.
+  Clayground blends every number of a replicated object, HP too
+  (clayground#368), so between two of the host's states the joiner shows
+  an HP that neither had (`hpBlended` counts these). Until the clayground
+  pin carries the fix this is a named tolerance; right after the scripted
+  hit and once the fight is over the HPs have to agree exactly.
+
+It exits with the number of failed checks. `--fault stale` makes the
+joiner apply none of the host's enemy states, which proves the checks
+can fail. `--dump` writes both processes' raw records to a file, and
+`--judge <file> --late-ms 200` judges them again with the joiner made
+200 ms later than it was. Whatever ends a run - its end, an exception,
+Ctrl-C - both loaders are stopped and the temp dir is removed; it stays,
+with the loaders' logs, only after a run that failed a check.
+
+Six runs against clayground `issue-306` @ 6eefb29 (the submodule), three
+with Local and three with Cloud signaling, all exited 0. Each judged 5110
+to 6280 enemy records of the joiner, all rendered 50 ms behind (the round
+trip on one machine is under 1 ms). The worst position error against the
+host 50 +- 20 ms before was 0.041 to 0.048 Wu, the mean 0.0007 to
+0.0009 Wu. No run had an id, AI state or HP the host had not had in the
+300 ms before; 2 to 10 HPs per run were blended. The scripted hit landed
+with the first swing in every run. The same six records judged with the
+joiner 200 ms late all failed the position check, with a worst error of
+1.21 to 1.29 Wu. With `--fault stale` the run exited 4: position (max
+8.0 Wu), AI state (1760 misses), HP during the fight (617 misses) and HP
+after the hit (joiner 52, host 39) failed.
+
+On the joiner a knight that stands still does not see a host's enemy
+walk into its reach: its swing misses. Box2D lets a body that is at rest
+fall asleep, and a sleeping body takes part in no new contact. A host's
+enemy on the joiner is a kinematic body that is moved only by setting
+its position (`SetTransform`), and that wakes nothing. So the knight's
+swing sensor never adds the enemy (clayground#369). Until that is fixed
+the bench's scripted hit walks the knight in instead of swinging from a
+standstill.
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"
