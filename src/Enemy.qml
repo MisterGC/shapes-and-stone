@@ -26,6 +26,8 @@ PhysicsItem {
     property string objectId: ""
     property var network: null
     property bool remote: false
+    // How far in the past a remote enemy is shown, in ms
+    readonly property real renderDelayMs: replica.interpolator.delayMs
     // The AI thinks here: only where the enemy is not remote
     readonly property bool thinks: aiTimer.running
 
@@ -802,7 +804,7 @@ PhysicsItem {
     function performAttack() {
         // Another node's knight: that node checks the reach and takes the hit
         if (target && !target.takeDamage && target.nodeId !== undefined) {
-            if (gameWorld) gameWorld.strikeKnight(target, atk, xWu, yWu)
+            if (gameWorld) gameWorld.strikeKnight(target, enemy, atk, xWu, yWu)
             return
         }
         if (target && target.takeDamage) {

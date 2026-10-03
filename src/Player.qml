@@ -259,6 +259,7 @@ PhysicsItem {
                 hitCount++
                 if (parried) {
                     if (gameWorld) gameWorld.countFight("parry")
+                    if (gameWorld && gameWorld.parried) gameWorld.parried(enemy)
                     enemy.stagger()
                     attackCooldown = 0
                     mana = Math.min(maxMana, mana + Balance.knight.parryMana)
