@@ -53,7 +53,7 @@ to guess.
 
 `tests/netbench` reproduces the game's sync path between two headless
 instances on one machine: the host moves on a path that is a function of
-the wall clock at 7.5 Wu/s, sends snapshots exactly like `Game.qml`, and
+the wall clock at 7.5 Wu/s, sends snapshots exactly like `Session.qml`, and
 the joiner records interpolated versus true position every frame. The
 effective delay is the time shift that best explains the interpolated
 motion; the residual is what remains after that shift.

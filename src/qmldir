@@ -19,3 +19,4 @@ DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
+Session 1.0 Session.qml

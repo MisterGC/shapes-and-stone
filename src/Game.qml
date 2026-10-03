@@ -5,7 +5,6 @@ import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
 import Clayground.Sound
-import Clayground.Network
 
 ClayWorld2d {
     id: world
@@ -362,72 +361,23 @@ ClayWorld2d {
     // Screen state: "title", "lobby", "game"
     property string screen: "title"
 
-    // Multiplayer
-    property var remotePlayers: ({})
-
-    Network {
-        id: gameNetwork
-        maxNodes: 4
-        topology: Network.Topology.Star
-        signalingMode: Network.SignalingMode.Cloud
-        autoRelay: true
-
-        onMessageReceived: (fromId, data) => {
-            if (data.type === "gameStart") {
-                masterSeed = data.seed
-                screen = "game"
-                world.forceActiveFocus()
-            } else if (data.type === "action") {
-                let rp = remotePlayers[fromId]
-                if (rp) rp.triggerAction(data.action)
-            } else if (data.type === "levelChange") {
-                _applyLevelChange(data.levelIndex)
-            } else if (data.type === "exitReached") {
-                // Host is level authority: any player reaching the exit
-                // advances the whole session
-                if (gameNetwork.isHost && !resetting) _hostAdvanceLevel()
-            }
+    // Co-op: the connection, the lobby and the remote players
+    Session {
+        id: session
+        z: 5000
+        world: world
+        player: world.player
+        inGame: screen === "game"
+        showLobby: screen === "lobby"
+        onStarted: (seed) => {
+            masterSeed = seed
+            screen = "game"
+            world.forceActiveFocus()
         }
-
-        onStateReceived: (fromId, data, sentAt) => {
-            let rp = remotePlayers[fromId]
-            if (rp) rp.pushState(data, sentAt)
-        }
-
-        onNodeLeft: (nodeId) => {
-            if (remotePlayers[nodeId]) {
-                remotePlayers[nodeId].destroy()
-                delete remotePlayers[nodeId]
-            }
-        }
-    }
-
-    // Sync health overlay (multiplayer only)
-    NetworkMonitor {
-        network: gameNetwork
-        visible: gameNetwork.connected && screen === "game"
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.margins: 10
-    }
-
-    // Player state broadcast: one snapshot per physics step (60 Hz), so the
-    // stream carries exactly the motion the simulation produced instead of a
-    // free-running timer sampling it. The lossy state channel makes the rate
-    // cheap; the payoff is that RemotePlayer can render only ~50 ms behind
-    // (see docs/multiplayer-sync.md for the measurements behind this).
-    Connections {
-        target: world.physics
-        enabled: screen === "game" && gameNetwork.connected && player !== null
-        function onStepped() {
-            gameNetwork.broadcastState({
-                x: player.xWu,
-                y: player.yWu,
-                a: player.facingAngle,
-                s: player.isAttacking ? 1 : player.isBlocking ? 2 : player.isDashing ? 3 : 0,
-                h: player.hp
-            })
-        }
+        onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
+        onAdvanceRequested: _hostAdvanceLevel()
+        onLobbyStartRequested: _startMultiplayerGame()
+        onLobbyLeft: screen = "title"
     }
 
     // Game state
@@ -469,9 +419,7 @@ ClayWorld2d {
     function _startMultiplayerGame() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        gameNetwork.broadcast({type: "gameStart", seed: masterSeed})
-        screen = "game"
-        world.forceActiveFocus()
+        session.start(masterSeed)
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -487,8 +435,7 @@ ClayWorld2d {
             if (mouse.button === Qt.LeftButton) {
                 player.attack()
                 // Reliable event so remote clients show the swing crisply
-                if (gameNetwork.connected && player.isAttacking)
-                    gameNetwork.broadcast({type: "action", action: "attack"})
+                if (player.isAttacking) session.sendAction("attack")
             }
             if (mouse.button === Qt.RightButton) player.isBlocking = true
         }
@@ -554,8 +501,7 @@ ClayWorld2d {
         onButtonBPressedChanged: {
             if (buttonBPressed && player) {
                 player.dash()
-                if (gameNetwork.connected && player.isDashing)
-                    gameNetwork.broadcast({type: "action", action: "dash"})
+                if (player.isDashing) session.sendAction("dash")
             }
         }
     }
@@ -968,14 +914,11 @@ ClayWorld2d {
         onBeginContact: (entity) => {
             if (entity === player && !resetting) {
                 console.log("[Game] Player reached the exit!")
-                if (!gameNetwork.connected) {
+                if (!session.connected) {
                     resetting = true
                     Qt.callLater(resetDungeon)
-                } else if (gameNetwork.isHost) {
-                    _hostAdvanceLevel()
                 } else {
-                    // Ask the host to advance; it answers with levelChange
-                    gameNetwork.broadcast({type: "exitReached"})
+                    session.reachExit()
                 }
             }
         }
@@ -985,7 +928,7 @@ ClayWorld2d {
     // regenerates on its own and the worlds silently diverge.
     function _hostAdvanceLevel() {
         if (resetting) return
-        gameNetwork.broadcast({type: "levelChange", levelIndex: levelIndex + 1})
+        session.announceLevel(levelIndex + 1)
         _applyLevelChange(levelIndex + 1)
     }
 
@@ -1029,7 +972,6 @@ ClayWorld2d {
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
     Component { id: npcComponent; Npc {} }
-    Component { id: remotePlayerComponent; RemotePlayer {} }
 
     // Dialogue panel (bottom-center, hidden by default)
     DialoguePanel { id: dialoguePanel; parent: world }
@@ -1168,7 +1110,7 @@ ClayWorld2d {
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
             let startRoom = rooms[0]
-            _spawnRemotePlayers((startRoom.x + startRoom.w / 2) * cellSize,
+            session.spawnRemotePlayers((startRoom.x + startRoom.w / 2) * cellSize,
                                 (startRoom.y + startRoom.h / 2) * cellSize)
         }
 
@@ -1558,30 +1500,6 @@ ClayWorld2d {
         }
     }
 
-    function _spawnRemotePlayers(px, py) {
-        if (!gameNetwork.connected) return
-        let colors = ["#A44A90", "#90A44A", "#A4904A"]
-        for (let i = 0; i < gameNetwork.nodes.length; i++)
-            _spawnRemotePlayer(gameNetwork.nodes[i], colors[i % colors.length], px, py)
-    }
-
-    function _spawnRemotePlayer(nodeId, color, px, py) {
-        let rp = remotePlayerComponent.createObject(world.room, {
-            nodeId: nodeId,
-            playerColor: color,
-            xWu: px,
-            yWu: py,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-            world: world.physics,
-            rttMs: Qt.binding(() => gameNetwork.latency),
-            fx: Qt.binding(() => world.fx)
-        })
-        if (rp) {
-            remotePlayers[nodeId] = rp
-            console.log("[Game] Remote player created for", nodeId, "color:", color)
-        }
-    }
-
     function spawnDeathParticles(wx, wy) {
         let colors = ["#CC4444", "#8B3A3A", "#FF6644", "#AA2222", "#FF8866"]
         for (let i = 0; i < 8; i++) {
@@ -1741,10 +1659,7 @@ ClayWorld2d {
         enemies = []
 
         // Destroy remote players
-        for (let id in remotePlayers) {
-            try { if (remotePlayers[id]) remotePlayers[id].destroy() } catch(err) {}
-        }
-        remotePlayers = ({})
+        session.clearRemotePlayers()
 
         // Destroy player
         if (player) {
@@ -1893,7 +1808,7 @@ ClayWorld2d {
 
         // Spawn player at entrance
         spawnPlayer(cx, (oy + 2) * cellSize)
-        _spawnRemotePlayers(cx, (oy + 2) * cellSize)
+        session.spawnRemotePlayers(cx, (oy + 2) * cellSize)
 
         // Block entrance + exit sensor
         blockEntrance()
@@ -2261,20 +2176,6 @@ ClayWorld2d {
             TitleScreen {
                 onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
                 onMultiplayerSelected: screen = "lobby"
-            }
-        }
-    }
-
-    // Multiplayer lobby
-    Loader {
-        anchors.fill: parent
-        z: 5000
-        active: screen === "lobby"
-        sourceComponent: Component {
-            MultiplayerLobby {
-                network: gameNetwork
-                onStartGame: _startMultiplayerGame()
-                onBack: { gameNetwork.leave(); screen = "title" }
             }
         }
     }
