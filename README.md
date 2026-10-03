@@ -43,6 +43,16 @@ the resources. On macOS the `qml` from the Qt installer refuses the build's
 ad-hoc signed plugins; a copy of it signed ad hoc (`codesign -s - --force`)
 next to a `lib` link to Qt's `lib` loads them.
 
+A hit shakes, kicks, flashes and hit-stops only the screen of the player who
+landed or took it; the other screens draw its sparks and shards only. The
+impact bench starts a host and a joiner in one process, joins them over LAN,
+lands every kind of hit on each side and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
+```
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```
