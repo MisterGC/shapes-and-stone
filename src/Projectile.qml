@@ -108,8 +108,16 @@ PhysicsItem {
         let entity = other.getBody().target
         if (!entity || !entity.takeDamage || entity.objectName === "enemy") return
 
+        // Where the shot comes from as the knight measures it, from its
+        // corner (xWu, yWu): the shot's centre moved by the knight's own
+        // half size. The shot's corner, 0.35 Wu off at the knight's size,
+        // put a shot from the left or from above at the shield arc's edge
+        // or beyond, and a raised shield missed it
+        let fromX = xWu + widthWu / 2 - entity.widthWu / 2
+        let fromY = yWu - heightWu / 2 + entity.heightWu / 2
+
         // Shield blocks projectile completely
-        if (entity.isBlocking && entity.isShieldFacing(xWu, yWu)) {
+        if (entity.isBlocking && entity.isShieldFacing(fromX, fromY)) {
             let sp = entity.getShieldWorldPos()
             if (gameWorld) {
                 gameWorld.playImpact()
@@ -121,7 +129,7 @@ PhysicsItem {
             return
         }
         // A shot the knight ignores bursts without a hit
-        if (entity.takeDamage(damage, xWu, yWu) !== "ignored" && gameWorld) {
+        if (entity.takeDamage(damage, fromX, fromY) !== "ignored" && gameWorld) {
             gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
             gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
         }
