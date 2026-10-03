@@ -26,8 +26,9 @@ ClayWorld2d {
     // Dark background behind the world
     Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
 
-    // Global mute
-    property bool muted: true
+    // Global mute, toggled with M. The dojo starts silent so reloads while
+    // developing stay quiet; a native or browser start plays.
+    property bool muted: Clayground.runsInSandbox
 
     // Atmosphere layer (lighting, procedural ground, screen effects).
     // V toggles it for a before/after comparison.
@@ -413,6 +414,7 @@ ClayWorld2d {
         player: world.player
         inGame: screen === "game"
         showLobby: screen === "lobby"
+        muted: world.muted
         onStarted: (seed) => {
             masterSeed = seed
             screen = "game"
@@ -504,6 +506,11 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_M) {
+            muted = !muted
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_V) {
             fx = !fx
             event.accepted = true
@@ -656,6 +663,7 @@ ClayWorld2d {
 
     // Mute indicator (always visible when muted)
     Rectangle {
+        objectName: "muteIcon"
         anchors.top: minimap.bottom
         anchors.right: parent.right
         anchors.topMargin: 4
@@ -2216,6 +2224,7 @@ ClayWorld2d {
         active: screen === "title"
         sourceComponent: Component {
             TitleScreen {
+                muted: world.muted
                 onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
                 onMultiplayerSelected: screen = "lobby"
             }

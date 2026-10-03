@@ -53,6 +53,15 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
 ```
 
+The game starts with its sound on, except in the dojo, and M mutes and
+unmutes it. The sound bench starts the game the way a native build does,
+enters the dungeon, presses M twice and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
+```
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```

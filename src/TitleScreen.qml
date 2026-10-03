@@ -7,25 +7,26 @@ Item {
     signal singlePlayerSelected()
     signal multiplayerSelected()
 
+    property bool muted: false
     property int _selectedIndex: 0
 
     // Menu sounds
     Sound {
         id: menuHoverSound
         source: "assets/menu_change.wav"
-        volume: 0.5
+        volume: muted ? 0 : 0.5
     }
     Sound {
         id: menuConfirmSound
         source: "assets/menu_confirm.wav"
-        volume: 0.6
+        volume: muted ? 0 : 0.6
     }
 
     // Title music
     Music {
         id: titleMusic
         source: "assets/title_music.mp3"
-        volume: 0.4
+        volume: muted ? 0 : 0.4
         loop: true
     }
     // Deferred: Game and the canvas both take focus while they are created;

@@ -13,6 +13,7 @@ Item {
     property var player: null
     property bool inGame: false      // the game screen is up
     property bool showLobby: false   // the lobby screen is up
+    property bool muted: false       // the lobby plays no sound
 
     readonly property bool connected: net.connected
     readonly property bool isHost: net.isHost
@@ -174,6 +175,7 @@ Item {
         sourceComponent: Component {
             MultiplayerLobby {
                 network: net
+                muted: session.muted
                 onStartGame: session.lobbyStartRequested()
                 onBack: { net.leave(); session.lobbyLeft() }
             }
