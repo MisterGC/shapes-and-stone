@@ -142,8 +142,12 @@ Two settings of the remote enemy's interpolation are not the defaults:
   1.2 Wu and snapped back.
 
 Both are behaviour of clayground's `StateInterpolator` and
-`ReplicatedObject` that any object which rests or stops would meet; they
-are noted on issue #13 for a clayground issue.
+`ReplicatedObject` that any object which rests or stops would meet, filed
+as [clayground #366](https://github.com/MisterGC/clayground/issues/366)
+(`autoDelay` after a rest) and
+[clayground #367](https://github.com/MisterGC/clayground/issues/367)
+(the overshoot until the settle); the two settings are workarounds until
+those are fixed.
 
 `tests/enemies` measures it: host and joiner in one process over LAN,
 five seconds of two knights fighting, every enemy compared every 16 ms.

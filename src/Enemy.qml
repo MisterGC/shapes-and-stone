@@ -33,10 +33,11 @@ PhysicsItem {
     // renders them 50 ms in the past plus the round trip (capped at
     // 100 ms), the rule RemotePlayer falls back to. Not autoDelay: it
     // takes an enemy's rests, in which nothing is sent, for its send
-    // period and renders it up to twice as far behind after one. An
-    // enemy stops dead (a lunge lands, a stagger): its last state goes
-    // out again after settleMs, before the remote one is rendered past
-    // it, so it does not extrapolate on through the stop.
+    // period and renders it up to twice as far behind after one
+    // (workaround until clayground#366). An enemy stops dead (a lunge
+    // lands, a stagger): its last state goes out again after settleMs,
+    // before the remote one is rendered past it, so it does not
+    // extrapolate on through the stop (workaround until clayground#367).
     ReplicatedObject {
         id: replica
         network: enemy.network
