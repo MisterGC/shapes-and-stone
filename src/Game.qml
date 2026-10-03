@@ -492,7 +492,8 @@ ClayWorld2d {
     // Host: an enemy lunged at another node's knight
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
-            session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y})
+            session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
+                                                 size: enemy.widthWu})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -554,7 +555,7 @@ ClayWorld2d {
             _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
-        let result = player.takeDamage(blow.atk, blow.x, blow.y)
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
         if (result === "hit" || result === "blocked") playImpact()
         _struck(blow.id, result)
     }

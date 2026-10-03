@@ -43,7 +43,7 @@ Item {
     // Host: another player's knight struck an enemy; blow.kind is "damage"
     // (amount, x, y), "stagger" or "push" (dx, dy, speed)
     signal enemyBlowReceived(string fromId, var blow)
-    // An enemy of the host's lunged at this node's knight (atk, x, y)
+    // An enemy of the host's lunged at this node's knight (atk, x, y, size)
     signal knightBlowReceived(var blow)
     // This node's knight dealt the blow that killed an enemy of the host's
     // (id, x, y, dx, dy, color)

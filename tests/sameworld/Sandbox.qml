@@ -142,7 +142,7 @@ Item {
             let p = game.player, e = bench._byId()[bench.guardId]
             let k = p ? {blocking: p.isBlocking, dashing: p.isDashing, grace: bench.r3(p.graceLeft),
                          facing: bench.r3(p.facingAngle),
-                         spitter: e ? bench.r3(Math.atan2(e.yWu - p.yWu, e.xWu - p.xWu) * 180 / Math.PI) : null}
+                         spitter: e ? bench.r3(bench._angleTo(p, e)) : null}
                       : null
             bench.shotEnds.push([Date.now(), shotId, result, local, k])
         }
@@ -336,10 +336,8 @@ Item {
             // Centre to centre: at 40 Wu/s a dash aimed beside the shot
             // passes it between two steps without touching it
             let s = game._shotById[shotToDodge]
-            let sx = s ? s.xWu + s.widthWu / 2 : 0, sy = s ? s.yWu - s.heightWu / 2 : 0
-            let px = p.xWu + p.widthWu / 2, py = p.yWu - p.heightWu / 2
-            if (s && !s.destroyed && Math.hypot(sx - px, sy - py) <= 1.2) {
-                p.facingAngle = Math.atan2(sy - py, sx - px) * 180 / Math.PI
+            if (s && !s.destroyed && _distTo(p, s) <= 1.2) {
+                _face(p, s)
                 log.dodge = Object.assign({shot: shotToDodge}, what)
                 p.dash()
                 guardMode = ""
@@ -362,8 +360,17 @@ Item {
     property bool fighting: false
     function fight(on) { fighting = on; if (!on && game.player) _stand(game.player) }
 
-    function _face(p, e) {
-        p.facingAngle = Math.atan2(e.yWu - p.yWu, e.xWu - p.xWu) * 180 / Math.PI
+    // Facing thing e, centre to centre, as the shield measures it
+    // (Player.isShieldFacing)
+    function _face(p, e) { p.facingAngle = _angleTo(p, e) }
+    function _angleTo(p, e) {
+        let ex = e.xWu + e.widthWu / 2, ey = e.yWu - e.heightWu / 2
+        let px = p.xWu + p.widthWu / 2, py = p.yWu - p.heightWu / 2
+        return Math.atan2(ey - py, ex - px) * 180 / Math.PI
+    }
+    function _distTo(p, e) {
+        return Math.hypot(e.xWu + e.widthWu / 2 - p.xWu - p.widthWu / 2,
+                          e.yWu - e.heightWu / 2 - p.yWu + p.heightWu / 2)
     }
     function _stand(p) { p.moveX = 0; p.moveY = 0 }
     // Each frame: toward the nearest enemy, or the hunted one, and swing

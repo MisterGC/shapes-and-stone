@@ -316,14 +316,27 @@ PhysicsItem {
 
     readonly property real shieldArcAngle: Balance.knight.shieldArc
 
-    function isShieldFacing(attackerX, attackerY) {
-        let dx = attackerX - xWu
-        let dy = attackerY - yWu
+    // Whether the shield faces an attacker whose corner is (attackerX,
+    // attackerY) and whose size is attackerSize Wu (the knight's own without
+    // it), measured from the knight's centre to the attacker's: the one
+    // place a blow's direction is judged. Corner to corner, a small shot
+    // from the left or from above came in at the arc's edge or beyond.
+    function isShieldFacing(attackerX, attackerY, attackerSize) {
+        let a = _centreOf(attackerX, attackerY, attackerSize)
+        let dx = a.x - (xWu + widthWu / 2)
+        let dy = a.y - (yWu - heightWu / 2)
         let angleToAttacker = Math.atan2(dy, dx) * 180 / Math.PI
         let angleDiff = angleToAttacker - facingAngle
         while (angleDiff > 180) angleDiff -= 360
         while (angleDiff < -180) angleDiff += 360
         return Math.abs(angleDiff) <= shieldArcAngle
+    }
+
+    // The centre of a square thing at corner (x, y) of size Wu, the
+    // knight's own size without one
+    function _centreOf(x, y, size) {
+        let s = size === undefined ? widthWu : size
+        return { x: x + s / 2, y: y - s / 2 }
     }
 
     function getShieldWorldPos() {
@@ -334,12 +347,14 @@ PhysicsItem {
     // Returns what became of the blow: "hit", "blocked" by the shield,
     // "dodged" by a dash, or "ignored" - fallen or in the grace after a hit.
     // Only a blow that was hit or blocked should look and sound like one.
-    function takeDamage(amount, attackerX, attackerY) {
+    // The attacker is the corner (attackerX, attackerY) of a thing
+    // attackerSize Wu in size (isShieldFacing).
+    function takeDamage(amount, attackerX, attackerY, attackerSize) {
         if (fallen) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
-        let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
+        let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
         if (blocked) {
             finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
             if (gameWorld) gameWorld.playImpact()
@@ -355,9 +370,10 @@ PhysicsItem {
             acted("hurt")
         }
         if (gameWorld) {
+            let a = _centreOf(attackerX, attackerY, attackerSize)
             if (gameWorld.impact)
                 gameWorld.impact(blocked ? "playerBlocked" : "playerHit", xWu, yWu,
-                                 xWu - attackerX, yWu - attackerY)
+                                 xWu + widthWu / 2 - a.x, yWu - heightWu / 2 - a.y)
             else
                 gameWorld.shake(blocked ? 1 : 3)
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
