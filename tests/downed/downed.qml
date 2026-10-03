@@ -6,8 +6,9 @@
 // must draw it downed, its own screen must say "You are down" with only Esc
 // offered, and the run must go on - the host's knight stands, no screen
 // leaves the game, no enemy stops. Then the host's knight falls: the host
-// must end the run, and both screens return to the title, out of the
-// session. In the second session the host's knight falls first and the
+// must end the run, both leave the session and both screens show the
+// party's summary - depth, kills, time and best depth - until a key, Enter
+// on one and Esc on the other, takes each to the title. In the second session the host's knight falls first and the
 // joiner's last, so the host learns of the last fall over the network.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
@@ -16,6 +17,7 @@
 
 import QtQuick
 import QtQuick.Window
+import QtTest
 import Clayground.Network
 
 Window {
@@ -32,10 +34,17 @@ Window {
     property int failures: 0
 
     readonly property int seed: 424242
-    // How long both screens may take to show a fall, and to reach the
-    // title once every knight is down
+    // How long both screens may take to show a fall, and to show the
+    // party's summary once every knight is down
     readonly property int showMs: 1000
     readonly property int endMs: 3000
+
+    // Sends a key the way a keyboard does, to whatever has the focus
+    TestEvent { id: keys }
+    function press(screen, key) {
+        screen.forceActiveFocus()
+        keys.keyClick(key, Qt.NoModifier, -1)
+    }
 
     function check(ok, what) {
         console.log("[Downed]", ok ? "PASS" : "FAIL", what)
@@ -182,15 +191,33 @@ Window {
                 strikeDown(l)
                 fellAt = Date.now()
             }],
-            [() => host.screen === "title" && joiner.screen === "title", () => {
+            [() => host.partyFallen && joiner.partyFallen && !hostNet.connected && !joinNet.connected, () => {
                 let ms = Date.now() - fellAt
-                check(ms <= endMs, "with every knight down both screens are on the title ("
+                check(ms <= endMs, "with every knight down both screens end the run and leave the session ("
                       + ms + " ms after the " + lastName + "'s knight fell)")
-                check(!hostNet.connected && !joinNet.connected, "both have left the session")
+                for (let [g, name] of [[host, "host"], [joiner, "joiner"]]) {
+                    let fs = fallenScreen(g)
+                    let text = n => fs ? find(fs, n).text : "no fallen screen"
+                    check(fs !== null && g.screen === "game" && text("fallenTitle") === "Your party has fallen",
+                          "the " + name + "'s screen says \"Your party has fallen\" (" + text("fallenTitle") + ")")
+                    check(fs !== null && text("fallenDepth") === "Depth " + g.depth
+                          && text("fallenStats").indexOf("kill") >= 0 && text("fallenBest").indexOf("est depth") >= 0,
+                          "it shows the run's depth, kills, time and best depth (" + text("fallenDepth") + " | "
+                          + text("fallenStats") + " | " + text("fallenBest") + ")")
+                    check(fs !== null && !fs.canGoAgain && text("fallenHint") === "Enter or Esc to the title",
+                          "it offers the title only (" + text("fallenHint") + ")")
+                }
+                check(host.enemies.every(e => e.halted), "the host's enemies stop")
+                press(fallenScreen(host), Qt.Key_Return)
+                press(fallenScreen(joiner), Qt.Key_Escape)
+            }],
+            [() => host.screen === "title" && joiner.screen === "title", () => {
+                check(true, "Enter on the host's summary and Esc on the joiner's go to the title")
                 check(host.player === null && joiner.player === null
                       && host.enemies.length === 0 && joiner.enemies.length === 0,
                       "the run is cleared on both")
-                check(!host.fallen && !joiner.fallen && fallenScreen(host) === null && fallenScreen(joiner) === null,
+                check(!host.fallen && !joiner.fallen && !host.partyFallen && !joiner.partyFallen
+                      && fallenScreen(host) === null && fallenScreen(joiner) === null,
                       "no fallen screen is left on either")
             }]
         ]
