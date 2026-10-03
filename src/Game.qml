@@ -437,13 +437,7 @@ ClayWorld2d {
             else if (blow.kind === "stagger") e.stagger()
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
-        onKnightBlowReceived: (blow) => {
-            // The reach is checked here, against where this knight really is
-            if (!player) return
-            let dx = player.xWu - blow.x, dy = player.yWu - blow.y
-            if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) return
-            if (player.takeDamage(blow.atk, blow.x, blow.y) !== "ignored") playImpact()
-        }
+        onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
@@ -492,8 +486,59 @@ ClayWorld2d {
         if (session.connected && enemy.objectId !== "") session.strikeEnemy(enemy.objectId, blow)
     }
     // Host: an enemy lunged at another node's knight
-    function strikeKnight(knight, atk, x, y) {
-        if (session.connected) session.strikeKnight(knight.nodeId, {atk: atk, x: x, y: y})
+    function strikeKnight(knight, enemy, atk, x, y) {
+        if (session.connected)
+            session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y})
+    }
+    // A host's enemy struck this knight: the blow lands when this screen
+    // shows the lunge land, the enemy's render delay after it arrived. A
+    // parry of that enemy from its last parry window before the blow arrived
+    // until then answers that lunge, and the blow is dropped. Without the
+    // hold, a parry in the window's last render delay on this screen came
+    // after the blow of the lunge it parried.
+    // knightStruck says what became of each blow: "hit", "blocked",
+    // "ignored", "out of reach" or "parried".
+    signal knightStruck(string enemyId, string result)
+    property var _parriedAt: ({})
+    property var _heldBlows: []
+    // This node's knight parried a host's enemy
+    function parried(enemy) {
+        if (enemy.remote) _parriedAt[enemy.objectId] = Date.now()
+    }
+    function _holdKnightBlow(blow) {
+        let e = _enemyById[blow.id]
+        let hold = e ? e.renderDelayMs : 0
+        _heldBlows.push(Object.assign({due: Date.now() + hold, hold: hold}, blow))
+        _heldBlowTimer.start()
+    }
+    Timer {
+        id: _heldBlowTimer
+        interval: 5
+        repeat: true
+        onTriggered: {
+            let now = Date.now()
+            let due = world._heldBlows.filter(b => b.due <= now)
+            world._heldBlows = world._heldBlows.filter(b => b.due > now)
+            if (world._heldBlows.length === 0) stop()
+            for (let b of due) world._landKnightBlow(b)
+        }
+    }
+    function _landKnightBlow(blow) {
+        // The reach is checked here, against where this knight really is
+        if (!player) return
+        let since = Date.now() - (_parriedAt[blow.id] || 0)
+        if (since <= blow.hold + Balance.enemy.parryFrames * world.physics.timeStep * 1000) {
+            knightStruck(blow.id, "parried")
+            return
+        }
+        let dx = player.xWu - blow.x, dy = player.yWu - blow.y
+        if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) {
+            knightStruck(blow.id, "out of reach")
+            return
+        }
+        let result = player.takeDamage(blow.atk, blow.x, blow.y)
+        if (result !== "ignored") playImpact()
+        knightStruck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
     function reportKill(nodeId, enemy, dx, dy, color) {
@@ -2052,6 +2097,9 @@ ClayWorld2d {
         dungeonObjects = []
         torches = []
         stains = []
+        // A blow held for the last level's enemy does not land in the next
+        _heldBlows = []
+        _parriedAt = {}
 
         grid = []
         rooms = []

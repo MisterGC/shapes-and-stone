@@ -223,8 +223,16 @@ PhysicsItem {
         }
     ]
 
-    // Track enemies currently in attack range
+    // Track enemies currently in attack range. An enemy that dies in range
+    // stays in it: its body's end of contact comes without its item, so the
+    // sensor cannot tell whom to drop. _inRange() drops it.
     property var enemiesInRange: new Set()
+    // The enemies in range that still stand
+    function _inRange() {
+        for (let enemy of enemiesInRange)
+            if (!enemy || enemy.destroyed !== false) enemiesInRange.delete(enemy)
+        return enemiesInRange
+    }
     property var _hitThisSwing: new Set()
 
     function onCollision(other) {
@@ -248,8 +256,8 @@ PhysicsItem {
     // Deal damage to enemies in attack arc (skips already-hit enemies this swing)
     function hitEnemiesInArc() {
         let hitCount = 0
-        for (let enemy of enemiesInRange) {
-            if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
+        for (let enemy of _inRange()) {
+            if (!_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
                 let parried = enemy.parryWindow
                 let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
                         : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
@@ -259,6 +267,7 @@ PhysicsItem {
                 hitCount++
                 if (parried) {
                     if (gameWorld) gameWorld.countFight("parry")
+                    if (gameWorld && gameWorld.parried) gameWorld.parried(enemy)
                     enemy.stagger()
                     attackCooldown = 0
                     mana = Math.min(maxMana, mana + Balance.knight.parryMana)
@@ -288,8 +297,8 @@ PhysicsItem {
 
     // Push enemies away during dash-push (skips already-pushed this dash)
     function pushEnemiesInRange() {
-        for (let enemy of enemiesInRange) {
-            if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy)) {
+        for (let enemy of _inRange()) {
+            if (!_hitThisSwing.has(enemy)) {
                 let dx = enemy.xWu - xWu
                 let dy = enemy.yWu - yWu
                 let len = Math.sqrt(dx * dx + dy * dy)

@@ -26,6 +26,8 @@ PhysicsItem {
     property string objectId: ""
     property var network: null
     property bool remote: false
+    // How far in the past a remote enemy is shown, in ms
+    readonly property real renderDelayMs: replica.interpolator.delayMs
     // The AI thinks here: only where the enemy is not remote
     readonly property bool thinks: aiTimer.running
 
@@ -527,16 +529,16 @@ PhysicsItem {
         }
     }
 
-    // A shove along (dx, dy) at speed, from the knight's shield push
+    // A shove along (dx, dy) at speed, from the knight's shield push. It
+    // runs as a knockback: a velocity set once lasted only until the AI's
+    // next think, which stops an enemy in recovery or stagger, so the
+    // shove went anywhere from 0 to 2 Wu
     function shove(dx, dy, speed) {
         if (remote) {
             if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "push", dx: dx, dy: dy, speed: speed})
             return
         }
-        let len = Math.sqrt(dx * dx + dy * dy)
-        if (len < 0.001) return
-        // Negate Y for world-to-screen
-        body.linearVelocity = Qt.point(dx / len * speed, -dy / len * speed)
+        knockback(dx, dy, speed)
     }
 
     // An attack runs on the physics steps, not on the AI's think ticks: a
@@ -802,7 +804,7 @@ PhysicsItem {
     function performAttack() {
         // Another node's knight: that node checks the reach and takes the hit
         if (target && !target.takeDamage && target.nodeId !== undefined) {
-            if (gameWorld) gameWorld.strikeKnight(target, atk, xWu, yWu)
+            if (gameWorld) gameWorld.strikeKnight(target, enemy, atk, xWu, yWu)
             return
         }
         if (target && target.takeDamage) {
