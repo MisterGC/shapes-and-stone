@@ -148,6 +148,8 @@ def compare(host, joiner, lag_ms, skew_ms=20):
     if not host or not joiner:
         return res
     t_first = max(host[0]["t"], joiner[0]["t"]) + lag_ms
+    # The two records stop a few frames apart: judge only what both had
+    t_last_joiner = host[-1]["t"]
     t_last_host = joiner[-1]["t"] - lag_ms
 
     def note(s):
@@ -157,7 +159,7 @@ def compare(host, joiner, lag_ms, skew_ms=20):
     lo = 0
     for js in joiner:
         t = js["t"]
-        if t < t_first:
+        if t < t_first or t > t_last_joiner:
             continue
         while lo < len(host) and host[lo]["t"] < t - lag_ms:
             lo += 1
