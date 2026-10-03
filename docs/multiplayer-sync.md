@@ -316,6 +316,8 @@ and tells the others (`struck`, broadcast):
   the deflection as before). A shot that meets no knight bursts on each
   screen on its own, at its wall or the end of its life.
   `Game.shotEnded` says what became of each shot on this screen.
+  A known trade-off: no host decides who a shot hits, so one shot that
+  meets two knights on their two screens within the network delay hits both.
 
 The parry window of a held blow is counted in physics steps (the blow's
 arrival step minus `enemy.parryFrames`), as the enemy's attack runs, not in
