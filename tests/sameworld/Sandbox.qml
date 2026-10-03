@@ -1,13 +1,14 @@
 // Same-world bench - one of two game instances, a host or a joiner, that
 // run_sameworld.py starts as two processes (clayliveloader --instance),
 // connects over Local or Cloud signaling and drives through the inspector
-// protocol (issues #14 and #17).
+// protocol (issues #14, #17 and #18).
 //
 // The instance runs the real game. Once the session is in the dungeon the
 // driver puts the host's knight beside an enemy and the joiner's in sight of
 // another. The joiner's knight stands until that enemy walks into its reach
-// and swings, parries it, shield-pushes it; then each knight kills an enemy,
-// and both fight: each goes for the nearest enemy and swings at it.
+// and swings, parries it, blocks and dodges its lunges, blocks, dodges and
+// takes a spitter's shots, shield-pushes it; then each knight kills an
+// enemy, and both fight: each goes for the nearest enemy and swings at it.
 // Meanwhile every frame records every enemy this screen shows - its object
 // id, position, HP and AI state - stamped with the wall clock, and the
 // driver takes the records and compares the two screens.
@@ -95,11 +96,27 @@ Item {
         return game.stains.filter(s => s).map(s => [r3(s.xWu), r3(s.yWu)])
     }
     // Every host's blow on this node's knight and what became of it, as
-    // [wall clock, enemy id, result] (Game.knightStruck)
+    // [wall clock, enemy id, result, knight's HP after, HP it lost]
+    // (Game.knightStruck)
     property var blows: []
+    property int _hpPrev: 0
+    property int _hpNow: 0
+    // This node's knight's HP over time, as [wall clock, HP]
+    property var hpLog: []
     Connections {
         target: game
-        function onKnightStruck(enemyId, result) { bench.blows.push([Date.now(), enemyId, result]) }
+        function onKnightStruck(enemyId, result) {
+            let landed = result === "hit" || result === "blocked"
+            bench.blows.push([Date.now(), enemyId, result, bench._hpNow, landed ? bench._hpPrev - bench._hpNow : 0])
+        }
+    }
+    Connections {
+        target: game.player
+        function onHpChanged() {
+            bench._hpPrev = bench._hpNow
+            bench._hpNow = game.player.hp
+            bench.hpLog.push([Date.now(), game.player.hp])
+        }
     }
     // Host: every blow another node's knight sent, as [wall clock, enemy
     // id, kind] (Session.enemyBlowReceived)
@@ -107,6 +124,75 @@ Item {
     Connections {
         target: bench.session
         function onEnemyBlowReceived(fromId, blow) { bench.received.push([Date.now(), blow.id, blow.kind]) }
+    }
+    // Every attack another node's knight met and its node judged, as [wall
+    // clock, node id, source, id, result] (Game.struckReported)
+    property var reports: []
+    // Every shot that met a knight on this screen, as [wall clock, shot id,
+    // result, local, knight] (Game.shotEnded); knight is this node's knight
+    // then: {blocking, dashing, grace, facing, spitter: the angle to the
+    // guarded enemy, shot: the angle to the shot, on this screen's own}
+    property var shotEnds: []
+    Connections {
+        target: game
+        function onStruckReported(nodeId, source, id, result) {
+            bench.reports.push([Date.now(), nodeId, source, id, result])
+        }
+        function onShotEnded(shotId, result, local) {
+            let p = game.player, e = bench._byId()[bench.guardId], s = game._shotById[shotId]
+            let k = p ? {blocking: p.isBlocking, dashing: p.isDashing, grace: bench.r3(p.graceLeft),
+                         facing: bench.r3(p.facingAngle),
+                         spitter: e ? bench.r3(bench._angleTo(p, e)) : null,
+                         shot: local && s ? bench.r3(bench._angleTo(p, s)) : null,
+                         at: [bench.r3(p.xWu), bench.r3(p.yWu)], from: e ? [bench.r3(e.xWu), bench.r3(e.yWu)] : null,
+                         shotAt: s ? [bench.r3(s.xWu), bench.r3(s.yWu)] : null}
+                      : null
+            bench.shotEnds.push([Date.now(), shotId, result, local, k])
+        }
+    }
+    // The shots flying on this screen, as {id: [x, y]}
+    function shots() {
+        let out = {}
+        for (let id in game._shotById) {
+            let s = game._shotById[id]
+            if (s && !s.destroyed) out[id] = [r3(s.xWu), r3(s.yWu)]
+        }
+        return out
+    }
+    // Host: the HP this screen shows for the other node's knight, as [wall
+    // clock, HP]; HP -1 without
+    function remoteHp() {
+        for (let id in session.remotePlayers) return [Date.now(), session.remotePlayers[id].remoteHp]
+        return [Date.now(), -1]
+    }
+    // Seconds left of this node's knight's grace after a hit
+    function graceLeft() { return game.player ? game.player.graceLeft : 0 }
+    // Host: every enemy stops thinking (on) or thinks again (off), so the
+    // spitter only spits when spit() says and no other enemy strikes the
+    // knight meanwhile
+    function hold(on) {
+        for (let e of game.enemies) {
+            if (!e || e.destroyed) continue
+            if (on) {
+                e.halt()
+            } else if (e.halted) {
+                e.halted = false
+                e.aiState = "patrol"
+            }
+        }
+    }
+    // Host: enemy id spits at the other node's knight, or at its own with
+    // own; the shot's id, "" without either
+    function spit(id, own) {
+        let e = _byId()[id], k = own ? game.player : null
+        if (!own) for (let n in session.remotePlayers) k = session.remotePlayers[n]
+        if (!e || !k) return ""
+        let dx = k.xWu - e.xWu, dy = k.yWu - e.yWu
+        let len = Math.max(0.01, Math.hypot(dx, dy))
+        e._dirToTargetX = dx / len
+        e._dirToTargetY = dy / len
+        e.fireProjectile()
+        return "shot" + game._shotCount
     }
     // How often each enemy entered "stagger" since record(true)
     property var staggers: ({})
@@ -178,17 +264,26 @@ Item {
     // mode "swing": one swing once the enemy is in reach; "parry": swings
     // only into its parry window, from the window's late-th frame on this
     // screen, until one parry; "push": raises the shield
-    // and dashes into it once it is in reach. The knight never walks. The
-    // log says what it did: when (wall clock), how it stood and what it saw.
+    // and dashes into it once it is in reach; "block": holds the shield up
+    // toward it; "dodge": dashes at it from its parry window's late-th
+    // frame on this screen, once; "dodgeShot": dashes into shot shotToDodge
+    // once it comes within 1.2 Wu, once; "stand": faces it and stands, the
+    // shield down. The knight never walks. The log says what it did: when
+    // (wall clock), how it stood and what it saw.
     property string guardMode: ""
     property string guardId: ""
     property var guardLog: ({})
+    property string shotToDodge: ""
     function guard(id, mode, late) {
         guardId = id
+        shotToDodge = ""
         guardMode = mode
         guardLog = {mode: mode, slept: false, done: false, parriesBefore: game.fightRecord.parries,
                     late: late || 1, windowFrames: 0}
-        if (game.player) _stand(game.player)
+        if (game.player) {
+            _stand(game.player)
+            game.player.isBlocking = mode === "block"
+        }
         return _byId()[id] !== undefined
     }
     function _guard() {
@@ -231,6 +326,25 @@ Item {
             p.dash()
             guardMode = "pushing"
             _shieldDown.restart()
+        } else if (guardMode === "block") {
+            p.mana = p.maxMana
+            p.isBlocking = true
+        } else if (guardMode === "dodge" && !e.parryWindow) {
+            log.windowFrames = 0
+        } else if (guardMode === "dodge" && ++log.windowFrames >= log.late && p.dashCooldown <= 0) {
+            log.dodge = what
+            p.dash()
+            guardMode = ""
+        } else if (guardMode === "dodgeShot" && p.dashCooldown <= 0) {
+            // Centre to centre: at 40 Wu/s a dash aimed beside the shot
+            // passes it between two steps without touching it
+            let s = game._shotById[shotToDodge]
+            if (s && !s.destroyed && _distTo(p, s) <= 1.2) {
+                _face(p, s)
+                log.dodge = Object.assign({shot: shotToDodge}, what)
+                p.dash()
+                guardMode = ""
+            }
         } else if (guardMode === "pushing") {
             // What the knight does while the dash lasts
             log.dash.push([what.t, p.isDashing, p.isBlocking, inRange, what.dist])
@@ -249,8 +363,17 @@ Item {
     property bool fighting: false
     function fight(on) { fighting = on; if (!on && game.player) _stand(game.player) }
 
-    function _face(p, e) {
-        p.facingAngle = Math.atan2(e.yWu - p.yWu, e.xWu - p.xWu) * 180 / Math.PI
+    // Facing thing e, centre to centre, as the shield measures it
+    // (Player.isShieldFacing)
+    function _face(p, e) { p.facingAngle = _angleTo(p, e) }
+    function _angleTo(p, e) {
+        let ex = e.xWu + e.widthWu / 2, ey = e.yWu - e.heightWu / 2
+        let px = p.xWu + p.widthWu / 2, py = p.yWu - p.heightWu / 2
+        return Math.atan2(ey - py, ex - px) * 180 / Math.PI
+    }
+    function _distTo(p, e) {
+        return Math.hypot(e.xWu + e.widthWu / 2 - p.xWu - p.widthWu / 2,
+                          e.yWu - e.heightWu / 2 - p.yWu + p.heightWu / 2)
     }
     function _stand(p) { p.moveX = 0; p.moveY = 0 }
     // Each frame: toward the nearest enemy, or the hunted one, and swing
@@ -337,7 +460,15 @@ Item {
             else if (bench.huntId !== "") bench._pilot(bench.huntId)
             else if (bench.fighting) bench._pilot("")
             if (bench.recording) bench._recordFrame()
+            bench._seeShots()
         }
+    }
+    // The wall clock of the last frame that showed each shot, by its id
+    property var shotSeen: ({})
+    function _seeShots() {
+        let now = Date.now()
+        for (let id in game._shotById)
+            if (game._shotById[id] && !game._shotById[id].destroyed) shotSeen[id] = now
     }
 
     // The delay a joiner's enemies are rendered with; -1 without one

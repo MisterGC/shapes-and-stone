@@ -293,6 +293,88 @@ not touch, in `recovery` or a lunge: 0.253 to 0.286 Wu against the 0.25
 tolerance, in about one run of five while these steps were built. That
 check and its tolerance are #14's.
 
+## An attack on a knight is judged by its own screen (issue #18)
+
+A block, a parry and a dash depend on the knight's facing and state, which
+only its own screen has exactly. So the host announces an enemy's attack,
+and the screen of the knight it goes for decides, applies that knight's HP
+and tells the others (`struck`, broadcast):
+
+- a lunge: the host sends the blow (`knightBlow`, issue #17); the knight's
+  screen holds it for the enemy's render delay and judges it `parried`,
+  `blocked`, `dodged`, `hit`, `ignored` (fallen, or in the grace after a
+  hit) or `out of reach`. A dash that carried the knight past the enemy
+  counts as `dodged`. The result goes to every node as
+  `{source: "lunge", id: <enemy>, result}`; `Game.struckReported` says it
+  on the others. The knight's HP reaches them with its state as before.
+- a shot: the host gives it an id (`shot1`, `shot2`, ... per game) and sends
+  it with the shot. Every node flies it under that id; it hurts only that
+  node's knight. The node whose knight it meets judges it - `blocked` by
+  the shield, `dodged` in a dash, `hit` or `ignored` - and sends
+  `{source: "shot", id, result}`. Every other node removes the shot of that
+  id without an impact of its own (the knight's screen sends the hit or
+  the deflection as before). A shot that meets no knight bursts on each
+  screen on its own, at its wall or the end of its life.
+  `Game.shotEnded` says what became of each shot on this screen.
+  A known trade-off: no host decides who a shot hits, so one shot that
+  meets two knights on their two screens within the network delay hits both.
+
+The parry window of a held blow is counted in physics steps (the blow's
+arrival step minus `enemy.parryFrames`), as the enemy's attack runs, not in
+wall-clock milliseconds; the hold itself stays wall clock, since the screen
+renders the enemy by it.
+
+Building the bench showed a game bug: the shield check for a shot measured
+from the knight's top-left corner to the shot's. The knight is 1.0 Wu, the
+shot 0.3 Wu, so the shot's corner sits 0.35 Wu off its centre at that size,
+and a shot from the left or from above came in at the edge of the 60 degree
+arc or beyond it: with the shield up and facing the spitter the knight took
+the hit. The shield is now measured in one place: `Player.isShieldFacing`
+takes the attacker's corner and its size and compares the two centres.
+A shot passes its 0.3 Wu, a lunge the enemy's 0.8 Wu (the host sends it in
+`knightBlow` as `size`); the reach of a lunge stays corner to corner, as
+the host's own check. The benches' scripted knights face a thing centre to
+centre too. The fight bench (seed 424242) before and after: `mix` and
+`parry` unchanged (175 dealt, 4 taken, 4 blocks, 116 HP; 170 dealt, 0
+taken, 4 parries, 120 HP), `block` still falls with 10 blocks and 120
+taken, now dealing 61 instead of 68 and killing 1 enemy instead of 0.
+
+`tests/sameworld/run_sameworld.py` checks it between a host and a joiner
+process, after the parry of issue #17:
+
+- the joiner's knight holds its shield toward the enemy, which lunges: the
+  joiner's screen judges the blow `blocked`, the knight loses HP for it, the
+  host receives `blocked` and shows an HP the joiner's knight had in the
+  300 ms before
+- it dashes at the enemy from the fifth frame of the parry window it shows:
+  `dodged`, no HP lost, the host receives `dodged`
+- it stands 2.5 to 4 Wu from a spitter while the host's enemies stop
+  thinking (so the spitter spits only when told, and no other blow puts the
+  knight into its grace), and the host makes the spitter spit at it three
+  times: with the shield up, dashing into the shot, standing. The joiner's
+  screen judges `blocked`, `dodged`, `hit`, each with the knight's state at
+  that moment in the log; the host receives each result, and its shot of
+  that id was shown until the result came and is gone after
+- the other way round, the joiner's knight waits beside another enemy, and
+  the host's knight holds its shield toward the spitter, which spits at it:
+  the host's screen judges `blocked`, the joiner receives it, and its shot
+  of that id goes then. (On the spot the joiner's knight had just stood
+  on, the joiner's screen met the shot with its own knight first: the
+  known trade-off above.)
+
+Six runs against clayground `issue-369` @ acffb2d (the submodule), three
+with Local and three with Cloud signaling, all exited 0 with 37 checks
+passed. In all six every new check passed on its first try: each lunge
+blocked and dodged, each shot on the joiner blocked, dodged and hit, the
+shot on the host blocked. Each result reached the other screen 0 to 2 ms
+after the judging screen decided, and its shot of that id was last drawn 0
+to 6 ms before the result arrived. The worst position error was 0.089 to
+0.223 Wu. With no node sending `struck` the run exits 6: the six checks
+that the other screen receives the result fail, and the shots fly on. With
+the joiner ignoring the host's results only (`_endShot` returning on a
+joiner) it exits 1, on the joiner's check alone. With `--fault stale` it
+exited 9 (run before the host's shot was added).
+
 ## Security note
 
 clayground #293 is the concrete gap behind the "secure/robust foundation"

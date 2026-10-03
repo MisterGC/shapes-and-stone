@@ -812,7 +812,8 @@ PhysicsItem {
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < Balance.enemy.lungeHitRange) {
-                if (target.takeDamage(atk, xWu, yWu) === "ignored") return
+                let result = target.takeDamage(atk, xWu, yWu, widthWu)
+                if (result !== "hit" && result !== "blocked") return
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }

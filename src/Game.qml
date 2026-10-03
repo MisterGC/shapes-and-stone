@@ -447,8 +447,12 @@ ClayWorld2d {
         }
         onShotReceived: (shot) => {
             if (screen !== "game") return
-            _flyShot(shot.x, shot.y, shot.dx, shot.dy, shot.damage)
+            _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
             playSpitShot()
+        }
+        onStruckReported: (fromId, report) => {
+            if (report.source === "shot") _endShot(report.id, report.result)
+            world.struckReported(fromId, report.source, report.id, report.result)
         }
     }
 
@@ -488,27 +492,41 @@ ClayWorld2d {
     // Host: an enemy lunged at another node's knight
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
-            session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y})
+            session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
+                                                 size: enemy.widthWu})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
     // parry of that enemy from its last parry window before the blow arrived
     // until then answers that lunge, and the blow is dropped. Without the
     // hold, a parry in the window's last render delay on this screen came
-    // after the blow of the lunge it parried.
+    // after the blow of the lunge it parried. The window is counted in
+    // physics steps, as the enemy's attack runs (issue #35); the hold is
+    // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
-    // "ignored", "out of reach" or "parried".
+    // "dodged", "ignored", "out of reach" or "parried". This screen judges
+    // it by its knight's own state, and reports it to the others
+    // (issue #18).
     signal knightStruck(string enemyId, string result)
+    // Another node's knight met a host's enemy's attack and its node judged
+    // it: source "lunge" (id: the enemy's) or "shot" (id: the shot's)
+    signal struckReported(string nodeId, string source, string id, string result)
+    function _struck(enemyId, result) {
+        knightStruck(enemyId, result)
+        if (session.connected) session.reportStruck({source: "lunge", id: enemyId, result: result})
+    }
+    // The physics steps since the game came up, the clock of the parry window
+    property int _physicsSteps: 0
     property var _parriedAt: ({})
     property var _heldBlows: []
     // This node's knight parried a host's enemy
     function parried(enemy) {
-        if (enemy.remote) _parriedAt[enemy.objectId] = Date.now()
+        if (enemy.remote) _parriedAt[enemy.objectId] = _physicsSteps
     }
     function _holdKnightBlow(blow) {
         let e = _enemyById[blow.id]
         let hold = e ? e.renderDelayMs : 0
-        _heldBlows.push(Object.assign({due: Date.now() + hold, hold: hold}, blow))
+        _heldBlows.push(Object.assign({due: Date.now() + hold, arrived: _physicsSteps}, blow))
         _heldBlowTimer.start()
     }
     Timer {
@@ -526,19 +544,20 @@ ClayWorld2d {
     function _landKnightBlow(blow) {
         // The reach is checked here, against where this knight really is
         if (!player) return
-        let since = Date.now() - (_parriedAt[blow.id] || 0)
-        if (since <= blow.hold + Balance.enemy.parryFrames * world.physics.timeStep * 1000) {
-            knightStruck(blow.id, "parried")
+        let at = _parriedAt[blow.id]
+        if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
+            _struck(blow.id, "parried")
             return
         }
+        // A dash that carried the knight past the enemy dodged it all the same
         let dx = player.xWu - blow.x, dy = player.yWu - blow.y
         if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) {
-            knightStruck(blow.id, "out of reach")
+            _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
-        let result = player.takeDamage(blow.atk, blow.x, blow.y)
-        if (result !== "ignored") playImpact()
-        knightStruck(blow.id, result)
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
+        if (result === "hit" || result === "blocked") playImpact()
+        _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
     function reportKill(nodeId, enemy, dx, dy, color) {
@@ -1069,6 +1088,7 @@ ClayWorld2d {
     Connections {
         target: world.physics
         function onStepped() {
+            world._physicsSteps++
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
                 world.runSeconds += world.physics.timeStep
@@ -1925,14 +1945,36 @@ ClayWorld2d {
     }
 
     // In a session the host's spitter fires on every node: each node flies
-    // the shot, and it hurts only that node's knight
+    // the shot under the host's id for it, and it hurts only that node's
+    // knight. That node judges it by its knight's own state - hit, blocked,
+    // dodged - and reports it, and the shot goes on every screen
+    // (issue #18). One that meets no knight bursts on each screen alone.
+    property int _shotCount: 0
+    property var _shotById: ({})
+    // A shot met a knight: this node's (local) or another's, which reported
+    // it; result as Player.takeDamage's, "blocked" for a deflected one
+    signal shotEnded(string shotId, string result, bool local)
     function spawnProjectile(px, py, dirX, dirY, damage) {
+        let id = "shot" + (++_shotCount)
         if (session.connected && session.isHost)
-            session.sendShot({x: px, y: py, dx: dirX, dy: dirY, damage: damage})
-        _flyShot(px, py, dirX, dirY, damage)
+            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage})
+        _flyShot(id, px, py, dirX, dirY, damage)
     }
-    function _flyShot(px, py, dirX, dirY, damage) {
+    // This node's knight met shot id
+    function shotLanded(id, result) {
+        shotEnded(id, result, true)
+        if (session.connected) session.reportStruck({source: "shot", id: id, result: result})
+    }
+    // Another node's knight met shot id: it goes here too, its impact is
+    // the other node's
+    function _endShot(id, result) {
+        let proj = _shotById[id]
+        if (proj && !proj.destroyed) proj.vanish()
+        shotEnded(id, result, false)
+    }
+    function _flyShot(id, px, py, dirX, dirY, damage) {
         let proj = projectileComponent.createObject(world.room, {
+            shotId: id,
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
             speed: Balance.projectile.speed,
@@ -1947,8 +1989,11 @@ ClayWorld2d {
             sensorCategories: catProjectile,
             sensorCollidesWith: catPlayer
         })
-        if (proj)
-            console.log("[Game] Projectile spawned at", px.toFixed(1), py.toFixed(1))
+        if (proj) {
+            _shotById[id] = proj
+            proj.gone.connect(() => { if (world._shotById[id] === proj) delete world._shotById[id] })
+            console.log("[Game] Projectile", id, "spawned at", px.toFixed(1), py.toFixed(1))
+        }
     }
 
     function spawnSpitParticles(wx, wy) {
@@ -2100,6 +2145,7 @@ ClayWorld2d {
         // A blow held for the last level's enemy does not land in the next
         _heldBlows = []
         _parriedAt = {}
+        _shotById = {}
 
         grid = []
         rooms = []

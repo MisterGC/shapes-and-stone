@@ -103,8 +103,12 @@ Item {
         let dx = x - p.xWu, dy = y - p.yWu
         return Math.sqrt(dx * dx + dy * dy)
     }
-    function face(p, x, y) {
-        p.facingAngle = Math.atan2(y - p.yWu, x - p.xWu) * 180 / Math.PI
+    // Facing thing o, centre to centre, as the shield measures it
+    // (Player.isShieldFacing)
+    function face(p, o) {
+        let ox = o.xWu + o.widthWu / 2, oy = o.yWu - o.heightWu / 2
+        let px = p.xWu + p.widthWu / 2, py = p.yWu - p.heightWu / 2
+        p.facingAngle = Math.atan2(oy - py, ox - px) * 180 / Math.PI
     }
     // moveY is screen down, world y is up
     function moveTowards(p, x, y, speed) {
@@ -141,7 +145,7 @@ Item {
         if (threat) {
             if (!_plans.has(threat))
                 _plans.set(threat, _rng() < parryChance ? "parry" : "block")
-            face(p, threat.xWu, threat.yWu)
+            face(p, threat)
             stand(p)
             if (_plans.get(threat) === "parry") {
                 p.isBlocking = false
@@ -161,7 +165,7 @@ Item {
         }
         if (shot) {
             _blockLeft = 0.3
-            face(p, shot.xWu, shot.yWu)
+            face(p, shot)
         }
         if (_blockLeft > 0) {
             _blockLeft -= dt
@@ -177,7 +181,7 @@ Item {
             let d = distTo(p, e.xWu, e.yWu)
             if (d < targetDist) { target = e; targetDist = d }
         }
-        face(p, target.xWu, target.yWu)
+        face(p, target)
 
         // A guardian's shield turns swings: a shield dash breaks its guard
         if (target.enemyType === "guardian" && target.aiState !== "stagger") {
