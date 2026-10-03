@@ -36,9 +36,9 @@ PhysicsItem {
     // 100 ms), the rule RemotePlayer falls back to. Not autoDelay: in the
     // same-world bench it rendered some enemies up to 359 ms behind, and
     // the joiner showed AI states the host had left over 300 ms before
-    // (workaround, clayground#366 did not settle it). An enemy that stops
-    // dead (a lunge lands, a stagger) stops in place on the other screens:
-    // clayground sends its last state once more right after the stop.
+    // (workaround until clayground#374). An enemy that stops dead (a lunge
+    // lands, a stagger) stops in place on the other screens: clayground
+    // sends its last state once more right after the stop.
     ReplicatedObject {
         id: replica
         network: enemy.network

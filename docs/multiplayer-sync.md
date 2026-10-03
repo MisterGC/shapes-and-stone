@@ -162,8 +162,9 @@ the branch's head:
   the host had left more than 300 ms before (e.g. `patrol` on the joiner
   where the host had `idle`). Widening the check's 300 ms is not the
   answer; an enemy shown 360 ms late also lunges 360 ms late on that
-  screen. It stays a workaround until clayground #366 also covers an
-  object that sends seldom.
+  screen. It stays a workaround until
+  [clayground #374](https://github.com/MisterGC/clayground/issues/374).
+  The same-world misses this table shows are shapes-and-stone #64.
 - The other failures are not the position or the state check, and come
   with every setting: the block phase, where the first lunge was judged
   `ignored` (the knight was in the grace after another hit, so every blow
@@ -416,27 +417,32 @@ enemies go for the knights still standing (issue #13).
 The host ends the run: whenever its own knight falls, another knight's
 HP changes (`Session.partyChanged`) or a node leaves, it checks whether
 its knight and every other one are at 0 HP. If so it broadcasts
-`runEnd`; each joiner goes to the title and leaves the session on it, and
-the host follows once every joiner has left, or after
-`Session.endRunWaitMs` (2 s), so its leaving cannot cut the message off.
-The best depth is kept as on any fall; the fallen screen's summary is not
-shown in a session.
+`runEnd`; each joiner leaves the session on it, and the host follows once
+every joiner has left, or after `Session.endRunWaitMs` (2 s), so its
+leaving cannot cut the message off. Then every screen stops its enemies
+and shows the run's summary, as the fall screen does for one knight:
+"Your party has fallen", the depth, the kills, the time and the best
+depth, which is kept as on any fall. Enter or Esc goes to the title; a
+co-op run is not started again from there.
 
 `tests/downed/downed.qml` checks it with a host and a joiner in one
 process, over LAN, in two sessions. In the first the joiner's knight
 falls first: both screens draw it down, its screen says "You are down"
 and offers only Esc, the host's knight stands, the run goes on and no
-enemy stops. Then the host's knight falls, and both screens must be on the
-title, out of the session, within 3 s. In the second the host's knight
+enemy stops. Then the host's knight falls: within 3 s both screens must
+be out of the session and show "Your party has fallen" with the depth,
+kills, time and best depth, and only the title offered; Enter on the
+host's and Esc on the joiner's must take each to the title. In the second the host's knight
 falls first and the joiner's last, so the host learns of the last fall
 through the joiner's state.
 
-Five runs against clayground `issue-366` @ e003cf9 (the submodule) all
-exited 0 with 28 checks passed. A fall was drawn down on both screens
-19 to 46 ms after it, and both screens were on the title 64 to 95 ms after
-the last knight fell. With the host's `runEnd` broadcast taken out the
-bench exits 100, waiting for the title; with `RemotePlayer` drawing no
-knight down it exits 100, waiting for the fall on the other screen.
+Six runs against clayground `issue-366` @ e003cf9 (the submodule) all
+exited 0 with 42 checks passed. Both screens showed the summary 57 to
+95 ms after the last knight fell. With the host's `runEnd` broadcast taken
+out the bench exits 100, waiting for the end; with `RemotePlayer` drawing
+no knight down it exits 100, waiting for the fall on the other screen;
+with Enter doing nothing on the summary it exits 100, waiting for the
+title.
 
 ## Security note
 

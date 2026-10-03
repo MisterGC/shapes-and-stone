@@ -122,10 +122,12 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fallen/fallen.qml
 In a session a knight at 0 HP is down, drawn slumped and dark on every
 screen, and the run goes on while another knight stands: the downed
 player's screen says "You are down" and offers only Esc, which leaves the
-session. When every knight is down the host ends the run and every screen
-returns to the title. The downed bench starts a host and a joiner in one
-process, joins them over LAN, brings down first one knight and then the
-other, twice in turn, and exits with the number of failed checks:
+session. When every knight is down the host ends the run: every screen
+leaves the session and shows how far the party got, as the fall screen does
+for one knight, and Enter or Esc goes to the title. The downed bench starts
+a host and a joiner in one process, joins them over LAN, brings down first
+one knight and then the other, twice in turn, and exits with the number of
+failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
