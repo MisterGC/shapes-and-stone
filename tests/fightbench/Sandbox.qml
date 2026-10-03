@@ -8,7 +8,7 @@
 // The numbers are the game's own fight record (Game.qml).
 //
 // Driven by run_fightbench.py (clayliveloader --sbx Sandbox.qml), which
-// calls begin(seed), steps and reads report().
+// calls begin(seed, answer), steps and reads report().
 
 import QtQuick
 import Clayground.Common
@@ -30,13 +30,16 @@ Item {
 
     // ---- driver API ----
     property int seed: 0
+    property string answer: "mix"
     property int steps: 0
     property var _rng: null
 
-    // Pauses the world and enters the fight room; the driver steps from here
-    function begin(s) {
+    // Pauses the world and enters the fight room; the driver steps from here.
+    // answer is how the knight meets an attack: "mix", "block" or "parry".
+    function begin(s, a) {
         Clayground.paused = true
         seed = s
+        answer = a === undefined ? "mix" : a
         steps = 0
         _rng = game.createRng(s)
         _plans = new Map()
@@ -55,6 +58,7 @@ Item {
         let p = game.player
         return {
             seed: seed,
+            answer: answer,
             outcome: cleared ? "cleared" : fallen ? "fallen" : "running",
             steps: steps,
             seconds: round3(r.seconds),
@@ -65,18 +69,21 @@ Item {
             kills: r.kills,
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
-            knightHp: p ? p.hp : 0
+            knightHp: p ? p.hp : 0,
+            knightMana: p ? round3(p.mana) : 0
         }
     }
     function round3(v) { return Math.round(v * 1000) / 1000 }
 
     // ---- the scripted knight ----
-    // Each attack an enemy winds up gets one plan, rolled from the seed:
-    // "parry" waits for the parry window and swings into it, "block" raises
-    // the shield towards it.
+    // Each attack an enemy winds up gets one plan: "parry" waits for the
+    // parry window and swings into it, "block" raises the shield towards
+    // it. The answer "mix" rolls the plan from the seed, "block" and
+    // "parry" always pick that one. A shot is always blocked.
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
-    readonly property real parryChance: 0.6
+    readonly property real parryChance: answer === "block" ? 0
+                                      : answer === "parry" ? 1 : 0.6
 
     Connections {
         target: game.physics

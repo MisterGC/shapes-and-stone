@@ -46,7 +46,8 @@ PhysicsItem {
     property int maxHp: Balance.knight.hp
     property int atk: Balance.knight.atk
     property int def: Balance.knight.def
-    property int mana: Balance.knight.mana
+    // A raised shield drains mana, a parry gives some back
+    property real mana: Balance.knight.mana
     property int maxMana: Balance.knight.mana
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
@@ -57,6 +58,8 @@ PhysicsItem {
     property bool isAttacking: false
     property real _swingTimer: 0
     property bool isBlocking: false
+    // No mana, no shield: it cannot be raised, and drops when it runs dry
+    onIsBlockingChanged: if (isBlocking && mana <= 0) isBlocking = false
     property real attackCooldown: 0
     readonly property real blockSpeedMultiplier: Balance.knight.blockSpeed
     readonly property real pushForce: Balance.knight.pushSpeed  // Knockback velocity for dash-push
@@ -89,6 +92,11 @@ PhysicsItem {
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
             if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt
+            if (isBlocking && !fallen) {
+                let left = mana - Balance.knight.blockDrain * dt
+                mana = left < 1e-6 ? 0 : left
+                if (mana <= 0) isBlocking = false
+            }
             // A swing hits until its arc has faded, as long as the view
             // draws it, but counted in steps
             if (isAttacking) {
@@ -253,6 +261,7 @@ PhysicsItem {
                     if (gameWorld) gameWorld.countFight("parry")
                     enemy.stagger()
                     attackCooldown = 0
+                    mana = Math.min(maxMana, mana + Balance.knight.parryMana)
                     view.parry()
                     acted("parry")
                     if (gameWorld) {
@@ -314,10 +323,13 @@ PhysicsItem {
         return { x: xWu + Math.cos(rad) * 0.5, y: yWu + Math.sin(rad) * 0.5 }
     }
 
+    // Returns what became of the blow: "hit", "blocked" by the shield, or
+    // "ignored" - fallen, dashing or in the grace after a hit. Only a blow
+    // that was not ignored should look and sound like one.
     function takeDamage(amount, attackerX, attackerY) {
-        if (fallen) return
-        if (isDashing) return  // Invulnerable during dash
-        if (graceLeft > 0) return  // and for a moment after a hit
+        if (fallen) return "ignored"
+        if (isDashing) return "ignored"  // Invulnerable during dash
+        if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
         if (blocked) {
@@ -342,6 +354,7 @@ PhysicsItem {
                 gameWorld.shake(blocked ? 1 : 3)
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
+        return blocked ? "blocked" : "hit"
     }
 
     function dash() {
