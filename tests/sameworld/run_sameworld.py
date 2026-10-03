@@ -40,6 +40,10 @@ The scripted hit walks the knight into the enemy instead of swinging from
 a standstill: a resting knight on the joiner never registers a host's
 enemy (clayground#369).
 
+Whatever ends the run - its end, an exception, Ctrl-C - both loaders are
+stopped and the temp dir is removed; it is kept, with the loaders' logs,
+only after a run that got to its end with a failed check.
+
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
 first clayliveloader on PATH. It should be built from the Clayground commit
@@ -339,13 +343,20 @@ def main():
     result = {"mode": args.mode, "seed": args.seed, "fault": args.fault or "",
               "lagMs": args.lag, "slackMs": args.slack, "toleranceWu": args.tolerance,
               "clayground": clayground_commit()}
-    aborted = run(args, loader, tmp, procs, result, check) == 100
-    stop(procs)
-    code = 100 if aborted else failures
-    if code != 0:
-        print("Logs kept at:", tmp, file=sys.stderr)
-    else:
-        shutil.rmtree(tmp, ignore_errors=True)
+    # Whatever happens - a failed check, an exception, Ctrl-C - both
+    # loaders are stopped and the temp dir goes; it stays only after a run
+    # that got to its end with a failed check, for the logs
+    aborted, finished = True, False
+    try:
+        aborted = run(args, loader, tmp, procs, result, check) == 100
+        finished = True
+    finally:
+        stop(procs)
+        code = 100 if aborted else failures
+        if finished and code != 0:
+            print("Logs kept at:", tmp, file=sys.stderr)
+        else:
+            shutil.rmtree(tmp, ignore_errors=True)
     print(f"[SameWorld] done, {failures} failed")
     sys.exit(min(code, 100))
 
