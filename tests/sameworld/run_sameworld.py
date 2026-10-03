@@ -9,28 +9,36 @@ enemy, lets the joiner's knight land a scripted hit and checks the host
 takes it, and lets both knights fight for a few seconds. Every frame each
 instance records every enemy it shows: object id, position, HP and AI state.
 
-The comparison: the joiner shows the host's enemies a little in the past
-(50 ms plus the round trip, see docs/multiplayer-sync.md), so each of the
-joiner's records is compared with the host's of the --lag ms before it.
-An enemy on the joiner has to be one the host had then, at most --tolerance
-Wu from a position the host had then, with an HP and an AI state the host
-had then; an enemy on the host has to show up on the joiner within --lag ms.
-Both instances run on one machine: they share the wall clock the records
-are stamped with.
+The comparison. The joiner renders the host's enemies a fixed delay in the
+past, 50 ms plus the round trip (Enemy.qml, docs/multiplayer-sync.md), and
+each of its records carries that delay. An enemy's position on the joiner
+has to be within --tolerance Wu of the host's at that delay, give or take
+--slack ms (the host's position between its two frames around that
+moment). Its id, HP and AI state have to be ones the host had in the --lag
+ms before; an enemy on the host has to show up on the joiner within --lag
+ms. Both instances run on one machine: they share the wall clock the
+records are stamped with.
 
 Usage:
   run_sameworld.py [--loader <clayliveloader>] [--mode local|cloud]
-                   [--seed 424242] [--seconds 8] [--lag 300]
-                   [--tolerance 0.5] [--fault stale] [--json out.json]
+                   [--seed 424242] [--seconds 8] [--lag 300] [--slack 20]
+                   [--tolerance 0.25] [--fault stale] [--json out.json]
                    [--dump records.json]
+  run_sameworld.py --judge records.json [--late-ms 200]
 
 --fault stale makes the joiner apply none of the host's enemy states: the
-run has to fail then. --dump writes both screens' raw records.
+run has to fail then. --dump writes both screens' raw records; --judge
+judges such a file again, and --late-ms makes its joiner that much later
+than it was: a joiner 200 ms late has to fail.
 
-HP is a number, and Clayground's StateInterpolator blends every number it
-is given: between two of the host's states the joiner shows an HP between
-the two. Such a value counts as within tolerance and is counted
-(hpBlended); once the fight is over the HPs have to agree exactly.
+HP is a number, and Clayground blends every number of a replicated object
+(clayground#368): between two of the host's states the joiner shows an HP
+between the two. Until the clayground pin carries the fix such a value
+counts as within tolerance and is counted (hpBlended); right after the
+scripted hit and once the fight is over the HPs have to agree exactly.
+The scripted hit walks the knight into the enemy instead of swinging from
+a standstill: a resting knight on the joiner never registers a host's
+enemy (clayground#369).
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -42,6 +50,7 @@ with the number of failed checks (0: both screens showed the same world).
 """
 
 import argparse
+import bisect
 import json
 import math
 import os
@@ -138,19 +147,38 @@ def dist(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
-def compare(host, joiner, lag_ms, skew_ms=20):
-    """Each joiner record against the host's of the lag_ms before it, each
-    host enemy against the joiner's records of the lag_ms after it."""
+def host_at(host, times, eid, t):
+    """The host's position of enemy eid at time t, between its two frames
+    around t; None where the host had no such enemy then"""
+    i = bisect.bisect_left(times, t)
+    if i == 0 or i >= len(host):
+        return None
+    a, b = host[i - 1], host[i]
+    if eid not in a["e"] or eid not in b["e"]:
+        return None
+    f = (t - a["t"]) / max(1, b["t"] - a["t"])
+    pa, pb = a["e"][eid], b["e"][eid]
+    return (pa[0] + (pb[0] - pa[0]) * f, pa[1] + (pb[1] - pa[1]) * f)
+
+
+def compare(host, joiner, lag_ms, slack_ms, skew_ms=20):
+    """Each joiner record against the host's: the position against the
+    host's at the delay the joiner renders with (its record's d), give or
+    take slack_ms; id, HP and AI state against the host's of the lag_ms
+    before it. Each host enemy against the joiner's records of the lag_ms
+    after it."""
     res = {"joinerRecords": len(joiner), "hostRecords": len(host),
-           "judged": 0, "maxErrWu": 0.0, "maxErrAt": "", "sumErrWu": 0.0,
+           "judged": 0, "posJudged": 0, "maxErrWu": 0.0, "maxErrAt": "", "sumErrWu": 0.0,
            "unknownIds": 0, "missingIds": 0, "hpMiss": 0, "hpBlended": 0, "stateMiss": 0,
-           "notes": []}
+           "delayMs": [], "notes": []}
     if not host or not joiner:
         return res
+    times = [s["t"] for s in host]
     t_first = max(host[0]["t"], joiner[0]["t"]) + lag_ms
     # The two records stop a few frames apart: judge only what both had
     t_last_joiner = host[-1]["t"]
     t_last_host = joiner[-1]["t"] - lag_ms
+    delays = set()
 
     def note(s):
         if len(res["notes"]) < 8:
@@ -170,6 +198,9 @@ def compare(host, joiner, lag_ms, skew_ms=20):
             i += 1
         if not window:
             continue
+        d = js.get("d", 50)
+        delays.add(d)
+        shifts = range(d - slack_ms, d + slack_ms + 1, 4)
         for eid, je in js["e"].items():
             seen = [w[eid] for w in window if eid in w]
             res["judged"] += 1
@@ -177,23 +208,30 @@ def compare(host, joiner, lag_ms, skew_ms=20):
                 res["unknownIds"] += 1
                 note(f"{t}: joiner shows {eid}, the host had no such enemy")
                 continue
-            err = min(dist(je, he) for he in seen)
-            res["sumErrWu"] += err
-            if err > res["maxErrWu"]:
-                res["maxErrWu"] = err
-                res["maxErrAt"] = f"{eid} ({je[3]})"
-            hps = {he[2] for he in seen}
+            at = [p for p in (host_at(host, times, eid, t - sh) for sh in shifts) if p]
+            if at:
+                err = min(dist(je, p) for p in at)
+                res["posJudged"] += 1
+                res["sumErrWu"] += err
+                if err > res["maxErrWu"]:
+                    res["maxErrWu"] = err
+                    res["maxErrAt"] = f"{eid} ({je[3]})"
+            # What the host had then: each record's own, and the states and
+            # HPs it passed through since the record before
+            hps = {he[2] for he in seen} | {h for he in seen for h in (he[6] if len(he) > 6 else [])}
+            states = {he[3] for he in seen} | {x for he in seen for x in (he[5] if len(he) > 5 else [])}
             if je[2] not in hps:
-                # Clayground's StateInterpolator blends every number, HP
-                # too: a value between two the host had is within tolerance
+                # Clayground blends every number of a replicated object, HP
+                # too (clayground#368): a value between two the host had is
+                # within tolerance until the pin carries the fix
                 if min(hps) < je[2] < max(hps):
                     res["hpBlended"] += 1
                 else:
                     res["hpMiss"] += 1
                     note(f"{t}: {eid} HP {je[2]} on the joiner, host had {sorted(hps)}")
-            if je[3] not in {he[3] for he in seen}:
+            if je[3] not in states:
                 res["stateMiss"] += 1
-                note(f"{t}: {eid} {je[3]} on the joiner, host had {sorted({he[3] for he in seen})}")
+                note(f"{t}: {eid} {je[3]} on the joiner, host had {sorted(states)}")
 
     jlo = 0
     for hs in host:
@@ -214,9 +252,39 @@ def compare(host, joiner, lag_ms, skew_ms=20):
     for name, rec in (("host", host), ("joiner", joiner)):
         ts = [s["t"] for s in rec]
         res[name + "MaxFrameGapMs"] = max((b - a for a, b in zip(ts, ts[1:])), default=0)
-    res["meanErrWu"] = res["sumErrWu"] / max(1, res["judged"])
+    res["meanErrWu"] = res["sumErrWu"] / max(1, res["posJudged"])
+    res["delayMs"] = sorted(delays)
     del res["sumErrWu"]
     return res
+
+
+def judge(host_rec, join_rec, args, check):
+    """The checks on the two records; returns the comparison"""
+    cmp = compare(host_rec, join_rec, args.lag, args.slack)
+    states = sorted({e[3] for s in host_rec for e in s["e"].values()})
+    n, np = cmp["judged"], cmp["posJudged"]
+    ds = cmp["delayMs"]
+    delay = f"{ds[0]}" if len(ds) == 1 else f"{ds[0]}-{ds[-1]}" if ds else "?"
+    check(n > 0, f"{n} enemy records of the joiner judged against the host's "
+          f"({cmp['joinerRecords']} joiner frames, {cmp['hostRecords']} host frames)")
+    check("chase" in states and any(s in states for s in ("telegraph", "lunge", "shoot")),
+          f"the enemies chased and attacked meanwhile (host states: {', '.join(states)})")
+    check(cmp["unknownIds"] == 0 and cmp["missingIds"] == 0,
+          f"every enemy id agrees within {args.lag} ms ({cmp['unknownIds']} on the joiner "
+          f"only, {cmp['missingIds']} on the host only)")
+    check(np > 0 and cmp["maxErrWu"] <= args.tolerance,
+          f"every enemy's position is within {args.tolerance} Wu of the host's {delay} ms "
+          f"(50 + rtt) +-{args.slack} ms before (max {cmp['maxErrWu']:.3f} at "
+          f"{cmp['maxErrAt']}, mean {cmp['meanErrWu']:.3f}, {np} judged)")
+    check(n > 0 and cmp["hpMiss"] == 0,
+          f"every enemy's HP agrees within {args.lag} ms ({cmp['hpMiss']} misses, "
+          f"{cmp['hpBlended']} blended between two of the host's, clayground#368)")
+    check(n > 0 and cmp["stateMiss"] == 0,
+          f"every enemy's AI state agrees within {args.lag} ms ({cmp['stateMiss']} misses)")
+    for s in cmp["notes"]:
+        print("[SameWorld]   e.g.", s)
+    cmp["hostStates"] = states
+    return cmp
 
 
 def main():
@@ -227,42 +295,21 @@ def main():
     ap.add_argument("--seed", type=int, default=424242, help="the game's seed")
     ap.add_argument("--seconds", type=float, default=8.0, help="how long the knights fight")
     ap.add_argument("--lag", type=int, default=300,
-                    help="ms the joiner may show the host's enemies in the past")
-    ap.add_argument("--tolerance", type=float, default=0.5,
-                    help="Wu an enemy on the joiner may be from the host's")
+                    help="ms the joiner may show an id, HP or AI state after the host")
+    ap.add_argument("--slack", type=int, default=20,
+                    help="ms the joiner's position may be off the expected delay")
+    ap.add_argument("--tolerance", type=float, default=0.25,
+                    help="Wu an enemy on the joiner may be from the host's at that delay")
     ap.add_argument("--fault", choices=("stale",),
                     help="stale: the joiner applies none of the host's enemy states")
     ap.add_argument("--json", help="also write the numbers to this file")
     ap.add_argument("--dump", help="write both screens' raw records to this file")
+    ap.add_argument("--judge", metavar="DUMP",
+                    help="judge the records of an earlier --dump instead of running")
+    ap.add_argument("--late-ms", type=int, default=0,
+                    help="with --judge: make the joiner this much later than it was")
     args = ap.parse_args()
 
-    loader = find_loader(args.loader)
-    if not loader:
-        print("FAIL no clayliveloader: pass --loader, set CLAYLIVELOADER or "
-              "configure the build with -DCLAYGROUND_WITH_TOOLS=ON", file=sys.stderr)
-        sys.exit(100)
-
-    # The sandbox imports ../../src: copy both, keeping their places
-    tmp = tempfile.mkdtemp(prefix="sas_sameworld_")
-    skip = shutil.ignore_patterns(".clay", "__pycache__", "*.py")
-    shutil.copytree(os.path.join(REPO, "src"), os.path.join(tmp, "src"), ignore=skip)
-    sandbox_dir = os.path.join(tmp, "tests", "sameworld")
-    shutil.copytree(os.path.dirname(os.path.abspath(__file__)), sandbox_dir, ignore=skip)
-    sbx = os.path.join(sandbox_dir, "Sandbox.qml")
-
-    env = dict(os.environ)
-    env.setdefault("QT_QPA_PLATFORM", "offscreen")
-    procs = {}
-    for n in ("host", "joiner"):
-        log = open(os.path.join(tmp, f"{n}.log"), "w")
-        procs[n] = subprocess.Popen([loader, "--sbx", sbx, "--instance", n],
-                                    cwd=os.path.dirname(loader), env=env,
-                                    stdout=log, stderr=subprocess.STDOUT)
-    H, J = Inspect(sandbox_dir, "host"), Inspect(sandbox_dir, "joiner")
-
-    result = {"mode": args.mode, "seed": args.seed, "fault": args.fault or "",
-              "lagMs": args.lag, "toleranceWu": args.tolerance,
-              "clayground": clayground_commit()}
     failures = 0
 
     def check(ok, what):
@@ -272,10 +319,61 @@ def main():
             failures += 1
         return ok
 
+    if args.judge:
+        with open(args.judge) as f:
+            rec = json.load(f)
+        joiner = [dict(s, t=s["t"] + args.late_ms) for s in rec["joiner"]]
+        print(f"[SameWorld] judging {args.judge}, the joiner {args.late_ms} ms later", flush=True)
+        judge(rec["host"], joiner, args, check)
+        print(f"[SameWorld] done, {failures} failed")
+        sys.exit(min(failures, 100))
+
+    loader = find_loader(args.loader)
+    if not loader:
+        print("FAIL no clayliveloader: pass --loader, set CLAYLIVELOADER or "
+              "configure the build with -DCLAYGROUND_WITH_TOOLS=ON", file=sys.stderr)
+        sys.exit(100)
+
+    tmp = tempfile.mkdtemp(prefix="sas_sameworld_")
+    procs = {}
+    result = {"mode": args.mode, "seed": args.seed, "fault": args.fault or "",
+              "lagMs": args.lag, "slackMs": args.slack, "toleranceWu": args.tolerance,
+              "clayground": clayground_commit()}
+    aborted = run(args, loader, tmp, procs, result, check) == 100
+    stop(procs)
+    code = 100 if aborted else failures
+    if code != 0:
+        print("Logs kept at:", tmp, file=sys.stderr)
+    else:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print(f"[SameWorld] done, {failures} failed")
+    sys.exit(min(code, 100))
+
+
+def run(args, loader, tmp, procs, result, check):
+    """The session; returns the number of failed checks, 100 when it could
+    not get to the end"""
+    # The sandbox imports ../../src: copy both, keeping their places
+    skip = shutil.ignore_patterns(".clay", "__pycache__", "*.py")
+    shutil.copytree(os.path.join(REPO, "src"), os.path.join(tmp, "src"), ignore=skip)
+    sandbox_dir = os.path.join(tmp, "tests", "sameworld")
+    shutil.copytree(os.path.dirname(os.path.abspath(__file__)), sandbox_dir, ignore=skip)
+    sbx = os.path.join(sandbox_dir, "Sandbox.qml")
+
+    env = dict(os.environ)
+    env.setdefault("QT_QPA_PLATFORM", "offscreen")
+    for n in ("host", "joiner"):
+        log = open(os.path.join(tmp, f"{n}.log"), "w")
+        procs[n] = subprocess.Popen([loader, "--sbx", sbx, "--instance", n],
+                                    cwd=os.path.dirname(loader), env=env,
+                                    stdout=log, stderr=subprocess.STDOUT)
+    H, J = Inspect(sandbox_dir, "host"), Inspect(sandbox_dir, "joiner")
+    procs["inspect"] = (H, J)
+
     def abort(what):
         check(False, what)
         print(json.dumps(result, indent=2))
-        return finish(procs, tmp, 100)
+        return 100
 
     try:
         if not (H.wait_phase("ready") and J.wait_phase("ready")):
@@ -325,8 +423,9 @@ def main():
             host_rec.extend(H.json("take()") or [])
             join_rec.extend(J.json("take()") or [])
 
-        # The scripted hit: the joiner's knight strikes enemy b; the host
-        # applies the blow, the joiner shows the host's HP
+        # The scripted hit: the joiner's knight walks into enemy b and
+        # strikes it (walks: clayground#369); the host applies the blow,
+        # the joiner shows the host's HP
         hp0 = H.eval1(f"hpOf('{b}')")
         landed = False
         deadline = time.time() + 5
@@ -370,28 +469,7 @@ def main():
         if args.dump:
             with open(args.dump, "w") as f:
                 json.dump({"host": host_rec, "joiner": join_rec}, f)
-        cmp = compare(host_rec, join_rec, args.lag)
-        result["compare"] = cmp
-        states = sorted({e[3] for s in host_rec for e in s["e"].values()})
-        result["hostStates"] = states
-        n = cmp["judged"]
-        check(n > 0, f"{n} enemy records of the joiner judged against the host's "
-              f"({cmp['joinerRecords']} joiner frames, {cmp['hostRecords']} host frames)")
-        check("chase" in states and any(s in states for s in ("telegraph", "lunge", "shoot")),
-              f"the enemies chased and attacked meanwhile (host states: {', '.join(states)})")
-        check(cmp["unknownIds"] == 0 and cmp["missingIds"] == 0,
-              f"every enemy id agrees within {args.lag} ms ({cmp['unknownIds']} on the joiner "
-              f"only, {cmp['missingIds']} on the host only)")
-        check(n > 0 and cmp["maxErrWu"] <= args.tolerance,
-              f"every enemy's position agrees within {args.tolerance} Wu (max "
-              f"{cmp['maxErrWu']:.3f} at {cmp['maxErrAt']}, mean {cmp['meanErrWu']:.3f})")
-        check(n > 0 and cmp["hpMiss"] == 0,
-              f"every enemy's HP agrees within {args.lag} ms ({cmp['hpMiss']} misses, "
-              f"{cmp['hpBlended']} blended between two of the host's)")
-        check(n > 0 and cmp["stateMiss"] == 0,
-              f"every enemy's AI state agrees within {args.lag} ms ({cmp['stateMiss']} misses)")
-        for s in cmp["notes"]:
-            print("[SameWorld]   e.g.", s)
+        result["compare"] = judge(host_rec, join_rec, args, check)
     except TimeoutError as e:
         return abort(str(e))
 
@@ -400,15 +478,15 @@ def main():
         with open(args.json, "w") as f:
             json.dump(result, f, indent=2)
             f.write("\n")
-    print(f"[SameWorld] done, {failures} failed")
-    return finish(procs, tmp, failures, (H, J))
+    return 0
 
 
-def finish(procs, tmp, code, insts=()):
+def stop(procs):
+    insts = procs.pop("inspect", ())
     for i in insts:
         try:
             i.eval(["leave()"])
-        except TimeoutError:
+        except (TimeoutError, OSError):
             pass
     for p in procs.values():
         p.terminate()
@@ -417,11 +495,6 @@ def finish(procs, tmp, code, insts=()):
             p.wait(5)
         except subprocess.TimeoutExpired:
             p.kill()
-    if code == 0:
-        shutil.rmtree(tmp, ignore_errors=True)
-    else:
-        print("Logs kept at:", tmp, file=sys.stderr)
-    sys.exit(min(code, 100))
 
 
 if __name__ == "__main__":

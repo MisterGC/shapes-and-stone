@@ -111,7 +111,7 @@ Item {
     // The scripted hit: a step beside enemy id, walking into it, one swing.
     // Walking, not standing: a knight at rest sleeps in Box2D, and a
     // joiner's enemy, moved by its position only, does not wake it, so the
-    // swing sensor would not see it
+    // swing sensor would not see it (clayground#369)
     function strike(id) {
         if (!placeBeside(id)) return false
         let p = game.player, e = _byId()[id]
@@ -157,8 +157,43 @@ Item {
     // ---- the record: every enemy on this screen, every frame ----
     property bool recording: false
     property var _samples: []
-    function record(on) { recording = on; _samples = [] }
-    // The samples since the last take, as [{t, e: enemies()}]
+    function record(on) { recording = on; _samples = []; _passed = {} }
+    // The AI states and HPs each enemy took since the last frame: one can
+    // last less than a frame (a lunge lands and a blow staggers it at once)
+    // and still be sent, and so be shown by the other screen
+    property var _hooked: ({})
+    property var _passed: ({})
+    function _note(id, key, v) {
+        let p = _passed[id] || (_passed[id] = {s: [], h: []})
+        p[key].push(v)
+    }
+    function _hook() {
+        for (let e of game.enemies) {
+            if (!e || e.destroyed || e.objectId === "" || _hooked[e.objectId]) continue
+            let id = e.objectId, en = e
+            _hooked[id] = true
+            en.aiStateChanged.connect(() => bench._note(id, "s", en.aiState))
+            en.hpChanged.connect(() => bench._note(id, "h", en.hp))
+        }
+    }
+    // One record: enemies() plus, per enemy, the states and HPs it took
+    // since the last record
+    function _recordFrame() {
+        let e = enemies()
+        for (let id in e) {
+            let p = _passed[id]
+            e[id].push(p ? p.s : [], p ? p.h : [])
+        }
+        _passed = {}
+        _hook()
+        let s = {t: Date.now(), e: e}
+        let d = renderDelayMs()
+        if (d >= 0) s.d = d
+        _samples.push(s)
+    }
+    // The samples since the last take, as [{t, e: _recordFrame's}]; a joiner's
+    // also carry d, the delay in ms its enemies are rendered with (50 ms
+    // plus the round trip, Enemy.qml)
     function take() {
         let s = _samples
         _samples = []
@@ -169,8 +204,20 @@ Item {
         running: bench.fighting || bench.recording
         onTriggered: {
             if (bench.fighting) bench._pilot()
-            if (bench.recording) bench._samples.push({t: Date.now(), e: bench.enemies()})
+            if (bench.recording) bench._recordFrame()
         }
+    }
+
+    // The delay a joiner's enemies are rendered with; -1 without one
+    function renderDelayMs() {
+        let r = _replicaOf(game.enemies.find(e => e && !e.destroyed && e.remote))
+        return r ? r.interpolator.delayMs : -1
+    }
+    function _replicaOf(e) {
+        if (!e) return null
+        for (let i = 0; i < e.data.length; i++)
+            if (typeof e.data[i]._receive === "function") return e.data[i]
+        return null
     }
 
     // ---- fault "stale": the joiner applies none of the host's enemy states ----
@@ -178,10 +225,8 @@ Item {
         let n = 0
         for (let e of game.enemies) {
             if (!e || !e.remote) continue
-            for (let i = 0; i < e.data.length; i++) {
-                let r = e.data[i]
-                if (typeof r._receive === "function") { r.properties = []; n++ }
-            }
+            let r = _replicaOf(e)
+            if (r) { r.properties = []; n++ }
         }
         return n
     }
