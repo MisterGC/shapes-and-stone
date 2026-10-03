@@ -31,6 +31,9 @@ Item {
     property real dashCooldownProgress: 1   // 0 just dashed, 1 ready
     // Seconds left of the grace after a hit: the knight flickers white
     property real graceLeft: 0
+    // At 0 HP: the knight slumps to the floor, dark, its lantern low and
+    // no aim shown - the same on every screen that draws it
+    property bool downed: false
 
     // Seconds, from the balance table: wind up plus follow through, and
     // the fade of the arc after it
@@ -75,7 +78,7 @@ Item {
         enabled: view._fx
         radius: view.gameWorld && view.gameWorld.levelType === "village" ? 5.5 : 7.5
         color: view.gameWorld && view.gameWorld.levelType === "village" ? "#FFC98A" : "#FFE2B8"
-        intensity: 1.0
+        intensity: view.downed ? 0.35 : 1.0
         flicker: 0.08
         castsShadows: true
     }
@@ -114,8 +117,8 @@ Item {
         transform: [
             Scale {
                 origin.x: visual.width / 2; origin.y: visual.height
-                xScale: view._fx ? 1 - 0.02 * view._breath + 0.03 * view._step : 1
-                yScale: view._fx ? 1 + 0.03 * view._breath - 0.05 * view._step : 1
+                xScale: view.downed ? 1.2 : view._fx ? 1 - 0.02 * view._breath + 0.03 * view._step : 1
+                yScale: view.downed ? 0.5 : view._fx ? 1 + 0.03 * view._breath - 0.05 * view._step : 1
             },
             Translate {
                 x: view._fx ? view.moveX * visual.width * 0.04 : 0
@@ -234,6 +237,15 @@ Item {
             id: parryGlow
             PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
         }
+
+        // Downed: the body darkens
+        Rectangle {
+            objectName: "downedShade"
+            anchors.fill: parent
+            radius: parent.radius
+            color: "#000000"
+            opacity: view.downed ? 0.55 : 0
+        }
     }
 
     // The lantern: carried in the off hand, a quarter turn from the facing
@@ -242,6 +254,7 @@ Item {
     Item {
         id: lantern
         visible: view._fx
+        opacity: view.downed ? 0.5 : 1
         readonly property real angleRad: (view.facingAngle + 100) * Math.PI / 180
         readonly property real orbit: view.width * 0.62
         readonly property real swing: Math.sin(view._lifeT * 5.5) * view.moveAmount * view.width * 0.05
@@ -373,6 +386,7 @@ Item {
     // Direction indicator arrowhead (orbits around the knight)
     Canvas {
         id: aimArrow
+        visible: !view.downed
         opacity: 0.5
         readonly property real arrowSize: view.width * 0.3
         readonly property real orbitRadius: view.width * 0.7

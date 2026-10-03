@@ -144,6 +144,7 @@ PhysicsItem {
         dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
         swingDuration: player.attackDuration
         graceLeft: player.graceLeft
+        downed: player.fallen
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)

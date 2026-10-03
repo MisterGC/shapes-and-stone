@@ -2641,6 +2641,7 @@ ClayWorld2d {
                 bestDepth: world.bestDepth
                 newBest: world.depth > world.runStartBest
                 canGoAgain: !session.connected
+                partyFights: session.connected
                 onGoAgain: world.newRun()
                 onBackToTitle: world.backToTitle()
             }

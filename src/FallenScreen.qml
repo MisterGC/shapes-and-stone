@@ -2,7 +2,9 @@ import QtQuick
 
 // Shown when the knight falls: how deep the run got, its kills and time,
 // the best depth kept between runs, Enter to go again, Esc back to the
-// title. Takes the keyboard focus and every click.
+// title. In a session whose other knights still fight it says the knight
+// is down, keeps the dungeon in sight and offers only Esc, which leaves.
+// Takes the keyboard focus and every click.
 Item {
     id: fallenScreen
     objectName: "fallenScreen"
@@ -17,9 +19,12 @@ Item {
     property int bestDepth: 0
     // This run went deeper than any before it
     property bool newBest: false
-    // A session run ends for everyone or no one (co-op death is #19):
-    // until then a fallen co-op player only leaves
+    // A session run ends for everyone or no one: a fallen co-op player
+    // only leaves
     property bool canGoAgain: true
+    // Another knight of the session still stands: this one is down, the
+    // run goes on, and the dungeon stays in sight
+    property bool partyFights: false
 
     // Deferred like the title screen's: the game may still take focus in
     // the same frame
@@ -36,7 +41,11 @@ Item {
         anchors.fill: parent
         color: "#000000"
         opacity: 0
-        NumberAnimation on opacity { to: 0.75; duration: 900; easing.type: Easing.OutQuad }
+        NumberAnimation on opacity {
+            to: fallenScreen.partyFights ? 0.3 : 0.75
+            duration: 900
+            easing.type: Easing.OutQuad
+        }
     }
 
     Column {
@@ -48,7 +57,7 @@ Item {
         Text {
             objectName: "fallenTitle"
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "You have fallen"
+            text: fallenScreen.partyFights ? "You are down" : "You have fallen"
             color: "#CC4444"
             font.pixelSize: 42
             font.bold: true
@@ -87,9 +96,12 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
+            objectName: "fallenHint"
             text: fallenScreen.canGoAgain
                   ? "Enter to go again • Esc to the title"
-                  : "Esc to leave the session"
+                  : fallenScreen.partyFights
+                    ? "Your party fights on • Esc to leave the session"
+                    : "Esc to leave the session"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true

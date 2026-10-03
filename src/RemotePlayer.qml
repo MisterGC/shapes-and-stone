@@ -134,5 +134,6 @@ PhysicsItem {
         moveAmount: rp._moveAmount
         blocking: rp.remoteBlocking
         dashing: rp.actionState === 3
+        downed: rp.remoteHp <= 0
     }
 }
