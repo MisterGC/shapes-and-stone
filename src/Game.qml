@@ -90,8 +90,9 @@ ClayWorld2d {
         volume: muted ? 0 : 0.6
     }
 
-    function playImpact() {
-        impactSound.play()
+    // gain (0..1) is for sounds of another player's knight, see remoteGain()
+    function playImpact(gain) {
+        impactSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
     Sound {
@@ -106,12 +107,23 @@ ClayWorld2d {
         volume: muted ? 0 : 0.5
     }
 
-    function playDash() {
-        dashSound.play()
+    function playDash(gain) {
+        dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
-    function playSwordSwing() {
-        swordSwingSound.play()
+    function playSwordSwing(gain) {
+        swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+
+    // How loud another knight is at xWu/yWu: never as loud as your own
+    // knight, and fading to silence about a screen away from you
+    readonly property real remoteMaxGain: 0.5
+    readonly property real remoteHearingWu: 14
+    function remoteGain(xWu, yWu) {
+        if (!player) return remoteMaxGain
+        let dx = xWu - player.xWu, dy = yWu - player.yWu
+        let d = Math.sqrt(dx * dx + dy * dy)
+        return remoteMaxGain * Math.max(0, 1 - d / remoteHearingWu)
     }
 
     function playDeathBurst() {
@@ -434,8 +446,6 @@ ClayWorld2d {
             if (!player) return
             if (mouse.button === Qt.LeftButton) {
                 player.attack()
-                // Reliable event so remote clients show the swing crisply
-                if (player.isAttacking) session.sendAction("attack")
             }
             if (mouse.button === Qt.RightButton) player.isBlocking = true
         }
@@ -501,7 +511,6 @@ ClayWorld2d {
         onButtonBPressedChanged: {
             if (buttonBPressed && player) {
                 player.dash()
-                if (player.isDashing) session.sendAction("dash")
             }
         }
     }
@@ -755,6 +764,13 @@ ClayWorld2d {
         }
     }
 
+    // Reliable events so the other players see swings, dashes, parries and
+    // hits crisply, not only when the sampled state catches them
+    Connections {
+        target: player
+        function onActed(action) { session.sendAction(action) }
+    }
+
     // Track player movement for minimap exploration
     Connections {
         target: player
@@ -790,20 +806,6 @@ ClayWorld2d {
         glow: 0.1
         falloff: 1.6
         shadowHardness: 2.5
-    }
-
-    // The player's own lantern: small, steady, just enough to fight by
-    Light2d {
-        target: world.player
-        // xWu/yWu of a body are its top-left corner
-        offsetXWu: 0.5
-        offsetYWu: -0.5
-        enabled: world.fx && world.player !== null
-        radius: levelType === "village" ? 5.5 : 7.5
-        color: levelType === "village" ? "#FFC98A" : "#FFE2B8"
-        intensity: 1.0
-        flicker: 0.08
-        castsShadows: true
     }
 
     ScreenFx2d {

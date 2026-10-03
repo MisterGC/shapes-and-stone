@@ -29,6 +29,20 @@ check every PR runs (`.github/workflows/build.yml`):
 ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 ```
 
+Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
+The knight bench puts the two side by side in the dungeon, makes them swing,
+block, parry, get hurt and dash at the same moment, and saves a PNG per pose:
+
+```
+cp build/.qsb/src/shaders/*.qsb src/shaders/
+qml -I build/bin/qml tests/knights/knights.qml -- <out dir>
+```
+
+The shaders are copied because the bench loads the QML from `src/`, not from
+the resources. On macOS the `qml` from the Qt installer refuses the build's
+ad-hoc signed plugins; a copy of it signed ad hoc (`codesign -s - --force`)
+next to a `lib` link to Qt's `lib` loads them.
+
 To build against another Clayground commit, move the submodule and commit it:
 
 ```

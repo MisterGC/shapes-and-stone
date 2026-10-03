@@ -72,7 +72,6 @@ PhysicsItem {
 
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held
-    property int _dashStepCount: 0
     Connections {
         target: player.world
         function onStepped() {
@@ -82,13 +81,6 @@ PhysicsItem {
                 let spd = isBlocking ? dashSpeed * blockSpeedMultiplier : dashSpeed
                 player.body.linearVelocity = Qt.point(_dashDirX * spd, _dashDirY * spd)
                 _dashTimer -= dt
-                _dashStepCount++
-                if (_dashStepCount % 2 === 0 && player.parent) {
-                    afterimageComp.createObject(player.parent, {
-                        x: player.x, y: player.y,
-                        width: player.width, height: player.height
-                    })
-                }
                 // Dash-push: knockback enemies instead of damage
                 if (isBlocking) pushEnemiesInRange()
                 if (_dashTimer <= 0) isDashing = false
@@ -115,304 +107,27 @@ PhysicsItem {
         }
     }
 
+    // A moment others should see: "attack", "dash", "parry" or "hurt".
+    // Game.qml sends it to the other players, whose RemotePlayer shows it.
+    signal acted(string action)
+
     // Healing state (set by Campfire)
     property bool isHealing: false
 
-    // Contact shadow: grounds the shape on the floor
-    Rectangle {
-        z: -1
-        visible: gameWorld ? gameWorld.fx : false
-        width: parent.width * 0.92
-        // Kept inside the body's bounds: a child reaching outside inflates
-        // childrenRect and skews the physics debug draw
-        height: parent.height * 0.32
-        radius: height / 2
-        x: (parent.width - width) / 2
-        y: parent.height * 0.68
-        color: "#000000"
-        opacity: 0.38
-    }
-
-    // Life: breathing at rest, a step bob and a lean while walking.
-    // Visual only - the body and its collider do not move.
-    readonly property bool _fx: gameWorld ? gameWorld.fx === true : false
-    readonly property real _moveAmount: Math.min(1, Math.sqrt(moveX * moveX + moveY * moveY))
-    property real _lifeT: 0
-    NumberAnimation on _lifeT {
-        running: player._fx
-        from: 0; to: 1000; duration: 1000000
-        loops: Animation.Infinite
-    }
-    readonly property real _breath: Math.sin(_lifeT * 2.4) * (1 - _moveAmount)
-    readonly property real _step: Math.abs(Math.sin(_lifeT * 11)) * _moveAmount
-
-    // Visual: Steel Blue circle (Knight)
-    Rectangle {
-        id: visual
-        anchors.centerIn: parent
-        width: parent.width
-        height: parent.height
-        transform: [
-            Scale {
-                origin.x: visual.width / 2; origin.y: visual.height
-                xScale: player._fx ? 1 - 0.02 * player._breath + 0.03 * player._step : 1
-                yScale: player._fx ? 1 + 0.03 * player._breath - 0.05 * player._step : 1
-            },
-            Translate {
-                x: player._fx ? player.moveX * visual.width * 0.04 : 0
-                y: player._fx ? -player._step * visual.height * 0.07 : 0
-            }
-        ]
-        color: "#4A90A4"  // Steel Blue
-        radius: width * .5
-
-        BodyShade {
-            visible: gameWorld ? gameWorld.fx : false
-            baseColor: visual.color
-        }
-
-        // Healing shimmer
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: "#44CC44"
-            opacity: 0
-            SequentialAnimation on opacity {
-                running: isHealing
-                loops: Animation.Infinite
-                NumberAnimation { to: 0.25; duration: 400; easing.type: Easing.InOutSine }
-                NumberAnimation { to: 0; duration: 400; easing.type: Easing.InOutSine }
-            }
-        }
-
-        Canvas {
-            anchors.centerIn: parent
-            width: parent.width * 0.6
-            height: parent.height * 0.6
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.reset()
-                var w = width, h = height
-                ctx.fillStyle = "#2A6A84"
-                ctx.strokeStyle = "#2A6A84"
-                ctx.lineWidth = w * 0.06
-
-                // Dome
-                ctx.beginPath()
-                ctx.moveTo(w * 0.15, h * 0.55)
-                ctx.quadraticCurveTo(w * 0.15, h * 0.1, w * 0.5, h * 0.08)
-                ctx.quadraticCurveTo(w * 0.85, h * 0.1, w * 0.85, h * 0.55)
-                ctx.closePath()
-                ctx.fill()
-
-                // Visor slit
-                ctx.fillStyle = "#4A90A4"
-                ctx.fillRect(w * 0.2, h * 0.42, w * 0.6, h * 0.1)
-
-                // Cheek guards
-                ctx.fillStyle = "#2A6A84"
-                ctx.beginPath()
-                ctx.moveTo(w * 0.15, h * 0.55)
-                ctx.lineTo(w * 0.15, h * 0.78)
-                ctx.lineTo(w * 0.3, h * 0.88)
-                ctx.lineTo(w * 0.3, h * 0.55)
-                ctx.closePath()
-                ctx.fill()
-
-                ctx.beginPath()
-                ctx.moveTo(w * 0.85, h * 0.55)
-                ctx.lineTo(w * 0.85, h * 0.78)
-                ctx.lineTo(w * 0.7, h * 0.88)
-                ctx.lineTo(w * 0.7, h * 0.55)
-                ctx.closePath()
-                ctx.fill()
-
-                // Nose guard
-                ctx.fillRect(w * 0.46, h * 0.35, w * 0.08, h * 0.25)
-            }
-        }
-
-        SequentialAnimation {
-            id: dashFlash
-            PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
-        }
-
-        // Hurt flash: white for a few frames, then back
-        Rectangle {
-            id: hurtFlashRect
-            anchors.fill: parent
-            radius: parent.radius
-            color: "white"
-            opacity: 0
-        }
-        SequentialAnimation {
-            id: hurtFlash
-            PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0.95 }
-            PauseAnimation { duration: 50 }
-            NumberAnimation { target: hurtFlashRect; property: "opacity"; to: 0; duration: 140 }
-        }
-
-        // Parry glow
-        Rectangle {
-            id: parryGlowRect
-            anchors.fill: parent
-            radius: parent.radius
-            color: "#FFD700"
-            opacity: 0
-        }
-
-        SequentialAnimation {
-            id: parryGlow
-            PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
-        }
-    }
-
-    // The lantern: carried in the off hand, a quarter turn from the facing
-    // direction, swinging a little with each step. The light around the
-    // knight has a source you can see.
-    Item {
-        id: lantern
-        visible: player._fx
-        readonly property real angleRad: (facingAngle + 100) * Math.PI / 180
-        readonly property real orbit: player.width * 0.62
-        readonly property real swing: Math.sin(player._lifeT * 5.5) * player._moveAmount * player.width * 0.05
-        width: player.width * 0.26
-        height: width * 1.25
-        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbit + swing
-        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbit
-        z: facingAngle > 0 && facingAngle < 180 ? -0.5 : 1
-        // Halo
-        Rectangle {
-            anchors.centerIn: glass
-            width: lantern.width * 2.2
-            height: width
-            radius: width / 2
-            color: "#FFD27A"
-            opacity: 0.18 + 0.05 * Math.sin(player._lifeT * 13)
-        }
-        // Handle, cage and the flame behind the glass
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width * 0.5; height: parent.height * 0.18
-            radius: height / 2
-            color: "transparent"
-            border.color: "#2A2420"; border.width: Math.max(1, width * 0.18)
-        }
-        Rectangle {
-            id: glass
-            y: parent.height * 0.14
-            width: parent.width; height: parent.height * 0.86
-            radius: width * 0.2
-            color: "#FFE8A8"
-            border.color: "#3A302A"; border.width: Math.max(1, width * 0.14)
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.width * 0.34; height: parent.height * 0.42
-                radius: width / 2
-                color: "#FFFFFF"
-            }
-        }
-    }
-
-    // Shield arc visual (orbits on facing side when blocking)
-    Canvas {
-        id: shieldArc
-        visible: isBlocking
-        readonly property real shieldSize: player.width * 0.8
-        readonly property real orbitRadius: player.width * 0.5
-        readonly property real angleRad: facingAngle * Math.PI / 180
-        width: shieldSize
-        height: shieldSize
-        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
-        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
-        rotation: -facingAngle
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var w = width, h = height
-            ctx.beginPath()
-            ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
-            ctx.strokeStyle = "#7AB8D4"
-            ctx.lineWidth = w * 0.25
-            ctx.stroke()
-        }
-
-        onVisibleChanged: if (visible) requestPaint()
-    }
-
-    // Dash cooldown ring
-    Canvas {
-        id: dashCooldownRing
-        anchors.centerIn: parent
-        width: parent.width * 1.3
-        height: parent.height * 1.3
-        visible: dashCooldown > 0
-        opacity: 0.4
-
-        property real progress: 1.0 - (dashCooldown / dashCooldownTime)
-
-        onProgressChanged: requestPaint()
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var cx = width / 2, cy = height / 2
-            var r = width * 0.45
-            var startAngle = -Math.PI / 2
-            var endAngle = startAngle + progress * Math.PI * 2
-            ctx.beginPath()
-            ctx.arc(cx, cy, r, startAngle, endAngle)
-            ctx.strokeStyle = "#AAAAAA"
-            ctx.lineWidth = 2
-            ctx.stroke()
-        }
-    }
-
-    // Dash afterimage component
-
-    Component {
-        id: afterimageComp
-        Rectangle {
-            id: _ghost
-            radius: width * 0.5
-            color: "#7AB8D4"
-            opacity: 0.5
-            SequentialAnimation {
-                running: true
-                ParallelAnimation {
-                    NumberAnimation { target: _ghost; property: "opacity"; to: 0; duration: 200 }
-                    NumberAnimation { target: _ghost; property: "scale"; to: 0.5; duration: 200 }
-                }
-                ScriptAction { script: _ghost.destroy() }
-            }
-        }
-    }
-
-    // Direction indicator arrowhead (orbits around player)
-    Canvas {
-        id: aimArrow
-        opacity: 0.5
-        readonly property real arrowSize: player.width * 0.3
-        readonly property real orbitRadius: player.width * 0.7
-        readonly property real angleRad: facingAngle * Math.PI / 180
-        width: arrowSize
-        height: arrowSize
-        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
-        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
-        rotation: -facingAngle
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var w = width, h = height
-            ctx.beginPath()
-            ctx.moveTo(w, h * 0.5)
-            ctx.lineTo(0, 0)
-            ctx.lineTo(w * 0.3, h * 0.5)
-            ctx.lineTo(0, h)
-            ctx.closePath()
-            ctx.fillStyle = "#7AB8D4"
-            ctx.fill()
-        }
+    // How the knight looks: shared with the RemotePlayer
+    KnightView {
+        id: view
+        host: player
+        gameWorld: player.gameWorld
+        facingAngle: player.facingAngle
+        moveX: player.moveX
+        moveAmount: Math.min(1, Math.sqrt(player.moveX * player.moveX + player.moveY * player.moveY))
+        blocking: player.isBlocking
+        dashing: player.isDashing
+        healing: player.isHealing
+        dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
+        swingDuration: player.attackDuration
+        onSwingFinished: player.isAttacking = false
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -451,156 +166,6 @@ PhysicsItem {
         Connections {
             target: player
             function onFacingAngleChanged() { attackZoneDebug.requestPaint() }
-        }
-    }
-
-    // Attack swing visualization
-    // Reparented to avoid inflating PhysicsItem's childrenRect.
-    Canvas {
-        id: attackArc
-        parent: player.parent
-        x: player.x + player.width/2 - width/2
-        y: player.y + player.height/2 - height/2
-        width: player.width * 4
-        height: player.height * 4
-        visible: isAttacking
-        rotation: -facingAngle
-
-        // Swing progress: 0 = start, 1 = end
-        property real swingProgress: 0
-        property real swingOpacity: 0.9
-
-        onSwingProgressChanged: requestPaint()
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-
-            var centerX = width / 2
-            var centerY = height / 2
-            var radius = width * 0.4
-            var innerRadius = width * 0.15
-
-            // Swing range 120 degrees
-            var swingRange = Math.PI * 0.67
-            var startAngle = -swingRange / 2
-            var currentAngle = startAngle + (swingProgress * swingRange)
-
-            // Smear: a crescent over the path the blade has covered, brightest
-            // just behind the blade, fading towards where the swing began.
-            if (gameWorld && gameWorld.fx) {
-                var segs = 10
-                var covered = currentAngle - startAngle
-                for (var sI = 0; sI < segs; sI++) {
-                    var a0 = startAngle + covered * sI / segs
-                    var a1 = startAngle + covered * (sI + 1) / segs + 0.01
-                    var k = (sI + 1) / segs
-                    var inner = innerRadius * 1.3 + (radius - innerRadius) * 0.35 * (1 - k)
-                    ctx.beginPath()
-                    ctx.arc(centerX, centerY, radius * (0.96 + 0.04 * k), a0, a1)
-                    ctx.arc(centerX, centerY, inner, a1, a0, true)
-                    ctx.closePath()
-                    ctx.fillStyle = "rgba(210, 236, 255, " + (swingOpacity * 0.55 * k * k) + ")"
-                    ctx.fill()
-                }
-            }
-
-            // Draw motion trails (3 curved arcs = "cut air" effect)
-            var arcSpan = 0.18  // ~10 degrees per arc
-            for (var i = 3; i >= 1; i--) {
-                var trailOffset = currentAngle - (i * 0.25)  // Offset behind blade
-                var trailRadius = innerRadius + (radius - innerRadius) * (i / 4)  // Varying radii
-                var trailOpacity = swingOpacity * (1.0 - i * 0.25)
-                ctx.beginPath()
-                ctx.arc(centerX, centerY, trailRadius, trailOffset - arcSpan/2, trailOffset + arcSpan/2)
-                ctx.strokeStyle = "rgba(122, 184, 212, " + trailOpacity + ")"
-                ctx.lineWidth = 2
-                ctx.stroke()
-            }
-
-            // Draw sword blade at leading edge
-            var bladeLen = radius - innerRadius
-            var bladeW = bladeLen * 0.15
-            var bx = centerX + innerRadius * Math.cos(currentAngle)
-            var by = centerY + innerRadius * Math.sin(currentAngle)
-            var tx = centerX + radius * Math.cos(currentAngle)
-            var ty = centerY + radius * Math.sin(currentAngle)
-            var perpX = -Math.sin(currentAngle)
-            var perpY = Math.cos(currentAngle)
-
-            ctx.beginPath()
-            // Tip
-            ctx.moveTo(tx, ty)
-            // Right shoulder
-            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) + perpX * bladeW,
-                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) + perpY * bladeW)
-            // Right base
-            ctx.lineTo(bx + perpX * bladeW * 0.6, by + perpY * bladeW * 0.6)
-            // Cross-guard right
-            ctx.lineTo(bx + perpX * bladeW * 0.9, by + perpY * bladeW * 0.9)
-            // Cross-guard left
-            ctx.lineTo(bx - perpX * bladeW * 0.9, by - perpY * bladeW * 0.9)
-            // Left base
-            ctx.lineTo(bx - perpX * bladeW * 0.6, by - perpY * bladeW * 0.6)
-            // Left shoulder
-            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) - perpX * bladeW,
-                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) - perpY * bladeW)
-            ctx.closePath()
-            ctx.fillStyle = "rgba(90, 154, 180, " + swingOpacity + ")"
-            ctx.fill()
-            ctx.strokeStyle = "rgba(122, 184, 212, " + swingOpacity + ")"
-            ctx.lineWidth = 1.5
-            ctx.stroke()
-
-            // Center ridge
-            ctx.beginPath()
-            ctx.moveTo(bx, by)
-            ctx.lineTo(tx, ty)
-            ctx.strokeStyle = "rgba(58, 138, 154, " + swingOpacity * 0.8 + ")"
-            ctx.lineWidth = 1
-            ctx.stroke()
-        }
-
-        // Swing animation
-        SequentialAnimation {
-            id: attackAnimation
-
-            // First half of swing (wind up)
-            PropertyAnimation {
-                target: attackArc
-                property: "swingProgress"
-                from: 0
-                to: 0.5
-                duration: attackDuration * 500
-                easing.type: Easing.OutQuad
-            }
-
-            // Second half of swing (follow through)
-            PropertyAnimation {
-                target: attackArc
-                property: "swingProgress"
-                from: 0.5
-                to: 1
-                duration: attackDuration * 500
-                easing.type: Easing.OutQuad
-            }
-
-            // Fade out
-            PropertyAnimation {
-                target: attackArc
-                property: "swingOpacity"
-                from: 0.9
-                to: 0
-                duration: 100
-            }
-
-            ScriptAction {
-                script: {
-                    isAttacking = false
-                    attackArc.swingProgress = 0
-                    attackArc.swingOpacity = 0.9
-                }
-            }
         }
     }
 
@@ -679,7 +244,8 @@ PhysicsItem {
                 if (parried) {
                     enemy.stagger()
                     attackCooldown = 0
-                    parryGlow.restart()
+                    view.parry()
+                    acted("parry")
                     if (gameWorld) {
                         gameWorld.playImpact()
                         if (gameWorld.impact)
@@ -748,7 +314,10 @@ PhysicsItem {
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
-        if (!blocked) hurtFlash.restart()
+        if (!blocked) {
+            view.hurt()
+            acted("hurt")
+        }
         if (gameWorld) {
             if (gameWorld.impact)
                 gameWorld.impact(blocked ? "playerBlocked" : "playerHit", xWu, yWu,
@@ -776,9 +345,9 @@ PhysicsItem {
         isDashing = true
         _hitThisSwing = new Set()
         _dashTimer = dashDuration
-        _dashStepCount = 0
         dashCooldown = dashCooldownTime
-        dashFlash.restart()
+        view.dash(dashDuration * 1000)
+        acted("dash")
         if (gameWorld) gameWorld.playDash()
     }
 
@@ -787,8 +356,8 @@ PhysicsItem {
             isAttacking = true
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
-            attackArc.requestPaint()
-            attackAnimation.restart()
+            view.swing()
+            acted("attack")
             if (!isDashing && gameWorld) gameWorld.playSwordSwing()
             console.log("[Player] Attack! Facing:", facingAngle.toFixed(0), "degrees")
         }
