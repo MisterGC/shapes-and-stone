@@ -177,7 +177,9 @@ PhysicsItem {
             case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
             case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
             case "kite": base = "#8EBB5A"; break
-            case "shoot": base = "#AADD66"; break
+            // A spitter winding up its shot turns warm yellow: an attack
+            // coming, like the melee telegraph, and far from its kiting green
+            case "shoot": base = "#F2D13A"; break
             case "telegraph": base = "#FF8C00"; break
             case "lunge": base = "#FF4444"; break
             case "stagger": base = "#666666"; break
