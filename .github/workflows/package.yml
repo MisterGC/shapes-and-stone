@@ -1,0 +1,282 @@
+name: Package
+
+# Builds the native game for a friend without Qt: a zip for macOS
+# (Apple Silicon) and Windows, an AppImage for Linux. Each package is then
+# started on a fresh runner that never had Qt installed.
+#
+# The packages are workflow artifacts. When a release is published by hand,
+# they are attached to it as well; this workflow never creates, tags or
+# publishes a release itself.
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+  # A PR that changes the packaging runs it, so its result is seen before
+  # a release needs it.
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - '.github/workflows/package.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Qt and modules Build (build.yml) and Clayground's own CI build with.
+  QT_VERSION: '6.10.1'
+  QT_MODULES: 'qtmultimedia qtquick3d qtquick3dphysics qtquicktimeline qtshadertools qt5compat qtimageformats'
+  AQT_VERSION: '>=3.2.0'
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: 'recursive'
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: mac
+        target: desktop
+        arch: clang_64
+        modules: ${{ env.QT_MODULES }}
+        aqtversion: ${{ env.AQT_VERSION }}
+        cache: true
+
+    - name: Install Ninja
+      run: brew install ninja
+
+    - name: Setup compiler cache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: macos-package
+        max-size: 1G
+
+    - name: Configure
+      run: |
+        cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Package
+      run: packaging/package-macos.sh build dist "$QT_ROOT_DIR/bin/macdeployqt"
+
+    # Two games on the package's runtime host and join a LAN session
+    - name: LAN check
+      run: packaging/lan-check.sh "dist/Shapes and Stone.app" "$QT_ROOT_DIR/bin/qml"
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShapesAndStone-macos-arm64
+        path: dist/ShapesAndStone-macos-arm64.zip
+
+  windows:
+    runs-on: windows-2022
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: 'recursive'
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: windows
+        target: desktop
+        arch: win64_msvc2022_64
+        modules: ${{ env.QT_MODULES }}
+        aqtversion: ${{ env.AQT_VERSION }}
+        cache: true
+
+    - name: Install Ninja
+      run: choco install ninja -y
+      shell: cmd
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Setup compiler cache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        variant: sccache
+        key: windows-package
+        max-size: 1G
+
+    - name: Configure
+      run: >
+        cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
+        -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache .
+
+    - name: Build
+      run: cmake --build build
+      env:
+        CL: /MP
+
+    - name: Package
+      shell: pwsh
+      run: packaging/package-windows.ps1 build dist
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShapesAndStone-windows-x64
+        path: dist/ShapesAndStone-windows-x64.zip
+
+  linux:
+    # The oldest supported runner: an AppImage runs on systems at least as
+    # new as the one it was built on.
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: 'recursive'
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: linux
+        target: desktop
+        arch: linux_gcc_64
+        modules: ${{ env.QT_MODULES }}
+        aqtversion: ${{ env.AQT_VERSION }}
+        cache: true
+
+    - name: Install Linux Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build libxkbcommon-dev libvulkan-dev libfuse2
+
+    - name: Install linuxdeploy
+      run: |
+        mkdir -p "$RUNNER_TEMP/bin"
+        cd "$RUNNER_TEMP/bin"
+        for t in linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
+                 linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage; do
+          curl -fsSL -O "https://github.com/linuxdeploy/$t"
+        done
+        chmod +x *.AppImage
+        ln -s linuxdeploy-x86_64.AppImage linuxdeploy
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+    - name: Setup compiler cache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: linux-package
+        max-size: 1G
+
+    - name: Configure
+      run: |
+        cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
+
+    - name: Build
+      run: cmake --build build
+
+    - name: Package
+      run: packaging/package-linux.sh build dist
+      env:
+        QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShapesAndStone-linux-x86_64
+        path: dist/ShapesAndStone-linux-x86_64.AppImage
+
+  # A friend's machine: a fresh runner, no Qt installed, the package
+  # downloaded and started from wherever it was unpacked.
+  start-macos:
+    needs: macos
+    runs-on: macos-14
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/download-artifact@v4
+      with:
+        name: ShapesAndStone-macos-arm64
+        path: ${{ runner.temp }}/download
+    - name: No Qt on this machine
+      run: |
+        for t in qmake qtpaths qml macdeployqt; do
+          if command -v "$t"; then echo "found $t"; exit 1; fi
+        done
+        if brew list --formula qt 2>/dev/null; then echo "found Homebrew's Qt"; exit 1; fi
+    - name: Start
+      run: |
+        cd "$RUNNER_TEMP/download"
+        ditto -x -k ShapesAndStone-macos-arm64.zip .
+        "$GITHUB_WORKSPACE/packaging/start-check.sh" "$PWD/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
+
+  start-windows:
+    needs: windows
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/download-artifact@v4
+      with:
+        name: ShapesAndStone-windows-x64
+        path: ${{ runner.temp }}/download
+    - name: No Qt on this machine
+      shell: pwsh
+      run: |
+        if (Get-Command qmake, qtpaths, windeployqt -ErrorAction SilentlyContinue) { exit 1 }
+        exit 0
+    - name: Start
+      shell: pwsh
+      run: |
+        cd "$env:RUNNER_TEMP\download"
+        Expand-Archive ShapesAndStone-windows-x64.zip .
+        & "$env:GITHUB_WORKSPACE\packaging\start-check.ps1" "$PWD\ShapesAndStone\shapes_and_stone.exe"
+
+  start-linux:
+    needs: linux
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/download-artifact@v4
+      with:
+        name: ShapesAndStone-linux-x86_64
+        path: ${{ runner.temp }}/download
+    - name: No Qt on this machine
+      run: |
+        for t in qmake qmake6 qtpaths qml; do
+          if command -v "$t"; then echo "found $t"; exit 1; fi
+        done
+        if ldconfig -p | grep libQt6Core; then echo "found a system Qt"; exit 1; fi
+    - name: Start
+      run: |
+        cd "$RUNNER_TEMP/download"
+        chmod +x ShapesAndStone-linux-x86_64.AppImage
+        ./ShapesAndStone-linux-x86_64.AppImage --appimage-extract > /dev/null
+        "$GITHUB_WORKSPACE/packaging/start-check.sh" "$PWD/squashfs-root/usr/bin/shapes_and_stone"
+
+  # Attaches the packages to a release a person published
+  attach:
+    if: github.event_name == 'release'
+    needs: [ start-macos, start-windows, start-linux ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: packages
+        merge-multiple: true
+    - name: Attach to the release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release upload "${{ github.event.release.tag_name }}" packages/* -R "${{ github.repository }}"
