@@ -29,7 +29,8 @@ chmod +x ShapesAndStone-linux-x86_64.AppImage
 ./ShapesAndStone-linux-x86_64.AppImage
 ```
 
-It needs a system at least as new as Ubuntu 24.04. If it says it needs
+It needs a system at least as new as Ubuntu 24.04, with OpenGL (on
+Ubuntu, Debian: `libopengl0`). If it says it needs
 FUSE, install `libfuse2` (Ubuntu, Debian:
 `sudo apt install libfuse2`), or start it with `--appimage-extract-and-run`.
 
