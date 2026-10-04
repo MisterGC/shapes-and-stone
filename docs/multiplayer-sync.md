@@ -128,9 +128,9 @@ host as a message (`enemyBlow`); the host's enemy hits another node's
 knight with one (`knightBlow`), which that node checks against where the
 knight really is; a spitter's shot is broadcast and flown on every node.
 
-One setting of the remote enemy's interpolation is not the default: a
-fixed delay of 50 ms plus the round trip (capped at 100 ms) instead of
-`autoDelay`. Until issue #19 it had a second one, `settleMs: 30`: an enemy
+The remote enemy renders on `autoDelay`, like `RemotePlayer.qml`. Until
+issue #64 it had a fixed delay of 50 ms plus the round trip (capped at
+100 ms) instead, and until issue #19 a second setting, `settleMs: 30`: an enemy
 that stops dead (a lunge lands) sent nothing until the settle, and the
 interpolator carried the lunge on, up to 1.2 Wu past the stop. Both were
 behaviour of clayground any object that rests or stops would meet, filed
@@ -156,21 +156,64 @@ the branch's head:
   go: 2 of 20 runs (0.256 and 0.262 Wu) against 3 of 10 with
   `settleMs: 30` (0.252, 0.270 and 0.306 Wu), every one in `recovery`.
   The tolerance stays 0.25 Wu.
-- The fixed delay stays. With `autoDelay` each enemy gets the delay its
+- The fixed delay stayed then. With `autoDelay` each enemy gets the delay its
   own send intervals ask for, and some enemies were rendered up to 359 ms
   behind: three Cloud runs failed the AI state check with a joiner state
   the host had left more than 300 ms before (e.g. `patrol` on the joiner
   where the host had `idle`). Widening the check's 300 ms is not the
   answer; an enemy shown 360 ms late also lunges 360 ms late on that
-  screen. It stays a workaround until
-  [clayground #374](https://github.com/MisterGC/clayground/issues/374).
-  The same-world misses this table shows are shapes-and-stone #64.
+  screen. It stayed a workaround until
+  [clayground #374](https://github.com/MisterGC/clayground/issues/374),
+  which issue #64 builds on.
 - The other failures are not the position or the state check, and come
   with every setting: the block phase, where the first lunge was judged
   `ignored` (the knight was in the grace after another hit, so every blow
   of that enemy counted `ignored`) or once `hit`, in 1 run with
   `settleMs: 30`, 3 with the default and 2 with `autoDelay`; and once a
   shield push that moved the enemy 0.93 Wu, under the 1.0 Wu asked.
+
+### Every same-world miss named (issue #64)
+
+Against clayground `issue-374` @ af6f806 (PR #394, the submodule), with
+the enemy on `autoDelay`, each miss of the table above has its cause:
+
+- the position just over 0.25 Wu in `recovery`: gone with the fixed
+  delay. Over 52 runs on `autoDelay` (12 Cloud on 8b6c263, 20 Local and
+  20 Cloud on af6f806) the worst position error was 0.138 Wu, in
+  `recovery`, every enemy rendered 33 to 81 ms behind, no AI state miss.
+  That the fixed 50 ms ran out of buffered states when Cloud's arrival
+  jitter outlasted it, while a lunge stopped, is inferred from the table
+  (2 misses in 20 runs with it, none with `autoDelay`), not reproduced.
+- the block judged `ignored`: the bench's question. The host's other
+  enemies kept thinking while the joiner's knight held its shield toward
+  one; one that hit the knight from behind put it into its grace, and
+  the knight ignored the lunge, as it should. The other enemies now stop
+  thinking for the lunge answers, as for the shots, and a lunge met in
+  the grace is tried again; no run needed a second try.
+- the shield push of 0.00 Wu (and 0.93): the bench's question. The bench
+  measured the push along the knight's approach before its dash; the push
+  goes along the direction the knight sends, from where it is at the step
+  it pushes. A blocking dash covers 0.27 Wu a step: an enemy within a step
+  of the knight when it dashes (0.011 to 0.083 Wu in these runs) is behind
+  it by the step it pushes, and is pushed back the way the knight came,
+  173 to 180 degrees off the approach. 14 of 52 runs pushed so; measured
+  along the approach each read 0.00 Wu, measured along the push the host
+  received, 1.17 to 1.37 Wu. On the host's own screen every push went
+  away from the joiner's knight as the host showed it. One of those
+  pushes stopped after 0.42 Wu at a wall: the knight had stood a step
+  from it, and a push turned back toward that spot met it. The knight now
+  stands in the open for the push.
+
+The last 10 Local and 10 Cloud runs, on this branch with every fix, all
+exited 0 with 37 checks passed: 11149 to 12154 enemy records judged per
+run, the worst position error 0.043 to 0.050 Wu, the render delay 33 to
+77 ms, no id, HP or AI state miss; every push moved its enemy 1.33 to
+1.36 Wu, seven of them turned back.
+
+None was a disagreement between the screens, so none went back to
+Clayground. Why pushes turned back came more often with the auto delay
+(10 of 40 runs on #374's branch against 1 of 16 before, clayground#374)
+is not determined; the measure no longer depends on it.
 
 `tests/enemies` measures it: host and joiner in one process over LAN,
 five seconds of two knights fighting, every enemy compared every 16 ms.
@@ -192,8 +235,9 @@ that both knights fight the nearest enemy for eight seconds. Every frame each pr
 records every enemy it shows, with the wall-clock time: object id,
 position, HP and AI state.
 
-The joiner renders the host's enemies 50 ms plus the round trip (capped
-at 100 ms) in the past, the delay `Enemy.qml` gives their interpolator.
+The joiner renders the host's enemies in the past by the delay their
+interpolator sizes itself (`autoDelay`, 33 to 81 ms in the runs of issue
+#64).
 Each joiner record carries the delay each enemy was rendered with (its
 interpolator's `effectiveDelayMs`, so an enemy on `autoDelay` is judged
 by its own), and is judged against the host's records:
@@ -268,8 +312,7 @@ and applied by the host, once:
 
 The other way round, a host's enemy that lunges at a joiner's knight sends
 the blow (`knightBlow`) with the enemy's id. The joiner holds it until its
-screen shows the lunge land, the enemy's render delay (50 ms plus the
-round trip) after it arrived. Without the hold, a parry in the last 50 ms
+screen shows the lunge land, the enemy's render delay after it arrived. Without the hold, a parry in the last 50 ms
 of the parry window as the joiner shows it came after the blow of the
 very lunge it parried: the knight was hurt and parried at once. A parry of
 that enemy from its last parry window (`enemy.parryFrames` steps) before
@@ -285,9 +328,10 @@ joiner's screen dealt. It parries that enemy from the sixth frame of the
 window it shows, when the host's lunge has landed and its blow is on its
 way: the host's enemy staggers and no blow of that lunge lands on the
 knight. The knight goes to a third enemy, which the host kills there, then
-stands 4 to 8 Wu from the first and shield-pushes it once it comes: the
-host receives the push and its enemy moves at least 1 Wu away from the
-knight. Then it
+stands 4 to 8 Wu from the first, on a spot whose grid cell and the eight
+around it are floor, and shield-pushes it once it comes: the host receives
+the push and its enemy moves at least 1 Wu along the direction the push
+carries (issue #64, below). Then it
 kills that enemy while the host's knight kills another: both are gone on
 both screens, the host's and the joiner's kill records grow by their own
 kills, and every death leaves one stain on each screen, in the same place.
@@ -366,7 +410,11 @@ taken, now dealing 61 instead of 68 and killing 1 enemy instead of 0.
 `tests/sameworld/run_sameworld.py` checks it between a host and a joiner
 process, after the parry of issue #17:
 
-- the joiner's knight holds its shield toward the enemy, which lunges: the
+- the joiner's knight holds its shield toward the enemy, which lunges,
+  while the host's other enemies stop thinking (one that hit the knight
+  from behind put it into its grace, and the lunge counted `ignored`,
+  issue #64); a lunge that meets the knight in its grace all the same is
+  tried again, as a shot is. The
   joiner's screen judges the blow `blocked`, the knight loses HP for it, the
   host receives `blocked` and shows an HP the joiner's knight had in the
   300 ms before
