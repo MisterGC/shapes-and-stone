@@ -25,8 +25,8 @@ enemy of the host's, and each answer is checked on both screens:
   its id goes on the host's screen when the result arrives
 - the other way round, the host's knight blocks a shot of that spitter: the
   joiner receives the result, and its shot of that id goes then
-- it raises its shield and dashes into the enemy right after the host
-  killed a third enemy in its reach: the host receives the push and its
+- it stands in the open, raises its shield and dashes into the enemy
+  right after the host killed a third enemy in its reach: the host receives the push and its
   enemy is shoved at least 1 Wu along the direction the push carries
 - it kills that enemy while the host's knight kills another: each dies on
   both screens, counts once for its killer, and leaves one stain on both
@@ -648,8 +648,11 @@ def push(H, J, a, b, host_rec, settle, check):
     else:
         c = ""
     res["deadInReach"] = c
-    if not J.eval1(f"standOff('{b}', 8, 4)"):
-        check(False, f"the joiner's shield push moves the host's {b} (no spot 4 to 8 Wu from it)")
+    # The knight stands in the open: an enemy within a dash step of it when
+    # it dashes is pushed back the way it came, toward this spot, and a wall
+    # a step beside it stopped such a push after 0.42 Wu
+    if not J.eval1(f"standOff('{b}', 8, 4, true)"):
+        check(False, f"the joiner's shield push moves the host's {b} (no open spot 4 to 8 Wu from it)")
         return res
     J.eval([f"guard('{b}', 'push')"])
     pushed = settle(lambda: J.json("guardLog").get("done"), 10)

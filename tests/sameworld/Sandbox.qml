@@ -250,9 +250,10 @@ Item {
                 dealt: r.damageDealt, parries: r.parries, kills: r.kills}
     }
     // The knight standing as far from enemy id as the enemy sees, up to
-    // d Wu and no nearer than near Wu (2 without), facing it; false where it
-    // sees no spot
-    function standOff(id, d, near) {
+    // d Wu and no nearer than near Wu (2 without), facing it; with open,
+    // only on a spot whose cell and the eight around it are floor. False
+    // where it sees no spot
+    function standOff(id, d, near, open) {
         let e = _byId()[id], p = game.player
         if (!e || !p) return false
         for (let r = d; r >= (near || 2); r -= 0.5) {
@@ -260,6 +261,7 @@ Item {
                 let a = k * Math.PI / 4
                 let x = e.xWu + Math.cos(a) * r, y = e.yWu + Math.sin(a) * r
                 if (!game.hasLineOfSight(e.xWu, e.yWu, x, y)) continue
+                if (open && !_open(x, y)) continue
                 p.hp = 100000
                 p.xWu = x
                 p.yWu = y
@@ -269,6 +271,16 @@ Item {
             }
         }
         return false
+    }
+
+    // Whether the cell at (x, y) and the eight around it are floor
+    function _open(x, y) {
+        let gx = Math.floor(x / game.cellSize), gy = Math.floor(y / game.cellSize)
+        for (let j = gy - 1; j <= gy + 1; j++)
+            for (let i = gx - 1; i <= gx + 1; i++)
+                if (j < 0 || j >= game.gridHeight || i < 0 || i >= game.gridWidth
+                    || game.grid[j][i] === game.cellWall) return false
+        return true
     }
 
     // ---- the knight stands and answers one enemy (issue #17) ----
