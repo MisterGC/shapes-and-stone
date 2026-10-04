@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Shapes & Stone
+Comment=A minimalist dungeon crawler
+Exec=shapes_and_stone
+Icon=shapes_and_stone
+Categories=Game;
