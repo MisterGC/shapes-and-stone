@@ -109,6 +109,22 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
+At depth 0 a line at the bottom of the screen names the controls: WASD,
+LMB strike, RMB shield, Shift dash, E talk, 1 potion, M mute and Esc menu.
+Esc opens a menu with Resume and Title. Alone it pauses the game: the
+world's time scale goes to 0, as in a full hit stop, so no step of the
+pause is caught up after Resume (a stopped world would catch it up in one
+step, clayground#338). In a session it pauses nothing, since a host's pause
+would stop every player's enemies: the menu says the party fights on and
+only this knight stops taking input. Title leaves the run, and a session.
+The pause bench checks the hint, the solo pause and its resume, and the
+menu of a host and a joiner joined over LAN in one process, and exits with
+the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
+```
+
 At 0 HP the knight falls: the enemies stop and a screen shows how deep the
 run got, counted in dungeons from depth 0. Enter starts a new run from depth
 0 on a new seed, Esc returns to the title. The fall bench brings the knight
