@@ -1008,6 +1008,27 @@ ClayWorld2d {
         font.letterSpacing: 1
     }
 
+    // The controls, for a first-time player: shown at depth 0 on a keyboard
+    // and mouse, out of the way of the dialogue panel and the fallen screen
+    readonly property bool touchControls: Qt.platform.os === "ios" || Qt.platform.os === "android"
+    Text {
+        id: controlsHint
+        objectName: "controlsHint"
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: 12
+        z: 1000
+        visible: player !== null && depth === 0 && !touchControls && !fallen && !dialoguePanel.visible
+        text: "WASD move  •  LMB strike  •  RMB shield  •  Shift dash  •  "
+              + "E talk  •  1 potion  •  M mute"
+        color: "#BBBBBB"
+        opacity: 0.85
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 13
+        font.letterSpacing: 1
+    }
+
     // Crosshair at mouse position
     Item {
         id: crosshair
