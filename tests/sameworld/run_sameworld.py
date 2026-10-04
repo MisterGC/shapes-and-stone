@@ -16,7 +16,9 @@ enemy of the host's, and each answer is checked on both screens:
   staggers, and the lunge's blow, on its way by then, does not land
 - it holds its shield toward the enemy, then dashes at it late in the parry
   window it shows: the lunge is blocked, then dodged, as the joiner judges
-  it; the host receives each result, and shows the joiner's knight's HP
+  it; the host receives each result, and shows the joiner's knight's HP.
+  The host's other enemies stand meanwhile, and a lunge that met the knight
+  in its grace after another hit (ignored) is tried again
 - it stands in sight of a spitter, which the host makes spit at it three
   times: it holds its shield up, dashes into the shot, stands. The shot is
   blocked, dodged, hits; the host receives each result, and the shot with
@@ -410,6 +412,17 @@ def lunge_answers(H, J, b, settle, check):
     late in the parry window it shows: the joiner's screen judges the lunge
     blocked, then dodged, by its knight's own state, applies its HP and
     reports; the host receives the report and shows the joiner's HP"""
+    # The host's other enemies stop thinking meanwhile: one that hit the
+    # knight from behind put it into its grace after a hit, and the knight
+    # ignored every lunge of b in it (the block judged "ignored")
+    H.eval([f"hold(true, '{b}')"])
+    try:
+        return _lunge_answers(H, J, b, settle, check)
+    finally:
+        H.eval(["hold(false)"])
+
+
+def _lunge_answers(H, J, b, settle, check):
     res = {}
     jid = J.eval1("nodeId")
     for mode, expect in (("block", "blocked"), ("dodge", "dodged")):
@@ -417,6 +430,8 @@ def lunge_answers(H, J, b, settle, check):
         blow = None
         for _ in range(3):
             r["tries"] += 1
+            # The knight's grace after a hit is over
+            settle(lambda: J.eval1("graceLeft()") == 0, 2)
             t0 = now_ms()
             if not J.eval1(f"guard('{b}', '{mode}', 5)"):
                 break
@@ -435,6 +450,11 @@ def lunge_answers(H, J, b, settle, check):
             if mode == "dodge":
                 new = [x for x in new if "dodge" in log and x[0] >= log["dodge"]["t"]]
             reached = [x for x in new if x[2] != "out of reach"]
+            # A lunge that meets the knight in the grace after another hit
+            # is ignored by the knight's state: one more try
+            if reached and reached[0][2] == "ignored" and reached[0][5] > 0:
+                r.setdefault("inGrace", []).append(reached[0][5])
+                continue
             if reached:
                 blow = reached[0]
                 r["log"] = log.get("dodge")

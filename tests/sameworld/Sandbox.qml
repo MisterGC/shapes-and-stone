@@ -96,8 +96,8 @@ Item {
         return game.stains.filter(s => s).map(s => [r3(s.xWu), r3(s.yWu)])
     }
     // Every host's blow on this node's knight and what became of it, as
-    // [wall clock, enemy id, result, knight's HP after, HP it lost]
-    // (Game.knightStruck)
+    // [wall clock, enemy id, result, knight's HP after, HP it lost, seconds
+    // left of its grace after a hit] (Game.knightStruck)
     property var blows: []
     property int _hpPrev: 0
     property int _hpNow: 0
@@ -107,7 +107,8 @@ Item {
         target: game
         function onKnightStruck(enemyId, result) {
             let landed = result === "hit" || result === "blocked"
-            bench.blows.push([Date.now(), enemyId, result, bench._hpNow, landed ? bench._hpPrev - bench._hpNow : 0])
+            bench.blows.push([Date.now(), enemyId, result, bench._hpNow, landed ? bench._hpPrev - bench._hpNow : 0,
+                              game.player ? bench.r3(game.player.graceLeft) : 0])
         }
     }
     Connections {
@@ -177,12 +178,12 @@ Item {
     }
     // Seconds left of this node's knight's grace after a hit
     function graceLeft() { return game.player ? game.player.graceLeft : 0 }
-    // Host: every enemy stops thinking (on) or thinks again (off), so the
-    // spitter only spits when spit() says and no other enemy strikes the
-    // knight meanwhile
-    function hold(on) {
+    // Host: every enemy but enemy except stops thinking (on) or thinks
+    // again (off), so the spitter only spits when spit() says and no other
+    // enemy strikes the knight meanwhile
+    function hold(on, except) {
         for (let e of game.enemies) {
-            if (!e || e.destroyed) continue
+            if (!e || e.destroyed || (on && except && e.objectId === except)) continue
             if (on) {
                 e.halt()
             } else if (e.halted) {
