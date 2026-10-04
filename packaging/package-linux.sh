@@ -23,8 +23,11 @@ rm -rf "$appdir"
 export QML_SOURCES_PATHS="$src/src"
 export QML_MODULES_PATHS="$build/bin/qml"
 export EXTRA_PLATFORM_PLUGINS="libqminimal.so"
-# Clayground's libraries are found where the build put them
-export LD_LIBRARY_PATH="$build/lib:$build/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Clayground's libraries are found where the build put them, Qt's FFmpeg
+# libraries in Qt's lib dir
+qtlibs=$("$QMAKE" -query QT_INSTALL_LIBS)
+qtplugins=$("$QMAKE" -query QT_INSTALL_PLUGINS)
+export LD_LIBRARY_PATH="$build/lib:$build/bin:$qtlibs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 cd "$out"
 linuxdeploy --appdir "$appdir" \
@@ -37,6 +40,17 @@ linuxdeploy --appdir "$appdir" \
 # deployed the modules to usr/qml.
 ln -sfn ../qml "$appdir/usr/bin/qml"
 
+# The Qt plugin misses two plugins the game needs: SQLite, for
+# Clayground.Storage, and the FFmpeg backend of Qt Multimedia, without which
+# the game has no music and no sound. Copied in, with what they link.
+for p in sqldrivers/libqsqlite.so multimedia/libffmpegmediaplugin.so; do
+    mkdir -p "$appdir/usr/plugins/$(dirname "$p")"
+    cp "$qtplugins/$p" "$appdir/usr/plugins/$p"
+done
+
 LDAI_OUTPUT="ShapesAndStone-linux-$(uname -m).AppImage" \
-    linuxdeploy --appdir "$appdir" --output appimage
+    linuxdeploy --appdir "$appdir" \
+    --deploy-deps-only "$appdir/usr/plugins/sqldrivers" \
+    --deploy-deps-only "$appdir/usr/plugins/multimedia" \
+    --output appimage
 echo "packaged: $out/ShapesAndStone-linux-$(uname -m).AppImage"
