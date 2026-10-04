@@ -16,6 +16,10 @@ app="$out/Shapes and Stone.app"
 
 rm -rf "$app"
 cp -R "$build/bin/shapes_and_stone.app" "$app"
+# clay_app copies bin/qml into the app while the build may still be writing
+# it: Clayground.Svg is no clay_plugin, so the copy does not wait for it and
+# a clean build can leave it out. Copied again from the finished build.
+cp -R "$build/bin/qml/." "$app/Contents/Resources/qml/"
 
 # -qmldir: the game's QML, scanned for the modules it imports.
 # -qmlimport: where Clayground's QML modules were built.
