@@ -268,6 +268,13 @@ jobs:
           if command -v "$t"; then echo "found $t"; exit 1; fi
         done
         if ldconfig -p | grep libQt6Core; then echo "found a system Qt"; exit 1; fi
+    # The graphics stack is the system's, never bundled into an AppImage:
+    # a desktop has it, a bare runner lacks GLVND's libOpenGL.
+    - name: Install the graphics stack
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopengl0 libegl1 libgl1 libxkbcommon0 libfontconfig1
+
     - name: Start
       run: |
         cd "$RUNNER_TEMP/download"
