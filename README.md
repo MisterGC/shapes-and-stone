@@ -337,7 +337,7 @@ The packaging is a workaround: Clayground's `clay_app` has no deploy step,
 so `packaging/` runs `macdeployqt`, `windeployqt` and `linuxdeploy` itself
 and repairs what they leave (the build's rpaths in Clayground's libraries,
 SQL drivers for databases the game does not use). It goes once `clay_app`
-can package an app (proposed on issue #41).
+can package an app (MisterGC/clayground#380).
 
 To build against another Clayground commit, move the submodule and commit it:
 

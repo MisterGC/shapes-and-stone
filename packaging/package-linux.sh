@@ -6,7 +6,7 @@
 # the Qt the game was built with.
 #
 # Workaround: clay_app has no deploy step, so the game runs linuxdeploy
-# itself. It waits on a clayground issue for a packaging step in clay_app
+# itself. It waits on clayground#380, a packaging step in clay_app
 # (see README, BUILD).
 set -euo pipefail
 

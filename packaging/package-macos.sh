@@ -3,8 +3,8 @@
 # packaging/package-macos.sh <build dir> <out dir> [<macdeployqt>]
 #
 # Workaround: clay_app has no deploy step, so the game runs macdeployqt
-# itself and repairs what it leaves behind. It waits on a clayground issue for
-# a packaging step in clay_app (see README, BUILD).
+# itself and repairs what it leaves behind. It waits on clayground#380, a
+# packaging step in clay_app (see README, BUILD).
 set -euo pipefail
 
 build=$(cd "$1" && pwd)
@@ -18,7 +18,8 @@ rm -rf "$app"
 cp -R "$build/bin/shapes_and_stone.app" "$app"
 # clay_app copies bin/qml into the app while the build may still be writing
 # it: Clayground.Svg is no clay_plugin, so the copy does not wait for it and
-# a clean build can leave it out. Copied again from the finished build.
+# a clean build can leave it out. Copied again from the finished build;
+# waits on clayground#381.
 cp -R "$build/bin/qml/." "$app/Contents/Resources/qml/"
 
 # -qmldir: the game's QML, scanned for the modules it imports.
