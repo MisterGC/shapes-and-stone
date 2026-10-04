@@ -136,7 +136,9 @@ RectBoxBody {
     Timer {
         running: true; repeat: true; interval: Balance.campfire.healTick * 1000
         onTriggered: {
-            if (!gameWorld || !gameWorld.player) return
+            // Paused, no fire heals: the Esc menu alone and the dojo's pause
+            if (!gameWorld || !gameWorld.player || gameWorld.gamePaused || !gameWorld.physics.running)
+                return
             let p = gameWorld.player
             let dx = p.xWu - campfire.xWu
             let dy = p.yWu - campfire.yWu

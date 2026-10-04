@@ -714,6 +714,22 @@ ClayWorld2d {
     // A session's run ended with every knight down: the session is left,
     // the fallen screen shows the run's summary and a key goes to the title
     property bool partyFallen: false
+    // Esc opened the menu (Resume, Title). Alone the world is paused under
+    // it; in a session it runs on, since a pause would stop every other
+    // player's enemies, and only this knight stops taking input.
+    property bool menuOpen: false
+    readonly property bool gamePaused: menuOpen && !session.connected
+    // Paused by a time scale of 0, as a full hit stop holds the world: the
+    // steps go on, each 0 s long. Workaround for clayground#338 - a stopped
+    // world (running: false) simulates the whole pause in its first step
+    // after resuming, and every cooldown and AI timer runs out on it.
+    Binding {
+        target: world.physics
+        property: "timeScale"
+        value: 0
+        when: world.gamePaused
+        restoreMode: Binding.RestoreBindingOrValue
+    }
     components: []
 
     // The run so far, for the fallen screen: the enemies killed and the
@@ -811,6 +827,11 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Escape) {
+            if (screen === "game" && player && !fallen) openMenu()
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_M) {
             muted = !muted
             event.accepted = true
@@ -853,6 +874,20 @@ ClayWorld2d {
         }
     }
     Keys.forwardTo: gameCtrl
+    function openMenu() {
+        // The menu takes the keys from here on: what is held now would
+        // never see its release
+        gameCtrl.axisX = 0
+        gameCtrl.axisY = 0
+        gameCtrl.buttonAPressed = false
+        gameCtrl.buttonBPressed = false
+        if (player) player.isBlocking = false
+        menuOpen = true
+    }
+    function closeMenu() {
+        menuOpen = false
+        world.forceActiveFocus()
+    }
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -1018,9 +1053,10 @@ ClayWorld2d {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: 12
         z: 1000
-        visible: player !== null && depth === 0 && !touchControls && !fallen && !dialoguePanel.visible
+        visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
+                 && !dialoguePanel.visible
         text: "WASD move  •  LMB strike  •  RMB shield  •  Shift dash  •  "
-              + "E talk  •  1 potion  •  M mute"
+              + "E talk  •  1 potion  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -1220,6 +1256,7 @@ ClayWorld2d {
     function _fall() {
         if (fallen || screen !== "game") return
         console.log("[Game] The knight has fallen at depth", depth)
+        menuOpen = false
         fallen = true
         _keepBest()
         countFight("fall")
@@ -1319,6 +1356,7 @@ ClayWorld2d {
         } while (masterSeed === oldSeed)
         console.log("[Game] New run, seed:", masterSeed)
         clearDungeon()
+        menuOpen = false
         fallen = false
         partyFallen = false
         resetting = false
@@ -1337,6 +1375,7 @@ ClayWorld2d {
         console.log("[Game] Back to the title")
         clearDungeon()
         if (session.connected) session.leave()
+        menuOpen = false
         fallen = false
         partyFallen = false
         resetting = false
@@ -2917,6 +2956,20 @@ ClayWorld2d {
     }
 
     // --- Screen Overlays ---
+
+    // Esc menu (over the dungeon, under the fallen screen)
+    Loader {
+        anchors.fill: parent
+        z: 4400
+        active: menuOpen && screen === "game" && !fallen
+        sourceComponent: Component {
+            PauseMenu {
+                inSession: session.connected
+                onResume: world.closeMenu()
+                onToTitle: world.backToTitle()
+            }
+        }
+    }
 
     // Fallen screen (over the dungeon, under the title)
     Loader {
