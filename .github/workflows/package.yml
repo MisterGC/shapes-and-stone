@@ -194,8 +194,12 @@ jobs:
     - name: Build
       run: cmake --build build
 
+    # Qt's TIFF plugin links libtiff.so.5, which 24.04 no longer has, and
+    # linuxdeploy stops on it; the game reads no TIFF.
     - name: Package
-      run: packaging/package-linux.sh build dist
+      run: |
+        rm "$QT_ROOT_DIR/plugins/imageformats/libqtiff.so"
+        packaging/package-linux.sh build dist
       env:
         QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
 
