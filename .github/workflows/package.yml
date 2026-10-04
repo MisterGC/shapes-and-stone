@@ -82,6 +82,12 @@ jobs:
   windows:
     runs-on: windows-2022
     steps:
+    # Workaround: with Windows line endings Clayground's libdatachannel patch
+    # no longer applies ("corrupt patch"); Clayground's own Windows CI fails
+    # the same way at the pinned commit.
+    - name: Keep line endings
+      run: git config --global core.autocrlf false
+
     - name: Checkout
       uses: actions/checkout@v7
       with:
@@ -135,9 +141,10 @@ jobs:
         path: dist/ShapesAndStone-windows-x64.zip
 
   linux:
-    # The oldest supported runner: an AppImage runs on systems at least as
-    # new as the one it was built on.
-    runs-on: ubuntu-22.04
+    # An AppImage runs on systems at least as new as the one it was built
+    # on. Workaround: 22.04's GCC 11 fails on Clayground's sound engine
+    # (`size_t` used without <cstddef>), so the oldest it can be is 24.04.
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout
       uses: actions/checkout@v7
