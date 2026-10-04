@@ -871,8 +871,6 @@ ClayWorld2d {
             }
         }
 
-        onAxisXChanged: console.log("[Input] axisX:", axisX)
-        onAxisYChanged: console.log("[Input] axisY:", axisY)
         onButtonBPressedChanged: {
             if (buttonBPressed && player) {
                 player.dash()
