@@ -6,6 +6,43 @@
 
 ---
 
+## PLAY
+
+The game comes as a download for macOS (Apple Silicon), Windows (64 bit) and
+Linux (x86_64). Nothing else needs to be installed. The builds are not signed
+by Apple or Microsoft, so the system asks once before it starts one.
+
+**macOS:** unzip `ShapesAndStone-macos-arm64.zip` and move
+`Shapes and Stone.app` where you like. On the first start macOS says it
+cannot check the app: click *Done*, open *System Settings > Privacy &
+Security*, scroll down to the message about "Shapes and Stone" and click
+*Open Anyway*, then confirm with *Open*. From then on it starts like any app.
+
+**Windows:** unzip `ShapesAndStone-windows-x64.zip` and start
+`shapes_and_stone.exe` in the `ShapesAndStone` folder. If "Windows protected
+your PC" appears, click *More info*, then *Run anyway*.
+
+**Linux:** make the AppImage executable and start it:
+
+```
+chmod +x ShapesAndStone-linux-x86_64.AppImage
+./ShapesAndStone-linux-x86_64.AppImage
+```
+
+If it says it needs FUSE, install `libfuse2` (Ubuntu, Debian:
+`sudo apt install libfuse2`), or start it with `--appimage-extract-and-run`.
+
+**Playing together over LAN:** all players are on the same network. One
+player chooses *Multiplayer*, picks *LAN*, clicks *Host Game* and tells the
+others the LAN code shown. Each of them chooses *Multiplayer*, types the code
+and clicks *Join Game*; once everyone is listed, the host clicks *Start Game*.
+The first time the host's game opens the network, macOS asks whether to
+accept incoming connections and Windows asks to allow access through the
+firewall: allow it (on Windows, for private networks), or the others cannot
+join.
+
+---
+
 ## BUILD
 
 Clayground comes in as the git submodule `clayground/`; its commit is the
@@ -274,6 +311,31 @@ always blocks, `parry` always parries. `--depth` puts the fight room at a
 depth: the lineup stays the table's, the enemies hit as hard as there. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
+
+The downloads under PLAY are built by `.github/workflows/package.yml`: by
+hand (*Run workflow*), on a PR that changes `packaging/`, and when a release
+is published, which then gets the three packages attached. The workflow
+never creates or publishes a release itself. Each package carries Qt and
+Clayground and is started on a fresh runner that has no Qt
+(`packaging/start-check.sh`, `packaging/start-check.ps1`), the same headless
+start check as above. The macOS one is packaged locally the same way:
+
+```
+packaging/package-macos.sh build dist <Qt>/6.10.1/macos/bin/macdeployqt
+packaging/start-check.sh "$PWD/dist/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
+packaging/lan-check.sh "dist/Shapes and Stone.app" <Qt>/6.10.1/macos/bin/qml
+```
+
+`start-check.sh` empties the environment and fails if the game loads a
+library from outside the package. `lan-check.sh` runs `src/Game.qml` twice on
+the package's Qt and Clayground, hosts a LAN session in one and joins it from
+the other; both have to get into the dungeon with the other's knight.
+
+The packaging is a workaround: Clayground's `clay_app` has no deploy step,
+so `packaging/` runs `macdeployqt`, `windeployqt` and `linuxdeploy` itself
+and repairs what they leave (the build's rpaths in Clayground's libraries,
+SQL drivers for databases the game does not use). It goes once `clay_app`
+can package an app (proposed on issue #41).
 
 To build against another Clayground commit, move the submodule and commit it:
 
