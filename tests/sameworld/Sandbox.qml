@@ -119,11 +119,21 @@ Item {
         }
     }
     // Host: every blow another node's knight sent, as [wall clock, enemy
-    // id, kind] (Session.enemyBlowReceived)
+    // id, kind, what it was on this screen when it arrived]
+    // (Session.enemyBlowReceived); a push's carries its direction (dx, dy),
+    // the enemy's position and the sender's knight's as this screen shows
+    // them
     property var received: []
     Connections {
         target: bench.session
-        function onEnemyBlowReceived(fromId, blow) { bench.received.push([Date.now(), blow.id, blow.kind]) }
+        function onEnemyBlowReceived(fromId, blow) {
+            let e = bench._byId()[blow.id], k = bench.session.remotePlayers[fromId]
+            let at = blow.kind !== "push" ? null
+                   : {dx: bench.r3(blow.dx), dy: bench.r3(blow.dy),
+                      enemy: e ? [bench.r3(e.xWu), bench.r3(e.yWu)] : null,
+                      knight: k ? [bench.r3(k.xWu), bench.r3(k.yWu)] : null}
+            bench.received.push([Date.now(), blow.id, blow.kind, at])
+        }
     }
     // Every attack another node's knight met and its node judged, as [wall
     // clock, node id, source, id, result] (Game.struckReported)

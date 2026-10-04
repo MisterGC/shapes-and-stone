@@ -25,7 +25,7 @@ enemy of the host's, and each answer is checked on both screens:
   joiner receives the result, and its shot of that id goes then
 - it raises its shield and dashes into the enemy right after the host
   killed a third enemy in its reach: the host receives the push and its
-  enemy is shoved at least 1 Wu away
+  enemy is shoved at least 1 Wu along the direction the push carries
 - it kills that enemy while the host's knight kills another: each dies on
   both screens, counts once for its killer, and leaves one stain on both
   screens, in the same place
@@ -642,19 +642,8 @@ def push(H, J, a, b, host_rec, settle, check):
         return res
     w = log["push"]
     res["reach"] = log.get("reach", [])
-    ux, uy = w["ex"] - w["x"], w["ey"] - w["y"]
-    n = math.hypot(ux, uy) or 1
-    ux, uy = ux / n, uy / n
-    # Along the push, from the host's position at the push to its farthest
-    # in the 400 ms after
-    at = [s["e"][b] for s in host_rec if b in s["e"] and w["t"] - 20 <= s["t"] <= w["t"] + 400]
-    moved = 0.0
-    if at:
-        moved = max((p[0] - at[0][0]) * ux + (p[1] - at[0][1]) * uy for p in at)
-    res["movedWu"] = round(moved, 3)
-    res["path"] = [[s["t"] - w["t"]] + s["e"][b][:2] + [s["e"][b][3]]
-                   for s in host_rec if b in s["e"] and w["t"] - 20 <= s["t"] <= w["t"] + 400][::3]
-    res["received"] = [r[2] for r in (H.json("received") or []) if r[1] == b and r[0] >= w["t"] - 50]
+    got = [r for r in (H.json("received") or []) if r[1] == b and r[0] >= w["t"] - 50]
+    res["received"] = [r[2] for r in got]
     # The dead enemy stays in the knight's reach only when its end of
     # contact came without its item, which is timing; first in the reach
     # it broke the push before the knight's fix
@@ -663,8 +652,46 @@ def push(H, J, a, b, host_rec, settle, check):
           f"the host receives the joiner's push on {b} ({res['received']}; the knight's "
           f"reach at the push {res['reach']}, "
           + ("a dead enemy first" if res["deadFirst"] else "no dead enemy first") + ")")
+    if "push" not in res["received"]:
+        return res
+    t, _, _, p = [r for r in got if r[2] == "push"][0]
+    # The push goes along the direction the joiner's knight sent, away from
+    # it as its screen showed them at the step it pushed. The knight dashes
+    # at 16 Wu/s: an enemy within a step of it when it dashes is behind it
+    # by the step it pushes, and is pushed back the way the knight came.
+    # Measured along the approach before the dash, such a push went 0 Wu
+    n = math.hypot(p["dx"], p["dy"]) or 1
+    ux, uy = p["dx"] / n, p["dy"] / n
+    ax, ay = w["ex"] - w["x"], w["ey"] - w["y"]
+    an = math.hypot(ax, ay) or 1
+    res["approachDist"] = w["dist"]
+    res["turnDeg"] = round(math.degrees(math.acos(max(-1, min(1, (ax * ux + ay * uy) / an)))))
+    # On the host's own screen: the push away from the joiner's knight as
+    # the host showed both when it arrived
+    if p["enemy"] and p["knight"]:
+        hx, hy = p["enemy"][0] - p["knight"][0], p["enemy"][1] - p["knight"][1]
+        res["hostDist"] = round(math.hypot(hx, hy), 3)
+        res["awayOnHost"] = hx * ux + hy * uy > 0
+    # Along the push, from the host's position in its last frame before the
+    # push arrived to its farthest in the 400 ms after
+    track = [s for s in host_rec if b in s["e"] and t - 40 <= s["t"] <= t + 400]
+    before = [s for s in track if s["t"] <= t]
+    start = before[-1] if before else (track[0] if track else None)
+    moved = 0.0
+    if start:
+        x0, y0 = start["e"][b][:2]
+        moved = max((s["e"][b][0] - x0) * ux + (s["e"][b][1] - y0) * uy
+                    for s in track if s["t"] >= start["t"])
+    res["movedWu"] = round(moved, 3)
+    # What the bench measured before: along the approach
+    if start:
+        res["alongApproachWu"] = round(max((s["e"][b][0] - x0) * ax / an + (s["e"][b][1] - y0) * ay / an
+                                           for s in track if s["t"] >= start["t"]), 3)
+    res["path"] = [[s["t"] - t] + s["e"][b][:2] + [s["e"][b][3]] for s in track][::3]
     check(moved >= 1.0, f"the joiner's shield push moves the host's {b} {moved:.2f} Wu "
-          f"away from the knight in 400 ms (at least 1.0)")
+          f"along the push it sent in 400 ms (at least 1.0; the push turned "
+          f"{res['turnDeg']} deg off the knight's approach, which began "
+          f"{w['dist']} Wu from {b})")
     return res
 
 
