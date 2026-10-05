@@ -93,9 +93,10 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
 In a session the host runs every enemy: it spawns them as Clayground
 replicated objects (`Network.spawn`, type `"enemy"`), runs their AI and
 sends their position, AI state, HP and target. Every other screen shows
-the host's enemies 50 ms in the past plus the round trip and runs no AI
-of its own. An enemy goes for the nearest knight still standing, on
-every screen the same one. A knight's blow on an enemy is drawn and
+the host's enemies in the past by the delay Clayground sizes from the
+jitter it sees (the interpolator's auto delay) and runs no AI of its
+own. An enemy goes for the nearest knight still standing, on every screen
+the same one. A knight's blow on an enemy is drawn and
 counted on its own screen and applied by the host; an enemy's lunge or
 shot is judged on the screen of the knight it goes for, by that knight's
 shield, parry and dash as that screen has them, which applies the HP and
@@ -327,9 +328,9 @@ clayground/cmake/clay_app/start-check.sh "$PWD/build/package/Shapes and Stone.ap
 packaging/lan-check.sh "build/package/Shapes and Stone.app" <Qt>/6.10.1/macos/bin/qml
 ```
 
-`start-check.sh` empties the environment and fails if the game loads a
 The packages land in `build/package/`. Linux needs `linuxdeploy` and
 `linuxdeploy-plugin-qt` on PATH, Windows an MSVC developer shell.
+`start-check.sh` empties the environment and fails if the game loads a
 library from outside the package. `lan-check.sh` runs `src/Game.qml` twice on
 the package's Qt and Clayground, hosts a LAN session in one and joins it from
 the other; both have to get into the dungeon with the other's knight.
