@@ -51,12 +51,9 @@ jobs:
         key: ubuntu-desktop
         max-size: 1G
 
-    # CMAKE_POLICY_VERSION_MINIMUM: a dependency of Clayground's networking
-    # plugin predates CMake 4's policies (see README).
     - name: Configure
       run: |
         cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
 
     - name: Build

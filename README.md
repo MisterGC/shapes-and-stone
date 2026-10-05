@@ -52,14 +52,12 @@ Clayground the game builds against.
 
 ```
 git clone --recursive https://github.com/MisterGC/shapes-and-stone.git
-cmake -S shapes-and-stone -B build -G Ninja -DCMAKE_PREFIX_PATH=<Qt>/6.11.1/macos \
-  -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake -S shapes-and-stone -B build -G Ninja -DCMAKE_PREFIX_PATH=<Qt>/6.11.1/macos
 cmake --build build
 ```
 
-`CMAKE_POLICY_VERSION_MINIMUM` is needed with CMake 4, whose policies a
-dependency of Clayground's networking plugin still predates. In an existing
-clone, `git submodule update --init --recursive` fetches Clayground.
+In an existing clone, `git submodule update --init --recursive` fetches
+Clayground.
 
 To start the game headless and fail on any QML warning while it loads - the
 check every PR runs (`.github/workflows/build.yml`):
