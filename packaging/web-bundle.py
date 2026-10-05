@@ -19,6 +19,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -64,6 +65,16 @@ def copy_runtime(runtime, out):
                     z.extract(info, out)
     if not os.path.isfile(os.path.join(out, "clayground.wasm")):
         raise SystemExit(f"no clayground.wasm in {runtime} - not a starter bundle")
+
+
+def name_page(out):
+    # The starter's page is titled for a sample game; the tab says ours.
+    path = os.path.join(out, "index.html")
+    with open(path, encoding="utf-8") as f:
+        html = f.read()
+    html = re.sub(r"<title>.*?</title>", "<title>Shapes &amp; Stone</title>", html, count=1)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
 
 
 def copy_game(out):
@@ -137,6 +148,7 @@ def main():
     os.makedirs(out)
 
     copy_runtime(os.path.abspath(args.runtime), out)
+    name_page(out)
     copy_game(out)
     baked = bake_shaders(qsb, out)
     files = load_manifest_module().collect(out, [])
