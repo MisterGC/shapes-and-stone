@@ -149,12 +149,9 @@ def main():
         # Let what the scene sets up on its first frames settle before step 1
         time.sleep(1.0)
 
-        # Clayground's MoveTo (enemy path following) re-aims on a 100 ms
-        # wall-clock Timer, not on the physics steps. A batch runs its steps
-        # in one go; the pause after it gives that Timer the time to fire
-        # once more, so the enemies re-aim after every batch, as often as a
-        # running game at 60 steps per second does. Workaround until MoveTo
-        # counts steps: clayground#340.
+        # Clayground's MoveTo re-aims on simulated time (clayground#340), so
+        # a batch of steps run in one go re-aims as often as a running game
+        # does, and the batches follow each other without a pause.
         max_steps = int(args.max_seconds * 60)
         steps = 0
         while True:
@@ -168,7 +165,6 @@ def main():
             steps = state.get("steps", 0)
             if state.get("done") is True or steps >= max_steps:
                 break
-            time.sleep(0.15)
 
         result = json.loads(bench.eval1("JSON.stringify(report())") or "{}")
         result["clayground"] = clayground_commit()
