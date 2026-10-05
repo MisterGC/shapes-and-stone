@@ -19,7 +19,7 @@ Security*, scroll down to the message about "Shapes and Stone" and click
 *Open Anyway*, then confirm with *Open*. From then on it starts like any app.
 
 **Windows:** unzip `ShapesAndStone-windows-x64.zip` and start
-`shapes_and_stone.exe` in the `ShapesAndStone` folder. If "Windows protected
+`shapes_and_stone.exe` in the `Shapes and Stone` folder. If "Windows protected
 your PC" appears, click *More info*, then *Run anyway*.
 
 **Linux:** make the AppImage executable and start it:

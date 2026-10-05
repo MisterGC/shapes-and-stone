@@ -234,7 +234,7 @@ jobs:
       run: |
         cd "$env:RUNNER_TEMP\download"
         Expand-Archive ShapesAndStone-windows-x64.zip .
-        & "$env:GITHUB_WORKSPACE\clayground\cmake\clay_app\start-check.ps1" "$PWD\ShapesAndStone\shapes_and_stone.exe"
+        & "$env:GITHUB_WORKSPACE\clayground\cmake\clay_app\start-check.ps1" "$PWD\Shapes and Stone\shapes_and_stone.exe"
 
   start-linux:
     needs: linux
