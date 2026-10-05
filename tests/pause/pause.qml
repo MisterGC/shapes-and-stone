@@ -14,8 +14,7 @@
 // enemies go on on its screen. Under the host's menu the host's world runs
 // on and its enemies go on on the joiner's screen. Esc on the joiner's
 // "You are down" screen still leaves the session, and Title in the host's
-// menu leaves it for the title. In one process the joiner's own world
-// steps 0 s long (clayground#338), so the joiner is judged by its input.
+// menu leaves it for the title.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -108,9 +107,9 @@ Window {
             sum += Math.abs(now[i].x - before[i].x) + Math.abs(now[i].y - before[i].y)
         return sum
     }
-    function speed(knight) {
-        let v = knight.body.linearVelocity
-        return Math.sqrt(v.x * v.x + v.y * v.y)
+    // How far the knight went since its position was taken
+    function walked(knight) {
+        return Math.abs(knight.xWu - knightPos.x) + Math.abs(knight.yWu - knightPos.y)
     }
     // The knights out of reach of harm while the bench looks
     function standUp(game) { game.player.hp = 100000 }
@@ -264,9 +263,12 @@ Window {
             joiner.player.potions = 1
             joiner.player.hp = joiner.player.maxHp - 10
             hold(joiner, Qt.Key_D)
+            knightPos = Qt.point(joiner.player.xWu, joiner.player.yWu)
         }],
         [300, () => {
-            check(joiner.player.moveX === 1, "in a session D held moves the joiner's knight")
+            check(joiner.player.moveX === 1 && walked(joiner.player) > 0.3,
+                  "in a session D held moves the joiner's knight ("
+                  + walked(joiner.player).toFixed(2) + " wu in 300 ms)")
             press(joiner, Qt.Key_Escape)
         }],
         [() => menu(joiner) !== null && menu(joiner).activeFocus, () => {
@@ -282,15 +284,13 @@ Window {
             check(joiner.player.potions === 1, "1 under the menu drinks no potion")
             standUp(joiner)
             enemyPos = positions(joiner)
+            knightPos = Qt.point(joiner.player.xWu, joiner.player.yWu)
         }],
         [1000, () => {
             check(moved(joiner, enemyPos) > 0.1, "the host's enemies go on on the joiner's screen ("
                   + moved(joiner, enemyPos).toFixed(2) + " wu in a second)")
-            // Two worlds in one process share qml-box2d's step clock, so the
-            // joiner's world steps 0 s long here (clayground#338): its knight
-            // is judged by the velocity its input gives it, not by distance
-            check(joiner.player.moveX === 0 && speed(joiner.player) < 0.01,
-                  "the joiner's knight is given no motion (" + speed(joiner.player).toFixed(2) + " wu/s)")
+            check(joiner.player.moveX === 0 && walked(joiner.player) < 0.1,
+                  "the joiner's knight is given no motion (" + walked(joiner.player).toFixed(2) + " wu in a second)")
             press(menu(joiner), Qt.Key_Escape)
         }],
         [() => menu(joiner) === null, () => {
