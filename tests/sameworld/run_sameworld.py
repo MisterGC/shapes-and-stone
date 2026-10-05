@@ -58,11 +58,8 @@ run has to fail then. --dump writes both screens' raw records; --judge
 judges such a file again, and --late-ms makes its joiner that much later
 than it was: a joiner 200 ms late has to fail.
 
-HP is a number, and Clayground blends every number of a replicated object
-(clayground#368): between two of the host's states the joiner shows an HP
-between the two. Until the clayground pin carries the fix such a value
-counts as within tolerance and is counted (hpBlended); right after the
-scripted hit and once the fight is over the HPs have to agree exactly.
+HP is a stepped property of the enemy's replicated object (clayground#368):
+the joiner shows only HPs the host had, so any other value is a miss.
 
 Whatever ends the run - its end, an exception, Ctrl-C - both loaders are
 stopped and the temp dir is removed; it is kept, with the loaders' logs,
@@ -197,7 +194,7 @@ def compare(host, joiner, lag_ms, slack_ms, skew_ms=20):
     after it."""
     res = {"joinerRecords": len(joiner), "hostRecords": len(host),
            "judged": 0, "posJudged": 0, "maxErrWu": 0.0, "maxErrAt": "", "sumErrWu": 0.0,
-           "unknownIds": 0, "missingIds": 0, "hpMiss": 0, "hpBlended": 0, "stateMiss": 0,
+           "unknownIds": 0, "missingIds": 0, "hpMiss": 0, "stateMiss": 0,
            "delayMs": [], "notes": []}
     if not host or not joiner:
         return res
@@ -251,14 +248,8 @@ def compare(host, joiner, lag_ms, slack_ms, skew_ms=20):
             hps = {he[2] for he in seen} | {h for he in seen for h in (he[6] if len(he) > 6 else [])}
             states = {he[3] for he in seen} | {x for he in seen for x in (he[5] if len(he) > 5 else [])}
             if je[2] not in hps:
-                # Clayground blends every number of a replicated object, HP
-                # too (clayground#368): a value between two the host had is
-                # within tolerance until the pin carries the fix
-                if min(hps) < je[2] < max(hps):
-                    res["hpBlended"] += 1
-                else:
-                    res["hpMiss"] += 1
-                    note(f"{t}: {eid} HP {je[2]} on the joiner, host had {sorted(hps)}")
+                res["hpMiss"] += 1
+                note(f"{t}: {eid} HP {je[2]} on the joiner, host had {sorted(hps)}")
             if je[3] not in states:
                 res["stateMiss"] += 1
                 note(f"{t}: {eid} {je[3]} on the joiner, host had {sorted(states)}")
@@ -307,8 +298,7 @@ def judge(host_rec, join_rec, args, check):
           f"(Enemy.qml) +-{args.slack} ms before (max {cmp['maxErrWu']:.3f} at "
           f"{cmp['maxErrAt']}, mean {cmp['meanErrWu']:.3f}, {np} judged)")
     check(n > 0 and cmp["hpMiss"] == 0,
-          f"every enemy's HP agrees within {args.lag} ms ({cmp['hpMiss']} misses, "
-          f"{cmp['hpBlended']} blended between two of the host's, clayground#368)")
+          f"every enemy's HP agrees within {args.lag} ms ({cmp['hpMiss']} misses)")
     check(n > 0 and cmp["stateMiss"] == 0,
           f"every enemy's AI state agrees within {args.lag} ms ({cmp['stateMiss']} misses)")
     for s in cmp["notes"]:

@@ -251,12 +251,10 @@ by its own), and is judged against the host's records:
   holds the states an enemy passed through since the record before: a
   lunge that lands and a blow that staggers in one frame make a
   `recovery` that no frame shows, but that is sent and shown
-- HP: one the host had in the 300 ms before, or one between two of them.
-  Clayground blends every number of a replicated object, HP too
-  (clayground#368), so between two of the host's states the joiner shows
-  an HP that neither had (`hpBlended` counts these). Until the clayground
-  pin carries the fix this is a named tolerance; right after the scripted
-  hit and once the fight is over the HPs have to agree exactly.
+- HP: one the host had in the 300 ms before. HP is a stepped property of
+  the enemy's replicated object (clayground#368): it switches with its
+  state and is never blended, so a value between two of the host's is a
+  miss.
 
 It exits with the number of failed checks. `--fault stale` makes the
 joiner apply none of the host's enemy states, which proves the checks
