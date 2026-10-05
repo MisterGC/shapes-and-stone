@@ -43,8 +43,8 @@ accept incoming connections and Windows asks to allow access through the
 firewall: allow it (on Windows, for private networks), or the others cannot
 join.
 
-**In the browser:** open the game's GitHub Pages URL in Chrome, Firefox or
-Safari; nothing is installed. The first visit reloads the page once. In the
+**In the browser:** open the game's GitHub Pages URL in a current browser;
+nothing is installed. The first visit reloads the page once. In the
 browser the lobby plays over the internet only: one player clicks *Host
 Game* and tells the others the code shown, they type it and click *Join
 Game*. A native game that hosts with *Internet* takes browser players too;
