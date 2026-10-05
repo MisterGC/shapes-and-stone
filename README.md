@@ -43,6 +43,13 @@ accept incoming connections and Windows asks to allow access through the
 firewall: allow it (on Windows, for private networks), or the others cannot
 join.
 
+**In the browser:** open the game's GitHub Pages URL in Chrome, Firefox or
+Safari; nothing is installed. The first visit reloads the page once. In the
+browser the lobby plays over the internet only: one player clicks *Host
+Game* and tells the others the code shown, they type it and click *Join
+Game*. A native game that hosts with *Internet* takes browser players too;
+a LAN code does not work in the browser.
+
 ---
 
 ## BUILD
@@ -230,8 +237,8 @@ the dungeon before it. The fallen screen adds the run's kills and its time
 (simulated, so a pause holds it) and the best depth any run got. The best
 depth is kept with `Clayground.Storage` (`KeyValueStore` "ShapesAndStone",
 key `bestDepth`) as soon as a run gets deeper, not only when it falls. In
-the browser it does not survive a reload yet: Clayground's `KeyValueStore`
-keeps nothing across a reload there (#37 has the details). The depth bench runs twice, as
+the browser it survives a page reload: Clayground's `KeyValueStore` keeps it
+in the browser's IndexedDB (clayground#341). The depth bench runs twice, as
 two processes, so the best depth crosses a restart; each run exits with the
 number of failed checks:
 
@@ -334,6 +341,28 @@ The packages land in `build/package/`. Linux needs `linuxdeploy` and
 library from outside the package. `lan-check.sh` runs `src/Game.qml` twice on
 the package's Qt and Clayground, hosts a LAN session in one and joins it from
 the other; both have to get into the dungeon with the other's knight.
+
+The browser game is Clayground's Web Runtime with the game's `src/` beside
+it, as static files. `packaging/web-bundle.py` writes them to `build/web/`:
+the runtime from a starter bundle (`clayground-starter.zip` of a Clayground
+release, or the `clayground-starter/` folder of a WASM build of the
+submodule), the QML, `qmldir` and `assets/`, the shaders baked to `.qsb` by
+Qt's `qsb`, and `assets-manifest.json`, which lists the `.qsb` the runtime
+preloads. `--check` loads the written files in headless Chromium with
+Clayground's `run_in_browser.py` and exits with its code, 0 when the game
+came up without a QML, shader or WebGL error; it needs Playwright
+(`pip install playwright && python -m playwright install chromium`):
+
+```
+python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10.1/macos/bin/qsb --check
+```
+
+`.github/workflows/pages.yml` does the same with the runtime of a Clayground
+release and, when the check passes, puts `build/web/` on GitHub Pages. It
+runs by hand (*Run workflow*, with the Clayground release to take the
+runtime from, `v2026.8` by default) and when a release of the game is
+published, never on a push. Pages must be set to deploy from GitHub Actions
+(*Settings > Pages > Source*).
 
 To build against another Clayground commit, move the submodule and commit it:
 
