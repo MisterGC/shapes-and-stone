@@ -1,0 +1,95 @@
+name: Pages
+
+# Puts the browser game on GitHub Pages: Clayground's Web Runtime starter of
+# a Clayground release, the game's src/ with its shaders baked to .qsb and
+# assets-manifest.json (packaging/web-bundle.py). Before the files go up,
+# run_in_browser.py loads them in headless Chromium; a QML, shader or WebGL
+# error stops the deploy.
+#
+# It runs by hand (*Run workflow*, with the runtime release to use) and when
+# a release of the game is published - never on a push. Pages has to be set
+# to deploy from GitHub Actions (Settings > Pages > Source).
+on:
+  workflow_dispatch:
+    inputs:
+      runtime:
+        description: 'Clayground release whose clayground-starter.zip is the runtime'
+        default: 'v2026.8'
+  release:
+    types: [ published ]
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # The runtime of a published release has no input: it is this one.
+  RUNTIME: ${{ inputs.runtime || 'v2026.8' }}
+  # The Qt the runtime is built with; only its qsb is used here.
+  QT_VERSION: '6.10.1'
+  AQT_VERSION: '>=3.2.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # The clayground/ submodule brings run_in_browser.py and the manifest
+    # writer; the runtime itself is the release's.
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: 'recursive'
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: linux
+        target: desktop
+        arch: linux_gcc_64
+        modules: qtshadertools
+        aqtversion: ${{ env.AQT_VERSION }}
+        cache: true
+
+    - name: Install Playwright
+      run: |
+        python3 -m pip install playwright
+        python3 -m playwright install --with-deps chromium
+
+    - name: Download runtime
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release download "$RUNTIME" -R MisterGC/clayground -p clayground-starter.zip
+
+    - name: Bundle and check
+      run: |
+        python3 packaging/web-bundle.py --runtime clayground-starter.zip \
+          --out build/web --qsb "$QT_ROOT_DIR/bin/qsb" --check
+
+    - name: Upload check
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: web-check
+        path: build/web-check
+        if-no-files-found: ignore
+
+    - name: Upload site
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+    - name: Deploy
+      id: deploy
+      uses: actions/deploy-pages@v4
