@@ -87,9 +87,6 @@ Item {
     property var lastStates: ({})
     // This node is leaving on its own: its session ending is no lost host
     property bool _leaving: false
-    property string _lastError: ""
-    // The host's run as far as its session properties have come
-    property var _run: ({})
 
     Network {
         id: net
@@ -98,21 +95,14 @@ Item {
         signalingMode: Network.SignalingMode.Cloud
         autoRelay: true
 
-        // The run is two session properties, its seed and the level played:
-        // the host sets them when the run starts and the level at each
-        // level, and a node that joins late gets both with its welcome
-        // (clayground#306). Numbers each: an object as a session property
-        // reaches the joiners as null at the clayground pin - a workaround
-        // that waits on clayground#375
+        // The run is the session property "run", its seed and the level
+        // played: the host sets it when the run starts and at each level,
+        // and a node that joins late gets it with its welcome
+        // (clayground#306)
         onSessionPropertyChanged: (name, value) => {
-            if (net.isHost || (name !== "seed" && name !== "level")) return
-            // Kept from the signal: Network.sessionProperties follows only
-            // after it (the same workaround, clayground#375)
-            let run = session._run
-            run[name] = value
-            if (run.seed === undefined || run.level === undefined) return
-            if (!session.inGame) session.started(run.seed, run.level)
-            else if (name === "level") session.levelChanged(run.level)
+            if (net.isHost || name !== "run") return
+            if (!session.inGame) session.started(value.seed, value.level)
+            else session.levelChanged(value.level)
         }
 
         onMessageReceived: (fromId, data) => {
@@ -178,28 +168,15 @@ Item {
             session.partyChanged()
         }
 
-        onErrorOccurred: (message) => session._lastError = message
         onConnectedChanged: {
-            if (net.connected) {
-                session._leaving = false
-                session._lastError = ""
-            } else {
-                session.lastStates = ({})
-                session._run = ({})
-                // The error that says why comes with the end or right after it
-                if (session.inGame && !session._leaving) _hostLostCheck.restart()
-            }
+            if (net.connected) session._leaving = false
+            else session.lastStates = ({})
         }
-    }
-    // Why the host was lost is read from the error's text, and the error
-    // comes after connected turned false, so it is waited for 50 ms: a
-    // workaround that waits on clayground#376, a machine-readable reason
-    Timer {
-        id: _hostLostCheck
-        interval: 50
-        onTriggered: {
-            if (net.connected || session._leaving || !session.inGame) return
-            session.hostLost(session._lastError.indexOf("left") >= 0
+        // reason is "host-left" when the host left on its own, else it
+        // crashed or the connection was lost (clayground#376)
+        onHostLost: (reason, message) => {
+            if (!session.inGame || session._leaving) return
+            session.hostLost(reason === "host-left"
                              ? "The host left the game"
                              : "Lost the connection to the host")
         }
@@ -238,8 +215,7 @@ Item {
 
     // Host: start the game for everyone with this seed
     function start(seed) {
-        net.setSessionProperty("seed", seed)
-        net.setSessionProperty("level", 0)
+        net.setSessionProperty("run", {seed: seed, level: 0})
         started(seed, 0)
     }
 
@@ -345,7 +321,8 @@ Item {
     // Host: tell the joiners which level comes next, and every node that
     // joins later which one is played
     function announceLevel(levelIndex) {
-        net.setSessionProperty("level", levelIndex)
+        net.setSessionProperty("run", {seed: net.sessionProperties.run.seed,
+                                       level: levelIndex})
     }
 
     Component { id: remotePlayerComponent; RemotePlayer {} }
