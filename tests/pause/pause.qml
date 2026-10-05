@@ -151,7 +151,7 @@ Window {
                   + find(m, "pauseTitle").text + ")")
             check(find(m, "pauseChoiceResume") !== null && find(m, "pauseChoiceTitle") !== null,
                   "the menu offers Resume and Title")
-            check(solo.gamePaused && solo.physics.timeScale === 0, "alone, the menu pauses the world")
+            check(solo.gamePaused && !solo.physics.running, "alone, the menu pauses the world")
             check(solo.player.moveX === 0, "the knight lets go of D under the menu")
             check(shown(solo, "controlsHint") === null, "the menu hides the controls hint")
             keys.keyRelease(Qt.Key_D, Qt.NoModifier, -1)
@@ -173,7 +173,7 @@ Window {
             press(menu(solo), Qt.Key_Escape)
         }],
         [() => menu(solo) === null, () => {
-            check(!solo.menuOpen && !solo.gamePaused && solo.physics.timeScale === 1,
+            check(!solo.menuOpen && !solo.gamePaused && solo.physics.running,
                   "Esc in the menu resumes, and the world runs again")
             check(solo.activeFocus, "the game has the keys back")
         }],
@@ -195,7 +195,7 @@ Window {
             press(menu(solo), Qt.Key_Return)
         }],
         [() => menu(solo) === null, () => {
-            check(solo.physics.timeScale === 1 && solo.screen === "game", "Enter on Resume goes back to the game")
+            check(solo.physics.running && solo.screen === "game", "Enter on Resume goes back to the game")
             press(solo, Qt.Key_Escape)
         }],
         [() => menu(solo) !== null && menu(solo).activeFocus, () => {
@@ -206,7 +206,7 @@ Window {
         [() => solo.screen === "title", () => {
             check(solo.player === null && solo.enemies.length === 0 && !solo.menuOpen
                   && menu(solo) === null, "Enter on Title clears the run and goes to the title")
-            check(solo.physics.timeScale === 1, "the world is not left paused")
+            check(solo.physics.running, "the world is not left paused")
             solo.screen = "game"
             solo.forceActiveFocus()
         }],
@@ -274,7 +274,7 @@ Window {
             check(find(m, "pauseTitle").text === "Menu" && shown(m, "pauseNote") !== null,
                   "the joiner's menu says the party fights on ("
                   + find(m, "pauseTitle").text + ": " + find(m, "pauseNote").text + ")")
-            check(!joiner.gamePaused && joiner.physics.timeScale === 1 && host.physics.timeScale === 1,
+            check(!joiner.gamePaused && joiner.physics.running && host.physics.running,
                   "in a session the menu pauses nothing, on either screen")
             check(joiner.player.moveX === 0, "the joiner's knight lets go of D under the menu")
             keys.keyRelease(Qt.Key_D, Qt.NoModifier, -1)
@@ -298,7 +298,7 @@ Window {
             press(host, Qt.Key_Escape)
         }],
         [() => menu(host) !== null && menu(host).activeFocus, () => {
-            check(!host.gamePaused && host.physics.timeScale === 1, "the host's menu does not pause the host")
+            check(!host.gamePaused && host.physics.running, "the host's menu does not pause the host")
             enemyPos = positions(joiner)
             seconds = host.runSeconds
         }],

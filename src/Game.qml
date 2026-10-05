@@ -719,14 +719,13 @@ ClayWorld2d {
     // player's enemies, and only this knight stops taking input.
     property bool menuOpen: false
     readonly property bool gamePaused: menuOpen && !session.connected
-    // Paused by a time scale of 0, as a full hit stop holds the world: the
-    // steps go on, each 0 s long. Workaround for clayground#338 - a stopped
-    // world (running: false) simulates the whole pause in its first step
-    // after resuming, and every cooldown and AI timer runs out on it.
+    // Paused by stopping the world: the first step after resuming is one
+    // frame long, not the whole pause (clayground#338), so no cooldown or
+    // AI timer runs out on it.
     Binding {
         target: world.physics
-        property: "timeScale"
-        value: 0
+        property: "running"
+        value: false
         when: world.gamePaused
         restoreMode: Binding.RestoreBindingOrValue
     }
