@@ -45,6 +45,9 @@ PhysicsItem {
         properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId"]
         interpolate: true
         interpolator.autoDelay: true
+        // HP switches with its state, never blended between two of the
+        // host's (clayground#368)
+        steppedProperties: ["hp"]
         interpolator.angleKeys: ["facingAngle"]
     }
 
