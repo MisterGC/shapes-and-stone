@@ -1,8 +1,10 @@
 name: Package
 
 # Builds the native game for a friend without Qt: a zip for macOS
-# (Apple Silicon) and Windows, an AppImage for Linux. Each package is then
-# started on a fresh runner that never had Qt installed.
+# (Apple Silicon) and Windows, an AppImage for Linux, each by Clayground's
+# clay_app_package (the target shapes_and_stone_package, into
+# build/package/). Each package is then started on a fresh runner that
+# never had Qt installed, with Clayground's start check.
 #
 # The packages are workflow artifacts. When a release is published by hand,
 # they are attached to it as well; this workflow never creates, tags or
@@ -17,6 +19,7 @@ on:
     paths:
       - 'packaging/**'
       - '.github/workflows/package.yml'
+      - 'CMakeLists.txt'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -62,31 +65,22 @@ jobs:
         cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
 
-    - name: Build
-      run: cmake --build build
-
     - name: Package
-      run: packaging/package-macos.sh build dist "$QT_ROOT_DIR/bin/macdeployqt"
+      run: cmake --build build --target shapes_and_stone_package
 
     # Two games on the package's runtime host and join a LAN session
     - name: LAN check
-      run: packaging/lan-check.sh "dist/Shapes and Stone.app" "$QT_ROOT_DIR/bin/qml"
+      run: packaging/lan-check.sh "build/package/Shapes and Stone.app" "$QT_ROOT_DIR/bin/qml"
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: ShapesAndStone-macos-arm64
-        path: dist/ShapesAndStone-macos-arm64.zip
+        path: build/package/ShapesAndStone-macos-arm64.zip
 
   windows:
     runs-on: windows-2022
     steps:
-    # Workaround: with Windows line endings Clayground's libdatachannel patch
-    # no longer applies ("corrupt patch"); Clayground's own Windows CI fails
-    # the same way at the pinned commit. Waits on clayground#383.
-    - name: Keep line endings
-      run: git config --global core.autocrlf false
-
     - name: Checkout
       uses: actions/checkout@v7
       with:
@@ -123,27 +117,21 @@ jobs:
         -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
         -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache .
 
-    - name: Build
-      run: cmake --build build
+    - name: Package
+      run: cmake --build build --target shapes_and_stone_package
       env:
         CL: /MP
-
-    - name: Package
-      shell: pwsh
-      run: packaging/package-windows.ps1 build dist
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: ShapesAndStone-windows-x64
-        path: dist/ShapesAndStone-windows-x64.zip
+        path: build/package/ShapesAndStone-windows-x64.zip
 
   linux:
     # An AppImage runs on systems at least as new as the one it was built
-    # on. Workaround: 22.04's GCC 11 fails on Clayground's sound engine
-    # (`size_t` used without <cstddef>), so the oldest it can be is 24.04.
-    # Waits on clayground#382.
-    runs-on: ubuntu-24.04
+    # on, so it is built on the oldest runner there is.
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout
       uses: actions/checkout@v7
@@ -189,23 +177,14 @@ jobs:
         cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
 
-    - name: Build
-      run: cmake --build build
-
-    # Qt's TIFF plugin links libtiff.so.5, which 24.04 no longer has, and
-    # linuxdeploy stops on it; the game reads no TIFF.
     - name: Package
-      run: |
-        rm "$QT_ROOT_DIR/plugins/imageformats/libqtiff.so"
-        packaging/package-linux.sh build dist
-      env:
-        QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+      run: cmake --build build --target shapes_and_stone_package
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: ShapesAndStone-linux-x86_64
-        path: dist/ShapesAndStone-linux-x86_64.AppImage
+        path: build/package/ShapesAndStone-linux-x86_64.AppImage
 
   # A friend's machine: a fresh runner, no Qt installed, the package
   # downloaded and started from wherever it was unpacked.
@@ -213,7 +192,10 @@ jobs:
     needs: macos
     runs-on: macos-14
     steps:
+    # The submodule only for Clayground's start check
     - uses: actions/checkout@v7
+      with:
+        submodules: true
     - uses: actions/download-artifact@v4
       with:
         name: ShapesAndStone-macos-arm64
@@ -228,13 +210,16 @@ jobs:
       run: |
         cd "$RUNNER_TEMP/download"
         ditto -x -k ShapesAndStone-macos-arm64.zip .
-        "$GITHUB_WORKSPACE/packaging/start-check.sh" "$PWD/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
+        "$GITHUB_WORKSPACE/clayground/cmake/clay_app/start-check.sh" "$PWD/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
 
   start-windows:
     needs: windows
     runs-on: windows-2022
     steps:
+    # The submodule only for Clayground's start check
     - uses: actions/checkout@v7
+      with:
+        submodules: true
     - uses: actions/download-artifact@v4
       with:
         name: ShapesAndStone-windows-x64
@@ -249,13 +234,16 @@ jobs:
       run: |
         cd "$env:RUNNER_TEMP\download"
         Expand-Archive ShapesAndStone-windows-x64.zip .
-        & "$env:GITHUB_WORKSPACE\packaging\start-check.ps1" "$PWD\ShapesAndStone\shapes_and_stone.exe"
+        & "$env:GITHUB_WORKSPACE\clayground\cmake\clay_app\start-check.ps1" "$PWD\ShapesAndStone\shapes_and_stone.exe"
 
   start-linux:
     needs: linux
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
+    # The submodule only for Clayground's start check
     - uses: actions/checkout@v7
+      with:
+        submodules: true
     - uses: actions/download-artifact@v4
       with:
         name: ShapesAndStone-linux-x86_64
@@ -278,7 +266,7 @@ jobs:
         cd "$RUNNER_TEMP/download"
         chmod +x ShapesAndStone-linux-x86_64.AppImage
         ./ShapesAndStone-linux-x86_64.AppImage --appimage-extract > /dev/null
-        "$GITHUB_WORKSPACE/packaging/start-check.sh" "$PWD/squashfs-root/usr/bin/shapes_and_stone"
+        "$GITHUB_WORKSPACE/clayground/cmake/clay_app/start-check.sh" "$PWD/squashfs-root/usr/bin/shapes_and_stone"
 
   # Attaches the packages to a release a person published
   attach:

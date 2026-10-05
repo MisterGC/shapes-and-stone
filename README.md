@@ -29,7 +29,7 @@ chmod +x ShapesAndStone-linux-x86_64.AppImage
 ./ShapesAndStone-linux-x86_64.AppImage
 ```
 
-It needs a system at least as new as Ubuntu 24.04, with OpenGL (on
+It needs a system at least as new as Ubuntu 22.04, with OpenGL (on
 Ubuntu, Debian: `libopengl0`). If it says it needs
 FUSE, install `libfuse2` (Ubuntu, Debian:
 `sudo apt install libfuse2`), or start it with `--appimage-extract-and-run`.
@@ -312,29 +312,27 @@ exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
 
 The downloads under PLAY are built by `.github/workflows/package.yml`: by
-hand (*Run workflow*), on a PR that changes `packaging/`, and when a release
-is published, which then gets the three packages attached. The workflow
-never creates or publishes a release itself. Each package carries Qt and
-Clayground and is started on a fresh runner that has no Qt
-(`packaging/start-check.sh`, `packaging/start-check.ps1`), the same headless
-start check as above. The macOS one is packaged locally the same way:
+hand (*Run workflow*), on a PR that changes `packaging/`, `CMakeLists.txt` or
+the workflow, and when a release is published, which then gets the three
+packages attached. The workflow never creates or publishes a release itself.
+Each package is made by Clayground's `clay_app_package`, carries Qt and
+Clayground, and is started on a fresh runner that has no Qt with
+Clayground's start check (`clayground/cmake/clay_app/start-check.sh`,
+`start-check.ps1`), the same headless start check as above. The macOS one is
+packaged locally the same way:
 
 ```
-packaging/package-macos.sh build dist <Qt>/6.10.1/macos/bin/macdeployqt
-packaging/start-check.sh "$PWD/dist/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
-packaging/lan-check.sh "dist/Shapes and Stone.app" <Qt>/6.10.1/macos/bin/qml
+cmake --build build --target shapes_and_stone_package
+clayground/cmake/clay_app/start-check.sh "$PWD/build/package/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
+packaging/lan-check.sh "build/package/Shapes and Stone.app" <Qt>/6.10.1/macos/bin/qml
 ```
 
 `start-check.sh` empties the environment and fails if the game loads a
+The packages land in `build/package/`. Linux needs `linuxdeploy` and
+`linuxdeploy-plugin-qt` on PATH, Windows an MSVC developer shell.
 library from outside the package. `lan-check.sh` runs `src/Game.qml` twice on
 the package's Qt and Clayground, hosts a LAN session in one and joins it from
 the other; both have to get into the dungeon with the other's knight.
-
-The packaging is a workaround: Clayground's `clay_app` has no deploy step,
-so `packaging/` runs `macdeployqt`, `windeployqt` and `linuxdeploy` itself
-and repairs what they leave (the build's rpaths in Clayground's libraries,
-SQL drivers for databases the game does not use). It goes once `clay_app`
-can package an app (MisterGC/clayground#380).
 
 To build against another Clayground commit, move the submodule and commit it:
 

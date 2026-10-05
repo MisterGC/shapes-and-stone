@@ -72,6 +72,15 @@ clay_app(shapes_and_stone
         ${SNS_ASSETS}
 )
 
+# The downloads for a friend without Qt (.github/workflows/package.yml):
+# cmake --build build --target shapes_and_stone_package writes them to
+# build/package/
+clay_app_package(shapes_and_stone
+    NAME "Shapes and Stone"
+    FILE_NAME ShapesAndStone
+    ICON packaging/shapes_and_stone.png
+)
+
 # The game's own shaders. PREFIX "/" puts src/shaders/x.frag at
 # :/src/shaders/x.frag.qsb - next to the QML in the resources, the same
 # relative place the dojo bakes them to beside the sources while developing.
