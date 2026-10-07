@@ -5,7 +5,7 @@ import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
 import Clayground.Sound
-import Clayground.Network
+import Clayground.Storage
 
 ClayWorld2d {
     id: world
@@ -27,8 +27,13 @@ ClayWorld2d {
     // Dark background behind the world
     Rectangle { parent: world; anchors.fill: parent; color: "#1a1a2e"; z: -1 }
 
-    // Global mute
-    property bool muted: true
+    // Global mute, toggled with M. The dojo starts silent so reloads while
+    // developing stay quiet; a native or browser start plays.
+    property bool muted: Clayground.runsInSandbox
+
+    // Atmosphere layer (lighting, procedural ground, screen effects).
+    // V toggles it for a before/after comparison.
+    property bool fx: true
 
     // Audio — switches based on levelType
     Music {
@@ -87,8 +92,9 @@ ClayWorld2d {
         volume: muted ? 0 : 0.6
     }
 
-    function playImpact() {
-        impactSound.play()
+    // gain (0..1) is for sounds of another player's knight, see remoteGain()
+    function playImpact(gain) {
+        impactSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
     Sound {
@@ -103,12 +109,23 @@ ClayWorld2d {
         volume: muted ? 0 : 0.5
     }
 
-    function playDash() {
-        dashSound.play()
+    function playDash(gain) {
+        dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
-    function playSwordSwing() {
-        swordSwingSound.play()
+    function playSwordSwing(gain) {
+        swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+
+    // How loud another knight is at xWu/yWu: never as loud as your own
+    // knight, and fading to silence about a screen away from you
+    readonly property real remoteMaxGain: 0.5
+    readonly property real remoteHearingWu: 14
+    function remoteGain(xWu, yWu) {
+        if (!player) return remoteMaxGain
+        let dx = xWu - player.xWu, dy = yWu - player.yWu
+        let d = Math.sqrt(dx * dx + dy * dy)
+        return remoteMaxGain * Math.max(0, 1 - d / remoteHearingWu)
     }
 
     function playDeathBurst() {
@@ -190,73 +207,488 @@ ClayWorld2d {
         _shakeIntensity = Math.max(_shakeIntensity, intensity)
     }
 
-    // Screen state: "title", "lobby", "game"
-    property string screen: "title"
+    // --- Impact feedback --------------------------------------------------
+    // Every hit in the game reports here, so how a fight feels is tuned in
+    // one place. With fx off it falls back to the original shake only.
+    //   kind: enemyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //         parry, projectileHit, projectileDeflected, projectileBurst
+    //   (x, y): where it happened; (dx, dy): direction the blow travelled
+    //   color: the struck thing's colour (shards and stains)
+    //   local: false for another player's hit (default true)
+    // Its world part (sparks, shards, rings, stains) belongs to the place
+    // of the hit and shows on every screen; its screen part (shake, kick,
+    // hit-stop, flash) only on the screen of whoever hit or was hit. A local
+    // hit goes out to the others, who draw its world part only.
+    function impact(kind, x, y, dx, dy, color, local) {
+        let len = Math.sqrt(dx * dx + dy * dy)
+        let nx = len > 0.001 ? dx / len : 0
+        let ny = len > 0.001 ? dy / len : 0
+        _impactWorld(kind, x, y, nx, ny, color)
+        if (local === false) return
+        _impactScreen(kind, nx, ny)
+        session.sendImpact(kind, x, y, dx, dy, color)
+    }
 
-    // Multiplayer
-    property var remotePlayers: ({})
-
-    Network {
-        id: gameNetwork
-        maxNodes: 4
-        topology: Network.Topology.Star
-        signalingMode: Network.SignalingMode.Cloud
-        autoRelay: true
-
-        onMessageReceived: (fromId, data) => {
-            if (data.type === "gameStart") {
-                masterSeed = data.seed
-                screen = "game"
-                world.forceActiveFocus()
-            } else if (data.type === "action") {
-                let rp = remotePlayers[fromId]
-                if (rp) rp.triggerAction(data.action)
-            } else if (data.type === "levelChange") {
-                _applyLevelChange(data.levelIndex)
-            } else if (data.type === "exitReached") {
-                // Host is level authority: any player reaching the exit
-                // advances the whole session
-                if (gameNetwork.isHost && !resetting) _hostAdvanceLevel()
-            }
+    function _impactWorld(kind, x, y, nx, ny, color) {
+        if (!fx) {
+            if (kind === "enemyDeath") spawnDeathParticles(x, y)
+            else if (kind === "parry") spawnParryEffect(x, y)
+            else if (kind === "projectileDeflected") spawnDeflectParticles(x, y)
+            else if (kind === "projectileBurst") spawnSpitParticles(x, y)
+            return
         }
-
-        onStateReceived: (fromId, data) => {
-            let rp = remotePlayers[fromId]
-            if (rp) rp.pushState(data)
-        }
-
-        onNodeLeft: (nodeId) => {
-            if (remotePlayers[nodeId]) {
-                remotePlayers[nodeId].destroy()
-                delete remotePlayers[nodeId]
-            }
+        switch (kind) {
+        case "enemyHit":
+            spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, 7, "#FFE6A0")
+            spawnShards(x, y, nx, ny, 4, color, 0.2)
+            break
+        case "enemyBlocked":
+            spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
+            break
+        case "enemyDeath":
+            spawnShards(x, y, nx, ny, 12, color, 0.3)
+            spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
+            spawnRing(x, y, Qt.lighter(color, 1.4))
+            spawnStain(x, y, color)
+            break
+        case "playerHit":
+            spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
+            break
+        case "playerBlocked":
+            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            break
+        case "parry":
+            spawnSparks(x, y, nx, ny, 14, "#FFE066")
+            spawnRing(x, y, "#FFD700")
+            break
+        case "projectileHit":
+        case "projectileBurst":
+            spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
+            break
+        case "projectileDeflected":
+            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            break
         }
     }
 
-    // Sync health overlay (multiplayer only)
-    NetworkMonitor {
-        network: gameNetwork
-        visible: gameNetwork.connected && screen === "game"
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        anchors.margins: 10
+    function _impactScreen(kind, nx, ny) {
+        if (!fx) {
+            let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
+                               playerBlocked: 1, projectileHit: 1,
+                               projectileDeflected: 0.5}[kind] || 0
+            if (legacyShake > 0) shake(legacyShake)
+            return
+        }
+        switch (kind) {
+        case "enemyHit":
+            _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
+            break
+        case "enemyBlocked":
+            _trauma(0.12); _freeze(30)
+            break
+        case "enemyDeath":
+            _trauma(0.4); _kick(nx * 0.2, ny * 0.2); _freeze(90)
+            break
+        case "playerHit":
+            _trauma(0.5); _kick(nx * 0.25, ny * 0.25); _freeze(75)
+            if (screenFx) screenFx.hurt()
+            break
+        case "playerBlocked":
+            _trauma(0.18); _kick(nx * 0.08, ny * 0.08)
+            break
+        case "parry":
+            _trauma(0.3); _freeze(140, 0.12)
+            if (screenFx) screenFx.parry()
+            break
+        case "projectileDeflected":
+            _trauma(0.12)
+            break
+        // projectileHit: the player's own playerHit carries the shake
+        }
     }
 
-    // Player state broadcast (~20 Hz)
-    Timer {
-        interval: 50
-        repeat: true
-        running: screen === "game" && gameNetwork.connected && player !== null
-        onTriggered: {
-            gameNetwork.broadcastState({
-                x: player.xWu,
-                y: player.yWu,
-                a: player.facingAngle,
-                s: player.isAttacking ? 1 : player.isBlocking ? 2 : player.isDashing ? 3 : 0,
-                h: player.hp
+
+    function _trauma(t) {
+        if (gameCamera.addTrauma) gameCamera.addTrauma(t)
+        else shake(t * 6)
+    }
+    function _kick(dxWu, dyWu) {
+        if (gameCamera.kick) gameCamera.kick(dxWu, dyWu)
+    }
+    function _freeze(ms, scale) {
+        if (world.hitStop) world.hitStop(ms, scale === undefined ? 0 : scale)
+    }
+
+    Component { id: fxParticleComp; FxParticle {} }
+    Component { id: stainComp; Stain {} }
+
+    // Fragments of the struck shape, thrown along the blow
+    function spawnShards(x, y, nx, ny, count, color, sizeWu) {
+        for (let i = 0; i < count; i++) {
+            let a = Math.atan2(ny, nx) + (Math.random() - 0.5) * 2.2
+            let speed = 3 + Math.random() * 5
+            fxParticleComp.createObject(world.room, {
+                xWu: x, yWu: y,
+                velX: Math.cos(a) * speed, velY: Math.sin(a) * speed,
+                sizeWu: sizeWu * (0.6 + Math.random() * 0.8),
+                color: Qt.darker(color, 0.9 + Math.random() * 0.5),
+                lifetime: 420 + Math.random() * 300,
+                spin: (Math.random() - 0.5) * 720,
+                pixelPerUnit: world.pixelPerUnit
             })
         }
     }
+
+    // Bright streaks flying off the point of contact
+    function spawnSparks(x, y, nx, ny, count, color) {
+        for (let i = 0; i < count; i++) {
+            let a = Math.atan2(ny, nx) + (Math.random() - 0.5) * 2.6
+            let speed = 6 + Math.random() * 7
+            fxParticleComp.createObject(glowParent(), {
+                xWu: x, yWu: y,
+                velX: Math.cos(a) * speed, velY: Math.sin(a) * speed,
+                sizeWu: 0.08, stretch: 4 + Math.random() * 4,
+                color: color, lifetime: 180 + Math.random() * 160,
+                shrinkTo: 0.1, z: 5,
+                pixelPerUnit: world.pixelPerUnit
+            })
+        }
+    }
+
+    Component {
+        id: ringComp
+        Rectangle {
+            id: _ring
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real rWu: 0.2
+            width: rWu * 2 * pixelPerUnit
+            height: width
+            radius: width / 2
+            x: xWu * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit - height / 2
+            color: "transparent"
+            border.width: Math.max(1, 0.08 * pixelPerUnit * (1 - opacity * 0.3))
+            z: 5
+            ParallelAnimation {
+                running: true
+                NumberAnimation { target: _ring; property: "rWu"; to: 1.6; duration: 280; easing.type: Easing.OutCubic }
+                NumberAnimation { target: _ring; property: "opacity"; from: 0.9; to: 0; duration: 280 }
+                onFinished: _ring.destroy()
+            }
+        }
+    }
+    function spawnRing(x, y, color) {
+        let r = ringComp.createObject(glowParent(), {
+            xWu: x, yWu: y, pixelPerUnit: world.pixelPerUnit
+        })
+        if (r) r.border.color = color
+    }
+
+    // Stains persist for the level; the oldest go once there are many
+    property var stains: []
+    function spawnStain(x, y, color) {
+        let s = stainComp.createObject(world.room, {
+            xWu: x, yWu: y,
+            color: Qt.darker(color, 1.7),
+            sizeWu: 0.8 + Math.random() * 0.5,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        stains.push(s)
+        dungeonObjects.push(s)
+        while (stains.length > 60) {
+            let old = stains.shift()
+            try { if (old) old.destroy() } catch (err) {}
+        }
+    }
+
+    // Screen state: "title", "lobby", "game"
+    property string screen: "title"
+    // Why the title is up, when it was not the player's choice (the host
+    // was lost); gone once the title is left
+    property string titleMessage: ""
+
+    // Co-op: the connection, the lobby and the remote players
+    Session {
+        id: session
+        z: 5000
+        world: world
+        player: world.player
+        inGame: screen === "game"
+        showLobby: screen === "lobby"
+        muted: world.muted
+        // The host's run, from its start or, on a node that joins late,
+        // at the level the host plays
+        onStarted: (seed, level) => {
+            masterSeed = seed
+            world.levelIndex = level
+            world.levelType = levelTypeOf(level)
+            screen = "game"
+            world.forceActiveFocus()
+        }
+        onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
+        onAdvanceRequested: _hostAdvanceLevel()
+        onLobbyStartRequested: _startMultiplayerGame()
+        onLobbyLeft: screen = "title"
+        onImpactReceived: (kind, x, y, dx, dy, color) => {
+            if (screen === "game") impact(kind, x, y, dx, dy, color, false)
+        }
+        onEnemySpawned: (objectId, props) => _makeEnemy(props, objectId)
+        onEnemyDespawned: (objectId) => _dropEnemy(objectId)
+        onEnemyBlowReceived: (fromId, blow) => {
+            let e = _enemyById[blow.id]
+            if (!e || e.destroyed) return
+            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId)
+            else if (blow.kind === "stagger") e.stagger()
+            else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
+        }
+        onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
+        onPartyChanged: _checkPartyDown()
+        onRunEnded: _endPartyRun()
+        onPlayerLeft: (nodeId) => _dropKnight(nodeId)
+        onHostLost: (message) => {
+            console.log("[Game]", message, "- back to the title")
+            backToTitle()
+            titleMessage = message
+        }
+        onEnemyKillReceived: (kill) => {
+            let e = _enemyById[kill.id]
+            if (e) e.destroyed = true
+            impact("enemyDeath", kill.x, kill.y, kill.dx, kill.dy, kill.color)
+            playDeathBurst()
+            countFight("kill")
+        }
+        onGoldSpawned: (objectId, props) => _makeGoldDrop(props, objectId)
+        onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
+        onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
+        onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
+        onShotReceived: (shot) => {
+            if (screen !== "game") return
+            _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
+            playSpitShot()
+        }
+        onStruckReported: (fromId, report) => {
+            if (report.source === "shot") _endShot(report.id, report.result)
+            world.struckReported(fromId, report.source, report.id, report.result)
+        }
+    }
+
+    // --- Enemies in a session (issue #13) ---
+    // The host runs every enemy: it spawns them as replicated objects,
+    // runs their AI and sends their state; every other node makes a
+    // remote enemy per object that shows the host's and passes its own
+    // knight's blows to the host. Without a session the game runs its
+    // enemies itself, as it always did.
+    property var _enemyById: ({})
+    // In a session an enemy goes for the nearest knight still standing;
+    // alone it keeps the target it was given
+    readonly property bool enemiesChooseTarget: session.connected
+    // The nearest knight at (x, y) that has not fallen, this node's or
+    // another player's, or null
+    function nearestKnight(x, y) {
+        let knights = [player]
+        for (let id in session.remotePlayers) knights.push(session.remotePlayers[id])
+        let best = null, bestD = Infinity
+        for (let k of knights) {
+            if (!k || (k === player ? player.fallen : !k.known || k.remoteHp <= 0)) continue
+            let dx = k.xWu - x, dy = k.yWu - y
+            let d = dx * dx + dy * dy
+            if (d < bestD) { bestD = d; best = k }
+        }
+        return best
+    }
+    // The node a knight belongs to
+    function knightIdOf(knight) {
+        if (!knight) return ""
+        return knight === player ? session.nodeId : knight.nodeId
+    }
+    // Joiner: this node's knight struck an enemy the host runs
+    function strikeEnemy(enemy, blow) {
+        if (session.connected && enemy.objectId !== "") session.strikeEnemy(enemy.objectId, blow)
+    }
+    // Host: an enemy lunged at another node's knight
+    function strikeKnight(knight, enemy, atk, x, y) {
+        if (session.connected)
+            session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
+                                                 size: enemy.widthWu})
+    }
+    // A host's enemy struck this knight: the blow lands when this screen
+    // shows the lunge land, the enemy's render delay after it arrived. A
+    // parry of that enemy from its last parry window before the blow arrived
+    // until then answers that lunge, and the blow is dropped. Without the
+    // hold, a parry in the window's last render delay on this screen came
+    // after the blow of the lunge it parried. The window is counted in
+    // physics steps, as the enemy's attack runs (issue #35); the hold is
+    // wall clock, as this screen renders the enemy.
+    // knightStruck says what became of each blow: "hit", "blocked",
+    // "dodged", "ignored", "out of reach" or "parried". This screen judges
+    // it by its knight's own state, and reports it to the others
+    // (issue #18).
+    signal knightStruck(string enemyId, string result)
+    // Another node's knight met a host's enemy's attack and its node judged
+    // it: source "lunge" (id: the enemy's) or "shot" (id: the shot's)
+    signal struckReported(string nodeId, string source, string id, string result)
+    function _struck(enemyId, result) {
+        knightStruck(enemyId, result)
+        if (session.connected) session.reportStruck({source: "lunge", id: enemyId, result: result})
+    }
+    // The physics steps since the game came up, the clock of the parry window
+    property int _physicsSteps: 0
+    property var _parriedAt: ({})
+    property var _heldBlows: []
+    // This node's knight parried a host's enemy
+    function parried(enemy) {
+        if (enemy.remote) _parriedAt[enemy.objectId] = _physicsSteps
+    }
+    function _holdKnightBlow(blow) {
+        let e = _enemyById[blow.id]
+        let hold = e ? e.renderDelayMs : 0
+        _heldBlows.push(Object.assign({due: Date.now() + hold, arrived: _physicsSteps}, blow))
+        _heldBlowTimer.start()
+    }
+    Timer {
+        id: _heldBlowTimer
+        interval: 5
+        repeat: true
+        onTriggered: {
+            let now = Date.now()
+            let due = world._heldBlows.filter(b => b.due <= now)
+            world._heldBlows = world._heldBlows.filter(b => b.due > now)
+            if (world._heldBlows.length === 0) stop()
+            for (let b of due) world._landKnightBlow(b)
+        }
+    }
+    function _landKnightBlow(blow) {
+        // The reach is checked here, against where this knight really is
+        if (!player) return
+        let at = _parriedAt[blow.id]
+        if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
+            _struck(blow.id, "parried")
+            return
+        }
+        // A dash that carried the knight past the enemy dodged it all the same
+        let dx = player.xWu - blow.x, dy = player.yWu - blow.y
+        if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) {
+            _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
+            return
+        }
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
+        if (result === "hit" || result === "blocked") playImpact()
+        _struck(blow.id, result)
+    }
+    // Host: another node's knight killed an enemy
+    function reportKill(nodeId, enemy, dx, dy, color) {
+        if (session.connected)
+            session.reportKill(nodeId, {id: enemy.objectId, x: enemy.xWu, y: enemy.yWu,
+                                        dx: dx, dy: dy, color: color})
+    }
+    // Host: a replicated enemy goes on every node, its item with it; false
+    // when it is not one
+    function despawnEnemy(enemy) {
+        if (!session.connected || !session.isHost || enemy.objectId === "") return false
+        session.despawnEnemy(enemy.objectId)
+        return true
+    }
+    // Host: a player left, its knight is gone; no enemy goes for it any more
+    function _dropKnight(nodeId) {
+        if (!session.isHost) return
+        for (let e of enemies) {
+            if (e && !e.destroyed && !e.remote && e.targetId === nodeId) e.dropTarget()
+        }
+    }
+    function _dropEnemy(objectId) {
+        let e = _enemyById[objectId]
+        if (!e) return
+        delete _enemyById[objectId]
+        enemies = enemies.filter(x => x !== e)
+        e.destroyed = true
+        try { e.destroy() } catch (err) {}
+        minimap.requestPaint()
+    }
+
+    // --- Gold (issue #38) ---
+    // A killed enemy drops gold where it fell; the first knight to reach it
+    // picks it up, whoever dealt the killing blow. In a session the host
+    // owns every drop as it owns the enemies: it spawns them as replicated
+    // objects, each node claims the drops its own knight reaches, and the
+    // host gives a drop to the first claim it gets and despawns it, so a
+    // drop is picked up once, by one knight. Each knight's gold is its own
+    // node's.
+    property var goldDrops: []
+    property var _goldById: ({})
+    // Where an enemy died: gold for its tier, none in the fight room
+    function dropGold(x, y, tier) {
+        if (fightRoomActive) return
+        let amount = Balance.loot.goldByTier[tier] || 0
+        if (amount <= 0) return
+        let props = {xWu: x, yWu: y, amount: amount}
+        if (!session.connected)
+            _makeGoldDrop(props)
+        else if (session.isHost)
+            session.spawnGold(props)
+    }
+    function _makeGoldDrop(props, objectId) {
+        objectId = objectId || ""
+        if (objectId !== "" && _goldById[objectId]) return _goldById[objectId]
+        let drop = goldDropComponent.createObject(world.room, Object.assign({}, props, {
+            objectId: objectId,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        }))
+        if (!drop) return null
+        goldDrops.push(drop)
+        if (objectId !== "") _goldById[objectId] = drop
+        return drop
+    }
+    function _removeGoldDrop(objectId) {
+        let drop = _goldById[objectId]
+        if (!drop) return
+        delete _goldById[objectId]
+        _forgetGoldDrop(drop)
+    }
+    function _forgetGoldDrop(drop) {
+        goldDrops = goldDrops.filter(d => d !== drop)
+        try { drop.destroy() } catch (err) {}
+    }
+    // Each step: the drops this node's knight stands on are its, or
+    // claimed from the host in a session
+    function _pickUpGold() {
+        if (!player || player.fallen || goldDrops.length === 0) return
+        let range = Balance.loot.pickupRange
+        for (let drop of goldDrops.slice()) {
+            if (!drop || drop.claimed) continue
+            let dx = drop.xWu - player.xWu, dy = drop.yWu - player.yWu
+            if (dx * dx + dy * dy > range * range) continue
+            if (drop.objectId === "") {
+                _collectGold(drop.amount, drop.xWu, drop.yWu)
+                _forgetGoldDrop(drop)
+            } else if (session.connected) {
+                drop.claimed = true
+                session.claimGold(drop.objectId)
+            }
+        }
+    }
+    // Host: a node's knight reached a drop; the first claim takes it, a
+    // later one finds it gone
+    function _giveGold(nodeId, objectId) {
+        let drop = _goldById[objectId]
+        if (!drop || !session.isHost) return
+        let grant = {id: objectId, amount: drop.amount, x: drop.xWu, y: drop.yWu}
+        session.despawnGold(objectId)
+        if (nodeId === session.nodeId) _collectGold(grant.amount, grant.x, grant.y)
+        else session.grantGold(nodeId, grant)
+    }
+    function _collectGold(amount, x, y) {
+        if (!player) return
+        player.gold += amount
+        spawnDamageNumber(x, y, "+" + amount, "#E8B83A")
+    }
+
+    // In a session every node simulates something the others see (the host
+    // the world, each player its own knight): the hit stop holds the picture
+    // and lets the simulation run on, so a hit never stalls the others
+    hitStopMode: session.connected ? "view" : "physics"
 
     // Game state
     property var player: null
@@ -268,7 +700,60 @@ ClayWorld2d {
     property int levelIndex: 0
     property string levelType: "dungeon"  // "dungeon" or "village"
     property var rng: null
+    // How deep the run got: the dungeons behind the knight, 0 for the first
+    readonly property int depth: depthOf(levelIndex)
+    // Two levels make one depth: the dungeon at depth d is level 2d, the
+    // village after it level 2d + 1. The rule lives only here, so the depth
+    // shown and kept comes from the same rule as the level entered.
+    function depthOf(index) { return Math.floor(index / 2) }
+    function levelTypeOf(index) { return index % 2 === 1 ? "village" : "dungeon" }
+    function levelIndexOf(d, type) { return 2 * d + (type === "village" ? 1 : 0) }
+    // The knight is at 0 HP: the enemies stand still and the fallen screen
+    // offers a new run or the title
+    property bool fallen: false
+    // A session's run ended with every knight down: the session is left,
+    // the fallen screen shows the run's summary and a key goes to the title
+    property bool partyFallen: false
+    // Esc opened the menu (Resume, Title). Alone the world is paused under
+    // it; in a session it runs on, since a pause would stop every other
+    // player's enemies, and only this knight stops taking input.
+    property bool menuOpen: false
+    readonly property bool gamePaused: menuOpen && !session.connected
+    // Paused by stopping the world: the first step after resuming is one
+    // frame long, not the whole pause (clayground#338), so no cooldown or
+    // AI timer runs out on it.
+    Binding {
+        target: world.physics
+        property: "running"
+        value: false
+        when: world.gamePaused
+        restoreMode: Binding.RestoreBindingOrValue
+    }
     components: []
+
+    // The run so far, for the fallen screen: the enemies killed and the
+    // simulated seconds since it started (a pause holds them)
+    property int runKills: 0
+    property real runSeconds: 0
+    // The deepest any run got on this machine (-1 before the first), kept
+    // with Clayground.Storage; runStartBest is what it was when this run
+    // started, so the fallen screen can tell a new best
+    property int bestDepth: -1
+    property int runStartBest: -1
+    // A bench keeps its record apart from the player's with its own name
+    property string recordStoreName: "ShapesAndStone"
+    KeyValueStore { id: records; name: world.recordStoreName }
+    function _startRunRecord() {
+        runKills = 0
+        runSeconds = 0
+        runStartBest = bestDepth
+    }
+    function _keepBest() {
+        if (depth <= bestDepth) return
+        bestDepth = depth
+        records.set("bestDepth", String(bestDepth))
+    }
+    onDepthChanged: _keepBest()
 
     // Collision categories
     readonly property int catWall: Box.Category1
@@ -278,16 +763,27 @@ ClayWorld2d {
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
+        bestDepth = parseInt(records.get("bestDepth", "-1"))
+        runStartBest = bestDepth
+        console.log("[Game] Best depth so far:", bestDepth)
         forceActiveFocus()
     }
 
     // Wait for valid size + game screen before generating dungeon
     onWidthChanged: _tryStartGame()
-    onScreenChanged: _tryStartGame()
+    onScreenChanged: {
+        if (screen !== "title") titleMessage = ""
+        _tryStartGame()
+    }
     function _tryStartGame() {
         if (screen === "game" && width > 0 && height > 0 && !player) {
             console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
+            // A node that joins a session late may start in a village
+            if (levelType === "village") {
+                generateVillage()
+                return
+            }
             dungeonAmbience.play()
             dungeonMusic.play()
             generateDungeon()
@@ -297,9 +793,7 @@ ClayWorld2d {
     function _startMultiplayerGame() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        gameNetwork.broadcast({type: "gameStart", seed: masterSeed})
-        screen = "game"
-        world.forceActiveFocus()
+        session.start(masterSeed)
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -314,9 +808,6 @@ ClayWorld2d {
             if (!player) return
             if (mouse.button === Qt.LeftButton) {
                 player.attack()
-                // Reliable event so remote clients show the swing crisply
-                if (gameNetwork.connected && player.isAttacking)
-                    gameNetwork.broadcast({type: "action", action: "attack"})
             }
             if (mouse.button === Qt.RightButton) player.isBlocking = true
         }
@@ -335,6 +826,34 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Escape) {
+            if (screen === "game" && player && !fallen) openMenu()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_M) {
+            muted = !muted
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_V) {
+            fx = !fx
+            event.accepted = true
+            return
+        }
+        // 1 and 2 buy what the dialogue panel offers; without wares 1
+        // drinks a potion
+        if (event.key === Qt.Key_1 || event.key === Qt.Key_2) {
+            let i = event.key - Qt.Key_1
+            if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
+                if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
+                event.accepted = true
+            } else if (event.key === Qt.Key_1) {
+                drinkPotion()
+                event.accepted = true
+            }
+            return
+        }
         if (event.key === Qt.Key_E) {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
@@ -354,6 +873,20 @@ ClayWorld2d {
         }
     }
     Keys.forwardTo: gameCtrl
+    function openMenu() {
+        // The menu takes the keys from here on: what is held now would
+        // never see its release
+        gameCtrl.axisX = 0
+        gameCtrl.axisY = 0
+        gameCtrl.buttonAPressed = false
+        gameCtrl.buttonBPressed = false
+        if (player) player.isBlocking = false
+        menuOpen = true
+    }
+    function closeMenu() {
+        menuOpen = false
+        world.forceActiveFocus()
+    }
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -372,13 +905,9 @@ ClayWorld2d {
             }
         }
 
-        onAxisXChanged: console.log("[Input] axisX:", axisX)
-        onAxisYChanged: console.log("[Input] axisY:", axisY)
         onButtonBPressedChanged: {
             if (buttonBPressed && player) {
                 player.dash()
-                if (gameNetwork.connected && player.isDashing)
-                    gameNetwork.broadcast({type: "action", action: "dash"})
             }
         }
     }
@@ -450,11 +979,89 @@ ClayWorld2d {
 
         Text {
             anchors.centerIn: parent
-            text: player ? player.mana + " / " + player.maxMana : ""
+            text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
             color: "white"
             font.pixelSize: 10
             font.bold: true
         }
+    }
+
+    // How deep the knight is, under the bars
+    Text {
+        id: hudDepth
+        objectName: "hudDepth"
+        anchors.top: manaHud.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: 6
+        z: 1000
+        visible: player !== null
+        text: "Depth " + depth
+        color: "#DDDDDD"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The knight's gold, under the depth
+    Text {
+        id: hudGold
+        objectName: "hudGold"
+        anchors.top: hudDepth.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: 2
+        z: 1000
+        visible: player !== null
+        text: "Gold " + (player ? player.gold : 0)
+        color: "#E8B83A"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The knight's potions, and the key that drinks one
+    Text {
+        objectName: "hudPotions"
+        anchors.top: hudGold.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: 2
+        z: 1000
+        visible: player !== null && player.potions > 0
+        text: "Potions " + (player ? player.potions : 0) + "  [1]"
+        color: "#66CC66"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The controls, for a first-time player: shown at depth 0 on a keyboard
+    // and mouse, out of the way of the dialogue panel and the fallen screen
+    readonly property bool touchControls: Qt.platform.os === "ios" || Qt.platform.os === "android"
+    Text {
+        id: controlsHint
+        objectName: "controlsHint"
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: 12
+        z: 1000
+        visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
+                 && !dialoguePanel.visible
+        text: "WASD move  •  LMB strike  •  RMB shield  •  Shift dash  •  "
+              + "E talk  •  1 potion  •  M mute  •  Esc menu"
+        color: "#BBBBBB"
+        opacity: 0.85
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 13
+        font.letterSpacing: 1
     }
 
     // Crosshair at mouse position
@@ -484,6 +1091,7 @@ ClayWorld2d {
 
     // Mute indicator (always visible when muted)
     Rectangle {
+        objectName: "muteIcon"
         anchors.top: minimap.bottom
         anchors.right: parent.right
         anchors.topMargin: 4
@@ -632,6 +1240,156 @@ ClayWorld2d {
         }
     }
 
+    // Reliable events so the other players see swings, dashes, parries and
+    // hits crisply, not only when the sampled state catches them
+    Connections {
+        target: player
+        function onActed(action) { session.sendAction(action) }
+    }
+
+    Connections {
+        target: player
+        function onHpChanged() { if (player.hp <= 0) _fall() }
+    }
+
+    function _fall() {
+        if (fallen || screen !== "game") return
+        console.log("[Game] The knight has fallen at depth", depth)
+        menuOpen = false
+        fallen = true
+        _keepBest()
+        countFight("fall")
+        // In a session the enemies go for the knights still standing
+        if (session.connected) {
+            _checkPartyDown()
+            return
+        }
+        for (let e of enemies) {
+            try { if (e && e.halt) e.halt() } catch(err) {}
+        }
+    }
+
+    // Host: when its own knight and every other knight of the session are
+    // down, the run ends for everyone and each screen shows its summary
+    function _checkPartyDown() {
+        if (!session.connected || !session.isHost || screen !== "game" || !player || !player.fallen)
+            return
+        for (let id in session.remotePlayers) {
+            let rp = session.remotePlayers[id]
+            if (rp && rp.remoteHp > 0) return
+        }
+        console.log("[Game] Every knight is down at depth", depth, "- the run ends")
+        session.endRun()
+    }
+
+    // The host ended the run: out of the session, the enemies stop, and the
+    // fallen screen shows how far the party got
+    function _endPartyRun() {
+        if (screen !== "game") return
+        console.log("[Game] The party has fallen at depth", depth)
+        if (session.connected) session.leave()
+        for (let e of enemies) {
+            try { if (e && e.halt) e.halt() } catch(err) {}
+        }
+        _keepBest()
+        partyFallen = true
+        fallen = true
+    }
+
+    // --- Fight record ---
+    // How the fight went, counted where it happens: the damage the knight
+    // dealt and took, its parries, the attacks its shield stopped, the
+    // enemies killed, its falls, and the simulated seconds since the record
+    // started and until no enemy stood (-1 while one does). Each new knight
+    // starts a fresh record; the fight bench reads it (issue #34).
+    readonly property QtObject fightRecord: QtObject {
+        property int damageDealt: 0
+        property int damageTaken: 0
+        property int parries: 0
+        property int blocks: 0
+        property int kills: 0
+        property int deaths: 0
+        property real seconds: 0
+        property real clearSeconds: -1
+    }
+    function resetFightRecord() {
+        let r = fightRecord
+        r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
+        r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
+    }
+    // what: dealt, taken (with the damage), parry, block, kill or fall
+    function countFight(what, amount) {
+        let r = fightRecord
+        switch (what) {
+        case "dealt": r.damageDealt += amount; break
+        case "taken": r.damageTaken += amount; break
+        case "parry": r.parries++; break
+        case "block": r.blocks++; break
+        case "fall": r.deaths++; break
+        case "kill":
+            r.kills++
+            runKills++
+            if (r.clearSeconds < 0 && !enemies.some(e => e && e.destroyed === false))
+                r.clearSeconds = r.seconds
+            break
+        }
+    }
+    // The record's clock is the physics: a pause or a hit stop holds it
+    Connections {
+        target: world.physics
+        function onStepped() {
+            world._physicsSteps++
+            world._pickUpGold()
+            if (world.player && !world.fallen) {
+                world.fightRecord.seconds += world.physics.timeStep
+                world.runSeconds += world.physics.timeStep
+            }
+        }
+    }
+
+    // Enter on the fallen screen: a new run from depth 0 on a new seed
+    function newRun() {
+        let oldSeed = masterSeed
+        do {
+            masterSeed = Math.floor(Math.random() * 2147483647)
+        } while (masterSeed === oldSeed)
+        console.log("[Game] New run, seed:", masterSeed)
+        clearDungeon()
+        menuOpen = false
+        fallen = false
+        partyFallen = false
+        resetting = false
+        fightRoomActive = false
+        levelIndex = 0
+        levelType = "dungeon"
+        _startRunRecord()
+        generateDungeon()
+        minimap.requestPaint()
+        world.forceActiveFocus()
+    }
+
+    // Esc on the fallen screen: leave the run (and a session) for the title,
+    // where the next start rolls a new seed
+    function backToTitle() {
+        console.log("[Game] Back to the title")
+        clearDungeon()
+        if (session.connected) session.leave()
+        menuOpen = false
+        fallen = false
+        partyFallen = false
+        resetting = false
+        fightRoomActive = false
+        masterSeed = -1
+        levelIndex = 0
+        levelType = "dungeon"
+        _startRunRecord()
+        dungeonAmbience.stop()
+        dungeonMusic.stop()
+        villageAmbience.stop()
+        villageMusic.stop()
+        screen = "title"
+    }
+
     // Track player movement for minimap exploration
     Connections {
         target: player
@@ -645,12 +1403,72 @@ ClayWorld2d {
     AnchoredMask {
         world: world
         target: player
-        enabled: levelType === "dungeon"
+        enabled: levelType === "dungeon" && !world.fx
         innerRadius: 4
         outerRadius: 18
         color: "#ffb060"
         darkness: "#000000"
         flicker: 0.15
+    }
+
+    // --- Atmosphere: light and screen treatment (fx on) ---------------------
+    // Coloured lights with wall shadows replace the single lantern mask. The
+    // ambient is how much of an unlit spot still shows: next to nothing deep
+    // in the dungeon, a moonlit dusk in the village.
+    LightLayer2d {
+        id: lighting
+        world: world
+        active: world.fx && screen === "game"
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : "#0c0b12"
+        // Little additive glow: it washes colours towards white-grey; the
+        // light should reveal the shapes' own colours, not tint them
+        glow: 0.1
+        falloff: 1.6
+        shadowHardness: 2.5
+    }
+
+    ScreenFx2d {
+        id: screenFxItem
+        world: world
+        vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
+        vignetteColor: "#000000"
+        // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
+        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15 : 0.12
+        // A touch more colour than flat: darkness already mutes everything
+        // outside the light, the lit shapes should stay vivid
+        saturation: world.fx ? 1.15 : 1
+        contrast: world.fx ? 1.05 : 1
+        // The heartbeat sets in below a quarter of the health and grows
+        // gently - a warning, not an alarm
+        lowHealth: world.fx && player && player.hp < player.maxHp * 0.25
+                   ? 0.8 * (1 - player.hp / (player.maxHp * 0.25)) : 0
+    }
+    // Screen-space hit feedback used by impact(); null with fx off
+    property var screenFx: world.fx ? screenFxApi : null
+    QtObject {
+        id: screenFxApi
+        function hurt() {
+            // A faint tint only: the knight's own white flash and the
+            // fringe pulse carry the hit; a full red screen on every spit
+            // wears the player out
+            screenFxItem.flash("#FF3020", 90, 0.12)
+            screenFxItem.pulse(0.4, 200)
+        }
+        function parry() {
+            screenFxItem.flash("#FFF0B0", 80, 0.3)
+            screenFxItem.pulse(1.0, 320)
+        }
+    }
+
+    // Where things that give off light go: above the darkness with fx on
+    function glowParent() {
+        return fx && lighting.emissive ? lighting.emissive : world.room
+    }
+
+    // Walls cast shadows: the occluder map mirrors the level grid
+    function updateOccluders() {
+        lighting.setOccluderGrid(gridWidth, gridHeight, cellSize,
+                                 (cx, cy) => grid[cy] && grid[cy][cx] === cellWall)
     }
 
     // Minimap with fog of war
@@ -708,6 +1526,8 @@ ClayWorld2d {
 
     // Exit trigger sensor
     property var exitSensor: null
+    property var exitStairs: null
+    Component { id: exitStairsComponent; ExitStairs {} }
     property bool resetting: false
 
     CollisionTracker {
@@ -715,14 +1535,11 @@ ClayWorld2d {
         onBeginContact: (entity) => {
             if (entity === player && !resetting) {
                 console.log("[Game] Player reached the exit!")
-                if (!gameNetwork.connected) {
+                if (!session.connected) {
                     resetting = true
                     Qt.callLater(resetDungeon)
-                } else if (gameNetwork.isHost) {
-                    _hostAdvanceLevel()
                 } else {
-                    // Ask the host to advance; it answers with levelChange
-                    gameNetwork.broadcast({type: "exitReached"})
+                    session.reachExit()
                 }
             }
         }
@@ -732,7 +1549,7 @@ ClayWorld2d {
     // regenerates on its own and the worlds silently diverge.
     function _hostAdvanceLevel() {
         if (resetting) return
-        gameNetwork.broadcast({type: "levelChange", levelIndex: levelIndex + 1})
+        session.announceLevel(levelIndex + 1)
         _applyLevelChange(levelIndex + 1)
     }
 
@@ -740,34 +1557,102 @@ ClayWorld2d {
         if (resetting || newIndex === levelIndex) return
         resetting = true
         Qt.callLater(() => {
-            let savedHp = player ? player.hp : 120
-            clearDungeon()
-            levelIndex = newIndex
-            levelType = (newIndex % 2 === 1) ? "village" : "dungeon"
-            if (levelType === "village")
-                generateVillage()
-            else
-                generateDungeon()
-            if (player) player.hp = savedHp
+            _enterLevel(newIndex)
             resetting = false
         })
+    }
+
+    // The one way to the next level: what the knight carries (its HP, mana,
+    // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon
+    function _enterLevel(newIndex) {
+        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
+                                 potions: player.potions, upgrade: player.upgrade }
+                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
+                                 potions: 0, upgrade: "" }
+        console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
+                    "gold:", carried.gold, "potions:", carried.potions, "upgrade:", carried.upgrade)
+        clearDungeon()
+        levelIndex = newIndex
+        levelType = levelTypeOf(newIndex)
+        if (levelType === "village")
+            generateVillage()
+        else
+            generateDungeon()
+        if (player) {
+            // The upgrade first: it raises max HP, which the HP is held to
+            player.upgrade = carried.upgrade
+            player.hp = carried.hp
+            player.mana = carried.mana
+            player.gold = carried.gold
+            player.potions = carried.potions
+        }
     }
 
     // Component factories
     Component { id: playerComponent; Player {} }
     Component { id: enemyComponent; Enemy {} }
     Component { id: wallComponent; Wall {} }
+    Component { id: wallFaceComponent; WallFace {} }
+    Component { id: torchComponent; Torch {} }
+    Component { id: motesComponent; Motes {} }
+
+    function spawnMotes() {
+        // Fireflies glow on their own; dust only shows where light falls
+        let village = levelType === "village" && !fightRoomActive
+        let m = motesComponent.createObject(village ? glowParent() : world.room, {
+            widthWu: xWuMax, heightWu: yWuMax,
+            fireflies: village,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(m)
+    }
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
     Component { id: npcComponent; Npc {} }
-    Component { id: remotePlayerComponent; RemotePlayer {} }
+    Component { id: goldDropComponent; GoldDrop {} }
 
     // Dialogue panel (bottom-center, hidden by default)
-    DialoguePanel { id: dialoguePanel; parent: world }
+    DialoguePanel { id: dialoguePanel; parent: world; gold: player ? player.gold : 0 }
 
-    function openDialogue(name, color, lines) {
-        dialoguePanel.open(name, color, lines)
+    function openDialogue(name, color, lines, wares) {
+        dialoguePanel.open(name, color, lines, _offered(wares || []))
+    }
+    // The smith's upgrade is one per run: once bought, the smith offers
+    // neither
+    function _offered(wares) {
+        return wares.filter(w => w.id === "potion" || (player && player.upgrade === ""))
+    }
+
+    // --- The village's wares (issue #38) ---
+    // Bought with this node's knight's own gold. A potion is kept for key 1;
+    // the smith's upgrade ("atk" or "hp") lasts the run
+    function buyWare(ware) {
+        if (!player || player.fallen) return false
+        if (player.gold < ware.price) {
+            dialoguePanel.note = "You'll need " + ware.price + " gold for that."
+            return false
+        }
+        player.gold -= ware.price
+        if (ware.id === "potion") {
+            player.potions++
+            dialoguePanel.note = "One potion. Drink it when it counts."
+        } else {
+            player.upgrade = ware.id
+            if (ware.id === "hp") player.hp += Balance.shop.hpUpgrade
+            dialoguePanel.note = ware.id === "atk" ? "There. That edge will bite deeper."
+                                                   : "There. That mail will take a few more blows."
+        }
+        dialoguePanel.wares = _offered(dialoguePanel.wares)
+        console.log("[Game] Bought", ware.id, "for", ware.price, "gold,", player.gold, "left")
+        return true
+    }
+    function drinkPotion() {
+        if (!player) return 0
+        let healed = player.drinkPotion()
+        if (healed > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
+        return healed
     }
 
     // Death particle
@@ -847,6 +1732,7 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -863,22 +1749,22 @@ ClayWorld2d {
         // Step 8: Place exit trigger sensor at the north edge
         placeExitSensor()
 
-        // Step 9: Spawn 10-20 enemies across non-start rooms with tier variation
+        // Step 9: Spawn enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            let numEnemies = 5 + Math.floor(rng() * 4)
+            let sb = spawnRolls(depth)
+            let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
+            let tiers = dealTiers(numEnemies, sb, rng)
             for (let i = 0; i < numEnemies; i++) {
                 let room = spawnRooms[i % spawnRooms.length]
                 let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
                 let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
-                // Tier: 0=weak(20%), 1=normal(60%), 2=tough(20%)
-                let roll = rng()
-                let tier = roll < 0.2 ? 0 : (roll < 0.8 ? 1 : 2)
-                // Enemy type: ~20% guardian, ~20% spitter, rest grunt
+                let tier = tiers[i]
+                // Enemy type: guardian, spitter, else grunt
                 let typeRoll = rng()
-                let guardianChance = tier === 2 ? 0.4 : 0.15
+                let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
                 let type = typeRoll < guardianChance ? "guardian"
-                    : typeRoll < guardianChance + 0.2 ? "spitter" : "grunt"
+                    : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
                 spawnEnemy(ex, ey, tier, type)
             }
         }
@@ -899,7 +1785,7 @@ ClayWorld2d {
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
             let startRoom = rooms[0]
-            _spawnRemotePlayers((startRoom.x + startRoom.w / 2) * cellSize,
+            session.spawnRemotePlayers((startRoom.x + startRoom.w / 2) * cellSize,
                                 (startRoom.y + startRoom.h / 2) * cellSize)
         }
 
@@ -1063,7 +1949,10 @@ ClayWorld2d {
         // Create floor for entire dungeon area
         let floorObj = floorComponent.createObject(world.room, {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            fx: Qt.binding(() => world.fx),
+            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            seed: (levelIndex * 0.137) % 1
         })
         dungeonObjects.push(floorObj)
 
@@ -1072,6 +1961,10 @@ ClayWorld2d {
 
         // Create boundary walls
         createBoundaryWalls()
+        createWallFaces()
+        createWallRims()
+        updateOccluders()
+        spawnMotes()
 
         console.log("[Game] Built dungeon with", wallCount, "merged walls")
     }
@@ -1121,14 +2014,115 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             categories: catWall,
-            collidesWith: catPlayer | catEnemy | catProjectile
+            collidesWith: catPlayer | catEnemy | catProjectile,
+            fx: Qt.binding(() => world.fx)
         })
         dungeonObjects.push(wall)
         return wall
     }
 
+    // Torches on the north wall of each room. Decoration draws from its own
+    // generator so the layout and enemies stay identical to a seed without it.
+    property var torches: []
+    function placeRoomTorches(decoRng) {
+        torches = []
+        for (let room of rooms) {
+            let gy = room.y + room.h
+            if (gy >= gridHeight) continue
+            let spots = []
+            for (let gx = room.x; gx < room.x + room.w; gx++)
+                if (grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                    spots.push(gx)
+            if (spots.length === 0) continue
+            let count = room.w >= 7 && spots.length >= 4 ? 2 : 1
+            for (let i = 0; i < count; i++) {
+                // Spread two torches across the wall, one sits near the middle
+                let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
+                t += (decoRng() - 0.5) * 0.15
+                let gx = spots[Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))]
+                placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75)
+            }
+        }
+    }
+
+    function placeTorch(wx, wy, color) {
+        let t = torchComponent.createObject(glowParent(), {
+            xWu: wx, yWu: wy,
+            flameColor: color || "#FF9A3C",
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(t)
+        torches.push(t)
+        return t
+    }
+
+    // A light rim on wall tops that border walkable ground to their north:
+    // the far edge of a wall, catching the same light as the faces.
+    Component {
+        id: wallRimComponent
+        Rectangle {
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real widthWu: 1
+            x: xWu * pixelPerUnit
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit
+            width: widthWu * pixelPerUnit
+            height: Math.max(2, pixelPerUnit / 12)
+            color: "#5A6A80"
+            opacity: 0.8
+        }
+    }
+    function createWallRims() {
+        for (let gy = 0; gy < gridHeight - 1; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                let isRim = grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall
+                if (!isRim) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall)
+                    gx++
+                let r = wallRimComponent.createObject(world.room, {
+                    xWu: startX * cellSize, yWu: (gy + 1) * cellSize,
+                    widthWu: (gx - startX) * cellSize,
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                })
+                dungeonObjects.push(r)
+            }
+        }
+    }
+
+    // Brick faces on every wall cell whose southern neighbour is walkable,
+    // merged into runs like the walls themselves.
+    readonly property real wallFaceWu: 0.7
+    function createWallFaces() {
+        for (let gy = 1; gy < gridHeight; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                let isFace = grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                if (!isFace) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                    gx++
+                let f = wallFaceComponent.createObject(world.room, {
+                    xWu: startX * cellSize,
+                    yWu: gy * cellSize + wallFaceWu,
+                    widthWu: (gx - startX) * cellSize,
+                    heightWu: wallFaceWu,
+                    color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                })
+                dungeonObjects.push(f)
+            }
+        }
+    }
+
     function spawnPlayer(px, py) {
         console.log("[Game] spawnPlayer at", px, py)
+        resetFightRecord()
         player = playerComponent.createObject(world.room, {
             xWu: px, yWu: py,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
@@ -1149,59 +2143,91 @@ ClayWorld2d {
         }
     }
 
+    // The spawn table at a depth: Balance.spawn with Balance.depth added
+    // once per depth, each number within its cap
+    function spawnRolls(d) {
+        let sb = Balance.spawn, bd = Balance.depth
+        let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
+        let more = Math.floor(d * bd.enemies)
+        return {
+            enemiesMin: Math.min(bd.enemiesCap, sb.enemiesMin + more),
+            enemiesMax: Math.min(bd.enemiesCap, sb.enemiesMax + more),
+            weakChance: Math.max(0, sb.weakChance + d * bd.weakChance),
+            normalChance: 1 - tough,
+            guardianChance: Math.min(bd.typeCap, sb.guardianChance + d * bd.guardianChance),
+            guardianChanceTough: Math.min(bd.typeCap, sb.guardianChanceTough + d * bd.guardianChance),
+            spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance)
+        }
+    }
+
+    // The tiers of n enemies (0=weak, 1=normal, 2=tough) in the table's
+    // mix, shuffled: the mix of a dungeon is the table's, not a roll's luck
+    function dealTiers(n, sb, rand) {
+        let weak = Math.round(n * sb.weakChance)
+        let tough = Math.min(n - weak, Math.round(n * (1 - sb.normalChance)))
+        let tiers = []
+        for (let i = 0; i < n; i++)
+            tiers.push(i < weak ? 0 : i < n - tough ? 1 : 2)
+        for (let i = n - 1; i > 0; i--) {
+            let j = Math.floor(rand() * (i + 1))
+            let t = tiers[i]; tiers[i] = tiers[j]; tiers[j] = t
+        }
+        return tiers
+    }
+
+    // An enemy's attack at a depth
+    function enemyAtk(type, d) {
+        return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
+    }
+
     function spawnEnemy(ex, ey, tier, type) {
-        tier = tier || 1
+        // A rolled tier 0 is the weak tier, not a missing one
+        tier = tier === undefined ? 1 : tier
         type = type || "grunt"
-        let tierData = [
-            { hp: 18, tint: "#6B2A2A" },  // weak: darker, desaturated
-            { hp: 30, tint: "" },           // normal: default colors
-            { hp: 42, tint: "#CC6644" }     // tough: brighter, warm glow
-        ]
-        let td = tierData[tier]
-        let ehp = td.hp + (type === "guardian" ? 10 : (type === "spitter" ? -6 : 0))
-        let eatk = type === "spitter" ? 8 : 10
-        let edef = type === "spitter" ? 0 : 2
-        let enemy = enemyComponent.createObject(world.room, {
+        let stats = Balance.enemy[type]
+        let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
+        let eatk = enemyAtk(type, depth)
+        let edef = stats.def
+        let props = {
             xWu: ex, yWu: ey,
             hp: ehp, maxHp: ehp,
             atk: eatk, def: edef,
             tier: tier,
-            enemyType: type,
+            enemyType: type
+        }
+        // In a session only the host spawns, for every node
+        if (!session.connected)
+            _makeEnemy(props)
+        else if (session.isHost)
+            session.spawnEnemy(props)
+    }
+
+    // An enemy item from what it is (props: where it stands, its stats,
+    // tier and type); objectId is its replicated object in a session
+    function _makeEnemy(props, objectId) {
+        objectId = objectId || ""
+        if (objectId !== "" && _enemyById[objectId]) return _enemyById[objectId]
+        let remote = objectId !== "" && !session.isHost
+        let enemy = enemyComponent.createObject(world.room, Object.assign({}, props, {
+            objectId: objectId,
+            network: objectId !== "" ? session.network : null,
+            remote: remote,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
             categories: catEnemy,
             collidesWith: catWall | catPlayer
-        })
+        }))
         if (enemy) {
-            console.log("[Game] Enemy created -", type, "tier:", tier, "hp:", ehp)
-            enemy.target = player
+            console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp,
+                        objectId !== "" ? (remote ? "shown for " : "run as ") + objectId : "")
+            if (!remote) enemy.target = player
             enemies.push(enemy)
+            if (objectId !== "") _enemyById[objectId] = enemy
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
         }
-    }
-
-    function _spawnRemotePlayers(px, py) {
-        if (!gameNetwork.connected) return
-        let colors = ["#A44A90", "#90A44A", "#A4904A"]
-        for (let i = 0; i < gameNetwork.nodes.length; i++)
-            _spawnRemotePlayer(gameNetwork.nodes[i], colors[i % colors.length], px, py)
-    }
-
-    function _spawnRemotePlayer(nodeId, color, px, py) {
-        let rp = remotePlayerComponent.createObject(world.room, {
-            nodeId: nodeId,
-            playerColor: color,
-            xWu: px,
-            yWu: py,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-            world: world.physics
-        })
-        if (rp) {
-            remotePlayers[nodeId] = rp
-            console.log("[Game] Remote player created for", nodeId, "color:", color)
-        }
+        return enemy
     }
 
     function spawnDeathParticles(wx, wy) {
@@ -1219,11 +2245,40 @@ ClayWorld2d {
         }
     }
 
+    // In a session the host's spitter fires on every node: each node flies
+    // the shot under the host's id for it, and it hurts only that node's
+    // knight. That node judges it by its knight's own state - hit, blocked,
+    // dodged - and reports it, and the shot goes on every screen
+    // (issue #18). One that meets no knight bursts on each screen alone.
+    property int _shotCount: 0
+    property var _shotById: ({})
+    // A shot met a knight: this node's (local) or another's, which reported
+    // it; result as Player.takeDamage's, "blocked" for a deflected one
+    signal shotEnded(string shotId, string result, bool local)
     function spawnProjectile(px, py, dirX, dirY, damage) {
+        let id = "shot" + (++_shotCount)
+        if (session.connected && session.isHost)
+            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage})
+        _flyShot(id, px, py, dirX, dirY, damage)
+    }
+    // This node's knight met shot id
+    function shotLanded(id, result) {
+        shotEnded(id, result, true)
+        if (session.connected) session.reportStruck({source: "shot", id: id, result: result})
+    }
+    // Another node's knight met shot id: it goes here too, its impact is
+    // the other node's
+    function _endShot(id, result) {
+        let proj = _shotById[id]
+        if (proj && !proj.destroyed) proj.vanish()
+        shotEnded(id, result, false)
+    }
+    function _flyShot(id, px, py, dirX, dirY, damage) {
         let proj = projectileComponent.createObject(world.room, {
+            shotId: id,
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
-            speed: 5.0,
+            speed: Balance.projectile.speed,
             damage: damage,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
@@ -1235,8 +2290,11 @@ ClayWorld2d {
             sensorCategories: catProjectile,
             sensorCollidesWith: catPlayer
         })
-        if (proj)
-            console.log("[Game] Projectile spawned at", px.toFixed(1), py.toFixed(1))
+        if (proj) {
+            _shotById[id] = proj
+            proj.gone.connect(() => { if (world._shotById[id] === proj) delete world._shotById[id] })
+            console.log("[Game] Projectile", id, "spawned at", px.toFixed(1), py.toFixed(1))
+        }
     }
 
     function spawnSpitParticles(wx, wy) {
@@ -1343,23 +2401,50 @@ ClayWorld2d {
         })
         exitSensor.opacity = 0
         dungeonObjects.push(exitSensor)
+        exitStairs = exitStairsComponent.createObject(world.room, {
+            xWu: wx, yWu: wy, widthWu: cellSize, heightWu: cellSize,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(exitStairs)
         console.log("[Game] Exit sensor placed at grid x=", exitGridX)
     }
 
     function clearDungeon() {
         exitSensor = null
+        exitStairs = null
 
-        // Destroy enemies
-        for (let e of enemies) {
-            try { if (e && !e.destroyed) e.destroy() } catch(err) {}
+        // Destroy enemies. In a session the host despawns its enemies on
+        // every node; a joiner's go when the host's do, which may already
+        // be the next level's
+        for (let e of enemies.slice()) {
+            if (!e || e.destroyed) continue
+            if (e.objectId !== "" && session.connected) {
+                if (session.isHost) session.despawnEnemy(e.objectId)
+                continue
+            }
+            try { e.destroy() } catch(err) {}
         }
-        enemies = []
+        enemies = enemies.filter(e => e && !e.destroyed && e.remote && session.connected)
+        let kept = {}
+        for (let e of enemies) kept[e.objectId] = e
+        _enemyById = kept
+
+        // Gold drops go as the enemies do: the host's on every node with
+        // their despawn, a joiner's when that arrives
+        for (let d of goldDrops.slice()) {
+            if (!d) continue
+            if (d.objectId !== "" && session.connected) {
+                if (session.isHost) session.despawnGold(d.objectId)
+                continue
+            }
+            try { d.destroy() } catch(err) {}
+        }
+        goldDrops = goldDrops.filter(d => d && d.objectId !== "" && session.connected
+                                     && _goldById[d.objectId] === d)
 
         // Destroy remote players
-        for (let id in remotePlayers) {
-            try { if (remotePlayers[id]) remotePlayers[id].destroy() } catch(err) {}
-        }
-        remotePlayers = ({})
+        session.clearRemotePlayers()
 
         // Destroy player
         if (player) {
@@ -1372,23 +2457,21 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        torches = []
+        stains = []
+        // A blow held for the last level's enemy does not land in the next
+        _heldBlows = []
+        _parriedAt = {}
+        _shotById = {}
 
         grid = []
         rooms = []
+        // The minimap paints what is explored of the grid, and the grid is gone
+        exploredCells = []
     }
 
     function resetDungeon() {
-        let savedHp = player ? player.hp : 120
-        console.log("[Game] Resetting, preserving HP:", savedHp)
-        clearDungeon()
-        levelIndex++
-        // Alternate: dungeon → village → dungeon → ...
-        levelType = (levelType === "dungeon") ? "village" : "dungeon"
-        if (levelType === "village")
-            generateVillage()
-        else
-            generateDungeon()
-        if (player) player.hp = savedHp
+        _enterLevel(levelIndex + 1)
         resetting = false
     }
 
@@ -1424,12 +2507,19 @@ ClayWorld2d {
         // Build walls and floor (cool blue palette)
         let floorObj = floorComponent.createObject(world.room, {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            fx: Qt.binding(() => world.fx),
+            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            seed: (levelIndex * 0.137) % 1
         })
         floorObj.color = "#2A3A4A"
         dungeonObjects.push(floorObj)
         createMergedWalls()
         createBoundaryWalls()
+        createWallFaces()
+        createWallRims()
+        updateOccluders()
+        spawnMotes()
 
         // Room center in world units
         let cx = (ox + roomSize / 2) * cellSize
@@ -1454,8 +2544,11 @@ ClayWorld2d {
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
+            "For the road, a potion. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
-        ], "assets/innkeeper_greeting.wav")
+        ], "assets/innkeeper_greeting.wav", [
+            { id: "potion", label: "Health potion", price: Balance.shop.potionPrice }
+        ])
 
         // Blacksmith building (top-right) — entrance facing south
         _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
@@ -1468,9 +2561,14 @@ ClayWorld2d {
             { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "I could sharpen that for you... if I had the right stone.",
-            "Bring me materials from below and I'll forge something proper."
-        ], "assets/blacksmith_greeting.wav")
+            "I can hone that edge or thicken your mail - one of the two, for this descent.",
+            "Bring gold from below and it's yours."
+        ], "assets/blacksmith_greeting.wav", [
+            { id: "atk", label: "Hone the blade (+" + Balance.shop.atkUpgrade + " damage)",
+              price: Balance.shop.upgradePrice },
+            { id: "hp", label: "Thicken the mail (+" + Balance.shop.hpUpgrade + " max HP)",
+              price: Balance.shop.upgradePrice }
+        ])
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {
@@ -1499,7 +2597,7 @@ ClayWorld2d {
 
         // Spawn player at entrance
         spawnPlayer(cx, (oy + 2) * cellSize)
-        _spawnRemotePlayers(cx, (oy + 2) * cellSize)
+        session.spawnRemotePlayers(cx, (oy + 2) * cellSize)
 
         // Block entrance + exit sensor
         blockEntrance()
@@ -1538,9 +2636,14 @@ ClayWorld2d {
         // Bottom wall (skip if entrance is south)
         if (entrance !== "south")
             createWallAt(x1, y1 + t, bw, t).color = wallColor
+        // Lanterns flanking the open front
+        if (entrance === "south") {
+            placeTorch(x1 + t / 2, y1 + 0.35, "#FFC870")
+            placeTorch(x2 - t / 2, y1 + 0.35, "#FFC870")
+        }
     }
 
-    function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting) {
+    function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting, wares) {
         let npc = npcComponent.createObject(world.room, {
             xWu: wx, yWu: wy,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
@@ -1555,7 +2658,8 @@ ClayWorld2d {
             npcName: name || "",
             routine: routine || [],
             dialogueLines: dialogue || [],
-            greetingSound: greeting || ""
+            greetingSound: greeting || "",
+            wares: wares || []
         })
         dungeonObjects.push(npc)
     }
@@ -1596,11 +2700,20 @@ ClayWorld2d {
         // Build walls and floor
         let floorObj = floorComponent.createObject(world.room, {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            fx: Qt.binding(() => world.fx),
+            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            seed: (levelIndex * 0.137) % 1
         })
         dungeonObjects.push(floorObj)
         createMergedWalls()
         createBoundaryWalls()
+        createWallFaces()
+        createWallRims()
+        updateOccluders()
+        spawnMotes()
+        rooms = [{x: ox, y: oy, w: roomSize, h: roomSize}]
+        placeRoomTorches(createRng(7))
 
         // Spawn player at center
         let cx = (ox + roomSize / 2) * cellSize
@@ -1620,14 +2733,14 @@ ClayWorld2d {
             gameCamera.target = player
         }
 
-        // Spawn test enemies: 2 grunts + 1 guardian
+        // Spawn the fight room's enemies
         _spawnFightRoomEnemies()
     }
 
     // Auto-respawn enemies in fight room when all dead
     Timer {
         id: fightRoomRespawn
-        interval: 2000
+        interval: Balance.spawn.fightRoomRespawn * 1000
         repeat: true
         running: fightRoomActive
         onTriggered: {
@@ -1643,12 +2756,8 @@ ClayWorld2d {
     }
 
     function _spawnFightRoomEnemies() {
-        let cx = _fightRoomCx
-        let cy = _fightRoomCy
-        spawnEnemy(cx + 4, cy + 2, 1, "grunt")
-        spawnEnemy(cx - 4, cy + 2, 1, "grunt")
-        spawnEnemy(cx, cy + 4, 2, "guardian")
-        spawnEnemy(cx - 3, cy - 3, 1, "spitter")
+        for (let e of Balance.spawn.fightRoom)
+            spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 
     function exitFightRoom() {
@@ -1656,6 +2765,37 @@ ClayWorld2d {
         fightRoomActive = false
         clearDungeon()
         generateDungeon()
+    }
+
+    // --- Dojo scenarios: land a reload directly in the scene under test ---
+    // A fixed seed keeps the layout identical across reloads, so before/after
+    // captures compare the same room.
+    readonly property int scenarioSeed: 424242
+    function scenarios() { return ["dungeon", "village", "fight"] }
+    // depth (0 when left out) is the depth the dungeon, the village or the
+    // fight room is at, e.g. applyScenario("dungeon", 4) through eval
+    function applyScenario(name, atDepth) {
+        let d = Math.max(0, Math.floor(atDepth || 0))
+        muted = true
+        masterSeed = scenarioSeed
+        if (player) clearDungeon()
+        fallen = false
+        fightRoomActive = false
+        // Generate before leaving the title: with a player in place,
+        // _tryStartGame() does not build a second level on top.
+        let type = name === "village" ? "village" : "dungeon"
+        levelIndex = levelIndexOf(d, type)
+        levelType = type
+        _startRunRecord()
+        if (name === "fight")
+            enterFightRoom()
+        else if (name === "village")
+            generateVillage()
+        else
+            generateDungeon()
+        screen = "game"
+        minimap.requestPaint()
+        world.forceActiveFocus()
     }
 
     // --- Seeded PRNG (mulberry32) ---
@@ -1816,6 +2956,41 @@ ClayWorld2d {
 
     // --- Screen Overlays ---
 
+    // Esc menu (over the dungeon, under the fallen screen)
+    Loader {
+        anchors.fill: parent
+        z: 4400
+        active: menuOpen && screen === "game" && !fallen
+        sourceComponent: Component {
+            PauseMenu {
+                inSession: session.connected
+                onResume: world.closeMenu()
+                onToTitle: world.backToTitle()
+            }
+        }
+    }
+
+    // Fallen screen (over the dungeon, under the title)
+    Loader {
+        anchors.fill: parent
+        z: 4500
+        active: fallen && screen === "game"
+        sourceComponent: Component {
+            FallenScreen {
+                depth: world.depth
+                kills: world.runKills
+                seconds: world.runSeconds
+                bestDepth: world.bestDepth
+                newBest: world.depth > world.runStartBest
+                canGoAgain: !session.connected && !world.partyFallen
+                partyFights: session.connected && !world.partyFallen
+                partyFallen: world.partyFallen
+                onGoAgain: world.newRun()
+                onBackToTitle: world.backToTitle()
+            }
+        }
+    }
+
     // Title screen (covers everything when active)
     Loader {
         anchors.fill: parent
@@ -1823,22 +2998,10 @@ ClayWorld2d {
         active: screen === "title"
         sourceComponent: Component {
             TitleScreen {
+                muted: world.muted
+                message: world.titleMessage
                 onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
                 onMultiplayerSelected: screen = "lobby"
-            }
-        }
-    }
-
-    // Multiplayer lobby
-    Loader {
-        anchors.fill: parent
-        z: 5000
-        active: screen === "lobby"
-        sourceComponent: Component {
-            MultiplayerLobby {
-                network: gameNetwork
-                onStartGame: _startMultiplayerGame()
-                onBack: { gameNetwork.leave(); screen = "title" }
             }
         }
     }

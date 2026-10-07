@@ -1,0 +1,7 @@
+# Shaders are baked from src/shaders/*.frag - by the dojo while developing,
+# by qt_add_shaders() in the build.
+*.qsb
+.clay/
+build*/
+# Python bytecode, written when a bench imports run_fightbench.py
+__pycache__/

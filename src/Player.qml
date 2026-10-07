@@ -40,55 +40,82 @@ PhysicsItem {
     // Screen Y is flipped (down = positive), so we use (playerScreenY - mouseScreenY)
     property real facingAngle: Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
-    // Stats from concept doc
-    readonly property real maxSpeed: 7.5  // World units per second
-    property int hp: 120
-    property int maxHp: 120
-    property int atk: 15
-    property int def: 5
-    property int mana: 40
-    property int maxMana: 40
+    // Stats, from the balance table
+    readonly property real maxSpeed: Balance.knight.moveSpeed
+    property int hp: Balance.knight.hp
+    property int maxHp: Balance.knight.hp + (upgrade === "hp" ? Balance.shop.hpUpgrade : 0)
+    property int atk: Balance.knight.atk + (upgrade === "atk" ? Balance.shop.atkUpgrade : 0)
+    property int def: Balance.knight.def
+    // A raised shield drains mana, a parry gives some back
+    property real mana: Balance.knight.mana
+    property int maxMana: Balance.knight.mana
+    // Gold picked up this run, for the village's wares
+    property int gold: 0
+    // Health potions bought from the innkeeper, drunk with key 1
+    property int potions: 0
+    // The smith's one upgrade of the run: "atk", "hp" or "" before it
+    property string upgrade: ""
+
+    // At 0 HP the knight has fallen: it stands still, takes no more hits
+    // and can neither swing nor dash
+    readonly property bool fallen: hp <= 0
 
     // Combat state
     property bool isAttacking: false
+    property real _swingTimer: 0
     property bool isBlocking: false
+    // No mana, no shield: it cannot be raised, and drops when it runs dry
+    onIsBlockingChanged: if (isBlocking && mana <= 0) isBlocking = false
     property real attackCooldown: 0
-    readonly property real blockSpeedMultiplier: 0.4
-    readonly property real pushForce: 20.0          // Knockback velocity for dash-push
-    readonly property real attackDuration: 0.25  // Visual swing duration
-    readonly property real attackCooldownTime: 0.5
-    readonly property real attackRange: 2.0  // World units
-    readonly property real attackArcAngle: 60  // Degrees from facing direction
+    readonly property real blockSpeedMultiplier: Balance.knight.blockSpeed
+    readonly property real pushForce: Balance.knight.pushSpeed  // Knockback velocity for dash-push
+    readonly property real attackDuration: Balance.knight.swingDuration
+    readonly property real attackCooldownTime: Balance.knight.attackCooldown
+    readonly property real attackRange: Balance.knight.attackRange
+    readonly property real attackArcAngle: Balance.knight.attackArc
 
     // Dash state
     property bool isDashing: false
     property real dashCooldown: 0
-    readonly property real dashSpeed: 40.0
-    readonly property real dashDuration: 0.15
-    readonly property real dashCooldownTime: 0.8
+    readonly property real dashSpeed: Balance.knight.dashSpeed
+    readonly property real dashDuration: Balance.knight.dashDuration
+    readonly property real dashCooldownTime: Balance.knight.dashCooldown
     property real _dashTimer: 0
     property real _dashDirX: 0
     property real _dashDirY: 0
 
+    // Seconds left of the grace after a hit, in which no damage is taken
+    property real graceLeft: 0
+
     // Movement - set velocity every physics step so collision response
-    // doesn't permanently zero a component while the key is held
-    property int _dashStepCount: 0
+    // doesn't permanently zero a component while the key is held.
+    // Dash, swing and cooldowns count the time the step simulated: a pause, a
+    // single step or a hit stop holds them with the world (issue #33).
     Connections {
         target: player.world
         function onStepped() {
-            let dt = 1/60.0
+            let dt = player.world.timeStep
+            attackCooldown = Math.max(0, attackCooldown - dt)
+            dashCooldown = Math.max(0, dashCooldown - dt)
+            if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt
+            if (isBlocking && !fallen) {
+                let left = mana - Balance.knight.blockDrain * dt
+                mana = left < 1e-6 ? 0 : left
+                if (mana <= 0) isBlocking = false
+            }
+            // A swing hits until its arc has faded, as long as the view
+            // draws it, but counted in steps
+            if (isAttacking) {
+                _swingTimer -= dt
+                if (_swingTimer <= 0) isAttacking = false
+            }
 
-            if (isDashing) {
+            if (fallen) {
+                player.body.linearVelocity = Qt.point(0, 0)
+            } else if (isDashing) {
                 let spd = isBlocking ? dashSpeed * blockSpeedMultiplier : dashSpeed
                 player.body.linearVelocity = Qt.point(_dashDirX * spd, _dashDirY * spd)
                 _dashTimer -= dt
-                _dashStepCount++
-                if (_dashStepCount % 2 === 0 && player.parent) {
-                    afterimageComp.createObject(player.parent, {
-                        x: player.x, y: player.y,
-                        width: player.width, height: player.height
-                    })
-                }
                 // Dash-push: knockback enemies instead of damage
                 if (isBlocking) pushEnemiesInRange()
                 if (_dashTimer <= 0) isDashing = false
@@ -102,211 +129,28 @@ PhysicsItem {
         }
     }
 
-    // Cooldown timer (attack + dash)
-    Timer {
-        id: cooldownTimer
-        interval: 50
-        repeat: true
-        running: attackCooldown > 0 || dashCooldown > 0
-        onTriggered: {
-            let dt = interval / 1000
-            attackCooldown = Math.max(0, attackCooldown - dt)
-            dashCooldown = Math.max(0, dashCooldown - dt)
-        }
-    }
+    // A moment others should see: "attack", "dash", "parry" or "hurt".
+    // Game.qml sends it to the other players, whose RemotePlayer shows it.
+    signal acted(string action)
 
     // Healing state (set by Campfire)
     property bool isHealing: false
 
-    // Visual: Steel Blue circle (Knight)
-    Rectangle {
-        id: visual
-        anchors.centerIn: parent
-        width: parent.width
-        height: parent.height
-        color: "#4A90A4"  // Steel Blue
-        radius: width * .5
-
-        // Healing shimmer
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: "#44CC44"
-            opacity: 0
-            SequentialAnimation on opacity {
-                running: isHealing
-                loops: Animation.Infinite
-                NumberAnimation { to: 0.25; duration: 400; easing.type: Easing.InOutSine }
-                NumberAnimation { to: 0; duration: 400; easing.type: Easing.InOutSine }
-            }
-        }
-
-        Canvas {
-            anchors.centerIn: parent
-            width: parent.width * 0.6
-            height: parent.height * 0.6
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.reset()
-                var w = width, h = height
-                ctx.fillStyle = "#2A6A84"
-                ctx.strokeStyle = "#2A6A84"
-                ctx.lineWidth = w * 0.06
-
-                // Dome
-                ctx.beginPath()
-                ctx.moveTo(w * 0.15, h * 0.55)
-                ctx.quadraticCurveTo(w * 0.15, h * 0.1, w * 0.5, h * 0.08)
-                ctx.quadraticCurveTo(w * 0.85, h * 0.1, w * 0.85, h * 0.55)
-                ctx.closePath()
-                ctx.fill()
-
-                // Visor slit
-                ctx.fillStyle = "#4A90A4"
-                ctx.fillRect(w * 0.2, h * 0.42, w * 0.6, h * 0.1)
-
-                // Cheek guards
-                ctx.fillStyle = "#2A6A84"
-                ctx.beginPath()
-                ctx.moveTo(w * 0.15, h * 0.55)
-                ctx.lineTo(w * 0.15, h * 0.78)
-                ctx.lineTo(w * 0.3, h * 0.88)
-                ctx.lineTo(w * 0.3, h * 0.55)
-                ctx.closePath()
-                ctx.fill()
-
-                ctx.beginPath()
-                ctx.moveTo(w * 0.85, h * 0.55)
-                ctx.lineTo(w * 0.85, h * 0.78)
-                ctx.lineTo(w * 0.7, h * 0.88)
-                ctx.lineTo(w * 0.7, h * 0.55)
-                ctx.closePath()
-                ctx.fill()
-
-                // Nose guard
-                ctx.fillRect(w * 0.46, h * 0.35, w * 0.08, h * 0.25)
-            }
-        }
-
-        SequentialAnimation {
-            id: dashFlash
-            PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: dashDuration * 1000 }
-        }
-
-        // Parry glow
-        Rectangle {
-            id: parryGlowRect
-            anchors.fill: parent
-            radius: parent.radius
-            color: "#FFD700"
-            opacity: 0
-        }
-
-        SequentialAnimation {
-            id: parryGlow
-            PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
-        }
-    }
-
-    // Shield arc visual (orbits on facing side when blocking)
-    Canvas {
-        id: shieldArc
-        visible: isBlocking
-        readonly property real shieldSize: player.width * 0.8
-        readonly property real orbitRadius: player.width * 0.5
-        readonly property real angleRad: facingAngle * Math.PI / 180
-        width: shieldSize
-        height: shieldSize
-        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
-        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
-        rotation: -facingAngle
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var w = width, h = height
-            ctx.beginPath()
-            ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
-            ctx.strokeStyle = "#7AB8D4"
-            ctx.lineWidth = w * 0.25
-            ctx.stroke()
-        }
-
-        onVisibleChanged: if (visible) requestPaint()
-    }
-
-    // Dash cooldown ring
-    Canvas {
-        id: dashCooldownRing
-        anchors.centerIn: parent
-        width: parent.width * 1.3
-        height: parent.height * 1.3
-        visible: dashCooldown > 0
-        opacity: 0.4
-
-        property real progress: 1.0 - (dashCooldown / dashCooldownTime)
-
-        onProgressChanged: requestPaint()
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var cx = width / 2, cy = height / 2
-            var r = width * 0.45
-            var startAngle = -Math.PI / 2
-            var endAngle = startAngle + progress * Math.PI * 2
-            ctx.beginPath()
-            ctx.arc(cx, cy, r, startAngle, endAngle)
-            ctx.strokeStyle = "#AAAAAA"
-            ctx.lineWidth = 2
-            ctx.stroke()
-        }
-    }
-
-    // Dash afterimage component
-
-    Component {
-        id: afterimageComp
-        Rectangle {
-            id: _ghost
-            radius: width * 0.5
-            color: "#7AB8D4"
-            opacity: 0.5
-            SequentialAnimation {
-                running: true
-                ParallelAnimation {
-                    NumberAnimation { target: _ghost; property: "opacity"; to: 0; duration: 200 }
-                    NumberAnimation { target: _ghost; property: "scale"; to: 0.5; duration: 200 }
-                }
-                ScriptAction { script: _ghost.destroy() }
-            }
-        }
-    }
-
-    // Direction indicator arrowhead (orbits around player)
-    Canvas {
-        id: aimArrow
-        opacity: 0.5
-        readonly property real arrowSize: player.width * 0.3
-        readonly property real orbitRadius: player.width * 0.7
-        readonly property real angleRad: facingAngle * Math.PI / 180
-        width: arrowSize
-        height: arrowSize
-        x: player.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
-        y: player.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
-        rotation: -facingAngle
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            var w = width, h = height
-            ctx.beginPath()
-            ctx.moveTo(w, h * 0.5)
-            ctx.lineTo(0, 0)
-            ctx.lineTo(w * 0.3, h * 0.5)
-            ctx.lineTo(0, h)
-            ctx.closePath()
-            ctx.fillStyle = "#7AB8D4"
-            ctx.fill()
-        }
+    // How the knight looks: shared with the RemotePlayer
+    KnightView {
+        id: view
+        host: player
+        gameWorld: player.gameWorld
+        facingAngle: player.facingAngle
+        moveX: player.moveX
+        moveAmount: Math.min(1, Math.sqrt(player.moveX * player.moveX + player.moveY * player.moveY))
+        blocking: player.isBlocking
+        dashing: player.isDashing
+        healing: player.isHealing
+        dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
+        swingDuration: player.attackDuration
+        graceLeft: player.graceLeft
+        downed: player.fallen
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -348,137 +192,6 @@ PhysicsItem {
         }
     }
 
-    // Attack swing visualization
-    // Reparented to avoid inflating PhysicsItem's childrenRect.
-    Canvas {
-        id: attackArc
-        parent: player.parent
-        x: player.x + player.width/2 - width/2
-        y: player.y + player.height/2 - height/2
-        width: player.width * 4
-        height: player.height * 4
-        visible: isAttacking
-        rotation: -facingAngle
-
-        // Swing progress: 0 = start, 1 = end
-        property real swingProgress: 0
-        property real swingOpacity: 0.9
-
-        onSwingProgressChanged: requestPaint()
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-
-            var centerX = width / 2
-            var centerY = height / 2
-            var radius = width * 0.4
-            var innerRadius = width * 0.15
-
-            // Swing range 120 degrees
-            var swingRange = Math.PI * 0.67
-            var startAngle = -swingRange / 2
-            var currentAngle = startAngle + (swingProgress * swingRange)
-
-            // Draw motion trails (3 curved arcs = "cut air" effect)
-            var arcSpan = 0.18  // ~10 degrees per arc
-            for (var i = 3; i >= 1; i--) {
-                var trailOffset = currentAngle - (i * 0.25)  // Offset behind blade
-                var trailRadius = innerRadius + (radius - innerRadius) * (i / 4)  // Varying radii
-                var trailOpacity = swingOpacity * (1.0 - i * 0.25)
-                ctx.beginPath()
-                ctx.arc(centerX, centerY, trailRadius, trailOffset - arcSpan/2, trailOffset + arcSpan/2)
-                ctx.strokeStyle = "rgba(122, 184, 212, " + trailOpacity + ")"
-                ctx.lineWidth = 2
-                ctx.stroke()
-            }
-
-            // Draw sword blade at leading edge
-            var bladeLen = radius - innerRadius
-            var bladeW = bladeLen * 0.15
-            var bx = centerX + innerRadius * Math.cos(currentAngle)
-            var by = centerY + innerRadius * Math.sin(currentAngle)
-            var tx = centerX + radius * Math.cos(currentAngle)
-            var ty = centerY + radius * Math.sin(currentAngle)
-            var perpX = -Math.sin(currentAngle)
-            var perpY = Math.cos(currentAngle)
-
-            ctx.beginPath()
-            // Tip
-            ctx.moveTo(tx, ty)
-            // Right shoulder
-            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) + perpX * bladeW,
-                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) + perpY * bladeW)
-            // Right base
-            ctx.lineTo(bx + perpX * bladeW * 0.6, by + perpY * bladeW * 0.6)
-            // Cross-guard right
-            ctx.lineTo(bx + perpX * bladeW * 0.9, by + perpY * bladeW * 0.9)
-            // Cross-guard left
-            ctx.lineTo(bx - perpX * bladeW * 0.9, by - perpY * bladeW * 0.9)
-            // Left base
-            ctx.lineTo(bx - perpX * bladeW * 0.6, by - perpY * bladeW * 0.6)
-            // Left shoulder
-            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) - perpX * bladeW,
-                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) - perpY * bladeW)
-            ctx.closePath()
-            ctx.fillStyle = "rgba(90, 154, 180, " + swingOpacity + ")"
-            ctx.fill()
-            ctx.strokeStyle = "rgba(122, 184, 212, " + swingOpacity + ")"
-            ctx.lineWidth = 1.5
-            ctx.stroke()
-
-            // Center ridge
-            ctx.beginPath()
-            ctx.moveTo(bx, by)
-            ctx.lineTo(tx, ty)
-            ctx.strokeStyle = "rgba(58, 138, 154, " + swingOpacity * 0.8 + ")"
-            ctx.lineWidth = 1
-            ctx.stroke()
-        }
-
-        // Swing animation
-        SequentialAnimation {
-            id: attackAnimation
-
-            // First half of swing (wind up)
-            PropertyAnimation {
-                target: attackArc
-                property: "swingProgress"
-                from: 0
-                to: 0.5
-                duration: attackDuration * 500
-                easing.type: Easing.OutQuad
-            }
-
-            // Second half of swing (follow through)
-            PropertyAnimation {
-                target: attackArc
-                property: "swingProgress"
-                from: 0.5
-                to: 1
-                duration: attackDuration * 500
-                easing.type: Easing.OutQuad
-            }
-
-            // Fade out
-            PropertyAnimation {
-                target: attackArc
-                property: "swingOpacity"
-                from: 0.9
-                to: 0
-                duration: 100
-            }
-
-            ScriptAction {
-                script: {
-                    isAttacking = false
-                    attackArc.swingProgress = 0
-                    attackArc.swingOpacity = 0.9
-                }
-            }
-        }
-    }
-
     // Circular collider — matches visual size closely
     fixtures: [
         Circle {
@@ -497,7 +210,7 @@ PhysicsItem {
         // so this just needs to be a rough proximity envelope.
         Circle {
             id: attackSensor
-            radius: player.width * 1.5
+            radius: player.width * Balance.knight.attackSensor
             x: player.width / 2
             y: player.height / 2
             sensor: true
@@ -517,8 +230,16 @@ PhysicsItem {
         }
     ]
 
-    // Track enemies currently in attack range
+    // Track enemies currently in attack range. An enemy that dies in range
+    // ends its contacts with its item since MisterGC/clayground#371;
+    // _inRange() stays as a guard that drops one that is gone or dead.
     property var enemiesInRange: new Set()
+    // The enemies in range that still stand
+    function _inRange() {
+        for (let enemy of enemiesInRange)
+            if (!enemy || enemy.destroyed !== false) enemiesInRange.delete(enemy)
+        return enemiesInRange
+    }
     property var _hitThisSwing: new Set()
 
     function onCollision(other) {
@@ -542,22 +263,29 @@ PhysicsItem {
     // Deal damage to enemies in attack arc (skips already-hit enemies this swing)
     function hitEnemiesInArc() {
         let hitCount = 0
-        for (let enemy of enemiesInRange) {
-            if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
+        for (let enemy of _inRange()) {
+            if (!_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
                 let parried = enemy.parryWindow
-                let dmg = isBlocking ? Math.floor(atk * 0.85)
-                        : isDashing ? Math.floor(atk * 1.5) : atk
-                if (parried) dmg = atk * 2
+                let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
+                        : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
+                if (parried) dmg = atk * Balance.knight.parrySwing
                 enemy.takeDamage(dmg, xWu, yWu)
                 _hitThisSwing.add(enemy)
                 hitCount++
                 if (parried) {
+                    if (gameWorld) gameWorld.countFight("parry")
+                    if (gameWorld && gameWorld.parried) gameWorld.parried(enemy)
                     enemy.stagger()
                     attackCooldown = 0
-                    parryGlow.restart()
+                    mana = Math.min(maxMana, mana + Balance.knight.parryMana)
+                    view.parry()
+                    acted("parry")
                     if (gameWorld) {
                         gameWorld.playImpact()
-                        gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
+                        if (gameWorld.impact)
+                            gameWorld.impact("parry", enemy.xWu, enemy.yWu, enemy.xWu - xWu, enemy.yWu - yWu)
+                        else
+                            gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFD700")
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
                     }
@@ -576,15 +304,13 @@ PhysicsItem {
 
     // Push enemies away during dash-push (skips already-pushed this dash)
     function pushEnemiesInRange() {
-        for (let enemy of enemiesInRange) {
-            if (enemy && !enemy.destroyed && !_hitThisSwing.has(enemy)) {
+        for (let enemy of _inRange()) {
+            if (!_hitThisSwing.has(enemy)) {
                 let dx = enemy.xWu - xWu
                 let dy = enemy.yWu - yWu
                 let len = Math.sqrt(dx * dx + dy * dy)
                 if (len < 0.01) continue
-                enemy.body.linearVelocity = Qt.point(
-                    (dx / len) * pushForce,
-                    -(dy / len) * pushForce)  // Negate Y for screen coords
+                enemy.shove(dx, dy, pushForce)
                 _hitThisSwing.add(enemy)
                 // Shield-push breaks guardian guard
                 if (enemy.enemyType === "guardian") enemy.stagger()
@@ -594,11 +320,17 @@ PhysicsItem {
         }
     }
 
-    readonly property real shieldArcAngle: 60  // ±60 degrees from facing
+    readonly property real shieldArcAngle: Balance.knight.shieldArc
 
-    function isShieldFacing(attackerX, attackerY) {
-        let dx = attackerX - xWu
-        let dy = attackerY - yWu
+    // Whether the shield faces an attacker whose corner is (attackerX,
+    // attackerY) and whose size is attackerSize Wu (the knight's own without
+    // it), measured from the knight's centre to the attacker's: the one
+    // place a blow's direction is judged. Corner to corner, a small shot
+    // from the left or from above came in at the arc's edge or beyond.
+    function isShieldFacing(attackerX, attackerY, attackerSize) {
+        let a = _centreOf(attackerX, attackerY, attackerSize)
+        let dx = a.x - (xWu + widthWu / 2)
+        let dy = a.y - (yWu - heightWu / 2)
         let angleToAttacker = Math.atan2(dy, dx) * 180 / Math.PI
         let angleDiff = angleToAttacker - facingAngle
         while (angleDiff > 180) angleDiff -= 360
@@ -606,28 +338,67 @@ PhysicsItem {
         return Math.abs(angleDiff) <= shieldArcAngle
     }
 
+    // The centre of a square thing at corner (x, y) of size Wu, the
+    // knight's own size without one
+    function _centreOf(x, y, size) {
+        let s = size === undefined ? widthWu : size
+        return { x: x + s / 2, y: y - s / 2 }
+    }
+
     function getShieldWorldPos() {
         let rad = facingAngle * Math.PI / 180
         return { x: xWu + Math.cos(rad) * 0.5, y: yWu + Math.sin(rad) * 0.5 }
     }
 
-    function takeDamage(amount, attackerX, attackerY) {
-        if (isDashing) return  // Invulnerable during dash
-        let finalDamage = Math.max(1, amount - def)
-        let blocked = isBlocking && isShieldFacing(attackerX, attackerY)
+    // Returns what became of the blow: "hit", "blocked" by the shield,
+    // "dodged" by a dash, or "ignored" - fallen or in the grace after a hit.
+    // Only a blow that was hit or blocked should look and sound like one.
+    // The attacker is the corner (attackerX, attackerY) of a thing
+    // attackerSize Wu in size (isShieldFacing).
+    function takeDamage(amount, attackerX, attackerY, attackerSize) {
+        if (fallen) return "ignored"
+        if (isDashing) return "dodged"  // Invulnerable during dash
+        if (graceLeft > 0) return "ignored"  // and for a moment after a hit
+        let finalDamage = Math.max(Balance.minDamage, amount - def)
+        let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
         if (blocked) {
-            finalDamage = Math.floor(finalDamage * 0.3)
+            finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
             if (gameWorld) gameWorld.playImpact()
         }
         hp = Math.max(0, hp - finalDamage)
         if (gameWorld) {
-            gameWorld.shake(blocked ? 1 : 3)
+            gameWorld.countFight("taken", finalDamage)
+            if (blocked) gameWorld.countFight("block")
+        }
+        if (!blocked) {
+            graceLeft = Balance.knight.hurtGrace
+            view.hurt()
+            acted("hurt")
+        }
+        if (gameWorld) {
+            let a = _centreOf(attackerX, attackerY, attackerSize)
+            if (gameWorld.impact)
+                gameWorld.impact(blocked ? "playerBlocked" : "playerHit", xWu, yWu,
+                                 xWu + widthWu / 2 - a.x, yWu - heightWu / 2 - a.y)
+            else
+                gameWorld.shake(blocked ? 1 : 3)
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
+        return blocked ? "blocked" : "hit"
+    }
+
+    // A potion heals up to max HP; none is wasted on a knight that is
+    // unhurt or has fallen. Returns the HP it healed, 0 when none was drunk
+    function drinkPotion() {
+        if (potions <= 0 || fallen || hp >= maxHp) return 0
+        let healed = Math.min(Balance.shop.potionHeal, maxHp - hp)
+        potions--
+        hp += healed
+        return healed
     }
 
     function dash() {
-        if (dashCooldown > 0 || isDashing) return
+        if (fallen || dashCooldown > 0 || isDashing) return
         // Use movement direction, or facing direction if stationary
         let dirX = moveX
         let dirY = moveY
@@ -643,19 +414,20 @@ PhysicsItem {
         isDashing = true
         _hitThisSwing = new Set()
         _dashTimer = dashDuration
-        _dashStepCount = 0
         dashCooldown = dashCooldownTime
-        dashFlash.restart()
+        view.dash(dashDuration * 1000)
+        acted("dash")
         if (gameWorld) gameWorld.playDash()
     }
 
     function attack() {
-        if (attackCooldown <= 0 && !isAttacking) {
+        if (!fallen && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
+            _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
-            attackArc.requestPaint()
-            attackAnimation.restart()
+            view.swing()
+            acted("attack")
             if (!isDashing && gameWorld) gameWorld.playSwordSwing()
             console.log("[Player] Attack! Facing:", facingAngle.toFixed(0), "degrees")
         }

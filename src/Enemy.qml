@@ -2,6 +2,7 @@ import QtQuick
 import Box2D
 import Clayground.Physics
 import Clayground.Behavior
+import Clayground.Network
 
 PhysicsItem {
     id: enemy
@@ -17,10 +18,43 @@ PhysicsItem {
 
     property bool destroyed: false
 
+    // In a session the host runs every enemy and the other nodes show it
+    // (issue #13): objectId is its replicated object, network the session's
+    // Network, and remote is true where another node runs its AI. A remote
+    // enemy is moved by the host's states and passes this node's knight's
+    // blows on to the host.
+    property string objectId: ""
+    property var network: null
+    property bool remote: false
+    // How far in the past a remote enemy is shown, in ms
+    readonly property real renderDelayMs: replica.interpolator.effectiveDelayMs
+    // The AI thinks here: only where the enemy is not remote
+    readonly property bool thinks: aiTimer.running
+
+    // The host sends a state when one of these changes; a remote enemy
+    // renders them in the past by the delay the interpolator sizes from
+    // the jitter it sees (autoDelay), as RemotePlayer does; the stop and
+    // settle copies of an enemy that stands and is hit no longer stretch
+    // it (clayground#374). An enemy that stops dead (a lunge lands, a
+    // stagger) stops in place on the other screens: clayground sends its
+    // last state once more right after the stop.
+    ReplicatedObject {
+        id: replica
+        network: enemy.network
+        objectId: enemy.objectId
+        properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId"]
+        interpolate: true
+        interpolator.autoDelay: true
+        // HP switches with its state, never blended between two of the
+        // host's (clayground#368)
+        steppedProperties: ["hp"]
+        interpolator.angleKeys: ["facingAngle"]
+    }
+
     widthWu: 0.8
     heightWu: 0.8
 
-    bodyType: Body.Dynamic
+    bodyType: remote ? Body.Kinematic : Body.Dynamic
     fixedRotation: true
     gravityScale: 0
 
@@ -30,32 +64,39 @@ PhysicsItem {
 
     // AI target
     property var target: null
+    // The node whose knight the target is, the same on every screen; ""
+    // without a session or a target
+    property string targetId: ""
+
+    // Set by halt() when the knight has fallen: the AI stays idle for good
+    property bool halted: false
 
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
     property real facingAngle: 0          // Guardian tracks player direction
-    readonly property real shieldArc: 60  // ±60 degrees frontal shield
-    readonly property real shieldRotSpeed: 120  // Degrees per second
+    readonly property real shieldArc: Balance.enemy.shieldArc
+    readonly property real shieldRotSpeed: Balance.enemy.shieldTurnSpeed
 
-    // Stats
-    readonly property real chaseSpeed: enemyType === "spitter" ? 2.4 : 4.0
-    readonly property real patrolSpeed: enemyType === "spitter" ? 0.9 : 1.5
+    // Stats, from the balance table; hp, atk and def are set on spawn
+    readonly property var _typeStats: Balance.enemy[enemyType] || Balance.enemy.grunt
+    readonly property real chaseSpeed: _typeStats.chaseSpeed
+    readonly property real patrolSpeed: _typeStats.patrolSpeed
     property real _lungeSpeed: 0  // Calculated per attack
-    readonly property real windUpSpeed: 4.0
-    readonly property real windUpDuration: 0.3
-    readonly property real lungeDuration: 0.35
-    readonly property real lungeRange: 2.0
-    property int hp: 30
-    property int maxHp: 30
-    property int atk: 10
-    property int def: 2
+    readonly property real windUpSpeed: Balance.enemy.windUpSpeed
+    readonly property real windUpDuration: Balance.enemy.windUp
+    readonly property real lungeDuration: Balance.enemy.lungeDuration
+    readonly property real lungeRange: Balance.enemy.lungeRange
+    property int hp: Balance.enemy.tierHp[1]
+    property int maxHp: Balance.enemy.tierHp[1]
+    property int atk: Balance.enemy.grunt.atk
+    property int def: Balance.enemy.grunt.def
 
     // Spitter-specific
-    readonly property real preferredDist: 5.0   // Distance to maintain from player
-    readonly property real shootRange: 8.0      // Max range to start shooting
-    readonly property real kiteSpeed: 3.0       // Retreat speed
-    readonly property real shootCooldown: 1.2
+    readonly property real preferredDist: Balance.enemy.preferredDist
+    readonly property real shootRange: Balance.enemy.shootRange
+    readonly property real kiteSpeed: Balance.enemy.kiteSpeed
+    readonly property real shootCooldown: Balance.enemy.shootCooldown
     property real _shootTimer: 0
 
     // Combat state
@@ -64,6 +105,7 @@ PhysicsItem {
     property real _dirToTargetX: 0
     property real _dirToTargetY: 0
     property bool parryWindow: false
+    property int _lungeSteps: 0     // physics steps until the lunge lands
 
     // AI state: patrol, chase, telegraph, lunge, stagger, recovery, kite, shoot
     property string aiState: "patrol"
@@ -73,6 +115,21 @@ PhysicsItem {
     property real _spawnYWu: 0
     property var _lastKnownTargetPos: null
     property real _pathRecalcTimer: 0
+
+    // Contact shadow: grounds the shape on the floor
+    Rectangle {
+        z: -1
+        visible: enemy._fx
+        width: parent.width * 0.92
+        // Kept inside the body's bounds: a child reaching outside inflates
+        // childrenRect and skews the physics debug draw
+        height: parent.height * 0.32
+        radius: height / 2
+        x: (parent.width - width) / 2
+        y: parent.height * 0.68
+        color: "#000000"
+        opacity: 0.38
+    }
 
     // Tough enemy glow ring
     Rectangle {
@@ -87,9 +144,30 @@ PhysicsItem {
         opacity: 0.6
     }
 
+    // Life: breathing at rest, a bob while moving (visual only)
+    property real _lifeT: Math.random() * 10
+    NumberAnimation on _lifeT {
+        running: enemy._fx
+        from: enemy._lifeT; to: enemy._lifeT + 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+    readonly property real _speed: enemy.linearVelocity
+        ? Math.min(1, Math.sqrt(enemy.linearVelocity.x * enemy.linearVelocity.x
+                                + enemy.linearVelocity.y * enemy.linearVelocity.y) / 3) : 0
+    readonly property real _breath: Math.sin(_lifeT * 2.1) * (1 - _speed)
+    readonly property real _bob: Math.abs(Math.sin(_lifeT * 12)) * _speed
+
     // Visual
     Rectangle {
         id: visual
+        transform: [
+            Scale {
+                origin.x: visual.width / 2; origin.y: visual.height
+                xScale: enemy._fx ? 1 - 0.025 * enemy._breath + 0.03 * enemy._bob : 1
+                yScale: enemy._fx ? 1 + 0.035 * enemy._breath - 0.05 * enemy._bob : 1
+            },
+            Translate { y: enemy._fx ? -enemy._bob * visual.height * 0.06 : 0 }
+        ]
         anchors.centerIn: parent
         anchors.fill: parent
         radius: width * .5
@@ -101,7 +179,9 @@ PhysicsItem {
             case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
             case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
             case "kite": base = "#8EBB5A"; break
-            case "shoot": base = "#AADD66"; break
+            // A spitter winding up its shot turns warm yellow: an attack
+            // coming, like the melee telegraph, and far from its kiting green
+            case "shoot": base = "#F2D13A"; break
             case "telegraph": base = "#FF8C00"; break
             case "lunge": base = "#FF4444"; break
             case "stagger": base = "#666666"; break
@@ -110,6 +190,11 @@ PhysicsItem {
             return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
         }
         Behavior on color { ColorAnimation { duration: 100 } }
+
+        BodyShade {
+            visible: enemy._fx
+            baseColor: visual.color
+        }
 
         Canvas {
             id: goblinIcon
@@ -183,9 +268,72 @@ PhysicsItem {
         }
     }
 
+    // Squash on a hit, crouch while winding up, stretch into the lunge
+    property real _poseScale: !_fx ? 1
+        : aiState === "telegraph" || aiState === "shoot" ? 0.8
+        : aiState === "lunge" ? 1.15 : 1
+    Behavior on _poseScale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+    property real _squash: 1
+    SequentialAnimation {
+        id: hitSquash
+        NumberAnimation { target: enemy; property: "_squash"; to: 0.7; duration: 40 }
+        NumberAnimation { target: enemy; property: "_squash"; to: 1; duration: 220; easing.type: Easing.OutBack; easing.overshoot: 3 }
+    }
+    Binding { target: visual; property: "scale"; value: enemy._poseScale * enemy._squash }
+
+    // Eyes that glow in the dark: drawn above the darkness, so an enemy
+    // beyond the light is a pair of eyes coming closer. They sit on the
+    // icon's eyes and blink now and then.
+    Item {
+        id: glowEyes
+        parent: enemy._fx && gameWorld && gameWorld.glowParent ? gameWorld.glowParent() : enemy
+        visible: enemy._fx && enemy.aiState !== "stagger"
+        x: parent === enemy ? 0 : enemy.x
+        y: parent === enemy ? 0 : enemy.y
+        width: enemy.width
+        height: enemy.height
+        scale: visual.scale
+        readonly property bool spitter: enemy.enemyType === "spitter"
+        readonly property color eyeColor: spitter ? "#D8FF80"
+            : enemy.aiState === "telegraph" || enemy.aiState === "lunge" ? "#FFF2C0" : "#FFB040"
+        property real open: 1
+        SequentialAnimation on open {
+            loops: Animation.Infinite
+            PauseAnimation { duration: 2200 + Math.random() * 2600 }
+            NumberAnimation { to: 0.1; duration: 60 }
+            NumberAnimation { to: 1; duration: 90 }
+        }
+        Repeater {
+            model: glowEyes.spitter ? [0.5] : [0.381, 0.619]
+            Item {
+                required property var modelData
+                x: enemy.width * modelData
+                y: enemy.height * 0.44
+                // Halo, then the eye itself
+                Rectangle {
+                    width: enemy.width * (glowEyes.spitter ? 0.5 : 0.36)
+                    height: width * (0.4 + 0.6 * glowEyes.open)
+                    radius: width / 2
+                    x: -width / 2; y: -height / 2
+                    color: glowEyes.eyeColor
+                    opacity: 0.18
+                }
+                Rectangle {
+                    width: enemy.width * (glowEyes.spitter ? 0.18 : 0.13)
+                    height: width * glowEyes.open
+                    radius: width / 2
+                    x: -width / 2; y: -height / 2
+                    color: glowEyes.eyeColor
+                }
+            }
+        }
+    }
+
     Rectangle {
         id: hitFlash
         anchors.fill: visual
+        radius: visual.radius
+        scale: visual.scale
         color: "white"
         opacity: 0
         SequentialAnimation {
@@ -298,7 +446,24 @@ PhysicsItem {
     // FollowPath for both patrol and chase navigation
     // Manage FollowPath.running imperatively — a declarative binding gets
     // broken by FollowPath's internal "running = false" on path completion.
-    onAiStateChanged: followPath.running = (aiState === "patrol" || aiState === "chase")
+    onAiStateChanged: {
+        followPath.running = !remote && (aiState === "patrol" || aiState === "chase")
+        // A remote enemy wobbles while the host's staggers
+        if (remote) {
+            if (aiState === "stagger") staggerWobble.restart()
+            else if (staggerWobble.running) { staggerWobble.stop(); rotation = 0 }
+        }
+    }
+    // A remote enemy flashes when the host's loses HP, unless this node's
+    // knight struck it a moment ago and it flashes already
+    property int _shownHp: hp
+    onHpChanged: {
+        if (remote && hp < _shownHp && !hitFlashAnimation.running) {
+            hitFlashAnimation.restart()
+            if (_fx) hitSquash.restart()
+        }
+        _shownHp = hp
+    }
     onEnemyTypeChanged: goblinIcon.requestPaint()
 
     FollowPath {
@@ -322,22 +487,176 @@ PhysicsItem {
         }
     }
 
-    Timer {
+    // The AI thinks on the game clock: a pause, a single step or a hit stop
+    // holds a telegraph, a lunge or a cooldown with the world (issue #33)
+    PhysicsTimer {
         id: aiTimer
-        interval: 100
-        running: true
+        world: enemy.world
+        interval: Balance.enemy.thinkInterval * 1000
+        running: !enemy.remote
         repeat: true
         onTriggered: updateAI(interval / 1000.0)
     }
 
+    // Knockback: a shove along the blow that the AI does not steer against
+    // until it has died down (README: "push 0.25 tiles in hit direction").
+    readonly property bool _fx: gameWorld ? gameWorld.fx === true : false
+    property real _lastHitDx: 0
+    property real _lastHitDy: 0
+    property real _knockT: 0
+    property real _knockVx: 0
+    property real _knockVy: 0
+    readonly property real knockDuration: Balance.enemy.knockbackDuration
+    function knockback(dx, dy, speed) {
+        let len = Math.sqrt(dx * dx + dy * dy)
+        if (len < 0.001) return
+        _knockVx = dx / len * speed
+        _knockVy = dy / len * speed
+        _knockT = knockDuration
+        followPath.running = false
+        hitSquash.restart()
+    }
+    Connections {
+        target: enemy.world
+        enabled: enemy._knockT > 0
+        function onStepped() {
+            let k = enemy._knockT / enemy.knockDuration
+            enemy.body.linearVelocity = Qt.point(enemy._knockVx * k, -enemy._knockVy * k)
+            enemy._knockT -= enemy.world.timeStep
+            if (enemy._knockT <= 0) {
+                enemy._knockT = 0
+                enemy.body.linearVelocity = Qt.point(0, 0)
+                followPath.running = (enemy.aiState === "patrol" || enemy.aiState === "chase")
+            }
+        }
+    }
+
+    // A shove along (dx, dy) at speed, from the knight's shield push. It
+    // runs as a knockback: a velocity set once lasted only until the AI's
+    // next think, which stops an enemy in recovery or stagger, so the
+    // shove went anywhere from 0 to 2 Wu
+    function shove(dx, dy, speed) {
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "push", dx: dx, dy: dy, speed: speed})
+            return
+        }
+        knockback(dx, dy, speed)
+    }
+
+    // An attack runs on the physics steps, not on the AI's think ticks: a
+    // telegraph lasts its wind-up to the step, and the parry window is open
+    // for exactly Balance.enemy.parryFrames steps (issue #35)
+    Connections {
+        target: enemy.world
+        enabled: !enemy.halted && !enemy.remote
+        function onStepped() { enemy._stepAttack(enemy.world.timeStep) }
+    }
+
+    // Seconds a telegraph of this length is drawn out to
+    function telegraphTime(seconds) {
+        return Math.max(Balance.enemy.minTelegraph, seconds)
+    }
+
+    function _stepAttack(dt) {
+        if (_knockT > 0) return
+        // Counted down per step; what is left of a step's rounding is none
+        if (_attackTimer > 0)
+            _attackTimer = _attackTimer - dt < 1e-6 ? 0 : _attackTimer - dt
+        switch (aiState) {
+        case "telegraph":
+            if (_attackTimer <= 0) _startLunge()
+            break
+        case "shoot":
+            if (_attackTimer <= 0) {
+                fireProjectile()
+                aiState = "kite"
+            }
+            break
+        case "lunge":
+            _stepLunge()
+            break
+        }
+    }
+
+    function _startLunge() {
+        if (!target) {
+            aiState = "chase"
+            return
+        }
+        // Lunge speed to reach the knight where it stands now
+        let lungeDx = target.xWu - xWu
+        let lungeDy = target.yWu - yWu
+        let lungeDist = Math.sqrt(lungeDx * lungeDx + lungeDy * lungeDy)
+        let len = Math.max(0.01, lungeDist)
+        _dirToTargetX = lungeDx / len
+        _dirToTargetY = lungeDy / len
+        _lungeSpeed = lungeDist / lungeDuration
+        _lungeSteps = Math.max(1, Math.round(lungeDuration / world.timeStep))
+        aiState = "lunge"
+        _stepLunge()
+    }
+
+    // Dash forward, the last parryFrames steps open to a parry, then land
+    function _stepLunge() {
+        // Negate Y for world-to-screen
+        body.linearVelocity = Qt.point(
+            _dirToTargetX * _lungeSpeed,
+            -_dirToTargetY * _lungeSpeed)
+        _lungeSteps--
+        if (_lungeSteps > 0) {
+            parryWindow = _lungeSteps <= Balance.enemy.parryFrames
+            return
+        }
+        parryWindow = false
+        body.linearVelocity = Qt.point(0, 0)
+        performAttack()
+        aiState = "recovery"
+        attackCooldown = Balance.enemy.recovery
+    }
+
+    // The knight has fallen: drop the target, stand still and stop thinking.
+    // A lunge or shot still winding up never lands.
+    function halt() {
+        halted = true
+        target = null
+        aiState = "idle"
+        staggerWobble.stop()
+        rotation = 0
+        body.linearVelocity = Qt.point(0, 0)
+    }
+
+    // Its knight's player left the session: the knight is gone, and so is
+    // an attack wound up against it. The next think picks the nearest
+    // knight still there
+    function dropTarget() {
+        target = null
+        targetId = ""
+        parryWindow = false
+        _attackTimer = 0
+        if (["telegraph", "lunge", "shoot", "chase", "kite"].indexOf(aiState) >= 0) {
+            aiState = "patrol"
+            followPath.running = false
+            followPath.wpsWu = []
+            if (_knockT <= 0) body.linearVelocity = Qt.point(0, 0)
+        }
+    }
+
     function updateAI(dt) {
+        if (halted) return
+        if (_knockT > 0) return
+        // In a session it goes for the nearest knight still standing; an
+        // attack under way stays on the knight it wound up against
+        if (gameWorld && gameWorld.enemiesChooseTarget
+            && aiState !== "telegraph" && aiState !== "lunge" && aiState !== "shoot") {
+            target = gameWorld.nearestKnight(xWu, yWu)
+            targetId = gameWorld.knightIdOf(target)
+        }
         if (!target || !gameWorld) {
             aiState = "patrol"
             return
         }
 
         if (attackCooldown > 0) attackCooldown -= dt
-        if (_attackTimer > 0) _attackTimer -= dt
         if (_shootTimer > 0) _shootTimer -= dt
         _pathRecalcTimer -= dt
 
@@ -366,7 +685,7 @@ PhysicsItem {
                     aiState = "kite"
                 } else if (_pathRecalcTimer <= 0) {
                     _recalcChasePath()
-                    _pathRecalcTimer = 1.0
+                    _pathRecalcTimer = Balance.enemy.repathInterval
                 }
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
@@ -375,12 +694,12 @@ PhysicsItem {
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
                     _dirToTargetY = dy / len
-                    _attackTimer = windUpDuration
+                    _attackTimer = telegraphTime(windUpDuration)
                     aiState = "telegraph"
                 } else if (_pathRecalcTimer <= 0) {
                     _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
                     _recalcChasePath()
-                    _pathRecalcTimer = 1.0
+                    _pathRecalcTimer = Balance.enemy.repathInterval
                 }
             }
             break
@@ -396,11 +715,11 @@ PhysicsItem {
                 let len = Math.max(0.01, dist)
                 let ndx = dx / len
                 let ndy = dy / len
-                if (dist < preferredDist * 0.7) {
+                if (dist < preferredDist * Balance.enemy.tooClose) {
                     // Too close — retreat
                     body.linearVelocity = Qt.point(
                         -ndx * kiteSpeed, ndy * kiteSpeed)
-                } else if (dist > preferredDist * 1.3) {
+                } else if (dist > preferredDist * Balance.enemy.tooFar) {
                     // Too far — approach
                     body.linearVelocity = Qt.point(
                         ndx * chaseSpeed, -ndy * chaseSpeed)
@@ -413,7 +732,7 @@ PhysicsItem {
             // Shoot when cooldown ready
             if (_shootTimer <= 0 && dist <= shootRange) {
                 _shootTimer = shootCooldown
-                _attackTimer = 0.3  // Brief telegraph
+                _attackTimer = telegraphTime(Balance.enemy.shootWindUp)
                 let len = Math.max(0.01, dist)
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
@@ -422,46 +741,16 @@ PhysicsItem {
             break
 
         case "shoot":
-            // Brief telegraph then fire
+            // Holds still while the shot winds up; _stepAttack fires it
             body.linearVelocity = Qt.point(0, 0)
-            if (_attackTimer <= 0) {
-                fireProjectile()
-                aiState = "kite"
-            }
             break
 
         case "telegraph":
-            // Pull backward (wind-up) — negate Y for world-to-screen
+            // Pull backward (wind-up) — negate Y for world-to-screen;
+            // _stepAttack starts the lunge, which it also runs
             body.linearVelocity = Qt.point(
                 -_dirToTargetX * windUpSpeed,
                 _dirToTargetY * windUpSpeed)
-            if (_attackTimer <= 0) {
-                // Calculate lunge speed to reach the player
-                let lungeDx = target.xWu - xWu
-                let lungeDy = target.yWu - yWu
-                let lungeDist = Math.sqrt(lungeDx * lungeDx + lungeDy * lungeDy)
-                let len = Math.max(0.01, lungeDist)
-                _dirToTargetX = lungeDx / len
-                _dirToTargetY = lungeDy / len
-                _lungeSpeed = lungeDist / lungeDuration
-                _attackTimer = lungeDuration
-                aiState = "lunge"
-            }
-            break
-
-        case "lunge":
-            // Dash forward — negate Y for world-to-screen
-            body.linearVelocity = Qt.point(
-                _dirToTargetX * _lungeSpeed,
-                -_dirToTargetY * _lungeSpeed)
-            parryWindow = _attackTimer < 0.15
-            if (_attackTimer <= 0) {
-                parryWindow = false
-                body.linearVelocity = Qt.point(0, 0)
-                performAttack()
-                aiState = "recovery"
-                attackCooldown = 0.8
-            }
             break
 
         case "stagger":
@@ -505,11 +794,12 @@ PhysicsItem {
 
     function _setupPatrol() {
         // Patrol near spawn point: 2-3 waypoints in a small area
+        let r = Balance.enemy.patrolRadius
         let offsets = [
-            Qt.point(_spawnXWu - 2, _spawnYWu),
-            Qt.point(_spawnXWu + 2, _spawnYWu),
-            Qt.point(_spawnXWu, _spawnYWu + 2),
-            Qt.point(_spawnXWu, _spawnYWu - 2)
+            Qt.point(_spawnXWu - r, _spawnYWu),
+            Qt.point(_spawnXWu + r, _spawnYWu),
+            Qt.point(_spawnXWu, _spawnYWu + r),
+            Qt.point(_spawnXWu, _spawnYWu - r)
         ]
         // Pick 2 random reachable offsets
         let wps = []
@@ -530,12 +820,18 @@ PhysicsItem {
     }
 
     function performAttack() {
+        // Another node's knight: that node checks the reach and takes the hit
+        if (target && !target.takeDamage && target.nodeId !== undefined) {
+            if (gameWorld) gameWorld.strikeKnight(target, enemy, atk, xWu, yWu)
+            return
+        }
         if (target && target.takeDamage) {
             let dx = target.xWu - xWu
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < 1.2) {
-                target.takeDamage(atk, xWu, yWu)
+            if (dist < Balance.enemy.lungeHitRange) {
+                let result = target.takeDamage(atk, xWu, yWu, widthWu)
+                if (result !== "hit" && result !== "blocked") return
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
@@ -551,8 +847,12 @@ PhysicsItem {
     }
 
     function stagger() {
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger"})
+            return
+        }
         parryWindow = false
-        _attackTimer = 1.0
+        _attackTimer = Balance.enemy.stagger
         aiState = "stagger"
         staggerWobble.restart()
     }
@@ -569,21 +869,67 @@ PhysicsItem {
         return Math.abs(angleDiff) <= shieldArc
     }
 
-    function takeDamage(amount, attackerX, attackerY) {
-        let finalDamage = Math.max(1, amount - def)
-
+    // What a blow of amount from (attackerX, attackerY) does: the damage
+    // and whether a guardian's shield took it
+    function _blow(amount, attackerX, attackerY) {
+        let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
         if (enemyType === "guardian" && aiState !== "stagger"
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
-            finalDamage = Math.floor(finalDamage * 0.3)
+            finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
         }
+        return {damage: finalDamage, blocked: blocked}
+    }
+
+    // This node's knight struck the enemy
+    function takeDamage(amount, attackerX, attackerY) {
+        if (!remote) {
+            _takeBlow(amount, attackerX, attackerY, "")
+            return
+        }
+        // Remote: the hit looks and counts here, the host applies it
+        let b = _blow(amount, attackerX, attackerY)
+        let hdx = attackerX !== undefined ? xWu - attackerX : 0
+        let hdy = attackerY !== undefined ? yWu - attackerY : 0
+        if (gameWorld) {
+            gameWorld.countFight("dealt", b.damage)
+            gameWorld.impact(b.blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
+            gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY})
+        }
+        hitFlashAnimation.restart()
+        if (_fx) hitSquash.restart()
+    }
+
+    // Host: the knight of node byId struck the enemy; that node drew the
+    // hit and counted it
+    function takeRemoteBlow(amount, attackerX, attackerY, byId) {
+        _takeBlow(amount, attackerX, attackerY, byId)
+    }
+
+    // A blow from this node's knight (byId "") or another node's
+    function _takeBlow(amount, attackerX, attackerY, byId) {
+        let b = _blow(amount, attackerX, attackerY)
+        let finalDamage = b.damage
+        let blocked = b.blocked
+        let own = byId === ""
 
         hp = Math.max(0, hp - finalDamage)
+        if (gameWorld && own) gameWorld.countFight("dealt", finalDamage)
         console.log("[Enemy] Took", finalDamage, "damage, HP:", hp, blocked ? "(blocked)" : "")
         hitFlashAnimation.restart()
-        if (gameWorld) gameWorld.shake(blocked ? 0.5 : 1.5)
+        let hdx = attackerX !== undefined ? xWu - attackerX : 0
+        let hdy = attackerY !== undefined ? yWu - attackerY : 0
+        _lastHitDx = hdx
+        _lastHitDy = hdy
+        if (gameWorld && own) {
+            if (gameWorld.impact)
+                gameWorld.impact(blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
+            else
+                gameWorld.shake(blocked ? 0.5 : 1.5)
+        }
+        if (!blocked && hp > 0 && _fx) knockback(hdx, hdy, Balance.enemy.knockbackSpeed)
 
         // Guardian counter-attacks after blocking
         if (blocked && aiState !== "telegraph" && aiState !== "lunge") {
@@ -593,7 +939,8 @@ PhysicsItem {
                 let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
-                _attackTimer = windUpDuration * 0.5  // Faster counter
+                // Faster counter, but no shorter than any telegraph
+                _attackTimer = telegraphTime(windUpDuration * Balance.enemy.counterWindUp)
                 aiState = "telegraph"
             }
         }
@@ -605,16 +952,30 @@ PhysicsItem {
             _recalcChasePath()
         }
 
-        if (hp <= 0) die()
+        if (hp <= 0) die(byId)
     }
 
-    function die() {
+    // byId: the node whose knight killed it, "" for this node's
+    function die(byId) {
         console.log("[Enemy] Died!")
-        if (gameWorld) {
-            gameWorld.spawnDeathParticles(xWu, yWu)
+        let own = !byId
+        if (gameWorld && own) {
+            if (gameWorld.impact)
+                gameWorld.impact("enemyDeath", xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
+            else
+                gameWorld.spawnDeathParticles(xWu, yWu)
             gameWorld.playDeathBurst()
         }
         destroyed = true
+        // Gold where it fell; in a session only the host's enemies die here
+        if (gameWorld && gameWorld.dropGold && !remote) gameWorld.dropGold(xWu, yWu, tier)
+        if (gameWorld) {
+            // The killer's node draws the death and counts the kill
+            if (own) gameWorld.countFight("kill")
+            else gameWorld.reportKill(byId, enemy, _lastHitDx, _lastHitDy, String(visual.color))
+        }
+        // A replicated enemy goes on every node; Game destroys this item
+        if (objectId !== "" && gameWorld && gameWorld.despawnEnemy(enemy)) return
         destroy()
     }
 }

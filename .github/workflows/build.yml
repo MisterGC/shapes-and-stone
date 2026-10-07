@@ -1,0 +1,67 @@
+name: Build
+
+on:
+  # Every PR, whatever its base: main, release/*, and the issue branches
+  # plan steps stack on.
+  pull_request:
+  push:
+    branches: [ main, 'release/**' ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Qt and modules Clayground's own CI builds with.
+  QT_VERSION: '6.10.1'
+  QT_MODULES: 'qtmultimedia qtquick3d qtquick3dphysics qtquicktimeline qtshadertools qt5compat qtimageformats'
+  AQT_VERSION: '>=3.2.0'
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    # The clayground/ submodule is the Clayground the game builds against.
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: 'recursive'
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: linux
+        target: desktop
+        arch: linux_gcc_64
+        modules: ${{ env.QT_MODULES }}
+        aqtversion: ${{ env.AQT_VERSION }}
+        cache: true
+
+    - name: Install Linux Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build libxkbcommon-dev libvulkan-dev
+
+    - name: Setup compiler cache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ubuntu-desktop
+        max-size: 1G
+
+    - name: Configure
+      run: |
+        cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
+
+    - name: Build
+      run: cmake --build build
+
+    # Starts the game headless (QT_QPA_PLATFORM=minimal): any QML warning
+    # while loading exits 1, Main.qml quits once it is up. Clayground's own
+    # tests are its CI's job, so only the game's check runs here.
+    # -V prints its output on a pass too, so the log shows the game came up.
+    - name: Headless start
+      run: ctest --test-dir build -R '^testshapes_and_stone$' -V --timeout 120

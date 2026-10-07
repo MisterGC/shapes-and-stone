@@ -1,17 +1,22 @@
 import QtQuick
 import Box2D
 import Clayground.Physics
+import Clayground.World
 
 PhysicsItem {
     id: projectile
     objectName: "projectile"
 
     property var gameWorld: null
+    // The host's id for this shot, the same on every node
+    property string shotId: ""
     property real dirX: 0
     property real dirY: 0
-    property real speed: 5.0
-    property int damage: 8
+    property real speed: Balance.projectile.speed
+    property int damage: Balance.enemy.spitter.atk
     property bool destroyed: false
+    // It went, on this screen
+    signal gone()
 
     widthWu: 0.3
     heightWu: 0.3
@@ -26,6 +31,16 @@ PhysicsItem {
     // Player sensor (detects hit without pushing)
     property alias sensorCategories: playerSensor.categories
     property alias sensorCollidesWith: playerSensor.collidesWith
+
+    // It lights its own way through the dark
+    Light2d {
+        offsetXWu: projectile.widthWu / 2
+        offsetYWu: -projectile.heightWu / 2
+        radius: 2.5
+        color: "#9ADD55"
+        intensity: 0.9
+        castsShadows: false
+    }
 
     // Visual: sickly green glowing orb
     Rectangle {
@@ -77,10 +92,11 @@ PhysicsItem {
         }
     }
 
-    // Auto-destroy after 3 seconds
-    Timer {
+    // Burst when its lifetime of simulated time is over
+    PhysicsTimer {
+        world: projectile.world
         running: true
-        interval: 3000
+        interval: Balance.projectile.lifetime * 1000
         onTriggered: projectile.die()
     }
 
@@ -97,29 +113,40 @@ PhysicsItem {
         if (!entity || !entity.takeDamage || entity.objectName === "enemy") return
 
         // Shield blocks projectile completely
-        if (entity.isBlocking && entity.isShieldFacing(xWu, yWu)) {
+        if (entity.isBlocking && entity.isShieldFacing(xWu, yWu, widthWu)) {
             let sp = entity.getShieldWorldPos()
             if (gameWorld) {
                 gameWorld.playImpact()
-                gameWorld.shake(0.5)
-                gameWorld.spawnDeflectParticles(sp.x, sp.y)
+                gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
+                gameWorld.countFight("block")
+                if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, "blocked")
             }
-            destroyed = true
-            destroy()
+            vanish()
             return
         }
-        entity.takeDamage(damage, xWu, yWu)
+        // A shot the knight dodges or ignores bursts without a hit
+        let result = entity.takeDamage(damage, xWu, yWu, widthWu)
         if (gameWorld) {
-            gameWorld.shake(1)
-            gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
+            if (result === "hit" || result === "blocked") {
+                gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
+                gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
+            }
+            if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, result)
         }
         die()
     }
 
     function die() {
         if (destroyed) return
+        if (gameWorld) gameWorld.impact("projectileBurst", xWu, yWu, -dirX, -dirY)
+        vanish()
+    }
+
+    // Gone without an impact of its own
+    function vanish() {
+        if (destroyed) return
         destroyed = true
-        if (gameWorld) gameWorld.spawnSpitParticles(xWu, yWu)
+        gone()
         destroy()
     }
 }
