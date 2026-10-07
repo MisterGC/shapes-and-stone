@@ -11,6 +11,8 @@ PhysicsItem {
     property color npcColor: "#C9A227"
     property string iconType: ""  // "mug", "hammer", "crystal"
     property var dialogueLines: []
+    // What it sells through the dialogue panel: [{id, label, price}]
+    property var wares: []
     property string greetingSound: ""
 
     // Routine: [{x, y, duration, text}, ...]
@@ -241,7 +243,7 @@ PhysicsItem {
         if (gameWorld && dialogueLines.length > 0) {
             if (greetingSound !== "" && gameWorld.playNpcGreeting)
                 gameWorld.playNpcGreeting(greetingSound)
-            gameWorld.openDialogue(npcName, npcColor, dialogueLines)
+            gameWorld.openDialogue(npcName, npcColor, dialogueLines, wares)
         }
     }
 }

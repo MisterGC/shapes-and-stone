@@ -1,7 +1,9 @@
 module shapes_and_stone
 Main 1.0 Main.qml
+singleton Balance 1.0 Balance.qml
 Game 1.0 Game.qml
 Player 1.0 Player.qml
+KnightView 1.0 KnightView.qml
 Enemy 1.0 Enemy.qml
 Wall 1.0 Wall.qml
 WallFace 1.0 WallFace.qml
@@ -9,6 +11,7 @@ Torch 1.0 Torch.qml
 Motes 1.0 Motes.qml
 FxParticle 1.0 FxParticle.qml
 Stain 1.0 Stain.qml
+GoldDrop 1.0 GoldDrop.qml
 BodyShade 1.0 BodyShade.qml
 ExitStairs 1.0 ExitStairs.qml
 Floor 1.0 Floor.qml
@@ -17,5 +20,8 @@ Projectile 1.0 Projectile.qml
 Npc 1.0 Npc.qml
 DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml
+FallenScreen 1.0 FallenScreen.qml
+PauseMenu 1.0 PauseMenu.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
+Session 1.0 Session.qml

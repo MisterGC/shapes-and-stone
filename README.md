@@ -6,6 +6,374 @@
 
 ---
 
+## PLAY
+
+The game comes as a download for macOS (Apple Silicon), Windows (64 bit) and
+Linux (x86_64). Nothing else needs to be installed. The builds are not signed
+by Apple or Microsoft, so the system asks once before it starts one.
+
+**macOS:** unzip `ShapesAndStone-macos-arm64.zip` and move
+`Shapes and Stone.app` where you like. On the first start macOS says it
+cannot check the app: click *Done*, open *System Settings > Privacy &
+Security*, scroll down to the message about "Shapes and Stone" and click
+*Open Anyway*, then confirm with *Open*. From then on it starts like any app.
+
+**Windows:** unzip `ShapesAndStone-windows-x64.zip` and start
+`shapes_and_stone.exe` in the `Shapes and Stone` folder. If "Windows protected
+your PC" appears, click *More info*, then *Run anyway*.
+
+**Linux:** make the AppImage executable and start it:
+
+```
+chmod +x ShapesAndStone-linux-x86_64.AppImage
+./ShapesAndStone-linux-x86_64.AppImage
+```
+
+It needs a system at least as new as Ubuntu 22.04, with OpenGL (on
+Ubuntu, Debian: `libopengl0`). If it says it needs
+FUSE, install `libfuse2` (Ubuntu, Debian:
+`sudo apt install libfuse2`), or start it with `--appimage-extract-and-run`.
+
+**Playing together over LAN:** all players are on the same network. One
+player chooses *Multiplayer*, picks *LAN*, clicks *Host Game* and tells the
+others the LAN code shown. Each of them chooses *Multiplayer*, types the code
+and clicks *Join Game*; once everyone is listed, the host clicks *Start Game*.
+The first time the host's game opens the network, macOS asks whether to
+accept incoming connections and Windows asks to allow access through the
+firewall: allow it (on Windows, for private networks), or the others cannot
+join.
+
+**In the browser:** open the game's GitHub Pages URL in a current browser;
+nothing is installed. The first visit reloads the page once. In the
+browser the lobby plays over the internet only: one player clicks *Host
+Game* and tells the others the code shown, they type it and click *Join
+Game*. A native game that hosts with *Internet* takes browser players too;
+a LAN code does not work in the browser.
+
+---
+
+## BUILD
+
+Clayground comes in as the git submodule `clayground/`; its commit is the
+Clayground the game builds against.
+
+```
+git clone --recursive https://github.com/MisterGC/shapes-and-stone.git
+cmake -S shapes-and-stone -B build -G Ninja -DCMAKE_PREFIX_PATH=<Qt>/6.11.1/macos
+cmake --build build
+```
+
+In an existing clone, `git submodule update --init --recursive` fetches
+Clayground.
+
+To start the game headless and fail on any QML warning while it loads - the
+check every PR runs (`.github/workflows/build.yml`):
+
+```
+ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
+```
+
+Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
+The knight bench puts the two side by side in the dungeon, makes them swing,
+block, parry, get hurt and dash at the same moment, and saves a PNG per pose:
+
+```
+cp build/.qsb/src/shaders/*.qsb src/shaders/
+qml -I build/bin/qml tests/knights/knights.qml -- <out dir>
+```
+
+The shaders are copied because the bench loads the QML from `src/`, not from
+the resources. On macOS the `qml` from the Qt installer refuses the build's
+ad-hoc signed plugins; a copy of it signed ad hoc (`codesign -s - --force`)
+next to a `lib` link to Qt's `lib` loads them.
+
+A hit shakes, kicks, flashes and hit-stops only the screen of the player who
+landed or took it; the other screens draw its sparks and shards only. The
+impact bench starts a host and a joiner in one process, joins them over LAN,
+lands every kind of hit on each side and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
+```
+
+In a session the host runs every enemy: it spawns them as Clayground
+replicated objects (`Network.spawn`, type `"enemy"`), runs their AI and
+sends their position, AI state, HP and target. Every other screen shows
+the host's enemies in the past by the delay Clayground sizes from the
+jitter it sees (the interpolator's auto delay) and runs no AI of its
+own. An enemy goes for the nearest knight still standing, on every screen
+the same one. A knight's blow on an enemy is drawn and
+counted on its own screen and applied by the host; an enemy's lunge or
+shot is judged on the screen of the knight it goes for, by that knight's
+shield, parry and dash as that screen has them, which applies the HP and
+tells the others what became of it. A lunge's blow lands when that screen
+shows the lunge land, so a parry there answers it; a shot carries the
+host's id, and goes on every screen once the knight's screen has judged
+it. The enemy bench
+starts a host and a joiner in one process, joins them over LAN, puts a
+knight at each of two enemies, compares every enemy on both screens for
+five seconds, kills one from the joiner and lets the joiner's knight
+fall, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/enemies/enemies.qml
+```
+
+The same-world bench checks the same over the network, as a real session
+has it: two processes of Clayground's live loader, a host and a joiner,
+connected over Local (LAN) or Cloud signaling and started on a fixed seed.
+The joiner's knight answers one of the host's enemies: it stands until the
+enemy walks into its reach and swings, parries it, blocks and dodges its
+lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
+kills it while the host's knight kills another. Each answer counts once,
+on both screens: the same HP, the stagger, the shove, the death and its
+stain, a parried lunge that does not land, each lunge and shot judged by
+the joiner's knight and reported to the host, and a shot that goes on the
+host's screen when the report arrives. Then both knights fight for
+eight seconds while each screen records every enemy it shows - its id, position,
+HP and AI state - every frame. It exits with the number of failed checks;
+`--fault stale` makes the joiner apply none of the host's enemy states, and
+the run fails. It needs the live loader (`-DCLAYGROUND_WITH_TOOLS=ON`, see
+the fight bench below):
+
+```
+python3 tests/sameworld/run_sameworld.py --mode local
+python3 tests/sameworld/run_sameworld.py --mode cloud
+```
+
+`docs/multiplayer-sync.md` says what is compared and with what tolerance;
+`--dump` and `--judge <file> --late-ms 200` show a joiner 200 ms late fail.
+
+The game starts with its sound on, except in the dojo, and M mutes and
+unmutes it. The sound bench starts the game the way a native build does,
+enters the dungeon, presses M twice and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
+```
+
+At depth 0 a line at the bottom of the screen names the controls: WASD,
+LMB strike, RMB shield, Shift dash, E talk, 1 potion, M mute and Esc menu.
+Esc opens a menu with Resume and Title. Alone it pauses the game: the
+world stops, and its first step after Resume is one frame long, so nothing
+of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
+would stop every player's enemies: the menu says the party fights on and
+only this knight stops taking input. Title leaves the run, and a session.
+The pause bench checks the hint, the solo pause and its resume, and the
+menu of a host and a joiner joined over LAN in one process, and exits with
+the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
+```
+
+At 0 HP the knight falls: the enemies stop and a screen shows how deep the
+run got, counted in dungeons from depth 0. Enter starts a new run from depth
+0 on a new seed, Esc returns to the title. The fall bench brings the knight
+down twice, goes again with Enter and back to the title with Esc, and exits
+with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fallen/fallen.qml
+```
+
+In a session a knight at 0 HP is down, drawn slumped and dark on every
+screen, and the run goes on while another knight stands: the downed
+player's screen says "You are down" and offers only Esc, which leaves the
+session. When every knight is down the host ends the run: every screen
+leaves the session and shows how far the party got, as the fall screen does
+for one knight, and Enter or Esc goes to the title. The downed bench starts
+a host and a joiner in one process, joins them over LAN, brings down first
+one knight and then the other, twice in turn, and exits with the number of
+failed checks. Between the two falls the host goes down two levels, and the
+other screen must make the downed knight downed in each, not standing until
+its next state:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
+```
+
+A session takes players in and lets them go while a run is under way. The
+host keeps the run's seed and level as Clayground session properties, so a
+player who joins late starts in the host's level, on its seed, with the
+host's enemies as they are, and every screen draws the newcomer's knight.
+A player who leaves is gone from every screen, and no enemy goes for its
+knight any more. A joiner whose host leaves or goes silent is taken to the
+title, which says so. The join and leave bench starts a host, a joiner and
+a late joiner in one process, joins them over LAN, brings the joiner's knight
+down and the host two levels deeper, lets the late joiner in, out again, and
+then the host leave, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/joinleave/joinleave.qml
+```
+
+A killed enemy drops gold where it fell, by its tier (`loot` in the balance
+table); the fight room drops none. The first knight to reach a drop picks
+it up, whoever dealt the killing blow, and the HUD shows "Gold N" under the
+depth. In a session the host owns the drops as it owns the enemies: it
+spawns each as a Clayground replicated object (type `"gold"`), a node
+claims the drops its own knight reaches, and the host gives each to the
+first claim it gets and despawns it, so a drop is picked up once, by one
+knight; each knight's gold is its own node's. In the village the
+innkeeper sells a health potion and the smith one upgrade for the run,
+more damage or more max HP, through the dialogue panel: E talks, 1 and 2
+buy what the panel offers. Outside the panel, 1 drinks a potion. The
+campfire stays the healer. Gold, potions and the upgrade go with the
+knight to the next level; a new run starts without them. Prices and
+effects are the table's `shop` group. The gold bench brings one knight to
+a drop, to the innkeeper and the smith, then a host and a joiner joined
+over LAN to three drops, one with both knights on it, and exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gold/gold.qml
+```
+
+The HUD shows "Depth N" under the bars; a village counts as the depth of
+the dungeon before it. The fallen screen adds the run's kills and its time
+(simulated, so a pause holds it) and the best depth any run got. The best
+depth is kept with `Clayground.Storage` (`KeyValueStore` "ShapesAndStone",
+key `bestDepth`) as soon as a run gets deeper, not only when it falls. In
+the browser it survives a page reload: Clayground's `KeyValueStore` keeps it
+in the browser's IndexedDB (clayground#341). The depth bench runs twice, as
+two processes, so the best depth crosses a restart; each run exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- first
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- second
+```
+
+Every fight number - HP, damage, timings, cooldowns, spawn counts, the heal
+rate, the gold a kill drops and the village's prices - sits in one table,
+`src/Balance.qml`; tuning the fight is an edit of that file. In the dojo's inspector, `eval JSON.stringify(Balance)` returns
+the whole table (a bare `eval Balance` returns `null`: the inspector does
+not turn objects into JSON). The balance bench checks that the knight, the
+enemies, the fight room and the campfire carry the table's values, and exits
+with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
+```
+
+Deeper is harder. Each dungeon is a depth, counted from 0, and the table's
+`depth` group says what each depth adds to the dungeon: two more enemies
+(up to `depth.enemiesCap`), fewer weak and more tough ones, more guardians
+and spitters, and half an attack point per enemy, rounded. A dungeon's
+tier mix is dealt, not rolled: `spawn.weakChance` of its enemies are weak
+and those above `spawn.normalChance` tough, so the mix follows the depth on
+every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
+in the dungeon at depth 4 (the village and the fight room take a depth the
+same way), and the balance bench checks depth 0, 2 and 4 against the table.
+
+Enemy AI, knockback and the knight's dash and cooldowns count the time the
+physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
+the dojo's pause, its single step and a hit stop hold them with the world.
+A new fight timing belongs on the same clock. The clock bench pauses the
+game, puts an enemy into its telegraph and the knight into its cooldowns,
+single-steps them on, hit-stops them, and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
+```
+
+Every enemy attack can be read and answered. An attack runs on the physics
+steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
+lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
+steps of a lunge are open to a parry. A hit the shield does not stop gives
+the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
+white for as long, and a lunge or a shot in it plays no hit. The shield is
+not free: raised, it drains `knight.blockDrain` mana per second, drops at
+0 and cannot be raised again until a parry gives `knight.parryMana` back
+or the campfire refills it at `campfire.manaPerSecond`; mana does not come
+back on its own.
+The answer bench single-steps the paused fight room, counts each of these
+in steps and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
+```
+
+The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
+damage dealt and taken, parries, attacks the shield stopped, kills, falls
+and the simulated seconds until no enemy stands. The fight bench plays the
+`fight` scenario with a scripted knight, stepping the paused game through
+the dojo's inspector, and prints the record as JSON; the same seed gives the
+same numbers on every run, so a tuning change shows in them. It needs
+Clayground's live loader, which the build makes when asked:
+
+```
+cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
+cmake --build build --target clayliveloader
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry] [--depth 0] [--json out.json]
+```
+
+`--answer` is how the scripted knight meets a grunt's or a guardian's
+attack: `mix` (the default) parries or blocks as the seed rolls, `block`
+always blocks, `parry` always parries. `--depth` puts the fight room at a
+depth: the lineup stays the table's, the enemies hit as hard as there. It
+exits 0 once the room is cleared or the knight has fallen. A fight takes
+about a minute of wall clock.
+
+The downloads under PLAY are built by `.github/workflows/package.yml`: by
+hand (*Run workflow*), on a PR that changes `packaging/`, `CMakeLists.txt` or
+the workflow, and when a release is published, which then gets the three
+packages attached. The workflow never creates or publishes a release itself.
+Each package is made by Clayground's `clay_app_package`, carries Qt and
+Clayground, and is started on a fresh runner that has no Qt with
+Clayground's start check (`clayground/cmake/clay_app/start-check.sh`,
+`start-check.ps1`), the same headless start check as above. The macOS one is
+packaged locally the same way:
+
+```
+cmake --build build --target shapes_and_stone_package
+clayground/cmake/clay_app/start-check.sh "$PWD/build/package/Shapes and Stone.app/Contents/MacOS/shapes_and_stone"
+packaging/lan-check.sh "build/package/Shapes and Stone.app" <Qt>/6.10.1/macos/bin/qml
+```
+
+The packages land in `build/package/`. Linux needs `linuxdeploy` and
+`linuxdeploy-plugin-qt` on PATH, Windows an MSVC developer shell.
+`start-check.sh` empties the environment and fails if the game loads a
+library from outside the package. `lan-check.sh` runs `src/Game.qml` twice on
+the package's Qt and Clayground, hosts a LAN session in one and joins it from
+the other; both have to get into the dungeon with the other's knight.
+
+The browser game is Clayground's Web Runtime with the game's `src/` beside
+it, as static files. `packaging/web-bundle.py` writes them to `build/web/`:
+the runtime from a starter bundle (`clayground-starter.zip` of a Clayground
+release, or the `clayground-starter/` folder of a WASM build of the
+submodule), the QML, `qmldir` and `assets/`, the shaders baked to `.qsb` by
+Qt's `qsb`, and `assets-manifest.json`, which lists the `.qsb` the runtime
+preloads. `--check` loads the written files in headless Chromium with
+Clayground's `run_in_browser.py` and exits with its code, 0 when the game
+came up without a QML, shader or WebGL error; it needs Playwright
+(`pip install playwright && python -m playwright install chromium`):
+
+```
+python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10.1/macos/bin/qsb --check
+```
+
+`.github/workflows/pages.yml` does the same with the runtime of a Clayground
+release and, when the check passes, puts `build/web/` on GitHub Pages. It
+runs by hand (*Run workflow*, with the Clayground release to take the
+runtime from, `v2026.8` by default) and when a release of the game is
+published, never on a push. Pages must be set to deploy from GitHub Actions
+(*Settings > Pages > Source*).
+
+To build against another Clayground commit, move the submodule and commit it:
+
+```
+git -C clayground checkout <commit>
+git -C clayground submodule update --init --recursive
+git add clayground
+```
+
+---
+
 ## CONCEPT
 
 A 2D top-down dungeon crawler where atmosphere triumphs over graphical complexity. Players navigate procedurally generated dungeons as geometric shapes — square knights, circular sorcerers, triangular hunters — fighting through stone corridors filled with danger and discovery. Simple visuals allow a solo developer to focus on tight gameplay, immersive audio, and satisfying progression. The world is built from basic primitives: axis-aligned rectangles form the walls, color sets the mood, particles bring it to life.
