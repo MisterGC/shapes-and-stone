@@ -298,8 +298,8 @@ white for the window; a spitter's shot gets the same ring, closing as the
 shot leaves, without the white. The ring runs on the physics steps, so a
 pause or a hit stop holds it; the `parryRing` group of the table holds
 its size, thickness and colour. On the other screens of a session it
-follows the host's telegraph and parry window. A hit the shield does not stop gives
-the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
+follows the host's telegraph and parry window. A hit the shield does not
+stop gives the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
 white for as long, and a lunge or a shot in it plays no hit. A hit that
 lands reads as a hurt: the knight flashes red (`hurt.color`) for
 `hurt.flash` seconds before the white flicker, plays its own hurt sound (a

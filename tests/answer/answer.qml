@@ -6,7 +6,8 @@
 // guardian's counter and a spitter's shot each last at least the table's
 // minTelegraph, and a lunge is open to a parry for exactly parryFrames
 // steps. The parry ring reaches the grunt on the step the window opens,
-// is white for the window, and closes on a spitter as its shot leaves. A hit the shield does not stop gives the knight hurtGrace seconds
+// is white for the window, and closes on a spitter as its shot leaves. A
+// hit the shield does not stop gives the knight hurtGrace seconds
 // in which no damage lands, and its view flickers for as long; a blocked
 // hit gives none. A shield raised at most knight.perfectBlockFrames steps
 // before a blow, after it was down knight.perfectBlockRearm steps, takes
