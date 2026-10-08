@@ -76,8 +76,9 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
 block, parry, get hurt, run their shields low and dry and dash at the same
-moment, and saves a PNG per pose (`hurt`, `lowMana` and `shieldBreak` among
-them). It needs a window: offscreen it saves the HUD but not the world.
+moment, and saves a PNG per pose (`hurt`, `lowMana`, `shieldBreak`,
+`charging` and `heavy` among them). It needs a window: offscreen it saves
+the HUD but not the world.
 
 ```
 cp build/.qsb/src/shaders/*.qsb src/shaders/
@@ -333,6 +334,24 @@ pause, a single step or the hit stop holds them. The words PARRY and
 PERFECT show over the
 struck enemy in normal play; damage numbers only with the dojo's
 Mechanics debug on.
+The left button swings when it is let go of before `knight.chargeStart`, so
+a click plays as it always did. Held longer, the knight charges a heavy
+swing: it moves at `knight.chargeSpeed` of its speed, its blade, drawn
+back, glows brighter, and at `knight.chargeTime` the charge is full - a
+ring flashes out with a high tick. Let go of then, it swings a wide heavy
+blow: `knight.heavySwing` times atk, within `knight.heavyArc` and
+`knight.heavyRange` times the swing's reach. It goes through a guardian's
+shield, which staggers, and knocks enemies back `knight.heavyKnockback`
+times as far. Let go of before it is full, it is a normal swing; held
+`knight.chargeHold` past full, the knight lets it go at normal strength,
+so no charge is carried around. A hit taken while charging, a raised
+shield or a dash cancels it, and its release swings nothing; behind the
+shield or in a dash the button swings at once, as it always did. The
+charge counts the physics steps (Clayground's `InputAction` on the
+physics world), so a pause or a hit stop holds it. The `heavy` group of the
+table holds its glow, ring, sounds and hit feedback (`impact("heavyHit")`).
+The other screens of a session see the charge in the state's `s` (4
+charging, 5 full) and the heavy swing as `acted("heavy")`.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -360,14 +379,17 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect] [--depth 0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy] [--depth 0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
 attack: `mix` (the default) parries or blocks as the seed rolls, `block`
 always blocks, `parry` always parries, `perfect` keeps the shield down
 until a lunge is 4 steps from landing and raises it then, a perfect
-block. `--depth` puts the fight room at a
+block, `heavy` meets attacks as `mix` does but holds the left button at a
+guardian instead of shield-dashing it and lets the full charge go once the
+guardian is in reach (the report counts them as `heavySwings` and
+`guardBreaks`). `--depth` puts the fight room at a
 depth: the lineup stays the table's, the enemies hit as hard as there. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
@@ -379,7 +401,15 @@ tried there too: the grunts hit a knight that stands still, and
 `eval player.mana = 5` makes the raised shield low at once and breaks it
 after about 0.6 s of holding. The `knight.perfectBlock...`
 values and the `perfectBlock` group are read from `src/Balance.qml` on
-every blow, so an edit of them changes the next fight after a reload.
+every blow, so an edit of them changes the next fight after a reload. The
+charged swing is tried there too: hold the left button while the guardian
+comes and let go once the ring has flashed. The reload bench does this
+through the inspector, changes `knight.chargeTime` in the loaded copy of
+the table, reloads and checks that the charge fills in the new time:
+
+```
+python3 tests/fightbench/run_reload.py
+```
 
 The downloads under PLAY are built by `.github/workflows/package.yml`: by
 hand (*Run workflow*), on a PR that changes `packaging/`, `CMakeLists.txt` or
