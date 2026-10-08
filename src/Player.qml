@@ -208,6 +208,7 @@ PhysicsItem {
         charge: player.chargeProgress
         chargeFull: player.chargeFull
         downed: player.fallen
+        upgrade: player.upgrade
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
