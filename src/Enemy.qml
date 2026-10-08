@@ -610,6 +610,8 @@ PhysicsItem {
         parryWindow = false
         body.linearVelocity = Qt.point(0, 0)
         performAttack()
+        // A blow blocked perfectly staggered it: no recovery over that
+        if (aiState !== "lunge") return
         aiState = "recovery"
         attackCooldown = Balance.enemy.recovery
     }
