@@ -65,9 +65,15 @@ PhysicsItem {
     property bool isAttacking: false
     property real _swingTimer: 0
     property bool isBlocking: false
+    // Seconds the shield stays down after a crushing blow broke it, on the
+    // physics clock: it cannot be raised until then
+    property real shieldLock: 0
+    // The right button is held: the shield rises again once a crushing
+    // blow's lockout is over
+    property bool _shieldWanted: false
     // No mana, no shield: it cannot be raised, and drops when it runs dry
     onIsBlockingChanged: {
-        if (isBlocking && mana <= 0) {
+        if (isBlocking && (mana <= 0 || shieldLock > 0)) {
             isBlocking = false
             return
         }
@@ -124,6 +130,10 @@ PhysicsItem {
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
             if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt
+            if (shieldLock > 0) {
+                shieldLock = shieldLock - dt < 1e-6 ? 0 : shieldLock - dt
+                if (shieldLock === 0 && _shieldWanted && !fallen && mana > 0) isBlocking = true
+            }
             if (isBlocking && !fallen) {
                 let left = mana - Balance.knight.blockDrain * dt
                 mana = left < 1e-6 ? 0 : left
@@ -416,18 +426,22 @@ PhysicsItem {
 
     // Returns what became of the blow: "hit", "blocked" by the shield,
     // "perfect" - blocked by a shield raised just before it (perfectGuard),
-    // "dodged" by a dash, or "ignored" - fallen or in the grace after a hit.
+    // "crushed" - a crushing blow that broke the held shield, "dodged" by
+    // a dash, or "ignored" - fallen or in the grace after a hit.
     // Only a blow that was hit or blocked should look and sound like one;
-    // a perfect block looks and sounds like its own.
+    // a perfect block and a crushing blow look and sound like their own.
     // The attacker is the corner (attackerX, attackerY) of a thing
-    // attackerSize Wu in size (isShieldFacing).
-    function takeDamage(amount, attackerX, attackerY, attackerSize) {
+    // attackerSize Wu in size (isShieldFacing); crush is true for a
+    // crushing blow (Balance.enemy.crush...).
+    function takeDamage(amount, attackerX, attackerY, attackerSize, crush) {
         if (fallen) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
         if (blocked && perfectGuard) return _perfectBlock(attackerX, attackerY, attackerSize)
+        if (blocked && crush === true)
+            return _crushed(finalDamage, attackerX, attackerY, attackerSize)
         if (blocked) {
             finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
             // The shield's own sound, the only one a blocked blow plays
@@ -482,6 +496,36 @@ PhysicsItem {
         return "perfect"
     }
 
+    // A crushing blow met the held shield: it breaks - crushMana mana gone,
+    // down for crushLockout seconds - and crushShare of the damage lands,
+    // a hurt with its grace
+    function _crushed(damage, attackerX, attackerY, attackerSize) {
+        let e = Balance.enemy
+        let finalDamage = Math.max(Balance.minDamage, Math.floor(damage * e.crushShare))
+        mana = Math.max(0, mana - e.crushMana)
+        shieldLock = e.crushLockout
+        isBlocking = false
+        hp = Math.max(0, hp - finalDamage)
+        _cancelCharge()
+        graceLeft = Balance.knight.hurtGrace
+        _shieldBreak()
+        view.hurt()
+        acted("hurt")
+        if (gameWorld) {
+            gameWorld.playHurt()
+            gameWorld.countFight("taken", finalDamage)
+            gameWorld.countFight("crushed")
+            let a = _centreOf(attackerX, attackerY, attackerSize)
+            if (gameWorld.impact)
+                gameWorld.impact("crushBlow", xWu, yWu,
+                                 xWu + widthWu / 2 - a.x, yWu - heightWu / 2 - a.y)
+            else
+                gameWorld.shake(3)
+            gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, "#FF4444")
+        }
+        return "crushed"
+    }
+
     // The shield ran dry while raised: it breaks, with a crack, and the
     // mana bar flashes
     function _shieldBreak() {
@@ -497,6 +541,9 @@ PhysicsItem {
     // a dull click and the mana bar's flash so it is no dead input
     function raiseShield() {
         if (fallen) return
+        _shieldWanted = true
+        // Broken by a crushing blow: it rises when the lockout is over
+        if (shieldLock > 0) return
         if (mana <= 0) {
             if (gameWorld) {
                 gameWorld.playShieldEmpty()
@@ -505,6 +552,11 @@ PhysicsItem {
             return
         }
         isBlocking = true
+    }
+    // The right button is let go of
+    function lowerShield() {
+        _shieldWanted = false
+        isBlocking = false
     }
 
     // A potion heals up to max HP; none is wasted on a knight that is

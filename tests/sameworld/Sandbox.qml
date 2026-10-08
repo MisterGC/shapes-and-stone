@@ -296,6 +296,13 @@ Item {
     // once it comes within 1.2 Wu, once; "stand": faces it and stands, the
     // shield down. The knight never walks. The log says what it did: when
     // (wall clock), how it stood and what it saw.
+    // The enemy answered winds up no crushing blow (issue #80): the answers
+    // are timed on its parry window, which a crushing blow does not open
+    function noCrush(id) {
+        let e = _byId()[id]
+        if (e) e.crushChance = 0
+        return e !== undefined
+    }
     property string guardMode: ""
     property string guardId: ""
     property var guardLog: ({})

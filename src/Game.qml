@@ -193,6 +193,22 @@ ClayWorld2d {
         spitterSound.play()
     }
 
+    // A tough enemy winds up a crushing blow: a low growl, the spitter's
+    // sample pitched down, fading with the distance from this knight
+    Sound {
+        id: growlSound
+        source: "assets/spitter.wav"
+        volume: muted ? 0 : 0.8
+    }
+    function playCrushGrowl(xWu, yWu) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+    }
+
     Sound {
         id: innkeeperGreeting
         source: "assets/innkeeper_greeting.wav"
@@ -262,7 +278,7 @@ ClayWorld2d {
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
     //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
-    //         perfectBlock, parry, projectileHit, projectileDeflected,
+    //         perfectBlock, crushBlow, parry, projectileHit, projectileDeflected,
     //         projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
@@ -318,6 +334,11 @@ ClayWorld2d {
             spawnSparks(x, y, -nx, -ny, Balance.perfectBlock.sparks, "#FFFFFF")
             spawnRing(x, y, "#BFE6FF")
             break
+        case "crushBlow":
+            // The held shield broken: sparks and its shards along the blow
+            spawnSparks(x, y, nx, ny, Balance.crush.sparks, Balance.crush.glow)
+            spawnShards(x, y, nx, ny, 6, "#9AA4AC", 0.2)
+            break
         case "parry":
             spawnSparks(x, y, nx, ny, 14, "#FFE066")
             spawnRing(x, y, "#FFD700")
@@ -335,7 +356,7 @@ ClayWorld2d {
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
             let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, perfectBlock: 1, projectileHit: 1,
+                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, projectileHit: 1,
                                projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
@@ -370,6 +391,13 @@ ClayWorld2d {
             _trauma(Balance.perfectBlock.trauma)
             _freeze(Balance.perfectBlock.freeze * 1000, Balance.perfectBlock.freezeScale)
             if (screenFx) screenFx.perfectBlock()
+            break
+        case "crushBlow":
+            // Worse than a hit: the shield is gone with it
+            _trauma(Balance.crush.trauma)
+            _kick(nx * Balance.crush.kick, ny * Balance.crush.kick)
+            _freeze(Balance.crush.freeze * 1000)
+            if (screenFx) screenFx.hurt()
             break
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
@@ -586,7 +614,7 @@ ClayWorld2d {
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
-                                                 size: enemy.widthWu})
+                                                 size: enemy.widthWu, crush: enemy.crushing})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -597,7 +625,8 @@ ClayWorld2d {
     // physics steps, as the enemy's attack runs (issue #35); the hold is
     // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
-    // "perfect", "dodged", "ignored", "out of reach" or "parried". This
+    // "perfect", "crushed", "dodged", "ignored", "out of reach" or
+    // "parried"; a crushing blow is never parried. This
     // screen judges it by its knight's own state, and reports it to the
     // others (issue #18).
     signal knightStruck(string enemyId, string result)
@@ -637,8 +666,9 @@ ClayWorld2d {
     function _landKnightBlow(blow) {
         // The reach is checked here, against where this knight really is
         if (!player) return
+        let crush = blow.crush === true
         let at = _parriedAt[blow.id]
-        if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
+        if (!crush && at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
             _struck(blow.id, "parried")
             return
         }
@@ -650,12 +680,14 @@ ClayWorld2d {
         }
         // A blow sounds the shield's own block or the knight's hurt, in
         // takeDamage
-        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush)
         // A blocked one throws the host's enemy back off the shield; a
-        // perfect block staggers it, as it does an enemy of this node's
+        // perfect block staggers it, as it does an enemy of this node's,
+        // a crushing blow's for the full stagger
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
-        if (result === "perfect" && e && !e.destroyed) e.stagger(Balance.knight.perfectBlockStagger)
+        if (result === "perfect" && e && !e.destroyed)
+            e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -899,11 +931,11 @@ ClayWorld2d {
         onReleased: (mouse) => {
             if (!player) return
             if (mouse.button === Qt.LeftButton) player.releaseSwing(mouse)
-            if (mouse.button === Qt.RightButton) player.isBlocking = false
+            if (mouse.button === Qt.RightButton) player.lowerShield()
         }
         onCanceled: if (player) {
             player.dropSwing()
-            player.isBlocking = false
+            player.lowerShield()
         }
     }
 
@@ -967,7 +999,7 @@ ClayWorld2d {
         // is held when the focus moves (clayground#413); the shield and the
         // swing are the mouse's, whose release the menu would swallow
         if (player) {
-            player.isBlocking = false
+            player.lowerShield()
             player.dropSwing()
         }
         menuOpen = true
@@ -1475,6 +1507,8 @@ ClayWorld2d {
         property int parries: 0
         property int blocks: 0
         property int perfectBlocks: 0
+        // Crushing blows that broke the held shield
+        property int crushed: 0
         property int kills: 0
         property int deaths: 0
         property real seconds: 0
@@ -1483,11 +1517,12 @@ ClayWorld2d {
     function resetFightRecord() {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
-        r.perfectBlocks = 0
+        r.perfectBlocks = 0; r.crushed = 0
         r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
     }
     // what: dealt, taken (with the damage), parry, block, perfectBlock
-    // (counted as a block too), kill or fall
+    // (counted as a block too), crushed (a crushing blow broke the held
+    // shield), kill or fall
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -1496,6 +1531,7 @@ ClayWorld2d {
         case "parry": r.parries++; break
         case "block": r.blocks++; break
         case "perfectBlock": r.perfectBlocks++; break
+        case "crushed": r.crushed++; break
         case "fall": r.deaths++; break
         case "kill":
             r.kills++
@@ -2600,6 +2636,7 @@ ClayWorld2d {
     }
 
     function clearDungeon() {
+        _attackRng = null
         exitSensor = null
         exitStairs = null
 
@@ -2985,6 +3022,15 @@ ClayWorld2d {
         screen = "game"
         minimap.requestPaint()
         world.forceActiveFocus()
+    }
+
+    // The level's attack rolls - whether a tough enemy winds up a crushing
+    // blow - from the run's seed and the level, so a seed plays the same
+    // fight; only where the AI runs. Seeded anew with each level
+    property var _attackRng: null
+    function rollAttack() {
+        if (!_attackRng) _attackRng = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x6372)
+        return _attackRng()
     }
 
     // --- Seeded PRNG (mulberry32) ---

@@ -920,6 +920,9 @@ def run(args, loader, tmp, procs, result, check):
         walkers = [i for i in ids if H.eval1(f"typeOf('{i}')") != "spitter"] or ids
         a, b = max(((x, y) for x in ids for y in walkers if x != y),
                    key=lambda p: dist(he[p[0]], he[p[1]]))
+        # The answers are timed on b's parry window, which a crushing blow
+        # does not open: b winds up none
+        check(H.eval1(f"noCrush('{b}')") is True, f"the host's {b} winds up no crushing blow")
         H.eval([f"placeBeside('{a}')"])
         H.eval(["record(true)"])
         J.eval(["record(true)"])

@@ -172,6 +172,28 @@ QtObject {
         flashColor: "#FFFFFF"
     })
 
+    // A crushing blow (enemy.crush...) reads as its own: while it winds up
+    // the enemy glows glow, white-hot, a halo of halo times its size at
+    // haloOpacity around it; its ring is ringColor, thickness times the
+    // parry ring's, with a second one gap times its size, and it growls:
+    // the spitter's sample growlPitch semitones down. Its blow on a held
+    // shield throws sparks sparks and the shield's shards, and the
+    // knight's own screen freezes for freeze seconds with this much
+    // trauma and a kick of kick wu
+    readonly property var crush: ({
+        glow: "#FFF4E0",
+        halo: 1.4,
+        haloOpacity: 0.45,
+        ringColor: "#FF4A1C",
+        thickness: 1.6,
+        gap: 1.5,
+        growlPitch: -12,
+        sparks: 14,
+        freeze: 0.11,
+        trauma: 0.6,
+        kick: 0.3
+    })
+
     readonly property var enemy: ({
         // Base HP by tier: weak, normal, tough
         tierHp: [18, 30, 42],
@@ -208,6 +230,18 @@ QtObject {
         blockedShare: 0.3,
         // After a blocked hit it counters, winding up this share of windUp
         counterWindUp: 0.5,
+        // Crushing blow: a tough grunt or guardian winds one up instead of
+        // a lunge at crushChance of its attacks, for crushWindUp seconds
+        // (aiState "crush"). A held shield breaks against it: crushMana
+        // mana gone, the shield down for crushLockout seconds, crushShare
+        // of the damage through. A perfect block stops it whole and
+        // staggers the enemy for stagger; a dash dodges it; it opens no
+        // parry window
+        crushChance: 0.3,
+        crushWindUp: 0.5,
+        crushMana: 15,
+        crushLockout: 0.5,
+        crushShare: 0.6,
         // Spitter: keeps its distance and shoots
         preferredDist: 5.0,
         // Backs off below this share of preferredDist, closes in above the other
