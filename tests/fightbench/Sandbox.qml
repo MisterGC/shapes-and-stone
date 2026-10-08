@@ -36,8 +36,8 @@ Item {
     property var _rng: null
 
     // Pauses the world and enters the fight room; the driver steps from here.
-    // answer is how the knight meets an attack: "mix", "block", "parry" or
-    // "perfect";
+    // answer is how the knight meets an attack: "mix", "block", "parry",
+    // "perfect" or "heavy" (as mix, but it charges at guardians);
     // depth is the depth the fight room is at.
     function begin(s, a, d) {
         Clayground.paused = true
@@ -48,7 +48,12 @@ Item {
         _rng = game.createRng(s)
         _plans = new Map()
         _blockLeft = 0
+        _held = false
+        heavySwings = 0
+        guardBreaks = 0
+        _staggered = new Set()
         game.applyScenario("fight", depth)
+        if (game.player) game.player.acted.connect(a => { if (a === "heavy") bench.heavySwings++ })
         return game.player !== null
     }
 
@@ -72,6 +77,8 @@ Item {
             parries: r.parries,
             blocks: r.blocks,
             perfectBlocks: r.perfectBlocks,
+            heavySwings: heavySwings,
+            guardBreaks: guardBreaks,
             kills: r.kills,
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
@@ -81,25 +88,88 @@ Item {
     }
     function round3(v) { return Math.round(v * 1000) / 1000 }
 
+    // ---- the charge, tried as in the dojo (run_reload.py) ----
+    // The fight room stands: the knight and its grunt, guardian and spitter
+    function fightReady() {
+        return game.player !== null && game.fightRoomActive === true
+            && ["grunt", "guardian", "spitter"].every(t => game.enemies.some(
+                e => e.enemyType === t && alive(e)))
+    }
+    // Holds the left button until the charge is full, counting the physics
+    // steps, then lets go at the guardian, which stands in front of the
+    // knight and faces it. The enemies stand still meanwhile. Returns the
+    // steps, whether the guardian staggered and the HP it lost, as JSON
+    function tryCharge() {
+        Clayground.paused = true
+        let p = game.player
+        let foes = game.enemies.filter(alive)
+        for (let e of foes) e.halt()
+        let gd = foes.find(e => e.enemyType === "guardian")
+        p.isBlocking = false
+        p.moveX = 0
+        p.moveY = 0
+        p.facingAngle = 0
+        p.attackCooldown = 0
+        p.pressSwing()
+        let n = 0
+        while (!p.chargeFull && n < 600) {
+            Clayground.physicsStep(1)
+            n++
+        }
+        gd.xWu = p.xWu + 1.5
+        gd.yWu = p.yWu
+        gd.facingAngle = 180
+        Clayground.physicsStep(1)
+        let hp0 = gd.hp
+        p.releaseSwing()
+        Clayground.physicsStep(1)
+        return JSON.stringify({fullSteps: n, staggered: gd.aiState === "stagger",
+                               lost: hp0 - gd.hp, chargeTime: Balance.knight.chargeTime})
+    }
+
     // ---- the scripted knight ----
     // Each attack an enemy winds up gets one plan: "parry" waits for the
     // parry window and swings into it, "block" raises the shield towards
     // it, "perfect" keeps the shield down until the lunge is perfectLead
     // steps from landing and raises it then. The answer "mix" rolls the
     // plan from the seed between parry and block; "block", "parry" and
-    // "perfect" always pick that one. A shot is always blocked.
+    // "perfect" always pick that one. A shot is always blocked. "heavy"
+    // meets attacks as "mix" does; it answers a guardian's shield with a
+    // charged heavy swing instead of a shield dash: it holds the left
+    // button on its way in and lets go once the charge is full and the
+    // guardian in the heavy swing's reach.
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
     // Steps before a lunge lands that the "perfect" plan raises the shield
     readonly property int perfectLead: 4
     readonly property real parryChance: answer === "block" || answer === "perfect" ? 0
                                       : answer === "parry" ? 1 : 0.6
+    // The scripted left button is held, and heavy swings so far
+    property bool _held: false
+    property int heavySwings: 0
+    // Guardians a heavy swing staggered
+    property int guardBreaks: 0
+    property var _staggered: new Set()
+    function countGuardBreaks(p) {
+        for (let e of game.enemies.filter(alive)) {
+            if (e.enemyType !== "guardian") continue
+            let now = e.aiState === "stagger"
+            if (now && !_staggered.has(e) && p.isHeavy) guardBreaks++
+            if (now) _staggered.add(e); else _staggered.delete(e)
+        }
+    }
+    function heavyReach(p) { return p.attackRange * Balance.knight.heavyRange * 0.9 }
+    function letGo(p) {
+        if (_held) p.dropSwing()
+        _held = false
+    }
 
     Connections {
         target: game.physics
         enabled: game.player !== null && bench._rng !== null
         function onStepped() {
             bench.steps++
+            if (game.player) bench.countGuardBreaks(game.player)
             bench.pilot(game.physics.timeStep)
         }
     }
@@ -129,11 +199,11 @@ Item {
     function pilot(dt) {
         let p = game.player
         if (!p || p.fallen || done) {
-            if (p) { stand(p); p.isBlocking = false }
+            if (p) { stand(p); letGo(p); p.isBlocking = false }
             return
         }
         let foes = game.enemies.filter(alive)
-        if (foes.length === 0) { stand(p); p.isBlocking = false; return }
+        if (foes.length === 0) { stand(p); letGo(p); p.isBlocking = false; return }
 
         // Forget plans of attacks that are over
         for (let e of Array.from(_plans.keys()))
@@ -149,6 +219,17 @@ Item {
             if (d < 3.5 && d < threatDist) { threat = e; threatDist = d }
         }
         if (threat) {
+            // A guardian winding up within reach of a full charge: the
+            // heavy swing staggers it before its blow
+            if (answer === "heavy" && threat.enemyType === "guardian" && p.chargeFull
+                    && threatDist <= heavyReach(p)) {
+                face(p, threat)
+                stand(p)
+                p.releaseSwing()
+                _held = false
+                return
+            }
+            letGo(p)
             if (!_plans.has(threat))
                 _plans.set(threat, answer === "perfect" ? "perfect"
                                    : _rng() < parryChance ? "parry" : "block")
@@ -173,6 +254,7 @@ Item {
             if (d < 3 && d < shotDist) { shot = o; shotDist = d }
         }
         if (shot) {
+            letGo(p)
             _blockLeft = 0.3
             face(p, shot)
         }
@@ -192,6 +274,22 @@ Item {
         }
         face(p, target)
 
+        // A guardian's shield turns swings: a charged heavy swing breaks
+        // its guard
+        if (answer === "heavy" && target.enemyType === "guardian" && target.aiState !== "stagger") {
+            // Held past the charge's hold, the knight let it go: press anew
+            if (_held && !p.isCharging && p.chargeHeld > Balance.knight.chargeStart) letGo(p)
+            if (!_held) _held = p.pressSwing()
+            if (p.chargeFull && targetDist <= heavyReach(p)) {
+                p.releaseSwing()
+                _held = false
+            }
+            // Charging, it lets the guardian come; full, it goes in
+            if (p.chargeFull && targetDist > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
+            else stand(p)
+            return
+        }
+        letGo(p)
         // A guardian's shield turns swings: a shield dash breaks its guard
         if (target.enemyType === "guardian" && target.aiState !== "stagger") {
             if (targetDist < 2.5 && p.dashCooldown <= 0 && !p.isDashing) {
