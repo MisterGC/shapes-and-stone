@@ -118,7 +118,8 @@ host's id, and goes on every screen once the knight's screen has judged
 it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
-five seconds, kills one from the joiner and lets the joiner's knight
+five seconds (the joiner shows the parry ring of the host's enemies),
+kills one from the joiner and lets the joiner's knight
 fall, and exits with the number of failed checks:
 
 ```
@@ -280,8 +281,8 @@ physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
 A new fight timing belongs on the same clock. The clock bench pauses the
 game, puts an enemy into its telegraph and the knight into its cooldowns,
-single-steps them on, hit-stops them, and exits with the number of failed
-checks:
+single-steps them on, hit-stops them (the parry ring with them), and exits
+with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
@@ -290,7 +291,14 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
 Every enemy attack can be read and answered. An attack runs on the physics
 steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
-steps of a lunge are open to a parry. A hit the shield does not stop gives
+steps of a lunge are open to a parry. The wind-up shows when: a thin
+ring in the telegraph colour closes from twice the enemy's size onto its
+outline and reaches it on the step the parry window opens, then stays
+white for the window; a spitter's shot gets the same ring, closing as the
+shot leaves, without the white. The ring runs on the physics steps, so a
+pause or a hit stop holds it; the `parryRing` group of the table holds
+its size, thickness and colour. On the other screens of a session it
+follows the host's telegraph and parry window. A hit the shield does not stop gives
 the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
 white for as long, and a lunge or a shot in it plays no hit. A hit that
 lands reads as a hurt: the knight flashes red (`hurt.color`) for
@@ -327,6 +335,14 @@ in steps and exits with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
+```
+
+The ring bench steps a grunt's wind-up in the paused fight room and saves
+it as `ring-0.png`, `ring-50.png` and `ring-100.png` (the parry window
+opening); like the knight bench it needs a window and the copied shaders:
+
+```
+qml -I build/bin/qml tests/ring/ring.qml -- <out dir>
 ```
 
 The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
