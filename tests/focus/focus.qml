@@ -5,7 +5,8 @@
 // bench never hands the focus to an item itself and never clicks the game.
 // From the title Enter starts a run, D held moves the knight. Esc opens the
 // pause menu and Esc closes it, the menu opens again and Enter on Resume
-// closes it: after each, D held moves the knight. A fall shows the fallen
+// closes it: after each, the game has the focus and D held moves the
+// knight. A fall shows the fallen
 // screen, Enter goes again, and D held moves the knight of the new run.
 // Title in the menu goes to the title, Multiplayer opens the lobby, its
 // start begins the run, and D held moves the knight. Holding D while the
@@ -89,10 +90,16 @@ Window {
         p.takeDamage(10 * Math.max(p.hp, p.maxHp), p.xWu + 1, p.yWu)
     }
 
-    // D held, checked a moment later, then let go
+    // The game holds the focus itself, then D held is checked a moment
+    // later and let go. Without the focus on the game the keys still reach
+    // it from the closed screen's Loader, so the knight alone would not tell
     function holdD(after) {
         return [
-            [100, () => hold(Qt.Key_D)],
+            [100, () => {
+                check(bench.activeFocusItem === game, "after " + after + " the game has the focus (focus on "
+                      + focused() + ")")
+                hold(Qt.Key_D)
+            }],
             [100, () => {
                 check(game.player.moveX === 1, "after " + after + " D held moves the knight (moveX "
                       + game.player.moveX + ", focus on " + focused() + ")")

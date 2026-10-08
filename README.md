@@ -184,8 +184,9 @@ while they are up, and the game takes them back when the last of them
 closes: the knight answers the keys again without a click. A key held when
 the menu opens is let go by Clayground's keyboard gamepad (clayground#413),
 so the knight stands until it is pressed again. The focus bench sends every
-key to whatever has the focus, closes each of these screens and holds D
-after it, and exits with the number of failed checks:
+key to whatever has the focus, closes each of these screens, checks that
+the game holds the focus and holds D after it, and exits with the number
+of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/focus/focus.qml
