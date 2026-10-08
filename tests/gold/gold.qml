@@ -6,8 +6,10 @@
 // the enemy's tier, the knight picks it up and the HUD shows it, and the
 // village keeps it. There, with E at the innkeeper and 1 in the dialogue
 // panel, it buys a potion: the gold drops by its price, and 1 outside the
-// panel heals. The smith sells one upgrade for the run, and the next level
-// keeps gold, potions and upgrade. Then a host and a joiner in one process, joined over
+// panel heals. The smith sells one upgrade for the run, the sharpened sword
+// (more atk) or the reinforced shield (a held block lets less through and
+// drains less mana), and refuses a second; the next level keeps gold,
+// potions and upgrade. Then a host and a joiner in one process, joined over
 // LAN: a drop the joiner's knight killed goes to the host's knight that
 // picks it up, one the host killed to the joiner's, one both knights stand
 // on to exactly one of them, and a late claim for a drop already taken
@@ -193,43 +195,116 @@ Window {
         [() => panel(solo).visible, () => {
             let p = panel(solo)
             check(p.speakerName === "Blacksmith" && p.wares.length === 2
-                  && p.wares[0].id === "atk" && p.wares[1].id === "hp",
-                  "the smith offers a damage and a max-HP upgrade")
+                  && p.wares[0].id === "sword" && p.wares[1].id === "shield"
+                  && p.wares[0].label.indexOf("+" + Balance.shop.swordAtk + " damage") >= 0
+                  && p.wares[1].label.indexOf(Math.round(Balance.shop.shieldBlockedShare * 100) + " %") >= 0
+                  && p.wares[1].label.indexOf(Balance.shop.shieldBlockDrain + " mana/s") >= 0,
+                  "the smith offers the sword and the shield, each with its effect (\""
+                  + p.wares.map(w => w.label).join("\", \"") + "\")")
             gold0 = solo.player.gold
-            hp0 = solo.player.hp
-            press(Qt.Key_2)
+            press(Qt.Key_1)
             let k = solo.player
-            check(k.upgrade === "hp" && k.maxHp === Balance.knight.hp + Balance.shop.hpUpgrade
-                  && k.hp === hp0 + Balance.shop.hpUpgrade && k.atk === Balance.knight.atk
-                  && k.gold === gold0 - Balance.shop.upgradePrice,
-                  "2 buys the max-HP upgrade (max HP " + k.maxHp + ", HP " + hp0 + " -> " + k.hp
+            check(k.upgrade === "sword" && k.atk === 20 && k.atk === Balance.knight.atk + Balance.shop.swordAtk
+                  && k.maxHp === Balance.knight.hp && k.gold === gold0 - Balance.shop.upgradePrice,
+                  "1 buys the sharpened sword (upgrade \"" + k.upgrade + "\", atk " + k.atk
                   + ", gold " + gold0 + " -> " + k.gold + ")")
             check(p.wares.length === 0, "after one upgrade the smith offers none for the run")
             gold0 = k.gold
-            press(Qt.Key_1)
-            check(k.upgrade === "hp" && k.atk === Balance.knight.atk && k.gold === gold0,
-                  "1 at the smith then buys no second upgrade")
+            press(Qt.Key_2)
+            let again = solo.buyWare({ id: "shield", price: Balance.shop.upgradePrice })
+            check(!again && k.upgrade === "sword" && k.gold === gold0,
+                  "a second purchase is refused (upgrade \"" + k.upgrade + "\", gold " + k.gold
+                  + ", \"" + panelText(solo) + "\")")
             for (let i = 0; i < 6 && p.visible; i++) press(Qt.Key_E)
             k.potions = 2
             solo._enterLevel(solo.levelIndex + 1)
         }],
         [() => solo.player && solo.levelType === "dungeon", () => {
             let k = solo.player
-            check(k.gold === gold0 && k.potions === 2 && k.upgrade === "hp"
-                  && k.maxHp === Balance.knight.hp + Balance.shop.hpUpgrade,
+            check(k.gold === gold0 && k.potions === 2 && k.upgrade === "sword" && k.atk === 20,
                   "the next level keeps gold, potions and upgrade (" + k.gold + " gold, " + k.potions
-                  + " potions, max HP " + k.maxHp + ")")
+                  + " potions, atk " + k.atk + ")")
             solo.newRun()
         }],
         [() => solo.player && solo.levelIndex === 0, () => {
             let k = solo.player
-            check(k.gold === 0 && k.potions === 0 && k.upgrade === "" && k.maxHp === Balance.knight.hp,
+            check(k.gold === 0 && k.potions === 0 && k.upgrade === "" && k.atk === Balance.knight.atk
+                  && k.blockedShare === Balance.knight.blockedShare && k.blockDrain === Balance.knight.blockDrain,
                   "a new run starts without gold, potions or upgrade")
+            solo._enterLevel(1)
+        }],
+        [() => solo.player && solo.levelType === "village", () => {
+            solo.player.gold = Balance.shop.upgradePrice
+            let smith = npc(solo, "Blacksmith")
+            standAt(solo.player, smith.xWu, smith.yWu - 1)
+        }],
+        [() => npc(solo, "Blacksmith").nearbyPlayer !== null, () => press(Qt.Key_E)],
+        [() => panel(solo).visible, () => {
+            let p = panel(solo)
+            press(Qt.Key_2)
+            let k = solo.player
+            check(k.upgrade === "shield" && k.atk === Balance.knight.atk && k.gold === 0,
+                  "2 buys the reinforced shield (upgrade \"" + k.upgrade + "\", atk " + k.atk + ")")
+            k.gold = Balance.shop.upgradePrice
+            press(Qt.Key_1)
+            check(k.upgrade === "shield" && k.gold === Balance.shop.upgradePrice,
+                  "1 at the smith then buys no sword")
+            for (let i = 0; i < 6 && p.visible; i++) press(Qt.Key_E)
+            // A 20-atk blow on the held shield, from the front, past the
+            // perfect block's window
+            k.graceLeft = 0
+            k.facingAngle = 0
+            k.raiseShield()
+            k._raisedAt = k._steps - Balance.knight.perfectBlockFrames - 1
+            let hp = k.hp
+            let res = k.takeDamage(20, k.xWu + 1, k.yWu)
+            let share = Math.floor((20 - k.def) * 0.15)
+            check(res === "blocked" && hp - k.hp === share
+                  && share === Math.floor((20 - k.def) * Balance.shop.shieldBlockedShare),
+                  "a held block of a 20-atk blow lets " + (hp - k.hp) + " of " + (20 - k.def)
+                  + " through (15 %: " + share + ")")
+            steps0 = k._steps
+        }],
+        // The drain, measured once the blow's hit stop is over
+        [() => solo.player._steps - steps0 >= 30, () => {
+            let k = solo.player
+            k.mana = k.maxMana
+            mana0 = k.mana
+            steps0 = k._steps
+            drainSecs = 0
+            measuring = true
+        }],
+        [() => solo.player._steps - steps0 >= 60, () => {
+            let k = solo.player
+            measuring = false
+            let secs = drainSecs
+            let drain = (mana0 - k.mana) / secs
+            check(k.isBlocking && Math.abs(drain - 6) < 0.05
+                  && Math.abs(drain - Balance.shop.shieldBlockDrain) < 0.05,
+                  "the held shield drains " + drain.toFixed(2) + " mana/s over " + secs.toFixed(2) + " s")
+            k.lowerShield()
+            // The upgrade is read live: set it, and its effects follow at once
+            k.upgrade = "sword"
+            let sword = k.atk === 20 && k.blockedShare === Balance.knight.blockedShare
+                && k.blockDrain === Balance.knight.blockDrain
+            k.upgrade = "shield"
+            let shield = k.atk === Balance.knight.atk && k.blockedShare === Balance.shop.shieldBlockedShare
+                && k.blockDrain === Balance.shop.shieldBlockDrain
+            check(sword && shield, "setting upgrade applies the sword or the shield at once")
         }],
         [100, () => solo.destroy()]
     ]
     property int gold0: 0
-    property int hp0: 0
+    property real mana0: 0
+    property int steps0: 0
+    // The simulated seconds the drain is measured over, step by step: a
+    // step's length is the world's timeStep at that step
+    property bool measuring: false
+    property real drainSecs: 0
+    Connections {
+        target: solo && solo.player ? solo.player.world : null
+        function onStepped() { if (bench.measuring) bench.drainSecs += target.timeStep }
+    }
 
     // --- A host and a joiner ---
     property string dropId: ""

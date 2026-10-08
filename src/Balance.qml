@@ -311,14 +311,19 @@ QtObject {
     })
 
     // The village's wares, in gold: the innkeeper's potions, drunk with
-    // key 1, and the smith's one upgrade of the run, either damage or max HP
+    // key 1, and the smith's one upgrade of the run, the sword or the shield
     readonly property var shop: ({
         potionPrice: 15,
         potionHeal: 50,
         upgradePrice: 30,
-        // Added to the knight's atk, or to its max HP (and its HP)
-        atkUpgrade: 5,
-        hpUpgrade: 30
+        // Sharpened sword: added to the knight's atk
+        swordAtk: 5,
+        // Reinforced shield: a held block lets this share through instead
+        // of knight.blockedShare, and a raised shield drains this much mana
+        // per second instead of knight.blockDrain. The perfect block's
+        // window stays the same
+        shieldBlockedShare: 0.15,
+        shieldBlockDrain: 6
     })
 
     readonly property var campfire: ({

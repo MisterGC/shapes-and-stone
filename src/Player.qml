@@ -44,8 +44,8 @@ PhysicsItem {
     // Stats, from the balance table
     readonly property real maxSpeed: Balance.knight.moveSpeed
     property int hp: Balance.knight.hp
-    property int maxHp: Balance.knight.hp + (upgrade === "hp" ? Balance.shop.hpUpgrade : 0)
-    property int atk: Balance.knight.atk + (upgrade === "atk" ? Balance.shop.atkUpgrade : 0)
+    property int maxHp: Balance.knight.hp
+    property int atk: Balance.knight.atk + (upgrade === "sword" ? Balance.shop.swordAtk : 0)
     property int def: Balance.knight.def
     // A raised shield drains mana, a parry gives some back
     property real mana: Balance.knight.mana
@@ -54,8 +54,15 @@ PhysicsItem {
     property int gold: 0
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0
-    // The smith's one upgrade of the run: "atk", "hp" or "" before it
+    // The smith's one upgrade of the run: "sword", "shield" or "" before
+    // it. Every effect reads it live, so setting it applies it at once
     property string upgrade: ""
+    // The share of a blow a held block lets through, and the mana a raised
+    // shield drains per second: a reinforced shield's are lower
+    readonly property real blockedShare: upgrade === "shield" ? Balance.shop.shieldBlockedShare
+                                                              : Balance.knight.blockedShare
+    readonly property real blockDrain: upgrade === "shield" ? Balance.shop.shieldBlockDrain
+                                                            : Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
@@ -135,7 +142,7 @@ PhysicsItem {
                 if (shieldLock === 0 && _shieldWanted && !fallen && mana > 0) isBlocking = true
             }
             if (isBlocking && !fallen) {
-                let left = mana - Balance.knight.blockDrain * dt
+                let left = mana - blockDrain * dt
                 mana = left < 1e-6 ? 0 : left
                 if (mana <= 0) {
                     isBlocking = false
@@ -443,7 +450,7 @@ PhysicsItem {
         if (blocked && crush === true)
             return _crushed(finalDamage, attackerX, attackerY, attackerSize)
         if (blocked) {
-            finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
+            finalDamage = Math.floor(finalDamage * blockedShare)
             // The shield's own sound, the only one a blocked blow plays
             if (gameWorld) gameWorld.playBlock()
             view.block()

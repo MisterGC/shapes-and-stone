@@ -1790,7 +1790,6 @@ ClayWorld2d {
         else
             generateDungeon()
         if (player) {
-            // The upgrade first: it raises max HP, which the HP is held to
             player.upgrade = carried.upgrade
             player.hp = carried.hp
             player.mana = carried.mana
@@ -1838,9 +1837,10 @@ ClayWorld2d {
 
     // --- The village's wares (issue #38) ---
     // Bought with this node's knight's own gold. A potion is kept for key 1;
-    // the smith's upgrade ("atk" or "hp") lasts the run
+    // the smith's upgrade ("sword" or "shield") lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
+        if (ware.id !== "potion" && player.upgrade !== "") return false
         if (player.gold < ware.price) {
             dialoguePanel.note = "You'll need " + ware.price + " gold for that."
             return false
@@ -1851,9 +1851,8 @@ ClayWorld2d {
             dialoguePanel.note = "One potion. Drink it when it counts."
         } else {
             player.upgrade = ware.id
-            if (ware.id === "hp") player.hp += Balance.shop.hpUpgrade
-            dialoguePanel.note = ware.id === "atk" ? "There. That edge will bite deeper."
-                                                   : "There. That mail will take a few more blows."
+            dialoguePanel.note = ware.id === "sword" ? "There. That edge will bite deeper."
+                                                     : "There. That shield will let less through."
         }
         dialoguePanel.wares = _offered(dialoguePanel.wares)
         console.log("[Game] Bought", ware.id, "for", ware.price, "gold,", player.gold, "left")
@@ -2787,12 +2786,14 @@ ClayWorld2d {
             { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "I can hone that edge or thicken your mail - one of the two, for this descent.",
+            "I can sharpen that sword or reinforce your shield - one of the two, for this descent.",
             "Bring gold from below and it's yours."
         ], "assets/blacksmith_greeting.wav", [
-            { id: "atk", label: "Hone the blade (+" + Balance.shop.atkUpgrade + " damage)",
+            { id: "sword", label: "Sharpened sword (+" + Balance.shop.swordAtk + " damage)",
               price: Balance.shop.upgradePrice },
-            { id: "hp", label: "Thicken the mail (+" + Balance.shop.hpUpgrade + " max HP)",
+            { id: "shield", label: "Reinforced shield (a block lets "
+                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, drains "
+                  + Balance.shop.shieldBlockDrain + " mana/s)",
               price: Balance.shop.upgradePrice }
         ])
 
