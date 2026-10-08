@@ -36,6 +36,13 @@ Item {
     // At 0 HP: the knight slumps to the floor, dark, its lantern low and
     // no aim shown - the same on every screen that draws it
     property bool downed: false
+    // The left button is held for a heavy swing: the blade, drawn back,
+    // glows brighter with charge (0..1); when chargeFull a ring flashes out
+    property bool charging: false
+    property real charge: 0
+    property bool chargeFull: false
+    readonly property color _glow: Balance.heavy.glow
+    onChargeFullChanged: if (chargeFull) chargeRingFlash.restart()
 
     // Seconds, from the balance table: wind up plus follow through, and
     // the fade of the arc after it
@@ -48,7 +55,9 @@ Item {
 
     readonly property bool _fx: gameWorld ? gameWorld.fx === true : false
 
-    function swing() {
+    // heavy: the charged swing, wider, longer and glowing
+    function swing(heavy) {
+        attackArc.heavy = heavy === true
         attackArc.swingProgress = 0
         attackArc.swingOpacity = 0.9
         attackArc.requestPaint()
@@ -558,6 +567,90 @@ Item {
         }
     }
 
+    // The charge: the blade drawn back at the far edge of the heavy arc,
+    // its colour going from the blade's to Balance.heavy.glow, with a halo
+    // that grows with the charge. Reparented like the swing.
+    Canvas {
+        id: chargeBlade
+        objectName: "chargeBlade"
+        parent: view.host.parent
+        x: view.host.x + view.host.width/2 - width/2
+        y: view.host.y + view.host.height/2 - height/2
+        width: view.host.width * 4
+        height: view.host.height * 4
+        visible: view.charging && !view.downed && !attackAnimation.running
+        rotation: -view.facingAngle
+        readonly property real charge: view.charge
+        onChargeChanged: requestPaint()
+        onVisibleChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var c = view.charge
+            var glow = view._glow
+            var cx = width / 2, cy = height / 2
+            var a = -Balance.knight.heavyArc * Math.PI / 180
+            var inner = view.host.width * 0.55, outer = view.host.width * 1.4
+            var bx = cx + inner * Math.cos(a), by = cy + inner * Math.sin(a)
+            var tx = cx + outer * Math.cos(a), ty = cy + outer * Math.sin(a)
+            var px = -Math.sin(a), py = Math.cos(a)
+            var w = (outer - inner) * 0.1
+            // Halo
+            ctx.beginPath()
+            ctx.moveTo(tx, ty)
+            ctx.lineTo(bx, by)
+            ctx.strokeStyle = view._rgba(glow, 0.15 + 0.45 * c)
+            ctx.lineWidth = w * (2 + 3 * c)
+            ctx.lineCap = "round"
+            ctx.stroke()
+            // Blade
+            ctx.beginPath()
+            ctx.moveTo(tx, ty)
+            ctx.lineTo(bx + px * w, by + py * w)
+            ctx.lineTo(bx - px * w, by - py * w)
+            ctx.closePath()
+            var r = view.bladeColor.r + (glow.r - view.bladeColor.r) * c
+            var g = view.bladeColor.g + (glow.g - view.bladeColor.g) * c
+            var b = view.bladeColor.b + (glow.b - view.bladeColor.b) * c
+            ctx.fillStyle = "rgba(" + Math.round(r * 255) + ", " + Math.round(g * 255) + ", "
+                    + Math.round(b * 255) + ", 1)"
+            ctx.fill()
+            ctx.strokeStyle = view.chargeFull ? "#FFFFFF" : view._rgba(view.accentColor, 0.9)
+            ctx.lineWidth = view.chargeFull ? 2 : 1
+            ctx.stroke()
+        }
+    }
+
+    // The charge is full: a ring flashes out from the knight
+    Rectangle {
+        id: chargeRing
+        objectName: "chargeRing"
+        parent: view.host.parent
+        width: view.host.width
+        height: view.host.height
+        x: view.host.x
+        y: view.host.y
+        radius: width / 2
+        color: "transparent"
+        border.color: Balance.heavy.ringColor
+        border.width: Math.max(1, view.host.width * 0.06)
+        opacity: 0
+        visible: opacity > 0
+        ParallelAnimation {
+            id: chargeRingFlash
+            NumberAnimation {
+                target: chargeRing; property: "scale"
+                from: 1; to: Balance.heavy.ringScale
+                duration: Balance.heavy.ring * 1000; easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: chargeRing; property: "opacity"
+                from: 0.9; to: 0
+                duration: Balance.heavy.ring * 1000
+            }
+        }
+    }
+
     // Attack swing visualization
     // Reparented to avoid inflating the body's childrenRect.
     Canvas {
@@ -565,14 +658,16 @@ Item {
         parent: view.host.parent
         x: view.host.x + view.host.width/2 - width/2
         y: view.host.y + view.host.height/2 - height/2
-        width: view.host.width * 4
-        height: view.host.height * 4
+        width: view.host.width * 5
+        height: view.host.height * 5
         visible: attackAnimation.running
         rotation: -view.facingAngle
 
         // Swing progress: 0 = start, 1 = end
         property real swingProgress: 0
         property real swingOpacity: 0.9
+        // The charged swing: its arc and reach (Balance.knight.heavy...)
+        property bool heavy: false
 
         onSwingProgressChanged: requestPaint()
 
@@ -582,11 +677,12 @@ Item {
 
             var centerX = width / 2
             var centerY = height / 2
-            var radius = width * 0.4
-            var innerRadius = width * 0.15
+            var reach = heavy ? Balance.knight.heavyRange : 1
+            var radius = view.host.width * 1.6 * reach
+            var innerRadius = view.host.width * 0.6
 
-            // Swing range 120 degrees
-            var swingRange = Math.PI * 0.67
+            // Swing range 120 degrees, a heavy one twice its arc
+            var swingRange = heavy ? Balance.knight.heavyArc * Math.PI / 90 : Math.PI * 0.67
             var startAngle = -swingRange / 2
             var currentAngle = startAngle + (swingProgress * swingRange)
 
@@ -604,7 +700,8 @@ Item {
                     ctx.arc(centerX, centerY, radius * (0.96 + 0.04 * k), a0, a1)
                     ctx.arc(centerX, centerY, inner, a1, a0, true)
                     ctx.closePath()
-                    ctx.fillStyle = "rgba(210, 236, 255, " + (swingOpacity * 0.55 * k * k) + ")"
+                    ctx.fillStyle = heavy ? view._rgba(view._glow, swingOpacity * 0.75 * k * k)
+                                          : "rgba(210, 236, 255, " + (swingOpacity * 0.55 * k * k) + ")"
                     ctx.fill()
                 }
             }
@@ -617,8 +714,8 @@ Item {
                 var trailOpacity = swingOpacity * (1.0 - i * 0.25)
                 ctx.beginPath()
                 ctx.arc(centerX, centerY, trailRadius, trailOffset - arcSpan/2, trailOffset + arcSpan/2)
-                ctx.strokeStyle = view._rgba(view.accentColor, trailOpacity)
-                ctx.lineWidth = 2
+                ctx.strokeStyle = view._rgba(heavy ? view._glow : view.accentColor, trailOpacity)
+                ctx.lineWidth = heavy ? 3 : 2
                 ctx.stroke()
             }
 
@@ -650,7 +747,7 @@ Item {
             ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) - perpX * bladeW,
                        centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) - perpY * bladeW)
             ctx.closePath()
-            ctx.fillStyle = view._rgba(view.bladeColor, swingOpacity)
+            ctx.fillStyle = view._rgba(heavy ? view._glow : view.bladeColor, swingOpacity)
             ctx.fill()
             ctx.strokeStyle = view._rgba(view.accentColor, swingOpacity)
             ctx.lineWidth = 1.5

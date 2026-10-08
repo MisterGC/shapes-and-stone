@@ -100,6 +100,9 @@ PhysicsItem {
         if (name === "attack") {
             view.swing()
             if (gameWorld && gain > 0 && actionState !== 3) gameWorld.playSwordSwing(gain)
+        } else if (name === "heavy") {
+            view.swing(true)
+            if (gameWorld && gain > 0) gameWorld.playHeavySwing(gain)
         } else if (name === "dash") {
             view.dash(150)
             if (gameWorld && gain > 0) gameWorld.playDash(gain)
@@ -133,7 +136,31 @@ PhysicsItem {
     }
 
     // A swing the event has not shown yet
-    onActionStateChanged: if (actionState === 1 && !view.swinging) view.swing()
+    onActionStateChanged: {
+        if (actionState === 1 && !view.swinging) view.swing()
+        // The charge: s says charging (4) and full (5); the glow grows on
+        // this screen's clock, as long as the knight's takes to fill
+        if (actionState === 4 && !_chargeGrow.running && remoteCharge === 0) _chargeGrow.start()
+        if (actionState === 5) {
+            _chargeGrow.stop()
+            remoteCharge = 1
+            let gain = gameWorld ? gameWorld.remoteGain(xWu, yWu) : 0
+            if (gameWorld && gain > 0) gameWorld.playChargeFull(gain)
+        }
+        if (actionState !== 4 && actionState !== 5) {
+            _chargeGrow.stop()
+            remoteCharge = 0
+        }
+    }
+    property real remoteCharge: 0
+    NumberAnimation {
+        id: _chargeGrow
+        target: rp
+        property: "remoteCharge"
+        from: 0
+        to: 1
+        duration: (Balance.knight.chargeTime - Balance.knight.chargeStart) * 1000
+    }
 
     KnightView {
         id: view
@@ -149,6 +176,9 @@ PhysicsItem {
         moveAmount: rp._moveAmount
         blocking: rp.remoteBlocking
         dashing: rp.actionState === 3
+        charging: rp.actionState === 4 || rp.actionState === 5
+        charge: rp.remoteCharge
+        chargeFull: rp.actionState === 5
         downed: rp.remoteHp <= 0
     }
 }

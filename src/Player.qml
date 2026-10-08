@@ -1,6 +1,7 @@
 import QtQuick
 import Box2D
 import Clayground.Physics
+import Clayground.GameController
 
 PhysicsItem {
     id: player
@@ -72,6 +73,7 @@ PhysicsItem {
         }
         // When the shield rose and fell, in physics steps: the perfect block
         if (isBlocking) {
+            _cancelCharge()
             _rearmed = _steps - _loweredAt >= Balance.knight.perfectBlockRearm
             _raisedAt = _steps
         } else {
@@ -88,6 +90,8 @@ PhysicsItem {
     readonly property bool perfectGuard: isBlocking && _rearmed
         && _steps - _raisedAt <= Balance.knight.perfectBlockFrames
     property real attackCooldown: 0
+    // The swing under way is a charged heavy one
+    property bool isHeavy: false
     readonly property real blockSpeedMultiplier: Balance.knight.blockSpeed
     readonly property real pushForce: Balance.knight.pushSpeed  // Knockback velocity for dash-push
     readonly property real attackDuration: Balance.knight.swingDuration
@@ -132,7 +136,10 @@ PhysicsItem {
             // draws it, but counted in steps
             if (isAttacking) {
                 _swingTimer -= dt
-                if (_swingTimer <= 0) isAttacking = false
+                if (_swingTimer <= 0) {
+                    isAttacking = false
+                    isHeavy = false
+                }
             }
 
             if (fallen) {
@@ -147,6 +154,9 @@ PhysicsItem {
             } else if (isBlocking) {
                 let spd = maxSpeed * blockSpeedMultiplier
                 player.body.linearVelocity = Qt.point(moveX * spd, moveY * spd)
+            } else if (isCharging) {
+                let spd = maxSpeed * Balance.knight.chargeSpeed
+                player.body.linearVelocity = Qt.point(moveX * spd, moveY * spd)
             } else {
                 player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
             }
@@ -154,8 +164,8 @@ PhysicsItem {
         }
     }
 
-    // A moment others should see: "attack", "dash", "parry", "block",
-    // "perfectBlock", "hurt" or "shieldBreak".
+    // A moment others should see: "attack", "heavy", "dash", "parry",
+    // "block", "perfectBlock", "hurt" or "shieldBreak".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -177,6 +187,9 @@ PhysicsItem {
         swingDuration: player.attackDuration
         graceLeft: player.graceLeft
         lowShield: player.mana < player.maxMana * Balance.shieldBreak.lowShare
+        charging: player.isCharging
+        charge: player.chargeProgress
+        chargeFull: player.chargeFull
         downed: player.fallen
     }
 
@@ -273,7 +286,8 @@ PhysicsItem {
         // Handle collision with enemies
     }
 
-    // Check if an enemy is within the attack arc
+    // Check if an enemy is within the attack arc: a heavy swing's when one
+    // is under way
     function isInAttackArc(enemy) {
         let dx = enemy.xWu - xWu
         let dy = enemy.yWu - yWu
@@ -284,19 +298,42 @@ PhysicsItem {
         while (angleDiff > 180) angleDiff -= 360
         while (angleDiff < -180) angleDiff += 360
 
-        return Math.abs(angleDiff) <= attackArcAngle
+        return Math.abs(angleDiff) <= (isHeavy ? Balance.knight.heavyArc : attackArcAngle)
+    }
+
+    // The enemies a swing can reach: those the attack sensor holds, and for
+    // a heavy swing every standing enemy within heavyRange of the attack
+    // range, centre to centre - it reaches past the sensor
+    function _swingCandidates() {
+        let inRange = _inRange()
+        if (!isHeavy || !gameWorld || !gameWorld.enemies) return inRange
+        let reach = attackRange * Balance.knight.heavyRange
+        let all = new Set(inRange)
+        for (let e of gameWorld.enemies) {
+            if (!e || e.destroyed !== false) continue
+            let dx = e.xWu + e.widthWu / 2 - (xWu + widthWu / 2)
+            let dy = e.yWu - e.heightWu / 2 - (yWu - heightWu / 2)
+            if (dx * dx + dy * dy <= reach * reach) all.add(e)
+        }
+        return all
     }
 
     // Deal damage to enemies in attack arc (skips already-hit enemies this swing)
     function hitEnemiesInArc() {
         let hitCount = 0
-        for (let enemy of _inRange()) {
+        for (let enemy of _swingCandidates()) {
             if (!_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
                 let parried = enemy.parryWindow
                 let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
                         : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
                 if (parried) dmg = atk * Balance.knight.parrySwing
-                enemy.takeDamage(dmg, xWu, yWu)
+                if (isHeavy) {
+                    dmg = Math.max(dmg, Math.floor(atk * Balance.knight.heavySwing))
+                    // It breaks a guardian's guard: staggered, its shield
+                    // takes nothing off and it does not counter
+                    if (enemy.enemyType === "guardian" && !parried) enemy.stagger()
+                }
+                enemy.takeDamage(dmg, xWu, yWu, isHeavy)
                 _hitThisSwing.add(enemy)
                 hitCount++
                 if (parried) {
@@ -404,6 +441,7 @@ PhysicsItem {
             if (blocked) gameWorld.countFight("block")
         }
         if (!blocked) {
+            _cancelCharge()
             graceLeft = Balance.knight.hurtGrace
             view.hurt()
             acted("hurt")
@@ -493,6 +531,7 @@ PhysicsItem {
         if (len < 0.01) return
         _dashDirX = dirX / len
         _dashDirY = dirY / len
+        _cancelCharge()
         isDashing = true
         _hitThisSwing = new Set()
         _dashTimer = dashDuration
@@ -505,6 +544,7 @@ PhysicsItem {
     function attack() {
         if (!fallen && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
+            isHeavy = false
             _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
@@ -513,5 +553,104 @@ PhysicsItem {
             if (!isDashing && gameWorld) gameWorld.playSwordSwing()
             console.log("[Player] Attack! Facing:", facingAngle.toFixed(0), "degrees")
         }
+    }
+
+    // The charged swing: a wide heavy blow (Balance.knight.heavy...).
+    // Returns whether it swung
+    function heavyAttack() {
+        if (fallen || attackCooldown > 0 || isAttacking) return false
+        isAttacking = true
+        isHeavy = true
+        _swingTimer = attackDuration + Balance.knight.swingFade
+        _hitThisSwing = new Set()
+        attackCooldown = attackCooldownTime
+        view.swing(true)
+        acted("heavy")
+        if (gameWorld) gameWorld.playHeavySwing()
+        console.log("[Player] Heavy swing! Facing:", facingAngle.toFixed(0), "degrees")
+        return true
+    }
+
+    // The left button. A press is a swing on its release before
+    // knight.chargeStart, and a charge when held longer: charging from
+    // chargeStart, full at chargeTime, let go at normal strength
+    // chargeHold after that. Its clock is the physics steps (swingInput), so
+    // a pause or a hit stop holds the charge. Game.qml hands the mouse
+    // button's events to pressSwing() and releaseSwing(); a bench can call
+    // them without one.
+    function pressSwing(mouse) { return swingInput.press(mouse) }
+    function releaseSwing(mouse) { return swingInput.release(mouse) }
+    // The button is let go of without a swing: a menu took the input
+    function dropSwing() {
+        _cancelCharge()
+        _charge = "spent"
+        swingInput.release()
+    }
+
+    // Where the press is: "" before chargeStart, "charging", "full",
+    // "normal" (held past chargeStart while it could not charge: a normal
+    // swing on release) or "spent" (swung already, or cancelled: nothing
+    // on release)
+    property string _charge: ""
+    readonly property bool isCharging: _charge === "charging" || _charge === "full"
+    readonly property bool chargeFull: _charge === "full"
+    // Seconds the left button has been held, on the physics clock
+    readonly property real chargeHeld: swingInput.heldMs / 1000
+    // 0 when the charge begins, 1 when it is full
+    readonly property real chargeProgress: !isCharging ? 0
+        : Math.min(1, Math.max(0, (chargeHeld - Balance.knight.chargeStart)
+                               / (Balance.knight.chargeTime - Balance.knight.chargeStart)))
+
+    // A hit, a raised shield or a dash ends a charge: its release swings
+    // nothing
+    function _cancelCharge() {
+        if (isCharging) _charge = "spent"
+    }
+
+    function _onSwingPressed() {
+        _charge = ""
+        if (fallen) {
+            _charge = "spent"
+        } else if (isBlocking || isDashing) {
+            // No charge behind the shield or in a dash: the press swings at
+            // once, as the swing while blocking and the dash swing always did
+            attack()
+            _charge = "spent"
+        }
+    }
+
+    function _onSwingHeld(heldMs) {
+        // timeStep is a float: 36 steps of 1/60 s sum to just under 600 ms
+        let held = heldMs + 1e-3
+        let k = Balance.knight
+        if (_charge === "" && held >= k.chargeStart * 1000)
+            _charge = isBlocking || isDashing || fallen ? "normal" : "charging"
+        if (_charge === "charging" && held >= k.chargeTime * 1000) {
+            _charge = "full"
+            if (gameWorld) gameWorld.playChargeFull()
+        }
+        if (_charge === "full" && held >= (k.chargeTime + k.chargeHold) * 1000) {
+            // Held too long: it goes at normal strength, no charge is carried
+            _charge = "spent"
+            attack()
+        }
+    }
+
+    function _onSwingReleased() {
+        if (_charge === "full") heavyAttack()
+        else if (_charge === "" || _charge === "charging" || _charge === "normal") attack()
+        _charge = ""
+    }
+
+    onFallenChanged: if (fallen) _cancelCharge()
+
+    InputAction {
+        id: swingInput
+        world: player.world
+        mouseButton: Qt.LeftButton
+        holdThresholdMs: Balance.knight.chargeStart * 1000
+        onPressedChanged: if (pressed) player._onSwingPressed()
+        onHeldMsChanged: if (pressed) player._onSwingHeld(heldMs)
+        onReleased: player._onSwingReleased()
     }
 }

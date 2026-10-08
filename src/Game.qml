@@ -124,6 +124,21 @@ ClayWorld2d {
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
+    // The charged swing: the swing sample pitched down, heavier
+    function playHeavySwing(gain) {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+    // The charge is full: a high tick
+    Sound {
+        id: chargeTickSound
+        source: "assets/menu_change.wav"
+        volume: muted ? 0 : 0.6
+    }
+    function playChargeFull(gain) {
+        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.heavy.tickPitch,
+                                    gain === undefined ? 1 : gain)
+    }
 
     // The knight's own hurt: a low thud, never the punch of a sword
     Sound {
@@ -872,15 +887,19 @@ ClayWorld2d {
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            if (mouse.button === Qt.LeftButton) {
-                player.attack()
-            }
+            // The left button swings on release, or charges while held
+            if (mouse.button === Qt.LeftButton) player.pressSwing(mouse)
             if (mouse.button === Qt.RightButton) player.raiseShield()
         }
 
         onReleased: (mouse) => {
-            if (mouse.button === Qt.RightButton && player)
-                player.isBlocking = false
+            if (!player) return
+            if (mouse.button === Qt.LeftButton) player.releaseSwing(mouse)
+            if (mouse.button === Qt.RightButton) player.isBlocking = false
+        }
+        onCanceled: if (player) {
+            player.dropSwing()
+            player.isBlocking = false
         }
     }
 
@@ -946,7 +965,10 @@ ClayWorld2d {
         gameCtrl.axisY = 0
         gameCtrl.buttonAPressed = false
         gameCtrl.buttonBPressed = false
-        if (player) player.isBlocking = false
+        if (player) {
+            player.isBlocking = false
+            player.dropSwing()
+        }
         menuOpen = true
     }
     function closeMenu() {
