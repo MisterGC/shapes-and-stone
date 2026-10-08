@@ -957,12 +957,13 @@ PhysicsItem {
     }
 
     // What a blow of amount from (attackerX, attackerY) does: the damage
-    // and whether a guardian's shield took it
-    function _blow(amount, attackerX, attackerY) {
+    // and whether a guardian's shield took it. A heavy blow (the knight's
+    // charged swing) goes through the shield
+    function _blow(amount, attackerX, attackerY, heavy) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
-        if (enemyType === "guardian" && aiState !== "stagger"
+        if (enemyType === "guardian" && aiState !== "stagger" && heavy !== true
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
@@ -970,20 +971,26 @@ PhysicsItem {
         return {damage: finalDamage, blocked: blocked}
     }
 
-    // This node's knight struck the enemy
-    function takeDamage(amount, attackerX, attackerY) {
+    // The impact a blow makes: a heavy one its own
+    function _hitKind(blocked, heavy) {
+        return blocked ? "enemyBlocked" : heavy === true ? "heavyHit" : "enemyHit"
+    }
+
+    // This node's knight struck the enemy; heavy for its charged swing
+    function takeDamage(amount, attackerX, attackerY, heavy) {
         if (!remote) {
-            _takeBlow(amount, attackerX, attackerY, "")
+            _takeBlow(amount, attackerX, attackerY, "", heavy)
             return
         }
         // Remote: the hit looks and counts here, the host applies it
-        let b = _blow(amount, attackerX, attackerY)
+        let b = _blow(amount, attackerX, attackerY, heavy)
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
         let hdy = attackerY !== undefined ? yWu - attackerY : 0
         if (gameWorld) {
             gameWorld.countFight("dealt", b.damage)
-            gameWorld.impact(b.blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
-            gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY})
+            gameWorld.impact(_hitKind(b.blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
+            gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY,
+                                          heavy: heavy === true})
         }
         hitFlashAnimation.restart()
         if (_fx) hitSquash.restart()
@@ -991,13 +998,13 @@ PhysicsItem {
 
     // Host: the knight of node byId struck the enemy; that node drew the
     // hit and counted it
-    function takeRemoteBlow(amount, attackerX, attackerY, byId) {
-        _takeBlow(amount, attackerX, attackerY, byId)
+    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy) {
+        _takeBlow(amount, attackerX, attackerY, byId, heavy)
     }
 
     // A blow from this node's knight (byId "") or another node's
-    function _takeBlow(amount, attackerX, attackerY, byId) {
-        let b = _blow(amount, attackerX, attackerY)
+    function _takeBlow(amount, attackerX, attackerY, byId, heavy) {
+        let b = _blow(amount, attackerX, attackerY, heavy)
         let finalDamage = b.damage
         let blocked = b.blocked
         let own = byId === ""
@@ -1012,11 +1019,13 @@ PhysicsItem {
         _lastHitDy = hdy
         if (gameWorld && own) {
             if (gameWorld.impact)
-                gameWorld.impact(blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
+                gameWorld.impact(_hitKind(blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
             else
                 gameWorld.shake(blocked ? 0.5 : 1.5)
         }
-        if (!blocked && hp > 0 && _fx) knockback(hdx, hdy, Balance.enemy.knockbackSpeed)
+        if (!blocked && hp > 0 && _fx)
+            knockback(hdx, hdy, Balance.enemy.knockbackSpeed
+                                * (heavy === true ? Balance.knight.heavyKnockback : 1))
 
         // Guardian counter-attacks after blocking
         if (blocked && aiState !== "telegraph" && aiState !== "lunge") {

@@ -246,7 +246,7 @@ ClayWorld2d {
     // --- Impact feedback --------------------------------------------------
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
-    //   kind: enemyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
     //         perfectBlock, parry, projectileHit, projectileDeflected,
     //         projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
@@ -278,6 +278,11 @@ ClayWorld2d {
         case "enemyHit":
             spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, 7, "#FFE6A0")
             spawnShards(x, y, nx, ny, 4, color, 0.2)
+            break
+        case "heavyHit":
+            spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, Balance.heavy.sparks, Balance.heavy.glow)
+            spawnShards(x, y, nx, ny, 6, color, 0.24)
+            spawnRing(x, y, Balance.heavy.glow)
             break
         case "enemyBlocked":
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
@@ -314,7 +319,7 @@ ClayWorld2d {
 
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
-            let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
+            let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
                                playerBlocked: 1, perfectBlock: 1, projectileHit: 1,
                                projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
@@ -323,6 +328,11 @@ ClayWorld2d {
         switch (kind) {
         case "enemyHit":
             _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
+            break
+        case "heavyHit":
+            _trauma(Balance.heavy.trauma)
+            _kick(nx * Balance.heavy.kick, ny * Balance.heavy.kick)
+            _freeze(Balance.heavy.freeze * 1000)
             break
         case "enemyBlocked":
             _trauma(0.12); _freeze(30)
@@ -490,7 +500,7 @@ ClayWorld2d {
         onEnemyBlowReceived: (fromId, blow) => {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
-            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId)
+            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true)
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
