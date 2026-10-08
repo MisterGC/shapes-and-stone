@@ -4,7 +4,8 @@
 //
 // The host's knight stands at one enemy, the joiner's at the one farthest
 // from it. For five seconds every frame compares each enemy on the two
-// screens: its position, its AI state and the knight it goes for. Then the
+// screens: its position, its AI state and the knight it goes for, and
+// that the joiner shows the parry ring of a host's enemy winding up. Then the
 // joiner's knight kills an enemy, and falls: the enemies must go for the
 // host's knight, the one still standing. Prints one PASS or FAIL line per
 // check and exits with the number of failures.
@@ -104,7 +105,8 @@ Window {
     property var stats: null
     function startSampling() {
         stats = {n: 0, maxErr: 0, maxErrId: "", sumErr: 0, judged: 0, stateMiss: 0, targetMiss: 0,
-                 missNote: "", history: {}, states: {}, startMs: Date.now()}
+                 missNote: "", history: {}, states: {}, startMs: Date.now(),
+                 windUps: 0, ringShown: 0, ringMax: 0, windows: 0, windowsClosed: 0}
         sampler.start()
     }
     Timer {
@@ -123,6 +125,17 @@ Window {
                 st.states[he.aiState] = true
                 let je = j[id]
                 if (!je) continue
+                // The parry ring on the joiner's screen, from the host's
+                // replicated state: shown on a wind-up, closed in the window
+                if (je.aiState === "telegraph" || je.aiState === "shoot" || je.aiState === "lunge") {
+                    st.windUps++
+                    if (je.ringShows && je.ringProgress > 0) st.ringShown++
+                    st.ringMax = Math.max(st.ringMax, je.ringProgress)
+                }
+                if (je.parryWindow) {
+                    st.windows++
+                    if (je.ringProgress === 1) st.windowsClosed++
+                }
                 let err = bench.dist(he, je)
                 st.n++
                 st.sumErr += err
@@ -207,6 +220,13 @@ Window {
             let seen = Object.keys(st.states).sort()
             check(st.states["chase"] && (st.states["telegraph"] || st.states["lunge"] || st.states["shoot"]),
                   "the enemies chased and attacked meanwhile (states seen: " + seen.join(", ") + ")")
+            check(st.windUps > 0 && st.ringShown > st.windUps / 2 && st.ringMax > 0.9,
+                  "the parry ring shows on the joiner's screen for the host's enemies ("
+                  + st.ringShown + " of " + st.windUps + " wind-up samples, up to "
+                  + st.ringMax.toFixed(3) + ")")
+            check(st.windows > 0 && st.windowsClosed === st.windows,
+                  "on the joiner's screen the ring is closed while the host's parry window is open ("
+                  + st.windowsClosed + " of " + st.windows + " samples)")
             check(st.judged > 0 && st.targetMiss === 0,
                   "every enemy goes for the same knight on both screens, within " + stateLagMs
                   + " ms (" + st.targetMiss + " misses in " + st.judged + " samples)")

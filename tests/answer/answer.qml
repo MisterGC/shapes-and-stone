@@ -5,7 +5,8 @@
 // target. Counted in physics steps of 1/60 s: a grunt's telegraph, a
 // guardian's counter and a spitter's shot each last at least the table's
 // minTelegraph, and a lunge is open to a parry for exactly parryFrames
-// steps. A hit the shield does not stop gives the knight hurtGrace seconds
+// steps. The parry ring reaches the grunt on the step the window opens,
+// is white for the window, and closes on a spitter as its shot leaves. A hit the shield does not stop gives the knight hurtGrace seconds
 // in which no damage lands, and its view flickers for as long; a blocked
 // hit gives none. A shield raised at most knight.perfectBlockFrames steps
 // before a blow, after it was down knight.perfectBlockRearm steps, takes
@@ -127,6 +128,31 @@ Window {
                   "the lunge (" + lunge + " steps) is open to a parry for " + open
                   + " steps, the table says " + Balance.enemy.parryFrames)
 
+            // From the start of its telegraph the parry ring closes on the
+            // grunt and reaches it on the step the parry window opens; it
+            // is white for the window and gone after the lunge
+            g.attackCooldown = 0
+            g.aiState = "chase"
+            entered = stepUntil(g, "telegraph")
+            let first = g.ringProgress, last = first, rising = true
+            let full = -1, window = -1, white = 0, i = 0
+            while (entered && (g.aiState === "telegraph" || g.aiState === "lunge") && i < 600) {
+                Clayground.physicsStep(1)
+                i++
+                if (g.ringShows && g.ringProgress < last) rising = false
+                last = g.ringProgress
+                if (full < 0 && g.ringProgress >= 1) full = i
+                if (window < 0 && g.parryWindow) window = i
+                if (g.parryWindow && g.ringShows && Qt.colorEqual(g.ringColor, Balance.parryRing.flashColor))
+                    white++
+            }
+            check(entered && first < 0.1 && rising && full > 0 && full === window,
+                  "the parry ring rises from " + first.toFixed(3) + " to 1 on step " + full
+                  + " of the telegraph and lunge, the parry window opens on step " + window)
+            check(white === Balance.enemy.parryFrames && !g.ringShows && g.ringProgress === 0,
+                  "the ring is white for " + white + " steps of the window and gone after the lunge ("
+                  + g.aiState + ")")
+
             // A guardian's counter after a blocked hit: the table's share of
             // a wind-up is below the minimum, the counter is not
             let d = only("guardian")
@@ -144,7 +170,17 @@ Window {
                   + minSteps + " (the share of a wind-up alone is "
                   + Math.round(share / stepS) + ")")
             d.attackCooldown = 10
-            stepsIn(d, "lunge")
+            // Its ring closes on the shorter counter as exactly
+            let cFull = -1, cWindow = -1, c = 0
+            while (d.aiState === "lunge" && c < 600) {
+                Clayground.physicsStep(1)
+                c++
+                if (cFull < 0 && d.ringProgress >= 1) cFull = c
+                if (cWindow < 0 && d.parryWindow) cWindow = c
+            }
+            check(cFull > 0 && cFull === cWindow,
+                  "on a guardian's counter the ring reaches 1 on lunge step " + cFull
+                  + ", the parry window opens on step " + cWindow)
 
             // A spitter's shot winds up for at least the minimum
             let s = only("spitter")
@@ -153,9 +189,19 @@ Window {
             s._shootTimer = 0
             s.aiState = "kite"
             entered = stepUntil(s, "shoot")
-            let shot = stepsIn(s, "shoot")
+            let shot = 0, sLast = 0, sRising = true, sWhite = false
+            while (s.aiState === "shoot" && shot < 600) {
+                if (s.ringProgress < sLast) sRising = false
+                sLast = s.ringProgress
+                if (!s.ringShows || Qt.colorEqual(s.ringColor, Balance.parryRing.flashColor)) sWhite = true
+                Clayground.physicsStep(1)
+                shot++
+            }
             check(entered && s.aiState === "kite" && shot >= minSteps,
                   "a spitter's shot winds up for " + shot + " steps, the minimum is " + minSteps)
+            check(sRising && sLast >= 1 - 1.5 * stepS / s.windUpLength && !sWhite,
+                  "a spitter's shot gets the ring, closing to " + sLast.toFixed(3)
+                  + " on its last wind-up step, never white")
             for (let o of game.enemies) o.target = null
         }],
         [() => true, () => {
