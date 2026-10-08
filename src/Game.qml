@@ -2489,12 +2489,26 @@ ClayWorld2d {
         }
     }
 
+    // Damage numbers are for tuning: they show only in debug mode
     function spawnDamageNumber(wx, wy, amount, color) {
         if (!debugMechanics) return
         damageNumberComp.createObject(world.room, {
+            objectName: "damageNumber",
             xWu: wx, yWu: wy + 0.5,
             startYWu: wy + 0.5,
             text: "" + amount,
+            color: color,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+    }
+
+    // A word over the struck enemy - PARRY, PERFECT - shows in normal play
+    function spawnWord(wx, wy, word, color) {
+        damageNumberComp.createObject(world.room, {
+            objectName: "fightWord",
+            xWu: wx, yWu: wy + 0.5,
+            startYWu: wy + 0.5,
+            text: word,
             color: color,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })

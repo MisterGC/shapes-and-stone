@@ -314,7 +314,7 @@ PhysicsItem {
                         else
                             gameWorld.spawnParryEffect(enemy.xWu, enemy.yWu)
                         gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, "#FFD700")
-                        gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
+                        gameWorld.spawnWord(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
                     }
                     console.log("[Player] PARRY! Dealt", dmg, "damage!")
                 } else {
@@ -432,6 +432,7 @@ PhysicsItem {
             gameWorld.playBlock(1, true)
             gameWorld.countFight("block")
             gameWorld.countFight("perfectBlock")
+            gameWorld.spawnWord(attackerX, attackerY + 0.5, "PERFECT", Balance.perfectBlock.flashColor)
             let a = _centreOf(attackerX, attackerY, attackerSize)
             let s = getShieldWorldPos()
             if (gameWorld.impact)
