@@ -327,7 +327,10 @@ back on its own. Below `shieldBreak.lowShare` of the mana the raised
 shield thins and blinks `shieldBreak.blink` times a second; at 0 it breaks
 into grey shards with a crack, on every screen (`acted("shieldBreak")`),
 and the mana bar flashes red. A right-click with no mana answers with a
-dull click and the same flash. The words PARRY and PERFECT show over the
+dull click and the same flash. The hurt flash, the HP chunk, the blink,
+the shards and the mana bar's flash count physics steps like the grace: a
+pause, a single step or the hit stop holds them. The words PARRY and
+PERFECT show over the
 struck enemy in normal play; damage numbers only with the dojo's
 Mechanics debug on.
 The answer bench single-steps the paused fight room, counts each of these

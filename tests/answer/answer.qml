@@ -23,7 +23,9 @@
 // right-click then answers with the empty click and the mana bar's flash.
 // A parry gives knight.parryMana back. With debugMechanics off a parry
 // and a perfect block show their word, PARRY and PERFECT, and a hit no
-// damage number. Prints one PASS or FAIL line per check and exits
+// damage number. The hurt flash, the HP chunk, the shards, the mana bar's
+// flash and the low shield's blink hold while the game is paused, however
+// long, and run on with its physics steps. Prints one PASS or FAIL line per check and exits
 // with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
@@ -43,6 +45,8 @@ Window {
 
     property var game: null
     property int failures: 0
+    // What a paused check saw, for the step after the wait
+    property var kept: null
 
     // Sends real mouse clicks to the game; runs no tests of its own
     TestCase { id: mouse; when: false }
@@ -486,6 +490,68 @@ Window {
             check(p.isBlocking, "with mana back the shield rises again")
             p.isBlocking = false
             for (let o of game.enemies) o.target = null
+
+            // Paused: a hit, the shield run dry and a right-click without
+            // mana, each on its own feedback
+            let hv = view(p)
+            p.hp = p.maxHp
+            p.graceLeft = 0
+            p.facingAngle = 0
+            p.takeDamage(20, p.xWu - 1, p.yWu)
+            p.mana = 0.001
+            p.isBlocking = true
+            Clayground.physicsStep(1)
+            p.raiseShield()
+            kept = {
+                chunk: find(game, "hpChunk").hp,
+                hurt: find(hv, "hurtFlash").opacity,
+                shards: find(hv, "shieldShards").visible,
+                shardsT: find(hv, "shieldShards").t,
+                mana: game.manaBarFlashing
+            }
+        }],
+        // Wall clock passes, the world does not
+        [600, () => {
+            let p = game.player
+            let hv = view(p)
+            let now = {
+                chunk: find(game, "hpChunk").hp,
+                hurt: find(hv, "hurtFlash").opacity,
+                shards: find(hv, "shieldShards").visible,
+                shardsT: find(hv, "shieldShards").t,
+                mana: game.manaBarFlashing
+            }
+            check(kept.chunk > p.hp && now.chunk === kept.chunk,
+                  "paused, the HP chunk holds (" + kept.chunk.toFixed(2) + " -> "
+                  + now.chunk.toFixed(2) + " HP over 600 ms, the knight at " + p.hp + ")")
+            check(kept.hurt > 0.5 && now.hurt === kept.hurt,
+                  "paused, the hurt flash holds (" + kept.hurt + " -> " + now.hurt + ")")
+            check(kept.shards && now.shards && now.shardsT === kept.shardsT,
+                  "paused, the shards hold (t " + kept.shardsT.toFixed(3) + " -> " + now.shardsT.toFixed(3) + ")")
+            check(kept.mana && now.mana, "paused, the mana bar's flash holds (" + kept.mana + " -> " + now.mana + ")")
+            // and they run on with the steps: each is over after its time
+            Clayground.physicsStep(Math.ceil(Balance.hurt.chunkDrain / stepS) + 1)
+            check(find(game, "hpChunk").hp === p.hp && find(hv, "hurtFlash").opacity === 0
+                  && !find(hv, "shieldShards").visible && !game.manaBarFlashing,
+                  "stepped on " + (Math.ceil(Balance.hurt.chunkDrain / stepS) + 1)
+                  + " steps, the chunk has drained (" + find(game, "hpChunk").hp + " HP) and the flashes and shards are over")
+            // The low shield's blink: off after half a blink, kept while
+            // paused, on again after the next half
+            p.mana = 5
+            p.raiseShield()
+            let arc = hv.children.find(c => c.thickness !== undefined)
+            Clayground.physicsStep(Math.round(0.5 / Balance.shieldBreak.blink / stepS))
+            kept = { blink: arc.opacity }
+        }],
+        [400, () => {
+            let p = game.player
+            let arc = view(p).children.find(c => c.thickness !== undefined)
+            let paused = arc.opacity
+            Clayground.physicsStep(Math.round(0.5 / Balance.shieldBreak.blink / stepS))
+            check(kept.blink < 1 && paused === kept.blink && arc.opacity === 1,
+                  "the low shield blinks on the steps: off " + kept.blink + ", still "
+                  + paused + " after 400 ms paused, on " + arc.opacity + " half a blink later")
+            p.isBlocking = false
             Clayground.paused = false
             console.log("[Answer] done,", failures, "failed")
         }],
@@ -493,6 +559,18 @@ Window {
         [300, () => game.destroy()],
         [300, () => Qt.exit(failures)]
     ]
+
+    // Found by objectName anywhere under item
+    function find(item, name) {
+        if (!item) return null
+        if (item.objectName === name) return item
+        let kids = item.children || []
+        for (let i = 0; i < kids.length; i++) {
+            let f = find(kids[i], name)
+            if (f) return f
+        }
+        return null
+    }
 
     // The floating texts of this kind (and this text) in the room
     function spawned(name, text) {
