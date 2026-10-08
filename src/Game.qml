@@ -1221,7 +1221,7 @@ ClayWorld2d {
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        text: "WASD move  •  LMB strike  •  RMB shield  •  Shift dash  •  "
+        text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Shift dash  •  "
               + "E talk  •  1 potion  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85

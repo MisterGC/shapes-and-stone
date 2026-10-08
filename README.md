@@ -163,7 +163,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike, RMB shield, Shift dash, E talk, 1 potion, M mute and Esc menu.
+LMB strike (hold to charge), RMB shield, Shift dash, E talk, 1 potion, M
+mute and Esc menu.
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
