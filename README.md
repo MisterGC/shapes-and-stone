@@ -90,8 +90,8 @@ next to a `lib` link to Qt's `lib` loads them.
 A hit shakes, kicks, flashes and hit-stops only the screen of the player who
 landed or took it; the other screens draw its sparks and shards only. The
 impact bench starts a host and a joiner in one process, joins them over LAN,
-lands every kind of hit on each side and exits with the number of failed
-checks:
+lands every kind of hit on each side, then a block alone, and exits with the
+number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
@@ -286,7 +286,12 @@ steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
 steps of a lunge are open to a parry. A hit the shield does not stop gives
 the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
-white for as long, and a lunge or a shot in it plays no hit. The shield is
+white for as long, and a lunge or a shot in it plays no hit. A blow the
+shield stops reads as a success, not a smaller hit: the shield flashes
+white and bumps out, the knight's screen freezes for a moment with a kick,
+the shield sounds its own block - the impact sample pitched up, once - and
+the attacker recoils off it; the `block` group of the table holds each of
+these values. The shield is
 not free: raised, it drains `knight.blockDrain` mana per second, drops at
 0 and cannot be raised again until a parry gives `knight.parryMana` back
 or the campfire refills it at `campfire.manaPerSecond`; mana does not come
