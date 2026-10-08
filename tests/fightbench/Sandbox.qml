@@ -52,6 +52,8 @@ Item {
         heavySwings = 0
         guardBreaks = 0
         _staggered = new Set()
+        crushBlows = 0
+        _crushing = new Set()
         game.applyScenario("fight", depth)
         if (game.player) game.player.acted.connect(a => { if (a === "heavy") bench.heavySwings++ })
         return game.player !== null
@@ -77,6 +79,8 @@ Item {
             parries: r.parries,
             blocks: r.blocks,
             perfectBlocks: r.perfectBlocks,
+            crushBlows: crushBlows,
+            crushed: r.crushed,
             heavySwings: heavySwings,
             guardBreaks: guardBreaks,
             kills: r.kills,
@@ -127,13 +131,43 @@ Item {
                                lost: hp0 - gd.hp, chargeTime: Balance.knight.chargeTime})
     }
 
+    // ---- the crushing blow, tried as in the dojo (run_reload.py) ----
+    // Only the tough guardian goes for the knight, which stands; the others
+    // stand still. Steps until the guardian has wound up attacks attacks or
+    // maxSteps have passed. Returns the attacks, the crushing ones among
+    // them and the chances, as JSON
+    function tryCrush(attacks, maxSteps) {
+        Clayground.paused = true
+        let p = game.player
+        let foes = game.enemies.filter(alive)
+        let gd = foes.find(e => e.enemyType === "guardian")
+        for (let e of foes) if (e !== gd) e.halt()
+        p.isBlocking = false
+        p.moveX = 0
+        p.moveY = 0
+        p.hp = 100000
+        let n = 0, wound = 0, crushes = 0, last = gd.aiState
+        while (wound < attacks && n < maxSteps) {
+            Clayground.physicsStep(1)
+            n++
+            if (gd.aiState !== last && (gd.aiState === "telegraph" || gd.aiState === "crush")) {
+                wound++
+                if (gd.aiState === "crush") crushes++
+            }
+            last = gd.aiState
+        }
+        return JSON.stringify({attacks: wound, crushes: crushes, steps: n, tier: gd.tier,
+                               guardianChance: gd.crushChance, crushChance: Balance.enemy.crushChance})
+    }
+
     // ---- the scripted knight ----
     // Each attack an enemy winds up gets one plan: "parry" waits for the
     // parry window and swings into it, "block" raises the shield towards
     // it, "perfect" keeps the shield down until the lunge is perfectLead
     // steps from landing and raises it then. The answer "mix" rolls the
     // plan from the seed between parry and block; "block", "parry" and
-    // "perfect" always pick that one. A shot is always blocked. "heavy"
+    // "perfect" always pick that one; a crushing blow (aiState "crush") gets
+    // the same plans, and a parry finds no window. A shot is always blocked. "heavy"
     // meets attacks as "mix" does; it answers a guardian's shield with a
     // charged heavy swing instead of a shield dash: it holds the left
     // button on its way in and lets go once the charge is full and the
@@ -150,6 +184,16 @@ Item {
     // Guardians a heavy swing staggered
     property int guardBreaks: 0
     property var _staggered: new Set()
+    // Crushing blows wound up at the knight
+    property int crushBlows: 0
+    property var _crushing: new Set()
+    function countCrushes() {
+        for (let e of game.enemies.filter(alive)) {
+            let now = e.aiState === "crush"
+            if (now && !_crushing.has(e)) crushBlows++
+            if (now) _crushing.add(e); else _crushing.delete(e)
+        }
+    }
     function countGuardBreaks(p) {
         for (let e of game.enemies.filter(alive)) {
             if (e.enemyType !== "guardian") continue
@@ -170,6 +214,7 @@ Item {
         function onStepped() {
             bench.steps++
             if (game.player) bench.countGuardBreaks(game.player)
+            bench.countCrushes()
             bench.pilot(game.physics.timeStep)
         }
     }
@@ -207,14 +252,14 @@ Item {
 
         // Forget plans of attacks that are over
         for (let e of Array.from(_plans.keys()))
-            if (!alive(e) || (e.aiState !== "telegraph" && e.aiState !== "lunge"))
+            if (!alive(e) || (e.aiState !== "telegraph" && e.aiState !== "crush" && e.aiState !== "lunge"))
                 _plans.delete(e)
 
         // 1. An attack coming at the knight: parry or block it
         let threat = null, threatDist = 1e9
         for (let e of foes) {
             if (e.enemyType === "spitter") continue
-            if (e.aiState !== "telegraph" && e.aiState !== "lunge") continue
+            if (e.aiState !== "telegraph" && e.aiState !== "crush" && e.aiState !== "lunge") continue
             let d = distTo(p, e.xWu, e.yWu)
             if (d < 3.5 && d < threatDist) { threat = e; threatDist = d }
         }

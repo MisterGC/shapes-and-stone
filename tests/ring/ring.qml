@@ -5,9 +5,11 @@
 // its telegraph, a step and a half from the knight. Saves <out>/ring-0.png
 // as the telegraph begins, ring-50.png once the ring is half closed and
 // ring-100.png on the step the parry window opens, where the ring lies on
-// the grunt's outline and is white. Checks the ring's drawn size at each,
-// prints one PASS or FAIL line per check and exits with the number of
-// failures. It needs a window: offscreen it saves the HUD but not the world.
+// the grunt's outline and is white. Then the tough guardian winds up a
+// crushing blow: crush-50.png once its ring is half closed, the guardian
+// white-hot and its ring doubled in the crushing blow's colour. Checks the
+// ring's drawn size at each, prints one PASS or FAIL line per check and
+// exits with the number of failures. It needs a window: offscreen it saves the HUD but not the world.
 //
 //   qml -I <build>/bin/qml tests/ring/ring.qml -- <out dir>
 
@@ -26,6 +28,7 @@ Window {
     readonly property string outDir: Qt.application.arguments[Qt.application.arguments.length - 1]
     property var game: null
     property var grunt: null
+    property var guardian: null
     property int failures: 0
 
     function check(ok, what) {
@@ -110,6 +113,35 @@ Window {
                   + grunt.ringProgress + ", " + grunt.ringColor + ")")
         }],
         [600, () => { checkSize("the parry window opens"); capture("ring-100") }],
+        // A crushing blow: the tough guardian at the knight, the grunt gone
+        [400, () => {
+            let p = game.player
+            grunt.target = null
+            grunt.xWu = p.xWu - 6
+            grunt.aiState = "patrol"
+            guardian = game.enemies.find(e => e.enemyType === "guardian" && !e.destroyed)
+            guardian.target = p
+            guardian.crushChance = 1
+            guardian._knockT = 0
+            guardian.attackCooldown = 0
+            guardian._attackTimer = 0
+            guardian.xWu = p.xWu + 1.5
+            guardian.yWu = p.yWu
+            guardian.aiState = "chase"
+            let n = 0
+            while (guardian.aiState !== "crush" && n++ < 600) Clayground.physicsStep(1)
+            while (guardian.ringProgress < 0.5 && n++ < 600) Clayground.physicsStep(1)
+            let near = item => item.visible && Math.abs(item.x + item.width / 2
+                                                        - guardian.x - guardian.width / 2) < 1
+            let drawn = name => [guardian].concat(game.glowParent()).some(
+                par => Array.from(par.children).some(c => c.objectName === name && near(c)))
+            check(guardian.aiState === "crush" && drawn("crushRing") && drawn("crushGlow")
+                  && Qt.colorEqual(guardian.ringColor, Balance.crush.ringColor),
+                  "the guardian winds up a crushing blow (" + guardian.aiState + ", progress "
+                  + guardian.ringProgress.toFixed(3) + "): white-hot, its ring doubled and "
+                  + guardian.ringColor)
+        }],
+        [600, () => capture("crush-50")],
         [500, () => {
             Clayground.paused = false
             console.log("[Ring] done,", failures, "failed")
