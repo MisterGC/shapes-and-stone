@@ -224,22 +224,30 @@ Window {
                   "a shield down for only " + (rearm - 1) + " steps before it rose has no perfect window ("
                   + armed + ") and blocks with the chip (" + res + ", " + before + " -> " + p.hp + " HP)")
             p.isBlocking = false
-            // A lunge blocked perfectly staggers the grunt. Out of the AI's
-            // hands while the shield re-arms: it gets its target only for
-            // the blow itself
+            // A lunge blocked perfectly staggers the grunt: a real one, run
+            // step by step to its landing, the shield raised 4 steps before
+            // it lands and down since the wind-up began, the knight facing
+            // the grunt centre to centre as the shield measures it
             let pg = only("grunt")
-            pg.target = null
-            Clayground.physicsStep(rearm)
-            pg.xWu = p.xWu + 0.5
+            p.mana = p.maxMana
+            pg.xWu = p.xWu + 1.5
             pg.yWu = p.yWu
             pg.target = p
-            p.isBlocking = true
-            pg.performAttack()
-            check(pg.aiState === "stagger"
+            pg.aiState = "chase"
+            let lunged = stepUntil(pg, "lunge")
+            let lungeSteps = 0
+            while (pg.aiState === "lunge" && lungeSteps < 600) {
+                p.facingAngle = Math.atan2(pg.yWu - pg.heightWu / 2 - p.yWu + p.heightWu / 2,
+                                           pg.xWu + pg.widthWu / 2 - p.xWu - p.widthWu / 2) * 180 / Math.PI
+                if (pg._lungeSteps <= 4) p.isBlocking = true
+                Clayground.physicsStep(1)
+                lungeSteps++
+            }
+            check(lunged && pg.aiState === "stagger"
                   && Math.abs(pg._attackTimer - Balance.knight.perfectBlockStagger) < 1e-6,
                   "a lunge blocked perfectly staggers the grunt for "
                   + pg._attackTimer.toFixed(3) + " s, the table says "
-                  + Balance.knight.perfectBlockStagger + " (" + pg.aiState + ")")
+                  + Balance.knight.perfectBlockStagger + " (" + pg.aiState + " after the lunge landed)")
             p.isBlocking = false
             pg.target = null
             Clayground.physicsStep(Math.round(Balance.knight.perfectBlockStagger / stepS) + 1)
