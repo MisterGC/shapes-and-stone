@@ -32,8 +32,14 @@
 // the step knight.chargeTime reaches; a full charge let go of at a guardian
 // facing the knight deals knight.heavySwing times atk through its shield
 // and staggers it; a hit while charging cancels it; held knight.chargeHold
-// past full it goes at normal strength. Prints one PASS or FAIL line per
-// check and exits with the number of failures.
+// past full it goes at normal strength. A tough guardian's crushing blow
+// winds up for at least enemy.crushWindUp as aiState "crush", white-hot
+// with a doubled ring, and its lunge opens no parry window; on a held
+// shield it takes enemy.crushMana mana and enemy.crushShare of the damage
+// and drops the shield for enemy.crushLockout, after which a held button
+// raises it again; a perfect block takes it whole and staggers the
+// guardian for enemy.stagger; a dash makes it miss. Prints one PASS or
+// FAIL line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
 
@@ -77,7 +83,8 @@ Window {
     readonly property real stepS: 1 / 60
     readonly property int minSteps: Math.round(Balance.enemy.minTelegraph / stepS)
 
-    // Only this enemy has the knight as its target, a step from it
+    // Only this enemy has the knight as its target, a step from it; it
+    // winds up no crushing blow
     function only(type) {
         let p = game.player
         let e = game.enemies.find(x => x.enemyType === type && !x.destroyed)
@@ -87,8 +94,36 @@ Window {
         e._knockT = 0
         e.attackCooldown = 0
         e._attackTimer = 0
+        e.crushChance = 0
         return e
     }
+
+    // The tough guardian, about to wind up a crushing blow at the knight,
+    // 1.5 wu to its right
+    function crusher() {
+        let p = game.player
+        let d = only("guardian")
+        d.crushChance = 1
+        d.xWu = p.xWu + 1.5
+        d.yWu = p.yWu
+        d.aiState = "chase"
+        return d
+    }
+    // The knight faces e centre to centre, as the shield measures it
+    function faceIt(p, e) {
+        p.facingAngle = Math.atan2(e.yWu - e.heightWu / 2 - p.yWu + p.heightWu / 2,
+                                   e.xWu + e.widthWu / 2 - p.xWu - p.widthWu / 2) * 180 / Math.PI
+    }
+    // Every item of this name anywhere under item
+    function findAll(item, name, out) {
+        out = out || []
+        if (!item) return out
+        if (item.objectName === name) out.push(item)
+        let kids = item.children || []
+        for (let i = 0; i < kids.length; i++) findAll(kids[i], name, out)
+        return out
+    }
+    function shows(name) { return findAll(game, name).some(r => r.visible) }
 
     // Steps while the enemy is in the state, at most a few seconds' worth
     function stepsIn(e, state) {
@@ -561,6 +596,142 @@ Window {
             p.isBlocking = false
             Clayground.paused = false
             console.log("[Answer] done,", failures, "failed")
+        }],
+        // The crushing blow of a tough guardian, step by step
+        [() => true, () => {
+            Clayground.paused = true
+            let p = game.player
+            let e = Balance.enemy
+            let acts = []
+            let record = a => acts.push(a)
+            p.acted.connect(record)
+            p.hp = p.maxHp
+            p.graceLeft = 0
+            p.mana = p.maxMana
+            p.shieldLock = 0
+            p.lowerShield()
+            Clayground.physicsStep(Balance.knight.perfectBlockRearm)
+
+            // Its wind-up: aiState "crush" for at least crushWindUp, the
+            // guardian white-hot and its ring doubled. The shield is held,
+            // raised long before the blow
+            let d = crusher()
+            faceIt(p, d)
+            p.raiseShield()
+            let wound = stepUntil(d, "crush")
+            let windUp = 0, looks = 0
+            while (d.aiState === "crush" && windUp < 600) {
+                if (d.crushing && shows("crushGlow") && shows("crushRing")) looks++
+                Clayground.physicsStep(1)
+                windUp++
+            }
+            let crushSteps = Math.round(e.crushWindUp / stepS)
+            check(wound && d.aiState === "lunge" && windUp >= crushSteps && windUp >= minSteps,
+                  "a crushing blow winds up for " + windUp + " steps (aiState \"crush\"), "
+                  + crushSteps + " at least")
+            check(looks === windUp, "for all " + looks + " of them the guardian glows white-hot and its ring is doubled")
+            // Its lunge opens no parry window, its ring never flashes white;
+            // on the held shield it lands: crushMana mana, crushShare of
+            // the damage, the shield down for crushLockout
+            let open = 0, white = 0, lunge = 0, hp = p.hp, mana = p.mana
+            let crushed = game.fightRecord.crushed
+            while (d.aiState === "lunge" && lunge < 600) {
+                faceIt(p, d)
+                hp = p.hp
+                mana = p.mana
+                Clayground.physicsStep(1)
+                lunge++
+                if (d.parryWindow) open++
+                if (d.ringShows && Qt.colorEqual(d.ringColor, Balance.parryRing.flashColor)) white++
+            }
+            check(open === 0 && white === 0,
+                  "its lunge (" + lunge + " steps) is open to a parry for " + open
+                  + " steps and its ring white for " + white)
+            let want = Math.max(Balance.minDamage,
+                                Math.floor(Math.max(Balance.minDamage, d.atk - p.def) * e.crushShare))
+            let manaLost = mana - p.mana
+            let drain = Balance.knight.blockDrain * stepS
+            check(hp - p.hp === want && manaLost >= e.crushMana - 1e-3 && manaLost <= e.crushMana + drain + 1e-3,
+                  "on the held shield it takes " + (hp - p.hp) + " HP (" + e.crushShare + " of "
+                  + Math.max(1, d.atk - p.def) + " is " + want + ") and " + manaLost.toFixed(3)
+                  + " mana (crushMana " + e.crushMana + ", a step's drain " + drain.toFixed(3) + ")")
+            check(!p.isBlocking && p.shieldLock > e.crushLockout - stepS - 1e-6
+                  && p.shieldLock <= e.crushLockout + 1e-6
+                  && acts.indexOf("shieldBreak") >= 0 && acts.indexOf("hurt") >= 0
+                  && game.fightRecord.crushed === crushed + 1,
+                  "the shield drops for " + p.shieldLock.toFixed(3) + " s (crushLockout " + e.crushLockout
+                  + "), breaks and the knight is hurt (acted " + acts.join(", ") + ")")
+            // Held, the button raises it again once the lockout is over
+            p.raiseShield()
+            let locked = 0
+            while (!p.isBlocking && locked < 600) {
+                Clayground.physicsStep(1)
+                locked++
+            }
+            check(p.isBlocking && Math.abs(locked - e.crushLockout / stepS) <= 1,
+                  "with the right button held the shield rises again after " + locked + " steps")
+            p.lowerShield()
+            d.target = null
+            d.aiState = "recovery"
+            Clayground.physicsStep(Math.round(Balance.knight.hurtGrace / stepS) + 1)
+
+            // A perfect block takes it whole and staggers the guardian for
+            // the full stagger
+            p.hp = p.maxHp
+            p.mana = p.maxMana - 10
+            d = crusher()
+            faceIt(p, d)
+            let crushedAgain = stepUntil(d, "crush")
+            stepUntil(d, "lunge")
+            hp = p.hp
+            mana = p.mana
+            let n = 0
+            while (d.aiState === "lunge" && n < 600) {
+                faceIt(p, d)
+                if (d._lungeSteps <= 4) p.raiseShield()
+                Clayground.physicsStep(1)
+                n++
+            }
+            check(crushedAgain && p.hp === hp && d.aiState === "stagger"
+                  && Math.abs(d._attackTimer - e.stagger) < 1e-6
+                  && p.mana > mana && game.fightRecord.crushed === crushed + 1,
+                  "a perfect block takes a crushing blow whole (" + hp + " -> " + p.hp
+                  + " HP) and staggers the guardian for " + d._attackTimer.toFixed(3)
+                  + " s, the table's stagger is " + e.stagger + " (" + d.aiState + ")")
+            p.lowerShield()
+            d.target = null
+            Clayground.physicsStep(Math.round(e.stagger / stepS) + 1)
+
+            // A dash makes it miss
+            p.hp = p.maxHp
+            p.mana = p.maxMana
+            p.dashCooldown = 0
+            d = crusher()
+            faceIt(p, d)
+            stepUntil(d, "lunge")
+            hp = p.hp
+            mana = p.mana
+            acts = []
+            n = 0
+            while (d.aiState === "lunge" && n < 600) {
+                faceIt(p, d)
+                if (d._lungeSteps <= 2 && !p.isDashing && p.dashCooldown <= 0) {
+                    p.moveX = 0
+                    p.moveY = 0
+                    p.dash()
+                }
+                Clayground.physicsStep(1)
+                n++
+            }
+            check(p.hp === hp && p.mana === mana && acts.indexOf("dash") >= 0
+                  && acts.indexOf("hurt") < 0 && d.aiState === "recovery",
+                  "in a dash a crushing blow misses (" + hp + " -> " + p.hp + " HP, acted "
+                  + acts.join(", ") + ", the guardian " + d.aiState + ")")
+            d.target = null
+            d.aiState = "patrol"
+            d.crushChance = Balance.enemy.crushChance
+            p.acted.disconnect(record)
+            Clayground.paused = false
         }],
         // The left button: a click swings, a hold charges a heavy swing
         [() => true, () => {
