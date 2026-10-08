@@ -115,6 +115,7 @@ PhysicsItem {
         } else if (name === "hurt") {
             view.hurt()
             _grace.restart()
+            if (gameWorld && gain > 0) gameWorld.playHurt(gain)
         }
     }
     // The grace after a hit, on this screen's clock: the other knight

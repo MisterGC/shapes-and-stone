@@ -211,19 +211,23 @@ Item {
             PropertyAnimation { target: visual; property: "opacity"; from: 0.4; to: 1.0; duration: 150 }
         }
 
-        // Hurt flash: white for a few frames, then back
+        // Hurt flash: red for a moment, then the white grace flicker takes
+        // over - a hurt never looks like the grace that follows it
         Rectangle {
             id: hurtFlashRect
+            objectName: "hurtFlash"
             anchors.fill: parent
             radius: parent.radius
-            color: "white"
+            color: Balance.hurt.color
             opacity: 0
+            // Above the grace flicker while it shows
+            z: 1
         }
         SequentialAnimation {
             id: hurtFlash
             PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0.95 }
-            PauseAnimation { duration: 50 }
-            NumberAnimation { target: hurtFlashRect; property: "opacity"; to: 0; duration: 140 }
+            PauseAnimation { duration: Balance.hurt.flash * 1000 }
+            PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0 }
         }
 
         // Grace after a hit: flickers white until no hit can land again

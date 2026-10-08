@@ -125,6 +125,16 @@ ClayWorld2d {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
+    // The knight's own hurt: a low thud, never the punch of a sword
+    Sound {
+        id: hurtSound
+        source: "assets/knight_hurt.wav"
+        volume: muted ? 0 : 0.8
+    }
+    function playHurt(gain) {
+        hurtSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+
     // How loud another knight is at xWu/yWu: never as loud as your own
     // knight, and fading to silence about a screen away from you
     readonly property real remoteMaxGain: 0.5
@@ -596,11 +606,11 @@ ClayWorld2d {
             _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
+        // A blow sounds the shield's own block or the knight's hurt, in
+        // takeDamage
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
-        // A blocked blow sounds the shield's own block, in takeDamage
-        if (result === "hit") playImpact()
-        // and throws the host's enemy back off the shield; a perfect block
-        // staggers it, as it does an enemy of this node's
+        // A blocked one throws the host's enemy back off the shield; a
+        // perfect block staggers it, as it does an enemy of this node's
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
         if (result === "perfect" && e && !e.destroyed) e.stagger(Balance.knight.perfectBlockStagger)
@@ -951,6 +961,53 @@ ClayWorld2d {
         color: "#333333"
         radius: 4
         z: 1000  // Above everything
+
+        // The HP the last hit took: a pale chunk past the fill that drains
+        // away; only the hurt knight's own screen has it
+        Rectangle {
+            id: hpChunk
+            objectName: "hpChunk"
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 2
+            // The HP the chunk reaches to, never below the knight's
+            property real hp: 0
+            function reset() {
+                hpChunkDrain.stop()
+                hp = player ? player.hp : 0
+            }
+            width: player ? (parent.width - 4) * Math.max(0, Math.min(hp, player.maxHp)) / player.maxHp : 0
+            radius: 2
+            color: "#F4E4D4"
+            opacity: 0.85
+            NumberAnimation {
+                id: hpChunkDrain
+                target: hpChunk; property: "hp"
+                duration: Balance.hurt.chunkDrain * 1000
+                easing.type: Easing.InQuad
+            }
+            Connections {
+                target: player
+                function onHpChanged() {
+                    if (player.hp < hpChunk.hp) {
+                        hpChunkDrain.stop()
+                        hpChunkDrain.from = hpChunk.hp
+                        hpChunkDrain.to = player.hp
+                        hpChunkDrain.start()
+                    } else {
+                        hpChunkDrain.stop()
+                        hpChunk.hp = player.hp
+                    }
+                }
+            }
+        }
+        // A new knight (a level, a run) starts without a chunk, also once
+        // it is given the HP it carries from the level before
+        Connections {
+            target: world
+            function onPlayerChanged() { Qt.callLater(hpChunk.reset) }
+        }
 
         Rectangle {
             id: healthFill

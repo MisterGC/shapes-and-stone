@@ -98,6 +98,16 @@ QtObject {
         pitch: 12
     })
 
+    // A hit that lands reads as a hurt, not as the grace after it: the
+    // knight turns color for flash seconds before the white flicker, and
+    // the HP it lost stays on the HP bar as a pale chunk that drains away
+    // over chunkDrain seconds
+    readonly property var hurt: ({
+        color: "#FF5040",
+        flash: 0.06,
+        chunkDrain: 0.4
+    })
+
     readonly property var enemy: ({
         // Base HP by tier: weak, normal, tough
         tierHp: [18, 30, 42],

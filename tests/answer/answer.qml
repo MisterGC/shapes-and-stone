@@ -12,7 +12,8 @@
 // it whole, gives knight.perfectBlockMana back and staggers a lunging
 // grunt for knight.perfectBlockStagger seconds; raised a step earlier or
 // re-armed a step short, it blocks with the chip.
-// A lunge or a shot that lands in the grace plays no hit.
+// A lunge that lands plays the knight's hurt sound, not the sword's punch;
+// a lunge or a shot that lands in the grace plays no hit.
 // A lunge the shield stops plays the shield's block once and no hit,
 // flashes the shield and throws the grunt block.recoil wu back.
 // A raised shield drains knight.blockDrain mana per second and drops at
@@ -252,28 +253,36 @@ Window {
             pg.target = null
             Clayground.physicsStep(Math.round(Balance.knight.perfectBlockStagger / stepS) + 1)
 
-            // In the grace a lunge and a shot play no hit. A stand-in for the
-            // game records what the attacker would show and play.
+            // A lunge that lands plays the knight's hurt, not the sword's
+            // punch; in the grace a lunge and a shot play no hit. A
+            // stand-in for the game of the grunt and of the knight records
+            // what they would show and play.
             let shown = []
             let fake = {
                 fx: false,
                 playImpact: () => shown.push("impact sound"),
+                playHurt: () => shown.push("hurt sound"),
                 impact: (kind) => shown.push(kind),
+                countFight: () => {},
                 spawnDamageNumber: () => shown.push("damage number")
             }
             let g = game.enemies.find(x => x.enemyType === "grunt" && !x.destroyed)
             let realWorld = g.gameWorld
+            let ownWorld = p.gameWorld
             g.xWu = p.xWu + 0.5
             g.yWu = p.yWu
             g.target = p
             g.gameWorld = fake
+            p.gameWorld = fake
             g.performAttack()
-            check(shown.length === 1 && shown[0] === "impact sound" && p.graceLeft > 0,
-                  "a lunge that lands plays its hit (" + shown.join(", ") + ")")
+            check(shown.filter(x => x === "hurt sound").length === 1
+                  && shown.indexOf("impact sound") < 0 && p.graceLeft > 0,
+                  "a lunge that lands plays the knight's hurt and no punch (" + shown.join(", ") + ")")
             shown = []
             let hp = p.hp
             g.performAttack()
             g.gameWorld = realWorld
+            p.gameWorld = ownWorld
             g.target = null
             check(p.hp === hp && shown.length === 0,
                   "a lunge in the grace plays no hit (" + (shown.join(", ") || "nothing") + ")")

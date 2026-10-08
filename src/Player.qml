@@ -403,6 +403,8 @@ PhysicsItem {
             graceLeft = Balance.knight.hurtGrace
             view.hurt()
             acted("hurt")
+            // The knight's own hurt sound, the only one a hit plays
+            if (gameWorld) gameWorld.playHurt()
         }
         if (gameWorld) {
             let a = _centreOf(attackerX, attackerY, attackerSize)

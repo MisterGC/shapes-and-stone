@@ -834,12 +834,11 @@ PhysicsItem {
             if (dist < Balance.enemy.lungeHitRange) {
                 let result = target.takeDamage(atk, xWu, yWu, widthWu)
                 // A blocked blow throws it back, a perfect block staggers
-                // it; the knight's shield sounds its own block, so only a
-                // hit plays the impact here
+                // it; the knight sounds its own block or hurt, so the
+                // lunge plays nothing here
                 if (result === "blocked") recoil(target)
                 if (result === "perfect") stagger(Balance.knight.perfectBlockStagger)
                 if (result !== "hit") return
-                if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
         }
