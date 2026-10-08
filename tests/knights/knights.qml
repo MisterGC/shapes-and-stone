@@ -4,7 +4,11 @@
 // Loads the real game in the dungeon scenario, spawns a RemotePlayer next
 // to the player and drives it the way Session.qml does (pushState and
 // triggerAction), without a network. Each pose is saved as <out>/<pose>.png;
-// in 3-block both shields have just taken a blow and flash white.
+// in 3-block both shields have just taken a blow and flash white. In hurt a
+// hit has just landed on the local knight: it flashes red and its HP bar
+// shows the lost chunk. In lowMana its raised shield is thin on 5 mana, and
+// in shieldBreak both shields have just broken into grey shards, the local
+// knight's mana bar flashing red.
 //
 //   qml -I <build>/bin/qml tests/knights/knights.qml -- <out dir>
 
@@ -105,13 +109,33 @@ Window {
         [100, () => { let v = view(game.player); if (v) v.parry(); remote.triggerAction("parry") }],
         [40, () => capture("4-parry")],
         [400, () => { game.player.isBlocking = false; remoteState = 0; remoteBlock = false }],
+        // A real hit on the local knight, from behind: the red flash and
+        // the chunk on its HP bar
         [300, () => {
-            let v = view(game.player); if (v) v.hurt(); remote.triggerAction("hurt")
-            game.player.graceLeft = Balance.knight.hurtGrace
+            let p = game.player
+            p.takeDamage(20, p.xWu, p.yWu - 1.5)
+            remote.triggerAction("hurt")
         }],
-        [30, () => capture("5-hurt")],
+        [20, () => capture("hurt")],
         // The grace after the hit: both knights flicker until it is over
         [220, () => capture("5b-grace")],
+        // Low on mana the local shield thins and blinks; the remote's mana
+        // is not sent, its shield stays as it is
+        [600, () => {
+            game.player.mana = 5
+            game.player.isBlocking = true
+            remoteState = 2; remoteBlock = true
+        }],
+        [60, () => capture("lowMana")],
+        // The local shield runs dry on the next step and breaks, the remote's
+        // breaks as its action says
+        [400, () => {
+            game.player.mana = 0.01
+            remote.triggerAction("shieldBreak")
+            remoteState = 0; remoteBlock = false
+        }],
+        [60, () => capture("shieldBreak")],
+        [500, () => { game.player.mana = game.player.maxMana }],
         [600, () => {
             game.player.dash(); remote.triggerAction("dash"); remoteState = 3
             dashMove.start()
@@ -134,7 +158,10 @@ Window {
             let v = view(game.player); if (v) v.downed = true
         }],
         [500, () => capture("8-downed")],
-        [500, () => { console.log("[Knights] done"); Qt.exit(0) }]
+        // Torn down before quitting, as the other benches do: the game
+        // crashes when Qt quits with it still up
+        [500, () => { console.log("[Knights] done"); remote.destroy(); game.destroy() }],
+        [300, () => Qt.exit(0)]
     ]
 
     // The remote dashes the same way as the local knight: up at dash speed

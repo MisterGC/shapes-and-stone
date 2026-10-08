@@ -17,14 +17,19 @@
 // A lunge the shield stops plays the shield's block once and no hit,
 // flashes the shield and throws the grunt block.recoil wu back.
 // A raised shield drains knight.blockDrain mana per second and drops at
-// 0, cannot be raised again without mana, and a parry gives
-// knight.parryMana back. Prints one PASS or FAIL line per check and exits
+// 0, where it breaks once - the view's shards, acted("shieldBreak") and
+// the mana bar's flash; it cannot be raised again without mana, and a
+// right-click then answers with the empty click and the mana bar's flash.
+// A parry gives knight.parryMana back. With debugMechanics off a parry
+// and a perfect block show their word, PARRY and PERFECT, and a hit no
+// damage number. Prints one PASS or FAIL line per check and exits
 // with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
 
 import QtQuick
 import QtQuick.Window
+import QtTest
 import Clayground.Common
 import "../../src"
 
@@ -37,6 +42,9 @@ Window {
 
     property var game: null
     property int failures: 0
+
+    // Sends real mouse clicks to the game; runs no tests of its own
+    TestCase { id: mouse; when: false }
 
     function check(ok, what) {
         console.log("[Answer]", ok ? "PASS" : "FAIL", what)
@@ -160,13 +168,19 @@ Window {
             p.isBlocking = false
             p.facingAngle = 0
 
-            // A hit from behind lands and starts the grace
+            // A hit from behind lands and starts the grace; outside debug
+            // mode it shows no damage number
+            game.debugMechanics = false
+            let numbers = spawned("damageNumber")
             p.takeDamage(20, p.xWu - 1, p.yWu)
             let afterHit = p.hp
             let v = view(p)
             check(afterHit < p.maxHp && p.graceLeft > 0 && v && v.graceLeft > 0,
                   "a hit lands (" + p.maxHp + " -> " + afterHit + " HP), starts "
                   + p.graceLeft.toFixed(3) + " s of grace and the knight flickers")
+            check(spawned("damageNumber") === numbers,
+                  "with debugMechanics off a hit shows no damage number ("
+                  + (spawned("damageNumber") - numbers) + " shown)")
             p.takeDamage(20, p.xWu - 1, p.yWu)
             check(p.hp === afterHit, "a second hit right after it does not land (" + p.hp + " HP)")
             Clayground.physicsStep(graceSteps - 1)
@@ -198,12 +212,16 @@ Window {
             p.isBlocking = true
             Clayground.physicsStep(pf)
             let before = p.hp, manaBefore = p.mana
+            let perfectWords = spawned("fightWord", "PERFECT")
             let res = p.takeDamage(20, p.xWu + 1, p.yWu)
             check(res === "perfect" && p.hp === before && p.graceLeft === 0
                   && Math.abs(p.mana - (manaBefore + Balance.knight.perfectBlockMana)) < 1e-3,
                   "a shield raised " + pf + " steps before a blow blocks it perfectly ("
                   + res + ", " + before + " -> " + p.hp + " HP, mana "
                   + manaBefore.toFixed(2) + " -> " + p.mana.toFixed(2) + ")")
+            check(spawned("fightWord", "PERFECT") === perfectWords + 1,
+                  "with debugMechanics off a perfect block shows PERFECT ("
+                  + (spawned("fightWord", "PERFECT") - perfectWords) + " shown)")
             p.isBlocking = false
             Clayground.physicsStep(rearm)
             p.isBlocking = true
@@ -356,6 +374,9 @@ Window {
                   "a second of shield drains " + (p.maxMana - p.mana).toFixed(3)
                   + " mana, the table says " + drain)
             let held = 60
+            let breaks = 0
+            let countBreak = (action) => { if (action === "shieldBreak") breaks++ }
+            p.acted.connect(countBreak)
             while (p.isBlocking && held < 6000) {
                 Clayground.physicsStep(1)
                 held++
@@ -363,8 +384,32 @@ Window {
             let dry = Math.round(p.maxMana / drain / stepS)
             check(!p.isBlocking && p.mana === 0 && held === dry,
                   "the shield drops at 0 mana after " + held + " steps, " + dry + " expected")
+            let shards = v.children.find(c => c.objectName === "shieldShards")
+            let broke = !!shards && shards.visible
+            let barFlashed = game.manaBarFlashing === true
+            Clayground.physicsStep(10)
+            p.acted.disconnect(countBreak)
+            check(breaks === 1 && broke && barFlashed,
+                  "a shield drained to 0 breaks once (acted " + breaks + "x, shards "
+                  + broke + ", mana bar flash " + barFlashed + ")")
             p.isBlocking = true
             check(!p.isBlocking, "without mana the shield cannot be raised")
+            // A right-click with no mana is no dead input: the empty click
+            // and the mana bar's flash, the shield stays down
+            let empty = []
+            let emptyWorld = {
+                playShieldEmpty: () => empty.push("playShieldEmpty"),
+                flashManaBar: () => empty.push("flashManaBar")
+            }
+            p.gameWorld = emptyWorld
+            mouse.mousePress(game, game.width / 2, game.height / 2, Qt.RightButton)
+            let raised = p.isBlocking
+            mouse.mouseRelease(game, game.width / 2, game.height / 2, Qt.RightButton)
+            p.gameWorld = ownWorld
+            check(!raised && empty.indexOf("playShieldEmpty") >= 0
+                  && empty.indexOf("flashManaBar") >= 0,
+                  "a right-click at 0 mana gives the empty feedback (" + (empty.join(", ") || "nothing")
+                  + ") and leaves the shield down (" + raised + ")")
             p.facingAngle = 180
             p.takeDamage(20, p.xWu - 1, p.yWu)
             check(p.graceLeft > 0, "with the shield dropped a hit from the front lands")
@@ -381,12 +426,16 @@ Window {
                 Clayground.physicsStep(1)
             }
             let parries = game.fightRecord.parries
+            let parryWords = spawned("fightWord", "PARRY")
             p.facingAngle = Math.atan2(pr.yWu - p.yWu, pr.xWu - p.xWu) * 180 / Math.PI
             p.attackCooldown = 0
             p.attack()
             Clayground.physicsStep(1)
             check(game.fightRecord.parries === parries + 1 && p.mana === Balance.knight.parryMana,
                   "a parry gives " + p.mana + " mana back, the table says " + Balance.knight.parryMana)
+            check(spawned("fightWord", "PARRY") === parryWords + 1,
+                  "with debugMechanics off a parry shows PARRY ("
+                  + (spawned("fightWord", "PARRY") - parryWords) + " shown)")
             p.isBlocking = true
             check(p.isBlocking, "with mana back the shield rises again")
             p.isBlocking = false
@@ -398,6 +447,12 @@ Window {
         [300, () => game.destroy()],
         [300, () => Qt.exit(failures)]
     ]
+
+    // The floating texts of this kind (and this text) in the room
+    function spawned(name, text) {
+        return game.room.children.filter(o => o.objectName === name
+                                         && (text === undefined || o.text === text)).length
+    }
 
     // The knight's KnightView
     function view(knight) {

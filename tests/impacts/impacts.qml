@@ -11,6 +11,10 @@
 // landed alone, freezes the screen that landed it and only that one; a
 // perfect block (perfectBlock), landed alone, freezes and flashes the
 // screen that landed it and only that one, and the other draws its sparks.
+// A real hit on the joiner's knight flashes the joiner's screen and leaves
+// the lost HP as a chunk on its HP bar, neither on the host's; the
+// joiner's shield run dry flashes the joiner's mana bar, not the host's,
+// and the host draws its shards on the joiner's knight.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -118,6 +122,49 @@ Window {
         }
     }
 
+    // Found by objectName anywhere under item
+    function find(item, name) {
+        if (!item) return null
+        if (item.objectName === name) return item
+        let kids = item.children || []
+        for (let i = 0; i < kids.length; i++) {
+            let f = find(kids[i], name)
+            if (f) return f
+        }
+        return null
+    }
+    // The KnightView of a knight
+    function view(knight) {
+        for (let i = 0; i < knight.children.length; i++)
+            if (typeof knight.children[i].parry === "function") return knight.children[i]
+        return null
+    }
+
+    // What a screen's HUD and the other screen's knight did: sampled every
+    // frame while a knight's own moment goes on
+    property var huds: []
+    function hud(game, otherKnight) {
+        return {game: game, flashed: false, chunk: false, manaFlash: false, shards: false,
+                other: otherKnight}
+    }
+    Timer {
+        interval: 5
+        repeat: true
+        running: bench.huds.length > 0
+        onTriggered: {
+            for (let h of bench.huds) {
+                let fx = screenFx(h.game)
+                if (fx && fx._flash > 0.001) h.flashed = true
+                let c = find(h.game, "hpChunk")
+                if (c && h.game.player && c.hp > h.game.player.hp + 0.5) h.chunk = true
+                if (h.game.manaBarFlashing) h.manaFlash = true
+                let v = h.other ? view(h.other) : null
+                let sh = v ? find(v, "shieldShards") : null
+                if (sh && sh.visible) h.shards = true
+            }
+        }
+    }
+
     // A hit of every kind (or of these kinds), landed on `from`, watched on
     // both screens
     property var sender: null
@@ -211,6 +258,42 @@ Window {
             check(seen.particles1 > seen.particles0,
                   "the host draws the joiner's perfect block (" + seen.particles0 + " -> "
                   + seen.particles1 + " particles)")
+        }],
+        // A real hit on the joiner's knight, from behind: the screen flash
+        // and the HP chunk are the joiner's alone
+        [300, () => {
+            let jp = joiner.player
+            jp.isBlocking = false
+            jp.graceLeft = 0
+            huds = [hud(joiner, null), hud(host, null)]
+            jp.takeDamage(20, jp.xWu - 1, jp.yWu)
+        }],
+        [300, () => {
+            let j = huds[0], h = huds[1]
+            huds = []
+            check(j.flashed && j.chunk,
+                  "the joiner's screen flashes and its HP bar shows the lost chunk for its knight's hurt (flashed "
+                  + j.flashed + ", chunk " + j.chunk + ")")
+            check(!h.flashed && !h.chunk,
+                  "the host's screen neither flashes nor shows an HP chunk for the joiner's hurt (flashed "
+                  + h.flashed + ", chunk " + h.chunk + ")")
+        }],
+        // The joiner's shield runs dry on its next step: its mana bar
+        // flashes, the host's does not, and the host draws the shards
+        [600, () => {
+            let jp = joiner.player
+            let rp = session(host).remotePlayers[joinNet.nodeId]
+            huds = [hud(joiner, null), hud(host, rp)]
+            jp.mana = 0.01
+            jp.isBlocking = true
+        }],
+        [300, () => {
+            let j = huds[0], h = huds[1]
+            huds = []
+            check(j.manaFlash && !joiner.player.isBlocking,
+                  "the joiner's mana bar flashes when its shield runs dry (" + j.manaFlash + ")")
+            check(!h.manaFlash, "the host's mana bar does not flash for the joiner's shield (" + h.manaFlash + ")")
+            check(h.shards, "the host draws the joiner's shield breaking into shards (" + h.shards + ")")
         }],
         [100, () => {
             console.log("[Impacts] done,", failures, "failed")
