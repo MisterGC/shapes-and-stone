@@ -48,6 +48,23 @@ QtObject {
         pushSpeed: 20.0
     })
 
+    // A blow the knight's shield stops reads as a success, not a smaller
+    // hit. The shield arc flashes white for flash seconds and swells to
+    // bump times its size; the knight's own screen freezes for freeze
+    // seconds, takes this much trauma and a kick of kick wu; sparks fly;
+    // the impact sample plays pitch semitones up; the attacker recoils
+    // recoil wu off the shield
+    readonly property var block: ({
+        flash: 0.14,
+        bump: 1.25,
+        freeze: 0.045,
+        trauma: 0.2,
+        kick: 0.1,
+        sparks: 12,
+        pitch: 7,
+        recoil: 0.3
+    })
+
     readonly property var enemy: ({
         // Base HP by tier: weak, normal, tough
         tierHp: [18, 30, 42],

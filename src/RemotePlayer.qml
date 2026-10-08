@@ -106,6 +106,9 @@ PhysicsItem {
         } else if (name === "parry") {
             view.parry()
             if (gameWorld && gain > 0) gameWorld.playImpact(gain)
+        } else if (name === "block") {
+            view.block()
+            if (gameWorld && gain > 0) gameWorld.playBlock(gain)
         } else if (name === "hurt") {
             view.hurt()
             _grace.restart()

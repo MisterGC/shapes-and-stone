@@ -113,6 +113,13 @@ ClayWorld2d {
         dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
+    // The shield's own sound: the impact sample pitched up, so a block
+    // never sounds like a hit
+    function playBlock(gain) {
+        impactSound.triggerNote(impactSound.rootNote + Balance.block.pitch,
+                                gain === undefined ? 1 : gain)
+    }
+
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
@@ -255,7 +262,7 @@ ClayWorld2d {
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
             break
         case "playerBlocked":
-            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            spawnSparks(x, y, -nx, -ny, Balance.block.sparks, "#CFEFFF")
             break
         case "parry":
             spawnSparks(x, y, nx, ny, 14, "#FFE066")
@@ -294,7 +301,11 @@ ClayWorld2d {
             if (screenFx) screenFx.hurt()
             break
         case "playerBlocked":
-            _trauma(0.18); _kick(nx * 0.08, ny * 0.08)
+            // A block is a success: a short freeze and a kick sell that the
+            // shield took it, still well below a hit's
+            _trauma(Balance.block.trauma)
+            _kick(nx * Balance.block.kick, ny * Balance.block.kick)
+            _freeze(Balance.block.freeze * 1000)
             break
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
@@ -575,7 +586,11 @@ ClayWorld2d {
             return
         }
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
-        if (result === "hit" || result === "blocked") playImpact()
+        // A blocked blow sounds the shield's own block, in takeDamage
+        if (result === "hit") playImpact()
+        // and throws the host's enemy back off the shield
+        let e = _enemyById[blow.id]
+        if (result === "blocked" && e && !e.destroyed) e.recoil(player)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy

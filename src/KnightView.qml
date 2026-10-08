@@ -62,6 +62,8 @@ Item {
     }
 
     function parry() { parryGlow.restart() }
+    // The shield took a blow: it flashes white and bumps out
+    function block() { shieldFlash.restart() }
     function hurt() { hurtFlash.restart() }
 
     function _rgba(c, a) {
@@ -308,6 +310,9 @@ Item {
         x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
         y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
         rotation: -view.facingAngle
+        scale: 1 + (Balance.block.bump - 1) * flash
+        // 1 the moment a blow lands on it, back to 0 as its flash fades
+        property real flash: 0
         onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
@@ -320,6 +325,32 @@ Item {
         }
 
         onVisibleChanged: if (visible) requestPaint()
+
+        // The flash: the same arc in white over it
+        Canvas {
+            anchors.fill: parent
+            opacity: shieldArc.flash
+            visible: opacity > 0
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                var w = width, h = height
+                ctx.beginPath()
+                ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
+                ctx.strokeStyle = "#FFFFFF"
+                ctx.lineWidth = w * 0.25
+                ctx.stroke()
+            }
+            Component.onCompleted: requestPaint()
+        }
+
+        NumberAnimation {
+            id: shieldFlash
+            target: shieldArc; property: "flash"
+            from: 1; to: 0
+            duration: Balance.block.flash * 1000
+            easing.type: Easing.OutCubic
+        }
     }
 
     // Dash cooldown ring

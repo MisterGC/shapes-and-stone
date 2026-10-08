@@ -129,7 +129,8 @@ PhysicsItem {
         }
     }
 
-    // A moment others should see: "attack", "dash", "parry" or "hurt".
+    // A moment others should see: "attack", "dash", "parry", "block" or
+    // "hurt".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -363,7 +364,10 @@ PhysicsItem {
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
         if (blocked) {
             finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
-            if (gameWorld) gameWorld.playImpact()
+            // The shield's own sound, the only one a blocked blow plays
+            if (gameWorld) gameWorld.playBlock()
+            view.block()
+            acted("block")
         }
         hp = Math.max(0, hp - finalDamage)
         if (gameWorld) {

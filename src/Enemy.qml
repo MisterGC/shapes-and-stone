@@ -831,11 +831,24 @@ PhysicsItem {
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < Balance.enemy.lungeHitRange) {
                 let result = target.takeDamage(atk, xWu, yWu, widthWu)
-                if (result !== "hit" && result !== "blocked") return
+                // A blocked blow throws it back; the knight's shield sounds
+                // its own block, so only a hit plays the impact here
+                if (result === "blocked") recoil(target)
+                if (result !== "hit") return
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
         }
+    }
+
+    // Thrown back off a knight's shield that stopped its blow, by
+    // Balance.block.recoil wu. A knockback fades out step by step, so it
+    // covers speed times the sum of its steps' shares of the speed
+    function recoil(knight) {
+        if (Balance.block.recoil <= 0) return
+        let dt = world.timeStep, per = 0
+        for (let t = knockDuration; t > 1e-9; t -= dt) per += t / knockDuration * dt
+        shove(xWu - knight.xWu, yWu - knight.yWu, Balance.block.recoil / per)
     }
 
     function fireProjectile() {
