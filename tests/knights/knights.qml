@@ -3,7 +3,8 @@
 //
 // Loads the real game in the dungeon scenario, spawns a RemotePlayer next
 // to the player and drives it the way Session.qml does (pushState and
-// triggerAction), without a network. Each pose is saved as <out>/<pose>.png.
+// triggerAction), without a network. Each pose is saved as <out>/<pose>.png;
+// in 3-block both shields have just taken a blow and flash white.
 //
 //   qml -I <build>/bin/qml tests/knights/knights.qml -- <out dir>
 
@@ -94,7 +95,9 @@ Window {
         [100, () => { game.player.attack(); remote.triggerAction("attack") }],
         [120, () => capture("2-swing")],
         [600, () => { game.player.isBlocking = true; remoteState = 2; remoteBlock = true }],
-        [250, () => capture("3-block")],
+        // The shields take a blow: both flash white and bump out
+        [250, () => { let v = view(game.player); if (v) v.block(); remote.triggerAction("block") }],
+        [10, () => capture("3-block")],
         // Swinging while blocking: the state's s says attack, b keeps the shield
         [100, () => { game.player.attack(); remote.triggerAction("attack"); remoteState = 1 }],
         [120, () => capture("3b-block-swing")],

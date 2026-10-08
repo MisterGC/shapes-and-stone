@@ -7,8 +7,10 @@
 // sparks and shards, and must neither shake, kick, flash nor hit-stop; the
 // side that landed it must. The host keeps its simulation at full speed for
 // its own hit stops too, and so does the joiner: in a session others see
-// what each node simulates. Prints one PASS or FAIL line per check and
-// exits with the number of failures.
+// what each node simulates. A blow the shield stops (playerBlocked),
+// landed alone, freezes the screen that landed it and only that one.
+// Prints one PASS or FAIL line per check and exits with the number of
+// failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/impacts/impacts.qml
 
@@ -114,12 +116,13 @@ Window {
         }
     }
 
-    // A hit of every kind, landed on `from`, watched on both screens
+    // A hit of every kind (or of these kinds), landed on `from`, watched on
+    // both screens
     property var sender: null
     property var receiver: null
     property var sent: null
     property var seen: null
-    function landHits(from, to) {
+    function landHits(from, to, only) {
         from.camera.resetShake()
         to.camera.resetShake()
         sender = from
@@ -128,7 +131,7 @@ Window {
         seen = probe(to)
         probes = [sent, seen]
         let p = from.player
-        for (let k of kinds)
+        for (let k of only || kinds)
             from.impact(k, p.xWu + 1, p.yWu, 1, 0, "#C04040")
     }
     function report(fromName, toName) {
@@ -174,6 +177,17 @@ Window {
             report("the host", "the joiner")
             // The host's own hit stop held the picture only
             check(!sent.slowed, "the host keeps its simulation at full speed for its own hits")
+        }],
+        // A block alone: it freezes the screen that landed it, only that one
+        [300, () => landHits(joiner, host, ["playerBlocked"])],
+        [300, () => {
+            probes = []
+            check(sent.froze && sent.shook,
+                  "the joiner hit-stops and kicks for its own block (froze "
+                  + sent.froze + ", shook " + sent.shook + ")")
+            check(!seen.froze && !seen.shook,
+                  "the host neither hit-stops nor kicks for the joiner's block (froze "
+                  + seen.froze + ", shook " + seen.shook + ")")
         }],
         [100, () => {
             console.log("[Impacts] done,", failures, "failed")

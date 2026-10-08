@@ -8,6 +8,8 @@
 // steps. A hit the shield does not stop gives the knight hurtGrace seconds
 // in which no damage lands, and its view flickers for as long; a blocked
 // hit gives none. A lunge or a shot that lands in the grace plays no hit.
+// A lunge the shield stops plays the shield's block once and no hit,
+// flashes the shield and throws the grunt block.recoil wu back.
 // A raised shield drains knight.blockDrain mana per second and drops at
 // 0, cannot be raised again without mana, and a parry gives
 // knight.parryMana back. Prints one PASS or FAIL line per check and exits
@@ -211,6 +213,55 @@ Window {
             check(p.hp === hp && shown.length === 1 && shown[0] === "projectileBurst",
                   "a shot in the grace bursts and plays no hit (" + shown.join(", ") + ")")
             Clayground.physicsStep(graceSteps)
+
+            // A lunge the shield stops plays the shield's block once, no
+            // hit, flashes the shield and throws the grunt back off it. The
+            // stand-in stands for the game of the grunt and of the knight.
+            let played = []
+            let blockWorld = {
+                fx: false,
+                playImpact: () => played.push("playImpact"),
+                playBlock: () => played.push("playBlock"),
+                impact: () => {},
+                countFight: () => {},
+                spawnDamageNumber: () => {}
+            }
+            let bg = only("grunt")
+            bg.target = null
+            bg.aiState = "recovery"
+            bg._attackTimer = 10
+            bg.xWu = p.xWu + 0.5
+            bg.yWu = p.yWu
+            Clayground.physicsStep(1)
+            p.facingAngle = 0
+            p.mana = p.maxMana
+            p.isBlocking = true
+            let bv = view(p)
+            let knightWorld = p.gameWorld
+            bg.target = p
+            bg.gameWorld = blockWorld
+            p.gameWorld = blockWorld
+            let x0 = bg.xWu
+            let graceFree = p.graceLeft === 0
+            bg.performAttack()
+            p.gameWorld = knightWorld
+            bg.gameWorld = realWorld
+            bg.target = null
+            let flashed = bv.children.some(c => c.flash !== undefined && c.flash > 0.5)
+            let blocks = played.filter(x => x === "playBlock").length
+            let impacts = played.filter(x => x === "playImpact").length
+            check(graceFree && blocks === 1 && impacts === 0,
+                  "a blocked lunge plays " + blocks + " playBlock and " + impacts
+                  + " playImpact (" + (played.join(", ") || "nothing") + ")")
+            check(flashed, "a blocked lunge flashes the knight's shield")
+            Clayground.physicsStep(Math.ceil(bg.knockDuration / stepS) + 1)
+            let recoiled = bg.xWu - x0
+            check(Math.abs(recoiled - Balance.block.recoil) < 0.02,
+                  "a blocked lunge throws the grunt " + recoiled.toFixed(3)
+                  + " wu back, the table says " + Balance.block.recoil)
+            p.isBlocking = false
+            bg.aiState = "patrol"
+            bg._attackTimer = 0
 
             // A raised shield drains mana and drops when it runs dry
             let drain = Balance.knight.blockDrain
