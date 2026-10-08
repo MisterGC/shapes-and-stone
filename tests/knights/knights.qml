@@ -8,7 +8,9 @@
 // hit has just landed on the local knight: it flashes red and its HP bar
 // shows the lost chunk. In lowMana its raised shield is thin on 5 mana, and
 // in shieldBreak both shields have just broken into grey shards, the local
-// knight's mana bar flashing red.
+// knight's mana bar flashing red. In charging both hold the left button,
+// their blades drawn back and glowing; in heavy both swing the wide heavy
+// blow of a full charge.
 //
 //   qml -I <build>/bin/qml tests/knights/knights.qml -- <out dir>
 
@@ -109,6 +111,18 @@ Window {
         [100, () => { let v = view(game.player); if (v) v.parry(); remote.triggerAction("parry") }],
         [40, () => capture("4-parry")],
         [400, () => { game.player.isBlocking = false; remoteState = 0; remoteBlock = false }],
+        // Holding the left button: both blades drawn back and glowing,
+        // the remote's from its state's s (4 charging, 5 full)
+        [300, () => { game.player.pressSwing(); remoteState = 4 }],
+        [450, () => capture("charging")],
+        // Full, then let go: the wide heavy swing, on both knights
+        [250, () => { remoteState = 5 }],
+        [100, () => {
+            game.player.releaseSwing()
+            remote.triggerAction("heavy"); remoteState = 1
+        }],
+        [120, () => capture("heavy")],
+        [500, () => { remoteState = 0 }],
         // A real hit on the local knight, from behind: the red flash and
         // the chunk on its HP bar
         [300, () => {

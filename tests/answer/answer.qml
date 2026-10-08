@@ -26,8 +26,14 @@
 // and a perfect block show their word, PARRY and PERFECT, and a hit no
 // damage number. The hurt flash, the HP chunk, the shards, the mana bar's
 // flash and the low shield's blink hold while the game is paused, however
-// long, and run on with its physics steps. Prints one PASS or FAIL line per check and exits
-// with the number of failures.
+// long, and run on with its physics steps. The left button, clicked
+// through the game's mouse area, swings on release before
+// knight.chargeStart; held, it charges at knight.chargeSpeed and is full on
+// the step knight.chargeTime reaches; a full charge let go of at a guardian
+// facing the knight deals knight.heavySwing times atk through its shield
+// and staggers it; a hit while charging cancels it; held knight.chargeHold
+// past full it goes at normal strength. Prints one PASS or FAIL line per
+// check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
 
@@ -555,6 +561,140 @@ Window {
             p.isBlocking = false
             Clayground.paused = false
             console.log("[Answer] done,", failures, "failed")
+        }],
+        // The left button: a click swings, a hold charges a heavy swing
+        [() => true, () => {
+            Clayground.paused = true
+            let p = game.player
+            let k = Balance.knight
+            let cx = game.width / 2, cy = game.height / 2
+            for (let o of game.enemies) { o.target = null; o.parryWindow = false }
+            p.isBlocking = false
+            p.moveX = 0
+            p.moveY = 0
+            let ready = () => {
+                p.facingAngle = 0
+                p.graceLeft = 0
+                p.attackCooldown = 0
+                Clayground.physicsStep(Math.ceil((k.swingDuration + k.swingFade) / stepS) + 1)
+            }
+            let startSteps = Math.round(k.chargeStart / stepS)
+            let fullSteps = Math.round(k.chargeTime / stepS)
+            let letGoSteps = Math.round((k.chargeTime + k.chargeHold) / stepS)
+            let actions = []
+            let record = (a) => actions.push(a)
+            p.acted.connect(record)
+
+            // A click: released before chargeStart it swings at once, a
+            // normal swing
+            ready()
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            let onPress = p.isAttacking
+            Clayground.physicsStep(startSteps - 1)
+            let charging = p.isCharging
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            check(!onPress && !charging && p.isAttacking && !p.isHeavy,
+                  "a click released after " + (startSteps - 1) + " steps swings normally on release"
+                  + " (on press " + onPress + ", charging " + charging + ", swing "
+                  + p.isAttacking + ", heavy " + p.isHeavy + ")")
+
+            // Held, it charges from chargeStart, moving at chargeSpeed, and
+            // is full at chargeTime
+            ready()
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(startSteps - 1)
+            let before = p.isCharging
+            Clayground.physicsStep(1)
+            let began = p.isCharging
+            p.moveX = 1
+            Clayground.physicsStep(1)
+            let vx = p.body.linearVelocity.x
+            p.moveX = 0
+            check(!before && began && Math.abs(vx - p.maxSpeed * k.chargeSpeed) < 1e-3,
+                  "the charge begins on step " + startSteps + " and moves the knight at "
+                  + vx.toFixed(3) + " wu/s, the table says " + (p.maxSpeed * k.chargeSpeed).toFixed(3))
+            Clayground.physicsStep(fullSteps - startSteps - 2)
+            let notYet = p.chargeFull
+            Clayground.physicsStep(1)
+            check(!notYet && p.chargeFull && p.chargeProgress === 1,
+                  "the charge is full on step " + fullSteps + " (full a step before: " + notYet + ")")
+
+            // Released full in front of a guardian that faces the knight:
+            // 2.5x atk through its shield, and it staggers
+            let gd = game.enemies.find(x => x.enemyType === "guardian" && !x.destroyed)
+            gd.halt()
+            gd.xWu = p.xWu + 1.5
+            gd.yWu = p.yWu
+            gd.facingAngle = 180
+            Clayground.physicsStep(1)
+            let front = gd._isShieldFacing(p.xWu, p.yWu)
+            let hp0 = gd.hp
+            let dealt0 = game.fightRecord.damageDealt
+            actions = []
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(1)
+            let heavyDmg = Math.floor(p.atk * k.heavySwing)
+            let lost = hp0 - gd.hp
+            check(front && p.isHeavy && lost === heavyDmg - gd.def && gd.aiState === "stagger"
+                  && actions.indexOf("heavy") >= 0,
+                  "a full charge released at a guardian's shield deals " + heavyDmg + " ("
+                  + k.heavySwing + "x atk " + p.atk + ") less its def " + gd.def + ": it lost "
+                  + lost + " HP, is " + gd.aiState + " (from the front " + front + ", acted "
+                  + actions.join(", ") + ")")
+            check(game.fightRecord.damageDealt - dealt0 === lost,
+                  "the heavy hit counts " + (game.fightRecord.damageDealt - dealt0) + " dealt")
+            gd.halted = false
+            gd.aiState = "patrol"
+            gd.target = null
+            gd.xWu = p.xWu - 6
+            Clayground.physicsStep(1)
+
+            // A hit taken while charging cancels the charge: its release
+            // swings nothing
+            ready()
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(startSteps + 4)
+            let wasCharging = p.isCharging
+            p.takeDamage(20, p.xWu + 1, p.yWu)
+            let cancelled = !p.isCharging
+            Clayground.physicsStep(fullSteps)
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            check(wasCharging && cancelled && !p.chargeFull && !p.isAttacking,
+                  "a hit while charging cancels it (charging " + wasCharging + ", after the hit "
+                  + p.isCharging + ", release swings " + p.isAttacking + ")")
+            Clayground.physicsStep(Math.ceil(k.hurtGrace / stepS) + 1)
+
+            // Held chargeHold past full, the knight lets it go at normal
+            // strength, and the release swings nothing more
+            ready()
+            let gr = game.enemies.find(x => x.enemyType === "grunt" && !x.destroyed)
+            gr.halt()
+            gr.hp = 100
+            gr.xWu = p.xWu + 1.5
+            gr.yWu = p.yWu
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(letGoSteps - 1)
+            let held = p.chargeFull && !p.isAttacking
+            let ghp = gr.hp
+            Clayground.physicsStep(1)
+            let letGo = p.isAttacking && !p.isHeavy && !p.isCharging
+            Clayground.physicsStep(1)
+            let normalLost = ghp - gr.hp
+            actions = []
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            let afterRelease = actions.slice()
+            check(held && letGo && normalLost === p.atk - gr.def,
+                  "held " + letGoSteps + " steps (" + (k.chargeTime + k.chargeHold).toFixed(1)
+                  + " s), the charge goes at normal strength: " + normalLost + " HP, atk "
+                  + p.atk + " less def " + gr.def + " (full until then " + held + ")")
+            check(afterRelease.length === 0,
+                  "its release later swings no second time (acted "
+                  + (afterRelease.join(", ") || "nothing") + ")")
+            gr.halted = false
+            gr.aiState = "patrol"
+            p.acted.disconnect(record)
+            Clayground.paused = false
+            console.log("[Answer] charge done,", failures, "failed")
         }],
         // Torn down before quitting, as the other benches do
         [300, () => game.destroy()],

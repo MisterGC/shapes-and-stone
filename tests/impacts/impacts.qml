@@ -37,7 +37,7 @@ Window {
     property var joinNet: null
     property int failures: 0
 
-    readonly property var kinds: ["enemyHit", "enemyBlocked", "enemyDeath",
+    readonly property var kinds: ["enemyHit", "heavyHit", "enemyBlocked", "enemyDeath",
         "playerHit", "playerBlocked", "perfectBlock", "parry", "projectileHit",
         "projectileDeflected", "projectileBurst"]
 
