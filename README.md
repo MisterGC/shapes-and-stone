@@ -90,8 +90,8 @@ next to a `lib` link to Qt's `lib` loads them.
 A hit shakes, kicks, flashes and hit-stops only the screen of the player who
 landed or took it; the other screens draw its sparks and shards only. The
 impact bench starts a host and a joiner in one process, joins them over LAN,
-lands every kind of hit on each side, then a block alone, and exits with the
-number of failed checks:
+lands every kind of hit on each side, then a block alone and a perfect
+block alone, and exits with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
@@ -124,10 +124,11 @@ The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
 connected over Local (LAN) or Cloud signaling and started on a fixed seed.
 The joiner's knight answers one of the host's enemies: it stands until the
-enemy walks into its reach and swings, parries it, blocks and dodges its
-lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
+enemy walks into its reach and swings, parries it, blocks, blocks
+perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
 kills it while the host's knight kills another. Each answer counts once,
-on both screens: the same HP, the stagger, the shove, the death and its
+on both screens: the same HP, the stagger of a parry and of a perfect
+block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
 the joiner's knight and reported to the host, and a shot that goes on the
 host's screen when the report arrives. Then both knights fight for
@@ -291,7 +292,17 @@ shield stops reads as a success, not a smaller hit: the shield flashes
 white and bumps out, the knight's screen freezes for a moment with a kick,
 the shield sounds its own block - the impact sample pitched up, once - and
 the attacker recoils off it; the `block` group of the table holds each of
-these values. The shield is
+these values. A shield raised at most `knight.perfectBlockFrames` steps
+before a blow from inside its arc blocks it perfectly: no damage, no
+chip, `knight.perfectBlockMana` mana back, and a lunging attacker
+staggers for `knight.perfectBlockStagger` seconds. It counts only if the
+shield was down at least `knight.perfectBlockRearm` steps before it rose,
+so mashing the right button does not keep the window open; the held
+shield still blocks with the chip. A perfect block flashes the shield
+longer and the knight pale blue, sparks fly around a ring on every
+screen, and the knight's own screen freezes, flashes and pulses; the
+`perfectBlock` group of the table holds these values. In co-op the
+knight's screen judges the blow and staggers the host's enemy. The shield is
 not free: raised, it drains `knight.blockDrain` mana per second, drops at
 0 and cannot be raised again until a parry gives `knight.parryMana` back
 or the campfire refills it at `campfire.manaPerSecond`; mana does not come
@@ -304,7 +315,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
 ```
 
 The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
-damage dealt and taken, parries, attacks the shield stopped, kills, falls
+damage dealt and taken, parries, attacks the shield stopped and those it
+stopped perfectly (`perfectBlocks`, also counted in `blocks`), kills, falls
 and the simulated seconds until no enemy stands. The fight bench plays the
 `fight` scenario with a scripted knight, stepping the paused game through
 the dojo's inspector, and prints the record as JSON; the same seed gives the
@@ -314,15 +326,23 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry] [--depth 0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect] [--depth 0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
 attack: `mix` (the default) parries or blocks as the seed rolls, `block`
-always blocks, `parry` always parries. `--depth` puts the fight room at a
+always blocks, `parry` always parries, `perfect` keeps the shield down
+until a lunge is 4 steps from landing and raises it then, a perfect
+block. `--depth` puts the fight room at a
 depth: the lineup stays the table's, the enemies hit as hard as there. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
+
+The fight bench plays the dojo's `fight` scenario, so the perfect block is
+tried the same way by hand: reload the dojo into `fight` and raise the
+shield just before a grunt's lunge lands. The `knight.perfectBlock...`
+values and the `perfectBlock` group are read from `src/Balance.qml` on
+every blow, so an edit of them changes the next fight after a reload.
 
 The downloads under PLAY are built by `.github/workflows/package.yml`: by
 hand (*Run workflow*), on a PR that changes `packaging/`, `CMakeLists.txt` or
