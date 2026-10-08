@@ -878,12 +878,9 @@ ClayWorld2d {
     }
     Keys.forwardTo: gameCtrl
     function openMenu() {
-        // The menu takes the keys from here on: what is held now would
-        // never see its release
-        gameCtrl.axisX = 0
-        gameCtrl.axisY = 0
-        gameCtrl.buttonAPressed = false
-        gameCtrl.buttonBPressed = false
+        // The menu takes the keys, and the keyboard gamepad lets go of what
+        // is held when the focus moves (clayground#413); the shield is the
+        // mouse's, whose release the menu would swallow
         if (player) player.isBlocking = false
         menuOpen = true
     }
