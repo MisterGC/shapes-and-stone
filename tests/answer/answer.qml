@@ -226,16 +226,19 @@ Window {
                 countFight: () => {},
                 spawnDamageNumber: () => {}
             }
+            // The shield is held: raised longer ago than a perfect block's
+            // window
             let bg = only("grunt")
             bg.target = null
+            p.facingAngle = 0
+            p.mana = p.maxMana
+            p.isBlocking = true
+            Clayground.physicsStep(Balance.knight.perfectBlockFrames + 1)
             bg.aiState = "recovery"
             bg._attackTimer = 10
             bg.xWu = p.xWu + 0.5
             bg.yWu = p.yWu
             Clayground.physicsStep(1)
-            p.facingAngle = 0
-            p.mana = p.maxMana
-            p.isBlocking = true
             let bv = view(p)
             let knightWorld = p.gameWorld
             bg.target = p

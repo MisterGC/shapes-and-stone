@@ -114,9 +114,10 @@ ClayWorld2d {
     }
 
     // The shield's own sound: the impact sample pitched up, so a block
-    // never sounds like a hit
-    function playBlock(gain) {
-        impactSound.triggerNote(impactSound.rootNote + Balance.block.pitch,
+    // never sounds like a hit, and a perfect block higher still
+    function playBlock(gain, perfect) {
+        impactSound.triggerNote(impactSound.rootNote
+                                + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
                                 gain === undefined ? 1 : gain)
     }
 
@@ -218,7 +219,8 @@ ClayWorld2d {
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
     //   kind: enemyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
-    //         parry, projectileHit, projectileDeflected, projectileBurst
+    //         perfectBlock, parry, projectileHit, projectileDeflected,
+    //         projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
@@ -264,6 +266,10 @@ ClayWorld2d {
         case "playerBlocked":
             spawnSparks(x, y, -nx, -ny, Balance.block.sparks, "#CFEFFF")
             break
+        case "perfectBlock":
+            spawnSparks(x, y, -nx, -ny, Balance.perfectBlock.sparks, "#FFFFFF")
+            spawnRing(x, y, "#BFE6FF")
+            break
         case "parry":
             spawnSparks(x, y, nx, ny, 14, "#FFE066")
             spawnRing(x, y, "#FFD700")
@@ -281,7 +287,7 @@ ClayWorld2d {
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
             let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, projectileHit: 1,
+                               playerBlocked: 1, perfectBlock: 1, projectileHit: 1,
                                projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
@@ -306,6 +312,11 @@ ClayWorld2d {
             _trauma(Balance.block.trauma)
             _kick(nx * Balance.block.kick, ny * Balance.block.kick)
             _freeze(Balance.block.freeze * 1000)
+            break
+        case "perfectBlock":
+            _trauma(Balance.perfectBlock.trauma)
+            _freeze(Balance.perfectBlock.freeze * 1000, Balance.perfectBlock.freezeScale)
+            if (screenFx) screenFx.perfectBlock()
             break
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
@@ -452,7 +463,7 @@ ClayWorld2d {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
             if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId)
-            else if (blow.kind === "stagger") e.stagger()
+            else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
@@ -534,9 +545,9 @@ ClayWorld2d {
     // physics steps, as the enemy's attack runs (issue #35); the hold is
     // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
-    // "dodged", "ignored", "out of reach" or "parried". This screen judges
-    // it by its knight's own state, and reports it to the others
-    // (issue #18).
+    // "perfect", "dodged", "ignored", "out of reach" or "parried". This
+    // screen judges it by its knight's own state, and reports it to the
+    // others (issue #18).
     signal knightStruck(string enemyId, string result)
     // Another node's knight met a host's enemy's attack and its node judged
     // it: source "lunge" (id: the enemy's) or "shot" (id: the shot's)
@@ -588,9 +599,11 @@ ClayWorld2d {
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
         // A blocked blow sounds the shield's own block, in takeDamage
         if (result === "hit") playImpact()
-        // and throws the host's enemy back off the shield
+        // and throws the host's enemy back off the shield; a perfect block
+        // staggers it, as it does an enemy of this node's
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
+        if (result === "perfect" && e && !e.destroyed) e.stagger(Balance.knight.perfectBlockStagger)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -1322,6 +1335,7 @@ ClayWorld2d {
         property int damageTaken: 0
         property int parries: 0
         property int blocks: 0
+        property int perfectBlocks: 0
         property int kills: 0
         property int deaths: 0
         property real seconds: 0
@@ -1330,9 +1344,11 @@ ClayWorld2d {
     function resetFightRecord() {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
+        r.perfectBlocks = 0
         r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
     }
-    // what: dealt, taken (with the damage), parry, block, kill or fall
+    // what: dealt, taken (with the damage), parry, block, perfectBlock
+    // (counted as a block too), kill or fall
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -1340,6 +1356,7 @@ ClayWorld2d {
         case "taken": r.damageTaken += amount; break
         case "parry": r.parries++; break
         case "block": r.blocks++; break
+        case "perfectBlock": r.perfectBlocks++; break
         case "fall": r.deaths++; break
         case "kill":
             r.kills++
@@ -1472,6 +1489,11 @@ ClayWorld2d {
         function parry() {
             screenFxItem.flash("#FFF0B0", 80, 0.3)
             screenFxItem.pulse(1.0, 320)
+        }
+        function perfectBlock() {
+            let b = Balance.perfectBlock
+            screenFxItem.flash(b.flashColor, b.screenFlash * 1000, b.screenFlashOpacity)
+            screenFxItem.pulse(b.pulse, b.pulseTime * 1000)
         }
     }
 

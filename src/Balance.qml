@@ -38,6 +38,15 @@ QtObject {
         // does not rise again until a parry gives some back
         blockDrain: 8,
         parryMana: 10,
+        // Perfect block: a shield raised at most this many physics steps
+        // before a blow takes it whole - no damage, this much mana back,
+        // and a lunging attacker staggers for this many seconds. Only a
+        // shield that was down at least perfectBlockRearm steps before it
+        // rose counts: one flicked up and down does not keep the window open
+        perfectBlockFrames: 8,
+        perfectBlockRearm: 12,
+        perfectBlockMana: 5,
+        perfectBlockStagger: 0.6,
         // After a hit the shield did not stop, no damage taken for this long
         hurtGrace: 0.5,
         // Dash: no damage taken while it lasts
@@ -63,6 +72,30 @@ QtObject {
         sparks: 12,
         pitch: 7,
         recoil: 0.3
+    })
+
+    // A perfect block (knight.perfectBlockFrames) reads as more than a
+    // block: the shield flashes for flash seconds and swells to bump times
+    // its size, the knight glows pale blue for glow seconds; sparks fly
+    // around a ring; the knight's own screen freezes for freeze seconds at
+    // freezeScale of its speed, takes this much trauma, flashes
+    // flashColor for screenFlash seconds at screenFlashOpacity and pulses
+    // by pulse over pulseTime seconds; the impact sample plays pitch
+    // semitones up
+    readonly property var perfectBlock: ({
+        flash: 0.26,
+        bump: 1.5,
+        glow: 0.22,
+        sparks: 18,
+        freeze: 0.09,
+        freezeScale: 0.1,
+        trauma: 0.28,
+        flashColor: "#DDF4FF",
+        screenFlash: 0.07,
+        screenFlashOpacity: 0.22,
+        pulse: 0.5,
+        pulseTime: 0.22,
+        pitch: 12
     })
 
     readonly property var enemy: ({

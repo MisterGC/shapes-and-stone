@@ -109,6 +109,9 @@ PhysicsItem {
         } else if (name === "block") {
             view.block()
             if (gameWorld && gain > 0) gameWorld.playBlock(gain)
+        } else if (name === "perfectBlock") {
+            view.perfectBlock()
+            if (gameWorld && gain > 0) gameWorld.playBlock(gain, true)
         } else if (name === "hurt") {
             view.hurt()
             _grace.restart()

@@ -831,9 +831,11 @@ PhysicsItem {
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < Balance.enemy.lungeHitRange) {
                 let result = target.takeDamage(atk, xWu, yWu, widthWu)
-                // A blocked blow throws it back; the knight's shield sounds
-                // its own block, so only a hit plays the impact here
+                // A blocked blow throws it back, a perfect block staggers
+                // it; the knight's shield sounds its own block, so only a
+                // hit plays the impact here
                 if (result === "blocked") recoil(target)
+                if (result === "perfect") stagger(Balance.knight.perfectBlockStagger)
                 if (result !== "hit") return
                 if (gameWorld) gameWorld.playImpact()
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
@@ -859,13 +861,15 @@ PhysicsItem {
         }
     }
 
-    function stagger() {
+    // Staggered for seconds, for the table's enemy.stagger without them
+    function stagger(seconds) {
+        let t = seconds === undefined ? Balance.enemy.stagger : seconds
         if (remote) {
-            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger"})
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger", seconds: t})
             return
         }
         parryWindow = false
-        _attackTimer = Balance.enemy.stagger
+        _attackTimer = t
         aiState = "stagger"
         staggerWobble.restart()
     }

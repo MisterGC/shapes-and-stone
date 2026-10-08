@@ -62,8 +62,17 @@ Item {
     }
 
     function parry() { parryGlow.restart() }
-    // The shield took a blow: it flashes white and bumps out
-    function block() { shieldFlash.restart() }
+    // The shield took a blow: it flashes white and bumps out; a perfect
+    // block flashes longer, swells further and lights the knight pale blue
+    function block() {
+        shieldArc.perfect = false
+        shieldFlash.restart()
+    }
+    function perfectBlock() {
+        shieldArc.perfect = true
+        shieldFlash.restart()
+        perfectGlow.restart()
+    }
     function hurt() { hurtFlash.restart() }
 
     function _rgba(c, a) {
@@ -240,6 +249,21 @@ Item {
             PropertyAnimation { target: parryGlowRect; property: "opacity"; from: 0.6; to: 0; duration: 200 }
         }
 
+        // Perfect block glow
+        Rectangle {
+            id: perfectGlowRect
+            anchors.fill: parent
+            radius: parent.radius
+            color: Balance.perfectBlock.flashColor
+            opacity: 0
+        }
+
+        PropertyAnimation {
+            id: perfectGlow
+            target: perfectGlowRect; property: "opacity"; from: 0.7; to: 0
+            duration: Balance.perfectBlock.glow * 1000
+        }
+
         // Downed: the body darkens
         Rectangle {
             objectName: "downedShade"
@@ -310,9 +334,11 @@ Item {
         x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
         y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
         rotation: -view.facingAngle
-        scale: 1 + (Balance.block.bump - 1) * flash
+        scale: 1 + ((perfect ? Balance.perfectBlock.bump : Balance.block.bump) - 1) * flash
         // 1 the moment a blow lands on it, back to 0 as its flash fades
         property real flash: 0
+        // The blow it flashes for was blocked perfectly
+        property bool perfect: false
         onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
@@ -348,7 +374,7 @@ Item {
             id: shieldFlash
             target: shieldArc; property: "flash"
             from: 1; to: 0
-            duration: Balance.block.flash * 1000
+            duration: (shieldArc.perfect ? Balance.perfectBlock.flash : Balance.block.flash) * 1000
             easing.type: Easing.OutCubic
         }
     }

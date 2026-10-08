@@ -65,7 +65,28 @@ PhysicsItem {
     property real _swingTimer: 0
     property bool isBlocking: false
     // No mana, no shield: it cannot be raised, and drops when it runs dry
-    onIsBlockingChanged: if (isBlocking && mana <= 0) isBlocking = false
+    onIsBlockingChanged: {
+        if (isBlocking && mana <= 0) {
+            isBlocking = false
+            return
+        }
+        // When the shield rose and fell, in physics steps: the perfect block
+        if (isBlocking) {
+            _rearmed = _steps - _loweredAt >= Balance.knight.perfectBlockRearm
+            _raisedAt = _steps
+        } else {
+            _loweredAt = _steps
+        }
+    }
+    // Physics steps since the knight came up, the perfect block's clock
+    property int _steps: 0
+    property int _raisedAt: -1000
+    property int _loweredAt: -1000
+    // The shield was down long enough before it rose
+    property bool _rearmed: true
+    // A blow the shield meets now is blocked perfectly
+    readonly property bool perfectGuard: isBlocking && _rearmed
+        && _steps - _raisedAt <= Balance.knight.perfectBlockFrames
     property real attackCooldown: 0
     readonly property real blockSpeedMultiplier: Balance.knight.blockSpeed
     readonly property real pushForce: Balance.knight.pushSpeed  // Knockback velocity for dash-push
@@ -95,6 +116,7 @@ PhysicsItem {
         target: player.world
         function onStepped() {
             let dt = player.world.timeStep
+            _steps++
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
             if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt
@@ -129,8 +151,8 @@ PhysicsItem {
         }
     }
 
-    // A moment others should see: "attack", "dash", "parry", "block" or
-    // "hurt".
+    // A moment others should see: "attack", "dash", "parry", "block",
+    // "perfectBlock" or "hurt".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -352,8 +374,10 @@ PhysicsItem {
     }
 
     // Returns what became of the blow: "hit", "blocked" by the shield,
+    // "perfect" - blocked by a shield raised just before it (perfectGuard),
     // "dodged" by a dash, or "ignored" - fallen or in the grace after a hit.
-    // Only a blow that was hit or blocked should look and sound like one.
+    // Only a blow that was hit or blocked should look and sound like one;
+    // a perfect block looks and sounds like its own.
     // The attacker is the corner (attackerX, attackerY) of a thing
     // attackerSize Wu in size (isShieldFacing).
     function takeDamage(amount, attackerX, attackerY, attackerSize) {
@@ -362,6 +386,7 @@ PhysicsItem {
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
+        if (blocked && perfectGuard) return _perfectBlock(attackerX, attackerY, attackerSize)
         if (blocked) {
             finalDamage = Math.floor(finalDamage * Balance.knight.blockedShare)
             // The shield's own sound, the only one a blocked blow plays
@@ -389,6 +414,27 @@ PhysicsItem {
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
         return blocked ? "blocked" : "hit"
+    }
+
+    // The shield rose just before the blow: it takes all of it and gives
+    // some mana back; the attacker staggers on "perfect"
+    function _perfectBlock(attackerX, attackerY, attackerSize) {
+        mana = Math.min(maxMana, mana + Balance.knight.perfectBlockMana)
+        view.perfectBlock()
+        acted("perfectBlock")
+        if (gameWorld) {
+            gameWorld.playBlock(1, true)
+            gameWorld.countFight("block")
+            gameWorld.countFight("perfectBlock")
+            let a = _centreOf(attackerX, attackerY, attackerSize)
+            let s = getShieldWorldPos()
+            if (gameWorld.impact)
+                gameWorld.impact("perfectBlock", s.x, s.y,
+                                 xWu + widthWu / 2 - a.x, yWu - heightWu / 2 - a.y)
+            else
+                gameWorld.shake(1)
+        }
+        return "perfect"
     }
 
     // A potion heals up to max HP; none is wasted on a knight that is
