@@ -120,6 +120,9 @@ it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
 five seconds (the joiner shows the parry ring of the host's enemies),
+has one of the host's enemies wind up a crushing blow (the joiner shows
+its `"crush"` state white-hot with the doubled ring, and its lunge with no
+parry window) and the joiner's knight judge one on its held shield,
 kills one from the joiner and lets the joiner's knight
 fall, and exits with the number of failed checks:
 
@@ -138,7 +141,9 @@ on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
 the joiner's knight and reported to the host, and a shot that goes on the
-host's screen when the report arrives. Then both knights fight for
+host's screen when the report arrives. The enemy it answers winds up no
+crushing blow: the answers are timed on its parry window, which a
+crushing blow does not open. Then both knights fight for
 eight seconds while each screen records every enemy it shows - its id, position,
 HP and AI state - every frame. It exits with the number of failed checks;
 `--fault stale` makes the joiner apply none of the host's enemy states, and
@@ -366,6 +371,21 @@ physics world), so a pause or a hit stop holds it. The `heavy` group of the
 table holds its glow, ring, sounds and hit feedback (`impact("heavyHit")`).
 The other screens of a session see the charge in the state's `s` (4
 charging, 5 full) and the heavy swing as `acted("heavy")`.
+Tough grunts and guardians now and then wind up a crushing blow instead
+of a lunge, at `enemy.crushChance` of their attacks: the wind-up takes
+`enemy.crushWindUp` seconds instead of `enemy.windUp`, the enemy glows
+white-hot, its ring is thicker and doubled, and it growls low. A held
+shield breaks against it: `enemy.crushMana` mana gone, the shield down for
+`enemy.crushLockout` seconds - held, the right button raises it again
+after that - and `enemy.crushShare` of the damage lands, a hurt with its
+grace. A perfect block takes it whole and staggers the enemy for the full
+`enemy.stagger`; a dash dodges it. It cannot be parried: its lunge opens
+no parry window and its ring never turns white. The roll comes from the
+run's seed and the level, so a seed plays the same fight. Its AI state is
+`"crush"`, replicated as any other, so every screen of a session shows the
+wind-up; the blow carries `crush` to the knight's screen, which judges it.
+The `crush` group of the table holds its look, its growl and its hit
+feedback (`impact("crushBlow")`).
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -375,7 +395,9 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
 
 The ring bench steps a grunt's wind-up in the paused fight room and saves
 it as `ring-0.png`, `ring-50.png` and `ring-100.png` (the parry window
-opening); like the knight bench it needs a window and the copied shaders:
+opening), then the tough guardian's crushing wind-up half way as
+`crush-50.png`; like the knight bench it needs a window and the copied
+shaders:
 
 ```
 qml -I build/bin/qml tests/ring/ring.qml -- <out dir>
@@ -383,7 +405,8 @@ qml -I build/bin/qml tests/ring/ring.qml -- <out dir>
 
 The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
 damage dealt and taken, parries, attacks the shield stopped and those it
-stopped perfectly (`perfectBlocks`, also counted in `blocks`), kills, falls
+stopped perfectly (`perfectBlocks`, also counted in `blocks`), crushing
+blows that broke the held shield (`crushed`), kills, falls
 and the simulated seconds until no enemy stands. The fight bench plays the
 `fight` scenario with a scripted knight, stepping the paused game through
 the dojo's inspector, and prints the record as JSON; the same seed gives the
@@ -403,7 +426,9 @@ until a lunge is 4 steps from landing and raises it then, a perfect
 block, `heavy` meets attacks as `mix` does but holds the left button at a
 guardian instead of shield-dashing it and lets the full charge go once the
 guardian is in reach (the report counts them as `heavySwings` and
-`guardBreaks`). `--depth` puts the fight room at a
+`guardBreaks`). A crushing blow is met by the same plan, so a parry finds
+no window; the report counts the crushing wind-ups as `crushBlows`.
+`--depth` puts the fight room at a
 depth: the lineup stays the table's, the enemies hit as hard as there. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
@@ -417,9 +442,14 @@ after about 0.6 s of holding. The `knight.perfectBlock...`
 values and the `perfectBlock` group are read from `src/Balance.qml` on
 every blow, so an edit of them changes the next fight after a reload. The
 charged swing is tried there too: hold the left button while the guardian
-comes and let go once the ring has flashed. The reload bench does this
-through the inspector, changes `knight.chargeTime` in the loaded copy of
-the table, reloads and checks that the charge fills in the new time:
+comes and let go once the ring has flashed. So is the crushing blow: the
+room's guardian is tough and winds one up now and then, and
+`crushChance: 1` in the table's `enemy` group, saved and reloaded, makes
+every attack of a tough enemy a crushing one. The reload bench does both
+through the inspector: it changes `knight.chargeTime` in the loaded copy
+of the table, reloads and checks that the charge fills in the new time,
+and it counts the guardian's crushing blows among its attacks before and
+after setting `enemy.crushChance` to 1:
 
 ```
 python3 tests/fightbench/run_reload.py
