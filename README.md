@@ -77,7 +77,8 @@ Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
 block, parry, get hurt, run their shields low and dry and dash at the same
 moment, and saves a PNG per pose (`hurt`, `lowMana`, `shieldBreak`,
-`charging` and `heavy` among them). It needs a window: offscreen it saves
+`charging`, `heavy`, and `sword` and `shield` for the smith's upgrades,
+on the local knight only, among them). It needs a window: offscreen it saves
 the HUD but not the world.
 
 ```
@@ -246,12 +247,23 @@ claims the drops its own knight reaches, and the host gives each to the
 first claim it gets and despawns it, so a drop is picked up once, by one
 knight; each knight's gold is its own node's. In the village the
 innkeeper sells a health potion and the smith one upgrade for the run,
-more damage or more max HP, through the dialogue panel: E talks, 1 and 2
-buy what the panel offers. Outside the panel, 1 drinks a potion. The
+the sword or the shield, through the dialogue panel: E talks, 1 and 2
+buy what the panel offers, each ware named with its effect. A sharpened
+sword adds `shop.swordAtk` to the knight's attack and shows a brighter,
+wider blade edge; a reinforced shield lets `shop.shieldBlockedShare` of a
+blow through a held block instead of `knight.blockedShare`, drains
+`shop.shieldBlockDrain` mana per second instead of `knight.blockDrain`,
+and shows a lighter rim. The perfect block's window is the same with
+either. The smith sells one of the two per run and refuses a second. The
+knight reads its `upgrade` live, so in the dojo's fight scenario
+`eval player.upgrade = "sword"` (or `"shield"`, or `""`) applies it at
+once. Outside the panel, 1 drinks a potion. The
 campfire stays the healer. Gold, potions and the upgrade go with the
 knight to the next level; a new run starts without them. Prices and
 effects are the table's `shop` group. The gold bench brings one knight to
-a drop, to the innkeeper and the smith, then a host and a joiner joined
+a drop, to the innkeeper and the smith - it buys the sword, is refused the
+shield, and in the next run buys the shield, blocks a 20-attack blow and
+measures the drain - then a host and a joiner joined
 over LAN to three drops, one with both knights on it, and exits with the
 number of failed checks:
 
@@ -340,7 +352,8 @@ longer and the knight pale blue, sparks fly around a ring on every
 screen, and the knight's own screen freezes, flashes and pulses; the
 `perfectBlock` group of the table holds these values. In co-op the
 knight's screen judges the blow and staggers the host's enemy. The shield is
-not free: raised, it drains `knight.blockDrain` mana per second, drops at
+not free: raised, it drains `knight.blockDrain` mana per second (less
+with the smith's reinforced shield), drops at
 0 and cannot be raised again until a parry gives `knight.parryMana` back
 or the campfire refills it at `campfire.manaPerSecond`; mana does not come
 back on its own. Below `shieldBreak.lowShare` of the mana the raised
