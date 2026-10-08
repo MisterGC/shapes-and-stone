@@ -108,6 +108,21 @@ QtObject {
         chunkDrain: 0.4
     })
 
+    // The shield shows how much mana is left. Below lowShare of the
+    // knight's mana its arc thins and blinks blink times a second; at 0 it
+    // breaks into shards grey pieces that fly apart for shardTime seconds,
+    // and the mana bar flashes barColor barFlashes times, each barFlash
+    // seconds long - as it does for a right-click with no mana
+    readonly property var shieldBreak: ({
+        lowShare: 0.25,
+        blink: 4,
+        shards: 3,
+        shardTime: 0.3,
+        barColor: "#FF3030",
+        barFlashes: 2,
+        barFlash: 0.12
+    })
+
     readonly property var enemy: ({
         // Base HP by tier: weak, normal, tough
         tierHp: [18, 30, 42],

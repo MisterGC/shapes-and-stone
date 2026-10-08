@@ -116,6 +116,9 @@ PhysicsItem {
             view.hurt()
             _grace.restart()
             if (gameWorld && gain > 0) gameWorld.playHurt(gain)
+        } else if (name === "shieldBreak") {
+            view.shieldBreak()
+            if (gameWorld && gain > 0) gameWorld.playShieldBreak(gain)
         }
     }
     // The grace after a hit, on this screen's clock: the other knight

@@ -123,7 +123,10 @@ PhysicsItem {
             if (isBlocking && !fallen) {
                 let left = mana - Balance.knight.blockDrain * dt
                 mana = left < 1e-6 ? 0 : left
-                if (mana <= 0) isBlocking = false
+                if (mana <= 0) {
+                    isBlocking = false
+                    _shieldBreak()
+                }
             }
             // A swing hits until its arc has faded, as long as the view
             // draws it, but counted in steps
@@ -152,7 +155,7 @@ PhysicsItem {
     }
 
     // A moment others should see: "attack", "dash", "parry", "block",
-    // "perfectBlock" or "hurt".
+    // "perfectBlock", "hurt" or "shieldBreak".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -173,6 +176,7 @@ PhysicsItem {
         dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
         swingDuration: player.attackDuration
         graceLeft: player.graceLeft
+        lowShield: player.mana < player.maxMana * Balance.shieldBreak.lowShare
         downed: player.fallen
     }
 
@@ -437,6 +441,31 @@ PhysicsItem {
                 gameWorld.shake(1)
         }
         return "perfect"
+    }
+
+    // The shield ran dry while raised: it breaks, with a crack, and the
+    // mana bar flashes
+    function _shieldBreak() {
+        view.shieldBreak()
+        acted("shieldBreak")
+        if (gameWorld) {
+            gameWorld.playShieldBreak()
+            gameWorld.flashManaBar()
+        }
+    }
+
+    // The right button: raises the shield, or, with no mana, answers with
+    // a dull click and the mana bar's flash so it is no dead input
+    function raiseShield() {
+        if (fallen) return
+        if (mana <= 0) {
+            if (gameWorld) {
+                gameWorld.playShieldEmpty()
+                gameWorld.flashManaBar()
+            }
+            return
+        }
+        isBlocking = true
     }
 
     // A potion heals up to max HP; none is wasted on a knight that is

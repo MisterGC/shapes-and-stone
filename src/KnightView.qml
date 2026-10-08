@@ -31,6 +31,8 @@ Item {
     property real dashCooldownProgress: 1   // 0 just dashed, 1 ready
     // Seconds left of the grace after a hit: the knight flickers white
     property real graceLeft: 0
+    // Mana is low: the raised shield thins and blinks
+    property bool lowShield: false
     // At 0 HP: the knight slumps to the floor, dark, its lantern low and
     // no aim shown - the same on every screen that draws it
     property bool downed: false
@@ -74,6 +76,11 @@ Item {
         perfectGlow.restart()
     }
     function hurt() { hurtFlash.restart() }
+    // The shield ran dry: its arc splits into grey shards that fly apart
+    function shieldBreak() {
+        shieldShards.angle = view.facingAngle
+        shardBurst.restart()
+    }
 
     function _rgba(c, a) {
         return "rgba(" + Math.round(c.r * 255) + ", " + Math.round(c.g * 255) + ", "
@@ -339,10 +346,16 @@ Item {
         y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
         rotation: -view.facingAngle
         scale: 1 + ((perfect ? Balance.perfectBlock.bump : Balance.block.bump) - 1) * flash
+        // Low on mana it blinks; a blow's flash shows through the blink
+        opacity: view.lowShield && !_blinkOn && flash <= 0 ? 0.25 : 1
         // 1 the moment a blow lands on it, back to 0 as its flash fades
         property real flash: 0
         // The blow it flashes for was blocked perfectly
         property bool perfect: false
+        // Thinner when mana runs low
+        readonly property real thickness: view.lowShield ? 0.12 : 0.25
+        property bool _blinkOn: true
+        onThicknessChanged: requestPaint()
         onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
@@ -350,11 +363,20 @@ Item {
             ctx.beginPath()
             ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
             ctx.strokeStyle = view.accentColor
-            ctx.lineWidth = w * 0.25
+            ctx.lineWidth = w * thickness
             ctx.stroke()
         }
 
         onVisibleChanged: if (visible) requestPaint()
+
+        // The blink: on and off blink times a second
+        Timer {
+            interval: 500 / Balance.shieldBreak.blink
+            repeat: true
+            running: shieldArc.visible && view.lowShield
+            onRunningChanged: shieldArc._blinkOn = true
+            onTriggered: shieldArc._blinkOn = !shieldArc._blinkOn
+        }
 
         // The flash: the same arc in white over it
         Canvas {
@@ -380,6 +402,72 @@ Item {
             from: 1; to: 0
             duration: (shieldArc.perfect ? Balance.perfectBlock.flash : Balance.block.flash) * 1000
             easing.type: Easing.OutCubic
+        }
+    }
+
+    // The broken shield: the arc in shards grey pieces, flying apart from
+    // where it was and fading out
+    Item {
+        id: shieldShards
+        objectName: "shieldShards"
+        readonly property real shieldSize: view.width * 0.8
+        readonly property real orbitRadius: view.width * 0.5
+        // The facing when it broke: the shards keep it while the knight turns
+        property real angle: 0
+        readonly property real angleRad: angle * Math.PI / 180
+        // 0 the moment it breaks, 1 when the shards are gone
+        property real t: 1
+        visible: t < 1
+        width: shieldSize
+        height: shieldSize
+        x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
+        y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbitRadius
+        rotation: -angle
+        opacity: 1 - t
+
+        Repeater {
+            model: Balance.shieldBreak.shards
+            Canvas {
+                id: shard
+                required property int index
+                readonly property int count: Balance.shieldBreak.shards
+                // This shard's part of the arc and the direction it flies
+                readonly property real a0: -Math.PI * 0.4 + Math.PI * 0.8 * index / count
+                readonly property real a1: -Math.PI * 0.4 + Math.PI * 0.8 * (index + 1) / count
+                readonly property real mid: (a0 + a1) / 2
+                anchors.fill: parent
+                transform: [
+                    Rotation {
+                        origin.x: shard.width / 2 + Math.cos(shard.mid) * shard.width * 0.4
+                        origin.y: shard.height / 2 + Math.sin(shard.mid) * shard.height * 0.4
+                        angle: (shard.index - (shard.count - 1) / 2) * 45 * shieldShards.t
+                    },
+                    Translate {
+                        x: Math.cos(shard.mid) * shard.width * 0.6 * shieldShards.t
+                        y: Math.sin(shard.mid) * shard.height * 0.6 * shieldShards.t
+                    }
+                ]
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.reset()
+                    var w = width, h = height
+                    ctx.beginPath()
+                    // A gap between the pieces: the cracks
+                    ctx.arc(w / 2, h / 2, w * 0.4, a0 + 0.06, a1 - 0.06)
+                    ctx.strokeStyle = "#8A8E94"
+                    ctx.lineWidth = w * 0.2
+                    ctx.stroke()
+                }
+                Component.onCompleted: requestPaint()
+            }
+        }
+
+        NumberAnimation {
+            id: shardBurst
+            target: shieldShards; property: "t"
+            from: 0; to: 1
+            duration: Balance.shieldBreak.shardTime * 1000
+            easing.type: Easing.OutQuad
         }
     }
 

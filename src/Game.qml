@@ -135,6 +135,24 @@ ClayWorld2d {
         hurtSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
+    // The shield breaking at 0 mana, and the right button with no mana
+    Sound {
+        id: shieldBreakSound
+        source: "assets/shield_break.wav"
+        volume: muted ? 0 : 0.7
+    }
+    function playShieldBreak(gain) {
+        shieldBreakSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+    Sound {
+        id: shieldEmptySound
+        source: "assets/shield_empty.wav"
+        volume: muted ? 0 : 0.6
+    }
+    function playShieldEmpty() {
+        shieldEmptySound.triggerOneShot(1)
+    }
+
     // How loud another knight is at xWu/yWu: never as loud as your own
     // knight, and fading to silence about a screen away from you
     readonly property real remoteMaxGain: 0.5
@@ -847,7 +865,7 @@ ClayWorld2d {
             if (mouse.button === Qt.LeftButton) {
                 player.attack()
             }
-            if (mouse.button === Qt.RightButton) player.isBlocking = true
+            if (mouse.button === Qt.RightButton) player.raiseShield()
         }
 
         onReleased: (mouse) => {
@@ -1062,6 +1080,25 @@ ClayWorld2d {
             Behavior on width { NumberAnimation { duration: 100 } }
         }
 
+        // The shield ran dry or a right-click found no mana: the bar
+        // flashes red
+        Rectangle {
+            id: manaFlash
+            objectName: "manaFlash"
+            anchors.fill: parent
+            radius: parent.radius
+            color: Balance.shieldBreak.barColor
+            opacity: 0
+        }
+        SequentialAnimation {
+            id: manaFlashAnim
+            loops: Balance.shieldBreak.barFlashes
+            PropertyAction { target: manaFlash; property: "opacity"; value: 0.85 }
+            PauseAnimation { duration: Balance.shieldBreak.barFlash * 500 }
+            PropertyAction { target: manaFlash; property: "opacity"; value: 0 }
+            PauseAnimation { duration: Balance.shieldBreak.barFlash * 500 }
+        }
+
         Text {
             anchors.centerIn: parent
             text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
@@ -1070,6 +1107,10 @@ ClayWorld2d {
             font.bold: true
         }
     }
+
+    // The mana bar's red flash, on this screen only
+    function flashManaBar() { manaFlashAnim.restart() }
+    readonly property bool manaBarFlashing: manaFlashAnim.running
 
     // How deep the knight is, under the bars
     Text {
