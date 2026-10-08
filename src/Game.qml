@@ -448,7 +448,6 @@ ClayWorld2d {
             world.levelIndex = level
             world.levelType = levelTypeOf(level)
             screen = "game"
-            world.forceActiveFocus()
         }
         onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
         onAdvanceRequested: _hostAdvanceLevel()
@@ -747,6 +746,11 @@ ClayWorld2d {
     // player's enemies, and only this knight stops taking input.
     property bool menuOpen: false
     readonly property bool gamePaused: menuOpen && !session.connected
+    // The title, the lobby, the pause menu and the fallen screen each take
+    // the keys while they are up; when the last of them closes the game
+    // takes them back, so the knight answers the keys without a click
+    readonly property bool overlayUp: screen !== "game" || menuOpen || fallen
+    onOverlayUpChanged: if (!overlayUp) world.forceActiveFocus()
     // Paused by stopping the world: the first step after resuming is one
     // frame long, not the whole pause (clayground#338), so no cooldown or
     // AI timer runs out on it.
@@ -902,18 +906,14 @@ ClayWorld2d {
     }
     Keys.forwardTo: gameCtrl
     function openMenu() {
-        // The menu takes the keys from here on: what is held now would
-        // never see its release
-        gameCtrl.axisX = 0
-        gameCtrl.axisY = 0
-        gameCtrl.buttonAPressed = false
-        gameCtrl.buttonBPressed = false
+        // The menu takes the keys, and the keyboard gamepad lets go of what
+        // is held when the focus moves (clayground#413); the shield is the
+        // mouse's, whose release the menu would swallow
         if (player) player.isBlocking = false
         menuOpen = true
     }
     function closeMenu() {
         menuOpen = false
-        world.forceActiveFocus()
     }
     GameController {
         id: gameCtrl
@@ -1397,7 +1397,6 @@ ClayWorld2d {
         _startRunRecord()
         generateDungeon()
         minimap.requestPaint()
-        world.forceActiveFocus()
     }
 
     // Esc on the fallen screen: leave the run (and a session) for the title,
@@ -3037,7 +3036,7 @@ ClayWorld2d {
             TitleScreen {
                 muted: world.muted
                 message: world.titleMessage
-                onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
+                onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
             }
         }
