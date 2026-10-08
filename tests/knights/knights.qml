@@ -10,7 +10,10 @@
 // in shieldBreak both shields have just broken into grey shards, the local
 // knight's mana bar flashing red. In charging both hold the left button,
 // their blades drawn back and glowing; in heavy both swing the wide heavy
-// blow of a full charge.
+// blow of a full charge. In sword the local knight swings a sharpened
+// sword, its blade's edge brighter and wider, in shield it holds up a
+// reinforced shield with a lighter rim; the remote's upgrade is not sent,
+// it swings and blocks as before.
 //
 //   qml -I <build>/bin/qml tests/knights/knights.qml -- <out dir>
 
@@ -150,6 +153,21 @@ Window {
         }],
         [60, () => capture("shieldBreak")],
         [500, () => { game.player.mana = game.player.maxMana }],
+        // The smith's upgrades, on the local knight: the sharpened sword's
+        // brighter edge in a swing, the reinforced shield's lighter rim
+        [300, () => { game.player.upgrade = "sword"; game.player.attack(); remote.triggerAction("attack") }],
+        [120, () => capture("sword")],
+        [500, () => {
+            game.player.upgrade = "shield"
+            game.player.isBlocking = true
+            remoteState = 2; remoteBlock = true
+        }],
+        [250, () => capture("shield")],
+        [100, () => {
+            game.player.isBlocking = false
+            game.player.upgrade = ""
+            remoteState = 0; remoteBlock = false
+        }],
         [600, () => {
             game.player.dash(); remote.triggerAction("dash"); remoteState = 3
             dashMove.start()
