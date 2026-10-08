@@ -47,6 +47,22 @@ QtObject {
         perfectBlockRearm: 12,
         perfectBlockMana: 5,
         perfectBlockStagger: 0.6,
+        // Charged heavy swing: the left button released before chargeStart
+        // swings at once. Held longer, the knight charges, moving at
+        // chargeSpeed of its move speed; at chargeTime the charge is full
+        // and a release swings a heavy blow: heavySwing times atk, within
+        // heavyArc and heavyRange times attackRange, through a guardian's
+        // shield (it staggers), knocking back heavyKnockback times as far.
+        // Released before full, a normal swing. Held chargeHold past full,
+        // the knight lets it go at normal strength. A hit cancels it
+        chargeStart: 0.2,
+        chargeTime: 0.6,
+        chargeHold: 1.0,
+        chargeSpeed: 0.7,
+        heavySwing: 2.5,
+        heavyArc: 90,
+        heavyRange: 1.25,
+        heavyKnockback: 2,
         // After a hit the shield did not stop, no damage taken for this long
         hurtGrace: 0.5,
         // Dash: no damage taken while it lasts
@@ -96,6 +112,26 @@ QtObject {
         pulse: 0.5,
         pulseTime: 0.22,
         pitch: 12
+    })
+
+    // The charged heavy swing (knight.charge...) reads as a commitment: the
+    // blade glows from the knight's blade colour to glow as it charges;
+    // when full a ring of ringColor flashes out to ringScale times the
+    // knight's size over ring seconds with a tick pitch semitones up. The
+    // heavy swing plays the swing sample swingPitch semitones; its hit
+    // throws sparks and a ring, and the knight's own screen freezes for
+    // freeze seconds with this much trauma and a kick of kick wu
+    readonly property var heavy: ({
+        glow: "#FFF2C0",
+        ringColor: "#FFFFFF",
+        ring: 0.2,
+        ringScale: 2.2,
+        tickPitch: 12,
+        swingPitch: -5,
+        sparks: 16,
+        freeze: 0.09,
+        trauma: 0.35,
+        kick: 0.2
     })
 
     // A hit that lands reads as a hurt, not as the grace after it: the
