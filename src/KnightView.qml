@@ -75,11 +75,30 @@ Item {
         shieldFlash.restart()
         perfectGlow.restart()
     }
-    function hurt() { hurtFlash.restart() }
+    function hurt() { hurtLeft = Balance.hurt.flash }
     // The shield ran dry: its arc splits into grey shards that fly apart
     function shieldBreak() {
         shieldShards.angle = view.facingAngle
-        shardBurst.restart()
+        shardAge = 0
+    }
+
+    // The hurt flash, the low shield's blink and the shards count the time
+    // the physics steps simulate, as the grace does: a pause or the hit
+    // stop of the blow that caused them holds them with the world, and a
+    // single step in the dojo advances them by a step
+    property real hurtLeft: 0
+    property real blinkT: 0
+    // Seconds since the shield broke; at shardTime the shards are gone
+    property real shardAge: Balance.shieldBreak.shardTime
+    Connections {
+        target: view.host && view.host.world ? view.host.world : null
+        function onStepped() {
+            let dt = view.host.world.timeStep
+            if (view.hurtLeft > 0) view.hurtLeft = view.hurtLeft - dt < 1e-6 ? 0 : view.hurtLeft - dt
+            view.blinkT = view.blocking && view.lowShield ? view.blinkT + dt : 0
+            if (view.shardAge < Balance.shieldBreak.shardTime)
+                view.shardAge = Math.min(Balance.shieldBreak.shardTime, view.shardAge + dt)
+        }
     }
 
     function _rgba(c, a) {
@@ -226,15 +245,9 @@ Item {
             anchors.fill: parent
             radius: parent.radius
             color: Balance.hurt.color
-            opacity: 0
+            opacity: view.hurtLeft > 0 ? 0.95 : 0
             // Above the grace flicker while it shows
             z: 1
-        }
-        SequentialAnimation {
-            id: hurtFlash
-            PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0.95 }
-            PauseAnimation { duration: Balance.hurt.flash * 1000 }
-            PropertyAction { target: hurtFlashRect; property: "opacity"; value: 0 }
         }
 
         // Grace after a hit: flickers white until no hit can land again
@@ -354,7 +367,8 @@ Item {
         property bool perfect: false
         // Thinner when mana runs low
         readonly property real thickness: view.lowShield ? 0.12 : 0.25
-        property bool _blinkOn: true
+        // On for the first half of each blink, counted from when it began
+        readonly property bool _blinkOn: Math.floor(view.blinkT * Balance.shieldBreak.blink * 2) % 2 === 0
         onThicknessChanged: requestPaint()
         onPaint: {
             var ctx = getContext("2d")
@@ -368,15 +382,6 @@ Item {
         }
 
         onVisibleChanged: if (visible) requestPaint()
-
-        // The blink: on and off blink times a second
-        Timer {
-            interval: 500 / Balance.shieldBreak.blink
-            repeat: true
-            running: shieldArc.visible && view.lowShield
-            onRunningChanged: shieldArc._blinkOn = true
-            onTriggered: shieldArc._blinkOn = !shieldArc._blinkOn
-        }
 
         // The flash: the same arc in white over it
         Canvas {
@@ -415,9 +420,10 @@ Item {
         // The facing when it broke: the shards keep it while the knight turns
         property real angle: 0
         readonly property real angleRad: angle * Math.PI / 180
-        // 0 the moment it breaks, 1 when the shards are gone
-        property real t: 1
-        visible: t < 1
+        // 0 the moment it breaks, 1 when the shards are gone, eased out
+        readonly property real age: view.shardAge / Balance.shieldBreak.shardTime
+        readonly property real t: 1 - (1 - age) * (1 - age)
+        visible: age < 1
         width: shieldSize
         height: shieldSize
         x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbitRadius
@@ -460,14 +466,6 @@ Item {
                 }
                 Component.onCompleted: requestPaint()
             }
-        }
-
-        NumberAnimation {
-            id: shardBurst
-            target: shieldShards; property: "t"
-            from: 0; to: 1
-            duration: Balance.shieldBreak.shardTime * 1000
-            easing.type: Easing.OutQuad
         }
     }
 

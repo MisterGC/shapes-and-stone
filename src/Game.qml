@@ -989,34 +989,41 @@ ClayWorld2d {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.margins: 2
-            // The HP the chunk reaches to, never below the knight's
+            // The HP the chunk reaches to, never below the knight's. It
+            // drains on the physics steps from `from` to the knight's HP
+            // over Balance.hurt.chunkDrain seconds, easing in: a pause or
+            // the hit stop of the blow holds it
             property real hp: 0
+            property real from: 0
+            property real age: 0
             function reset() {
-                hpChunkDrain.stop()
                 hp = player ? player.hp : 0
+                from = hp
+                age = Balance.hurt.chunkDrain
             }
             width: player ? (parent.width - 4) * Math.max(0, Math.min(hp, player.maxHp)) / player.maxHp : 0
             radius: 2
             color: "#F4E4D4"
             opacity: 0.85
-            NumberAnimation {
-                id: hpChunkDrain
-                target: hpChunk; property: "hp"
-                duration: Balance.hurt.chunkDrain * 1000
-                easing.type: Easing.InQuad
-            }
             Connections {
                 target: player
                 function onHpChanged() {
                     if (player.hp < hpChunk.hp) {
-                        hpChunkDrain.stop()
-                        hpChunkDrain.from = hpChunk.hp
-                        hpChunkDrain.to = player.hp
-                        hpChunkDrain.start()
+                        hpChunk.from = hpChunk.hp
+                        hpChunk.age = 0
                     } else {
-                        hpChunkDrain.stop()
-                        hpChunk.hp = player.hp
+                        hpChunk.reset()
                     }
+                }
+            }
+            Connections {
+                target: world.physics
+                function onStepped() {
+                    let d = Balance.hurt.chunkDrain
+                    if (!player || hpChunk.age >= d) return
+                    hpChunk.age = Math.min(d, hpChunk.age + world.physics.timeStep)
+                    let k = hpChunk.age / d
+                    hpChunk.hp = hpChunk.from + (player.hp - hpChunk.from) * k * k
                 }
             }
         }
@@ -1088,15 +1095,17 @@ ClayWorld2d {
             anchors.fill: parent
             radius: parent.radius
             color: Balance.shieldBreak.barColor
-            opacity: 0
-        }
-        SequentialAnimation {
-            id: manaFlashAnim
-            loops: Balance.shieldBreak.barFlashes
-            PropertyAction { target: manaFlash; property: "opacity"; value: 0.85 }
-            PauseAnimation { duration: Balance.shieldBreak.barFlash * 500 }
-            PropertyAction { target: manaFlash; property: "opacity"; value: 0 }
-            PauseAnimation { duration: Balance.shieldBreak.barFlash * 500 }
+            // Seconds since the flash began, on the physics steps: on for
+            // the first half of each of its barFlashes
+            property real age: Balance.shieldBreak.barFlashes * Balance.shieldBreak.barFlash
+            readonly property bool running: age < Balance.shieldBreak.barFlashes * Balance.shieldBreak.barFlash
+            opacity: running && (age % Balance.shieldBreak.barFlash) < Balance.shieldBreak.barFlash / 2 ? 0.85 : 0
+            Connections {
+                target: world.physics
+                function onStepped() {
+                    if (manaFlash.running) manaFlash.age += world.physics.timeStep
+                }
+            }
         }
 
         Text {
@@ -1109,8 +1118,8 @@ ClayWorld2d {
     }
 
     // The mana bar's red flash, on this screen only
-    function flashManaBar() { manaFlashAnim.restart() }
-    readonly property bool manaBarFlashing: manaFlashAnim.running
+    function flashManaBar() { manaFlash.age = 0 }
+    readonly property bool manaBarFlashing: manaFlash.running
 
     // How deep the knight is, under the bars
     Text {
