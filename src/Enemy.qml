@@ -591,9 +591,15 @@ PhysicsItem {
         _dirToTargetX = lungeDx / len
         _dirToTargetY = lungeDy / len
         _lungeSpeed = lungeDist / lungeDuration
-        _lungeSteps = Math.max(1, Math.round(lungeDuration / world.timeStep))
+        _lungeSteps = lungeStepCount(world.timeStep)
         aiState = "lunge"
         _stepLunge()
+    }
+
+    // Physics steps a lunge takes at steps of this length, the first one
+    // included
+    function lungeStepCount(step) {
+        return Math.max(1, Math.round(lungeDuration / step))
     }
 
     // Dash forward, the last parryFrames steps open to a parry, then land
