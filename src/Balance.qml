@@ -123,6 +123,19 @@ QtObject {
         barFlash: 0.12
     })
 
+    // While an enemy winds up, a ring in its telegraph colour closes from
+    // from times its size onto its outline, on the physics steps, and
+    // reaches it on the step the lunge's parry window opens. It is
+    // thickness of the enemy's width thick, drawn at this opacity, and
+    // flashColor while the window is open. A spitter's shot gets the same
+    // ring, closing as the shot leaves, without the flash
+    readonly property var parryRing: ({
+        from: 2,
+        thickness: 0.06,
+        opacity: 0.9,
+        flashColor: "#FFFFFF"
+    })
+
     readonly property var enemy: ({
         // Base HP by tier: weak, normal, tough
         tierHp: [18, 30, 42],

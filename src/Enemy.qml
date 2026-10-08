@@ -42,12 +42,13 @@ PhysicsItem {
         id: replica
         network: enemy.network
         objectId: enemy.objectId
-        properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId"]
+        properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId",
+                     "windUpLength"]
         interpolate: true
         interpolator.autoDelay: true
         // HP switches with its state, never blended between two of the
-        // host's (clayground#368)
-        steppedProperties: ["hp"]
+        // host's (clayground#368); so does a wind-up's length
+        steppedProperties: ["hp", "windUpLength"]
         interpolator.angleKeys: ["facingAngle"]
     }
 
@@ -109,6 +110,41 @@ PhysicsItem {
 
     // AI state: patrol, chase, telegraph, lunge, stagger, recovery, kite, shoot
     property string aiState: "patrol"
+
+    // The parry ring (issue #78): while it winds up, a ring closes on it
+    // and reaches its outline on the step the lunge's parry window opens,
+    // or as a shot leaves. ringProgress runs from 0 to 1 on the physics
+    // steps, so a pause or a hit stop holds it. windUpLength is the
+    // telegraph or shot wind-up under way, in seconds, sent to the other
+    // screens: there the ring counts its own steps from the host's
+    // telegraph and closes when the host's parryWindow opens
+    property real windUpLength: 0
+    property real _ringT: 0
+    // The step length the ring counts a lunge's steps in: the world's at
+    // the start of the wind-up, never 0 as it is in a full hit stop
+    property real _ringStep: 1 / 60
+    readonly property bool ringShows: aiState === "telegraph" || aiState === "shoot"
+                                      || aiState === "lunge"
+    readonly property color ringColor: parryWindow ? Balance.parryRing.flashColor
+        : enemyType === "spitter" ? "#F2D13A" : "#FF8C00"
+    // Seconds of a lunge after its first step until the parry window opens
+    readonly property real _ringLunge: aiState === "shoot" ? 0
+        : Math.max(0, lungeStepCount(_ringStep) - 1 - Balance.enemy.parryFrames) * _ringStep
+    readonly property real ringProgress: {
+        if (!ringShows) return 0
+        if (parryWindow) return 1
+        let total = windUpLength + _ringLunge
+        if (total <= 0) return 1
+        let left = remote ? total - _ringT
+            : aiState === "lunge" ? Math.max(0, _lungeSteps - Balance.enemy.parryFrames) * _ringStep
+            : _attackTimer + _ringLunge
+        return Math.max(0, Math.min(1, 1 - left / total))
+    }
+    Connections {
+        target: enemy.world
+        enabled: enemy.remote && enemy.ringShows
+        function onStepped() { enemy._ringT += enemy.world.timeStep }
+    }
 
     // Internal state
     property real _spawnXWu: 0
@@ -356,6 +392,26 @@ PhysicsItem {
         Behavior on opacity { NumberAnimation { duration: 50 } }
     }
 
+    // The parry ring: above the darkness with fx on, as the eyes are, in
+    // the telegraph colour, white while the parry window is open
+    Rectangle {
+        id: parryRing
+        objectName: "parryRing"
+        parent: enemy._fx && gameWorld && gameWorld.glowParent ? gameWorld.glowParent() : enemy
+        visible: enemy.ringShows
+        readonly property real size: enemy.width * visual.scale
+            * (Balance.parryRing.from - (Balance.parryRing.from - 1) * enemy.ringProgress)
+        width: size
+        height: size
+        radius: size / 2
+        x: (parent === enemy ? 0 : enemy.x) + (enemy.width - size) / 2
+        y: (parent === enemy ? 0 : enemy.y) + (enemy.height - size) / 2
+        color: "transparent"
+        border.width: Math.max(1.5, enemy.width * Balance.parryRing.thickness)
+        border.color: enemy.ringColor
+        opacity: Balance.parryRing.opacity
+    }
+
     // Stagger wobble animation
     SequentialAnimation {
         id: staggerWobble
@@ -448,6 +504,13 @@ PhysicsItem {
     // broken by FollowPath's internal "running = false" on path completion.
     onAiStateChanged: {
         followPath.running = !remote && (aiState === "patrol" || aiState === "chase")
+        // A wind-up starts the parry ring: its length where the AI runs, a
+        // count of steps where it is shown
+        if (aiState === "telegraph" || aiState === "shoot") {
+            if (world && world.timeStep > 0) _ringStep = world.timeStep
+            if (remote) _ringT = 0
+            else windUpLength = _attackTimer
+        }
         // A remote enemy wobbles while the host's staggers
         if (remote) {
             if (aiState === "stagger") staggerWobble.restart()
