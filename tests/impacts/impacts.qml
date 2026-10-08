@@ -8,7 +8,9 @@
 // side that landed it must. The host keeps its simulation at full speed for
 // its own hit stops too, and so does the joiner: in a session others see
 // what each node simulates. A blow the shield stops (playerBlocked),
-// landed alone, freezes the screen that landed it and only that one.
+// landed alone, freezes the screen that landed it and only that one; a
+// perfect block (perfectBlock), landed alone, freezes and flashes the
+// screen that landed it and only that one, and the other draws its sparks.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -32,7 +34,7 @@ Window {
     property int failures: 0
 
     readonly property var kinds: ["enemyHit", "enemyBlocked", "enemyDeath",
-        "playerHit", "playerBlocked", "parry", "projectileHit",
+        "playerHit", "playerBlocked", "perfectBlock", "parry", "projectileHit",
         "projectileDeflected", "projectileBurst"]
 
     function check(ok, what) {
@@ -178,8 +180,13 @@ Window {
             // The host's own hit stop held the picture only
             check(!sent.slowed, "the host keeps its simulation at full speed for its own hits")
         }],
-        // A block alone: it freezes the screen that landed it, only that one
-        [300, () => landHits(joiner, host, ["playerBlocked"])],
+        // A block alone: it freezes the screen that landed it, only that one.
+        // The host's enemies stand from here on: a lunge that hit a knight
+        // meanwhile froze and flashed that knight's screen for its own hit
+        [300, () => {
+            for (let e of host.enemies) if (e && !e.destroyed) e.halt()
+            landHits(joiner, host, ["playerBlocked"])
+        }],
         [300, () => {
             probes = []
             check(sent.froze && sent.shook,
@@ -188,6 +195,22 @@ Window {
             check(!seen.froze && !seen.shook,
                   "the host neither hit-stops nor kicks for the joiner's block (froze "
                   + seen.froze + ", shook " + seen.shook + ")")
+        }],
+        // A perfect block alone: it freezes and flashes the screen that
+        // landed it, only that one; the other draws its sparks
+        [300, () => landHits(joiner, host, ["perfectBlock"])],
+        [300, () => {
+            seen.particles1 = particles(host)
+            probes = []
+            check(sent.froze && sent.flashed,
+                  "the joiner hit-stops and flashes for its own perfect block (froze "
+                  + sent.froze + ", flashed " + sent.flashed + ")")
+            check(!seen.froze && !seen.flashed && !seen.shook,
+                  "the host neither hit-stops, flashes nor shakes for the joiner's perfect block (froze "
+                  + seen.froze + ", flashed " + seen.flashed + ", shook " + seen.shook + ")")
+            check(seen.particles1 > seen.particles0,
+                  "the host draws the joiner's perfect block (" + seen.particles0 + " -> "
+                  + seen.particles1 + " particles)")
         }],
         [100, () => {
             console.log("[Impacts] done,", failures, "failed")

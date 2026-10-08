@@ -7,7 +7,12 @@
 // minTelegraph, and a lunge is open to a parry for exactly parryFrames
 // steps. A hit the shield does not stop gives the knight hurtGrace seconds
 // in which no damage lands, and its view flickers for as long; a blocked
-// hit gives none. A lunge or a shot that lands in the grace plays no hit.
+// hit gives none. A shield raised at most knight.perfectBlockFrames steps
+// before a blow, after it was down knight.perfectBlockRearm steps, takes
+// it whole, gives knight.perfectBlockMana back and staggers a lunging
+// grunt for knight.perfectBlockStagger seconds; raised a step earlier or
+// re-armed a step short, it blocks with the chip.
+// A lunge or a shot that lands in the grace plays no hit.
 // A lunge the shield stops plays the shield's block once and no hit,
 // flashes the shield and throws the grunt block.recoil wu back.
 // A raised shield drains knight.blockDrain mana per second and drops at
@@ -173,12 +178,71 @@ Window {
             p.takeDamage(20, p.xWu - 1, p.yWu)
             check(p.hp < afterHit, "after the grace a hit lands again (" + afterHit + " -> " + p.hp + " HP)")
 
-            // A hit the shield stops gives no grace
+            // A hit the held shield stops gives no grace
             Clayground.physicsStep(graceSteps)
             p.isBlocking = true
+            Clayground.physicsStep(Balance.knight.perfectBlockFrames + 1)
             p.takeDamage(20, p.xWu + 1, p.yWu)
             check(p.graceLeft === 0, "a blocked hit gives no grace")
             p.isBlocking = false
+
+            // A shield raised at most perfectBlockFrames steps before a blow
+            // blocks it perfectly: no damage, mana back. Raised a step
+            // earlier, it blocks with the chip; down for less than
+            // perfectBlockRearm steps before it rose, it is no perfect block
+            let pf = Balance.knight.perfectBlockFrames
+            let rearm = Balance.knight.perfectBlockRearm
+            Clayground.physicsStep(rearm)
+            p.mana = p.maxMana - 10
+            p.isBlocking = true
+            Clayground.physicsStep(pf)
+            let before = p.hp, manaBefore = p.mana
+            let res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            check(res === "perfect" && p.hp === before && p.graceLeft === 0
+                  && Math.abs(p.mana - (manaBefore + Balance.knight.perfectBlockMana)) < 1e-3,
+                  "a shield raised " + pf + " steps before a blow blocks it perfectly ("
+                  + res + ", " + before + " -> " + p.hp + " HP, mana "
+                  + manaBefore.toFixed(2) + " -> " + p.mana.toFixed(2) + ")")
+            p.isBlocking = false
+            Clayground.physicsStep(rearm)
+            p.isBlocking = true
+            Clayground.physicsStep(pf)
+            let open = p.perfectGuard
+            Clayground.physicsStep(1)
+            before = p.hp
+            res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            check(open === true && res === "blocked" && p.hp < before,
+                  "raised " + (pf + 1) + " steps before a blow, a step after its perfect window ("
+                  + open + "), it blocks with the chip (" + res + ", " + before + " -> " + p.hp + " HP)")
+            p.isBlocking = false
+            Clayground.physicsStep(rearm - 1)
+            p.isBlocking = true
+            let armed = p.perfectGuard
+            before = p.hp
+            res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            check(armed === false && res === "blocked" && p.hp < before,
+                  "a shield down for only " + (rearm - 1) + " steps before it rose has no perfect window ("
+                  + armed + ") and blocks with the chip (" + res + ", " + before + " -> " + p.hp + " HP)")
+            p.isBlocking = false
+            // A lunge blocked perfectly staggers the grunt. Out of the AI's
+            // hands while the shield re-arms: it gets its target only for
+            // the blow itself
+            let pg = only("grunt")
+            pg.target = null
+            Clayground.physicsStep(rearm)
+            pg.xWu = p.xWu + 0.5
+            pg.yWu = p.yWu
+            pg.target = p
+            p.isBlocking = true
+            pg.performAttack()
+            check(pg.aiState === "stagger"
+                  && Math.abs(pg._attackTimer - Balance.knight.perfectBlockStagger) < 1e-6,
+                  "a lunge blocked perfectly staggers the grunt for "
+                  + pg._attackTimer.toFixed(3) + " s, the table says "
+                  + Balance.knight.perfectBlockStagger + " (" + pg.aiState + ")")
+            p.isBlocking = false
+            pg.target = null
+            Clayground.physicsStep(Math.round(Balance.knight.perfectBlockStagger / stepS) + 1)
 
             // In the grace a lunge and a shot play no hit. A stand-in for the
             // game records what the attacker would show and play.

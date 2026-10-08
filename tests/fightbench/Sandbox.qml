@@ -36,7 +36,8 @@ Item {
     property var _rng: null
 
     // Pauses the world and enters the fight room; the driver steps from here.
-    // answer is how the knight meets an attack: "mix", "block" or "parry";
+    // answer is how the knight meets an attack: "mix", "block", "parry" or
+    // "perfect";
     // depth is the depth the fight room is at.
     function begin(s, a, d) {
         Clayground.paused = true
@@ -70,6 +71,7 @@ Item {
             damageTaken: r.damageTaken,
             parries: r.parries,
             blocks: r.blocks,
+            perfectBlocks: r.perfectBlocks,
             kills: r.kills,
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
@@ -82,11 +84,15 @@ Item {
     // ---- the scripted knight ----
     // Each attack an enemy winds up gets one plan: "parry" waits for the
     // parry window and swings into it, "block" raises the shield towards
-    // it. The answer "mix" rolls the plan from the seed, "block" and
-    // "parry" always pick that one. A shot is always blocked.
+    // it, "perfect" keeps the shield down until the lunge is perfectLead
+    // steps from landing and raises it then. The answer "mix" rolls the
+    // plan from the seed between parry and block; "block", "parry" and
+    // "perfect" always pick that one. A shot is always blocked.
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
-    readonly property real parryChance: answer === "block" ? 0
+    // Steps before a lunge lands that the "perfect" plan raises the shield
+    readonly property int perfectLead: 4
+    readonly property real parryChance: answer === "block" || answer === "perfect" ? 0
                                       : answer === "parry" ? 1 : 0.6
 
     Connections {
@@ -144,12 +150,15 @@ Item {
         }
         if (threat) {
             if (!_plans.has(threat))
-                _plans.set(threat, _rng() < parryChance ? "parry" : "block")
+                _plans.set(threat, answer === "perfect" ? "perfect"
+                                   : _rng() < parryChance ? "parry" : "block")
             face(p, threat)
             stand(p)
             if (_plans.get(threat) === "parry") {
                 p.isBlocking = false
                 if (threat.parryWindow && threatDist <= p.attackRange) p.attack()
+            } else if (_plans.get(threat) === "perfect") {
+                p.isBlocking = threat.aiState === "lunge" && threat._lungeSteps <= perfectLead
             } else {
                 p.isBlocking = true
             }

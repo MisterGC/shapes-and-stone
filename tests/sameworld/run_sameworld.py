@@ -14,9 +14,12 @@ enemy of the host's, and each answer is checked on both screens:
   (clayground#369: a sleeping knight saw no enemy walk in)
 - it parries the enemy late in the parry window it shows: the host's enemy
   staggers, and the lunge's blow, on its way by then, does not land
-- it holds its shield toward the enemy, then dashes at it late in the parry
-  window it shows: the lunge is blocked, then dodged, as the joiner judges
-  it; the host receives each result, and shows the joiner's knight's HP.
+- it holds its shield toward the enemy, then raises it just before a lunge
+  lands, then dashes at it late in the parry window it shows: the lunge is
+  blocked, blocked perfectly, then dodged, as the joiner judges it; the host
+  receives each result, and shows the joiner's knight's HP. The perfect
+  block staggers the host's enemy for the table's perfectBlockStagger, on
+  both screens.
   The host's other enemies stand meanwhile, and a lunge that met the knight
   in its grace after another hit (ignored) is tried again
 - it stands in sight of a spitter, which the host makes spit at it three
@@ -398,10 +401,13 @@ def now_ms():
 
 
 def lunge_answers(H, J, b, settle, check):
-    """The joiner's knight holds its shield toward enemy b, then dashes at it
-    late in the parry window it shows: the joiner's screen judges the lunge
-    blocked, then dodged, by its knight's own state, applies its HP and
-    reports; the host receives the report and shows the joiner's HP"""
+    """The joiner's knight holds its shield toward enemy b, then raises it
+    early in the parry window it shows, just before the lunge lands, then
+    dashes at it late in that window: the joiner's screen judges the lunge
+    blocked, blocked perfectly, then dodged, by its knight's own state,
+    applies its HP and reports; the host receives the report and shows the
+    joiner's HP. The perfect block staggers the host's b, which both
+    screens show"""
     # The host's other enemies stop thinking meanwhile: one that hit the
     # knight from behind put it into its grace after a hit, and the knight
     # ignored every lunge of b in it (the block judged "ignored")
@@ -415,7 +421,9 @@ def lunge_answers(H, J, b, settle, check):
 def _lunge_answers(H, J, b, settle, check):
     res = {}
     jid = J.eval1("nodeId")
-    for mode, expect in (("block", "blocked"), ("dodge", "dodged")):
+    doing = {"block": "holds its shield", "perfect": "raises its shield just before the lunge lands",
+             "dodge": "dashes"}
+    for mode, expect in (("block", "blocked"), ("perfect", "perfect"), ("dodge", "dodged")):
         r = res[mode] = {"blows": [], "tries": 0}
         blow = None
         for _ in range(3):
@@ -423,7 +431,8 @@ def _lunge_answers(H, J, b, settle, check):
             # The knight's grace after a hit is over
             settle(lambda: J.eval1("graceLeft()") == 0, 2)
             t0 = now_ms()
-            if not J.eval1(f"guard('{b}', '{mode}', 5)"):
+            staggers0 = [(X.json("staggers") or {}).get(b, 0) for X in (H, J)]
+            if not J.eval1(f"guard('{b}', '{mode}', {3 if mode == 'perfect' else 5})"):
                 break
             # The first blow of b judged after t0 that reached the knight
             got = settle(lambda: any(x[1] == b and x[0] >= t0 for x in (J.json("blows") or [])), 15)
@@ -445,14 +454,19 @@ def _lunge_answers(H, J, b, settle, check):
             if reached and reached[0][2] == "ignored" and reached[0][5] > 0:
                 r.setdefault("inGrace", []).append(reached[0][5])
                 continue
+            # A shield raised a frame too early or too late on this screen
+            # is no perfect block: one more try
+            if mode == "perfect" and reached and reached[0][2] != "perfect":
+                r.setdefault("missed", []).append([reached[0][2], log.get("raise")])
+                continue
             if reached:
                 blow = reached[0]
-                r["log"] = log.get("dodge")
+                r["log"] = log.get("dodge" if mode == "dodge" else "raise")
                 break
         r["result"] = blow[2] if blow else ""
         check(blow is not None and blow[2] == expect,
               f"the joiner's screen judges {b}'s lunge {expect} as the joiner's knight "
-              f"{'holds its shield' if mode == 'block' else 'dashes'} ({r['result'] or 'no blow'}; "
+              f"{doing[mode]} ({r['result'] or 'no blow'}; "
               f"blows {r['blows']}, tries {r['tries']})")
         if not blow:
             continue
@@ -475,10 +489,31 @@ def _lunge_answers(H, J, b, settle, check):
         had.update([h for (u, h) in log if u < t - 300][-1:])
         lost = blow[4]
         r["hp"] = {"after": blow[3], "lost": lost, "hostShows": hhp, "joinerHad": sorted(had)}
-        check(hhp in had and ((lost == 0) if expect == "dodged" else (lost > 0)),
+        check(hhp in had and ((lost == 0) if expect in ("dodged", "perfect") else (lost > 0)),
               f"the joiner's knight loses {lost} HP to the {expect} lunge (HP {blow[3]} after it), "
               f"and the host shows an HP it had in the 300 ms before (host {hhp}, joiner {sorted(had)})")
+        if mode == "perfect":
+            perfect_stagger(H, J, b, jid, blow, staggers0, r, settle, check)
     return res
+
+
+def perfect_stagger(H, J, b, jid, blow, staggers0, r, settle, check):
+    """The joiner's perfect block of b's lunge staggered the host's b: the
+    host received the stagger with the table's length, and b staggered on
+    both screens"""
+    seconds = H.eval1("Balance.knight.perfectBlockStagger")
+    got = settle(lambda: all((X.json("staggers") or {}).get(b, 0) > n
+                             for X, n in zip((H, J), staggers0)), 1.5)
+    sent = [x for x in (H.json("received") or []) if x[1] == b and x[2] == "stagger"
+            and x[0] >= blow[0] - 50]
+    r["stagger"] = {"sent": [x[3] for x in sent],
+                    "host": (H.json("staggers") or {}).get(b, 0) - staggers0[0],
+                    "joiner": (J.json("staggers") or {}).get(b, 0) - staggers0[1]}
+    check(sent and sent[0][3] and sent[0][3].get("seconds") == seconds,
+          f"the joiner's perfect block sends the host a stagger of {b} for {seconds} s "
+          f"({r['stagger']['sent']})")
+    check(got, f"the perfect block staggers {b} on both screens "
+          f"(host {r['stagger']['host']}, joiner {r['stagger']['joiner']} staggers)")
 
 
 def shot_answers(H, J, s, settle, check):
