@@ -75,7 +75,9 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
-block, parry, get hurt and dash at the same moment, and saves a PNG per pose:
+block, parry, get hurt, run their shields low and dry and dash at the same
+moment, and saves a PNG per pose (`hurt`, `lowMana` and `shieldBreak` among
+them). It needs a window: offscreen it saves the HUD but not the world.
 
 ```
 cp build/.qsb/src/shaders/*.qsb src/shaders/
@@ -91,7 +93,10 @@ A hit shakes, kicks, flashes and hit-stops only the screen of the player who
 landed or took it; the other screens draw its sparks and shards only. The
 impact bench starts a host and a joiner in one process, joins them over LAN,
 lands every kind of hit on each side, then a block alone and a perfect
-block alone, and exits with the number of failed checks:
+block alone, then a real hit on the joiner's knight and its shield run
+dry - the screen flash, the HP chunk and the mana bar's flash stay on the
+joiner's screen, and the host draws the shards - and exits with the number
+of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
@@ -287,7 +292,11 @@ steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
 steps of a lunge are open to a parry. A hit the shield does not stop gives
 the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
-white for as long, and a lunge or a shot in it plays no hit. A blow the
+white for as long, and a lunge or a shot in it plays no hit. A hit that
+lands reads as a hurt: the knight flashes red (`hurt.color`) for
+`hurt.flash` seconds before the white flicker, plays its own hurt sound (a
+low thud, never the sword's punch), and the HP it lost stays on the HP bar
+as a pale chunk that drains away over `hurt.chunkDrain` seconds. A blow the
 shield stops reads as a success, not a smaller hit: the shield flashes
 white and bumps out, the knight's screen freezes for a moment with a kick,
 the shield sounds its own block - the impact sample pitched up, once - and
@@ -306,7 +315,13 @@ knight's screen judges the blow and staggers the host's enemy. The shield is
 not free: raised, it drains `knight.blockDrain` mana per second, drops at
 0 and cannot be raised again until a parry gives `knight.parryMana` back
 or the campfire refills it at `campfire.manaPerSecond`; mana does not come
-back on its own.
+back on its own. Below `shieldBreak.lowShare` of the mana the raised
+shield thins and blinks `shieldBreak.blink` times a second; at 0 it breaks
+into grey shards with a crack, on every screen (`acted("shieldBreak")`),
+and the mana bar flashes red. A right-click with no mana answers with a
+dull click and the same flash. The words PARRY and PERFECT show over the
+struck enemy in normal play; damage numbers only with the dojo's
+Mechanics debug on.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -340,7 +355,10 @@ about a minute of wall clock.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
-shield just before a grunt's lunge lands. The `knight.perfectBlock...`
+shield just before a grunt's lunge lands. The hurt and the dry shield are
+tried there too: the grunts hit a knight that stands still, and
+`eval player.mana = 5` makes the raised shield low at once and breaks it
+after about 0.6 s of holding. The `knight.perfectBlock...`
 values and the `perfectBlock` group are read from `src/Balance.qml` on
 every blow, so an edit of them changes the next fight after a reload.
 
