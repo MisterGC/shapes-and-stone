@@ -1075,6 +1075,155 @@ Window {
             Clayground.paused = false
             console.log("[Answer] whirlwind done,", failures, "failed")
         }],
+        [() => true, () => {
+            // The knock-back: in the fight room's middle, the others idle
+            Clayground.paused = true
+            let p = game.player
+            let k = Balance.knight
+            let kSteps = Math.round(k.knockbackDuration / stepS)
+            let ready = () => {
+                p.hp = p.maxHp; p.mana = p.maxMana; p.graceLeft = 0
+                p.isBlocking = false; p.shieldLock = 0; p._knockT = 0
+                p.xWu = game._fightRoomCx; p.yWu = game._fightRoomCy
+                Clayground.physicsStep(Balance.knight.perfectBlockRearm)
+            }
+            let moved = (x, y) => Math.sqrt((p.xWu - x) * (p.xWu - x) + (p.yWu - y) * (p.yWu - y))
+            let overlaps = (e) => e.xWu < p.xWu + p.widthWu && p.xWu < e.xWu + e.widthWu
+                && e.yWu - e.heightWu < p.yWu && p.yWu - p.heightWu < e.yWu
+
+            // A grunt's lunge that lands throws the knight back along it,
+            // knockback wu, and off the grunt that covered it
+            ready()
+            let g = only("grunt")
+            g.xWu = p.xWu + 1.5
+            g.yWu = p.yWu
+            g.aiState = "chase"
+            let lunged = stepUntil(g, "lunge"), n = 0
+            while (p.graceLeft === 0 && g.aiState === "lunge" && n < 600) {
+                Clayground.physicsStep(1)
+                n++
+            }
+            let hitX = p.xWu, hitY = p.yWu, covered = overlaps(g)
+            let lx = g._dirToTargetX, ly = g._dirToTargetY
+            g.target = null
+            Clayground.physicsStep(kSteps + 2)
+            let d = moved(hitX, hitY)
+            // Along the lunge: the throw's direction is the lunge's
+            let along = d > 0 ? ((p.xWu - hitX) * lx + (p.yWu - hitY) * ly) / d : 0
+            check(lunged && p.graceLeft > 0 && p.xWu < hitX && Math.abs(d - k.knockback) < 0.1
+                  && along > 0.99,
+                  "a lunge that lands from the right throws the knight " + d.toFixed(3)
+                  + " wu along it (" + along.toFixed(3) + "), the table says " + k.knockback)
+            check(!overlaps(g),
+                  "after the knock-back the grunt no longer covers the knight (covered at the hit: "
+                  + covered + ", gap " + (g.xWu - p.xWu - p.widthWu).toFixed(3) + " wu)")
+            check(p._knockT === 0 && p.body.linearVelocity.x === 0,
+                  "the knock-back is over after " + kSteps + " steps and the knight stands")
+
+            // A blow the held shield stops, one it stops perfectly and one
+            // a dash dodges throw nothing back
+            ready()
+            p.facingAngle = 0
+            p.isBlocking = true
+            Clayground.physicsStep(Balance.knight.perfectBlockFrames + 1)
+            let x0 = p.xWu, y0 = p.yWu
+            let res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            Clayground.physicsStep(kSteps)
+            check(res === "blocked" && p._knockT === 0 && moved(x0, y0) < 1e-3,
+                  "a blow the held shield stops throws nothing back (" + res + ", moved "
+                  + moved(x0, y0).toFixed(3) + " wu)")
+            ready()
+            p.isBlocking = true
+            Clayground.physicsStep(1)
+            x0 = p.xWu; y0 = p.yWu
+            res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            Clayground.physicsStep(kSteps)
+            check(res === "perfect" && p._knockT === 0 && moved(x0, y0) < 1e-3,
+                  "a blow blocked perfectly throws nothing back (" + res + ", moved "
+                  + moved(x0, y0).toFixed(3) + " wu)")
+            ready()
+            p.dashCooldown = 0
+            p.dash()
+            res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            check(res === "dodged" && p._knockT === 0,
+                  "a blow a dash dodges throws nothing back (" + res + ")")
+            Clayground.physicsStep(Math.ceil(k.dashDuration / stepS) + 1)
+
+            // A crushing blow through the held shield throws it back
+            ready()
+            p.isBlocking = true
+            Clayground.physicsStep(Balance.knight.perfectBlockFrames + 1)
+            x0 = p.xWu; y0 = p.yWu
+            res = p.takeDamage(20, p.xWu + 1, p.yWu, undefined, true)
+            Clayground.physicsStep(kSteps + 2)
+            d = moved(x0, y0)
+            check(res === "crushed" && p.xWu < x0 && Math.abs(d - k.knockback) < 0.1,
+                  "a crushing blow through the held shield throws the knight " + d.toFixed(3)
+                  + " wu back (" + res + ")")
+
+            // A shot that lands throws it along the shot's flight
+            ready()
+            x0 = p.xWu; y0 = p.yWu
+            game.spawnProjectile(p.xWu + 20, p.yWu, -1, 0, 8)
+            let shots = game.room.children.filter(o => o.objectName === "projectile" && !o.destroyed)
+            shots[shots.length - 1].onHitPlayer({ getBody: () => ({ target: p }) })
+            Clayground.physicsStep(kSteps + 2)
+            check(p.xWu < x0 && Math.abs(moved(x0, y0) - k.knockback) < 0.1
+                  && Math.abs(p.yWu - y0) < 0.05,
+                  "a shot flying west that lands throws the knight " + (x0 - p.xWu).toFixed(3)
+                  + " wu west")
+
+            // A wall stops it: the knight 0.3 wu left of the room's east
+            // wall, hit from the west
+            ready()
+            let cs = game.cellSize
+            let row = Math.floor((p.yWu - p.heightWu / 2) / cs)
+            let gx = Math.floor(p.xWu / cs)
+            while (gx < game.gridWidth && game.grid[row][gx] !== game.cellWall) gx++
+            let wallX = gx * cs
+            p.xWu = wallX - p.widthWu - 0.3
+            Clayground.physicsStep(1)
+            x0 = p.xWu
+            res = p.takeDamage(20, p.xWu - 1, p.yWu)
+            Clayground.physicsStep(kSteps + 2)
+            // The knight's body is a circle of 0.45 of its width
+            let edge = p.xWu + p.widthWu * 0.95
+            check(res === "hit" && p.xWu > x0 && p.xWu - x0 < k.knockback && edge <= wallX + 0.02,
+                  "a hit towards a wall 0.3 wu away throws the knight " + (p.xWu - x0).toFixed(3)
+                  + " wu, up to the wall (its body's edge " + edge.toFixed(3)
+                  + ", the wall " + wallX + ")")
+
+            // A pause holds it: hit, then the world stands for a while
+            ready()
+            res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            Clayground.physicsStep(2)
+            kept = {x: p.xWu, y: p.yWu, t: p._knockT}
+        }],
+        [500, () => {
+            let p = game.player
+            check(kept.t > 0 && p._knockT === kept.t && p.xWu === kept.x && p.yWu === kept.y,
+                  "paused 500 ms two steps into a knock-back, the knight holds ("
+                  + kept.t.toFixed(3) + " -> " + p._knockT.toFixed(3) + " s left)")
+            // A full hit stop holds it the same
+            Clayground.paused = false
+            game.hitStop(1500, 0)
+            kept = {x: p.xWu, y: p.yWu, t: p._knockT}
+        }],
+        [500, () => {
+            let p = game.player
+            check(game.hitStopActive && p._knockT === kept.t
+                  && Math.abs(p.xWu - kept.x) < 1e-3 && Math.abs(p.yWu - kept.y) < 1e-3,
+                  "500 ms into a full hit stop the knock-back holds ("
+                  + kept.t.toFixed(3) + " -> " + p._knockT.toFixed(3) + " s left)")
+        }],
+        [() => !game.hitStopActive, () => {}],
+        [300, () => {
+            let p = game.player
+            check(p._knockT === 0 && p.xWu < kept.x,
+                  "after the hit stop the knock-back runs on and out (moved "
+                  + (kept.x - p.xWu).toFixed(3) + " wu)")
+            console.log("[Answer] knock-back done,", failures, "failed")
+        }],
         // Torn down before quitting, as the other benches do
         [300, () => game.destroy()],
         [300, () => Qt.exit(failures)]
