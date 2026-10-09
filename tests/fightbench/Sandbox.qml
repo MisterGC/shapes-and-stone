@@ -58,6 +58,11 @@ Item {
         whirlsStarted = 0
         _whirlPending = false
         game.applyScenario("fight", depth)
+        // The bench tries the moves, not the mana they cost: plenty of it
+        if (game.player) {
+            game.player.maxMana = 1000
+            game.player.mana = 1000
+        }
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind") bench.whirlsStarted++

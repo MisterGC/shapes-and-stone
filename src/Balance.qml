@@ -34,12 +34,23 @@ QtObject {
         shieldArc: 60,
         blockedShare: 0.3,
         blockSpeed: 0.4,    // share of move and dash speed while blocking
-        // Mana a raised shield drains per second; at 0 the shield drops and
-        // does not rise again until a parry or the rest below gives some back
-        blockDrain: 8,
+        // Mana pays for what the knight does: a raised shield drains
+        // blockDrain per second, a blow it stops costs blockMana, a dash
+        // dashMana and a whirlwind whirlMana, its dash included. At 0 the
+        // shield drops and does not rise again until a parry or the rest
+        // below gives some back. Without the mana a dash does not start and
+        // a whirlwind is a heavy swing; the knight shows noManaWord in
+        // noManaColor, clicks empty and flashes the mana bar
+        blockDrain: 1,
+        blockMana: 6,
+        dashMana: 8,
+        whirlMana: 20,
+        noManaWord: "NO MANA",
+        noManaColor: "#C080FF",
         parryMana: 10,
-        // With the shield down manaRegenDelay seconds, mana comes back at
-        // manaRegen per second: resting gives the block back
+        // With the shield down and no mana spent for manaRegenDelay
+        // seconds, mana comes back at manaRegen per second: resting gives
+        // the block back
         manaRegen: 4,
         manaRegenDelay: 1.5,
         // Perfect block: a shield raised at most this many physics steps
@@ -368,11 +379,11 @@ QtObject {
         // Sharpened sword: added to the knight's atk
         swordAtk: 5,
         // Reinforced shield: a held block lets this share through instead
-        // of knight.blockedShare, and a raised shield drains this much mana
-        // per second instead of knight.blockDrain. The perfect block's
-        // window stays the same
+        // of knight.blockedShare, and a blow it stops costs this much mana
+        // instead of knight.blockMana. The perfect block's window stays
+        // the same
         shieldBlockedShare: 0.15,
-        shieldBlockDrain: 6
+        shieldBlockMana: 4
     })
 
     readonly property var campfire: ({

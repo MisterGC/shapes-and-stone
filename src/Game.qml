@@ -2852,8 +2852,8 @@ ClayWorld2d {
             { id: "sword", label: "Sharpened sword (+" + Balance.shop.swordAtk + " damage)",
               price: Balance.shop.upgradePrice },
             { id: "shield", label: "Reinforced shield (a block lets "
-                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, drains "
-                  + Balance.shop.shieldBlockDrain + " mana/s)",
+                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, costs "
+                  + Balance.shop.shieldBlockMana + " mana)",
               price: Balance.shop.upgradePrice }
         ])
 

@@ -121,6 +121,7 @@ PhysicsItem {
                 gameWorld.countFight("block")
                 if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, "blocked")
             }
+            if (entity.payBlock) entity.payBlock()
             vanish()
             return
         }

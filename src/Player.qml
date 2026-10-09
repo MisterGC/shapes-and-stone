@@ -57,12 +57,13 @@ PhysicsItem {
     // The smith's one upgrade of the run: "sword", "shield" or "" before
     // it. Every effect reads it live, so setting it applies it at once
     property string upgrade: ""
-    // The share of a blow a held block lets through, and the mana a raised
-    // shield drains per second: a reinforced shield's are lower
+    // The share of a blow a held block lets through, and the mana a blow
+    // the shield stops costs: a reinforced shield's are lower
     readonly property real blockedShare: upgrade === "shield" ? Balance.shop.shieldBlockedShare
                                                               : Balance.knight.blockedShare
-    readonly property real blockDrain: upgrade === "shield" ? Balance.shop.shieldBlockDrain
-                                                            : Balance.knight.blockDrain
+    readonly property real blockMana: upgrade === "shield" ? Balance.shop.shieldBlockMana
+                                                           : Balance.knight.blockMana
+    readonly property real blockDrain: Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
@@ -97,6 +98,8 @@ PhysicsItem {
     property int _steps: 0
     property int _raisedAt: -1000
     property int _loweredAt: -1000
+    // The physics step mana was last spent on: the rest starts over
+    property int _spentAt: -1000
     // The shield was down long enough before it rose
     property bool _rearmed: true
     // A blow the shield meets now is blocked perfectly
@@ -165,7 +168,7 @@ PhysicsItem {
                     _shieldBreak()
                 }
             } else if (!fallen && mana < maxMana
-                       && (_steps - _loweredAt) * dt >= Balance.knight.manaRegenDelay) {
+                       && (_steps - Math.max(_loweredAt, _spentAt)) * dt >= Balance.knight.manaRegenDelay) {
                 // Down long enough, the shield's mana comes back
                 mana = Math.min(maxMana, mana + Balance.knight.manaRegen * dt)
             }
@@ -522,6 +525,7 @@ PhysicsItem {
             if (gameWorld) gameWorld.playBlock()
             view.block()
             acted("block")
+            payBlock()
         }
         hp = Math.max(0, hp - finalDamage)
         if (gameWorld) {
@@ -599,7 +603,7 @@ PhysicsItem {
     function _crushed(damage, attackerX, attackerY, attackerSize, alongX, alongY) {
         let e = Balance.enemy
         let finalDamage = Math.max(Balance.minDamage, Math.floor(damage * e.crushShare))
-        mana = Math.max(0, mana - e.crushMana)
+        _spend(e.crushMana)
         shieldLock = e.crushLockout
         isBlocking = false
         hp = Math.max(0, hp - finalDamage)
@@ -624,6 +628,36 @@ PhysicsItem {
         return "crushed"
     }
 
+    // Mana spent: the rest before it comes back starts over
+    function _spend(amount) {
+        mana = Math.max(0, mana - amount)
+        _spentAt = _steps
+    }
+    // Whether the knight has amount mana; without it, it says so - the
+    // word over it, the empty click and the mana bar's flash - so a
+    // refused move is never a dead input
+    function _afford(amount) {
+        if (mana >= amount) return true
+        _noMana()
+        return false
+    }
+    function _noMana() {
+        if (!gameWorld) return
+        gameWorld.playShieldEmpty()
+        gameWorld.flashManaBar()
+        if (gameWorld.spawnWord)
+            gameWorld.spawnWord(xWu, yWu + 0.4, Balance.knight.noManaWord, Balance.knight.noManaColor)
+    }
+    // A blow the raised shield stopped, a lunge or a shot: it costs
+    // blockMana, and the shield breaks if that empties it
+    function payBlock() {
+        _spend(blockMana)
+        if (mana <= 0 && isBlocking) {
+            isBlocking = false
+            _shieldBreak()
+        }
+    }
+
     // The shield ran dry while raised: it breaks, with a crack, and the
     // mana bar flashes
     function _shieldBreak() {
@@ -643,10 +677,7 @@ PhysicsItem {
         // Broken by a crushing blow: it rises when the lockout is over
         if (shieldLock > 0) return
         if (mana <= 0) {
-            if (gameWorld) {
-                gameWorld.playShieldEmpty()
-                gameWorld.flashManaBar()
-            }
+            _noMana()
             return
         }
         isBlocking = true
@@ -684,6 +715,14 @@ PhysicsItem {
         // A heavy swing just let go of turns into a whirlwind; a full
         // charge still held waits whirlWindow steps for its release
         let whirl = isAttacking && isHeavy && _steps - _fullLetGoAt <= Balance.knight.whirlWindow
+        // A dash costs dashMana, a whirlwind whirlMana with its dash;
+        // without the whirlwind's, the dash goes on as one
+        if (!_afford(Balance.knight.dashMana)) return
+        if (whirl && mana < Balance.knight.whirlMana) {
+            whirl = false
+            _noMana()
+        }
+        _spend(whirl ? Balance.knight.whirlMana : Balance.knight.dashMana)
         let kept = whirl ? new Set(_hitThisSwing) : null
         if (_charge === "full" && !whirl) _dashedFullAt = _steps
         else _cancelCharge()
@@ -820,9 +859,15 @@ PhysicsItem {
 
     function _onSwingReleased() {
         // Let go of within the window after the dash started: a whirlwind
-        if (_charge === "full" && isDashing && !isWhirling
-                && _steps - _dashedFullAt <= Balance.knight.whirlWindow) _whirl()
-        else if (_charge === "full") heavyAttack()
+        // its dash paid dashMana already, the whirlwind the rest of
+        // whirlMana; without it, the charge swings heavy
+        let whirlRest = Balance.knight.whirlMana - Balance.knight.dashMana
+        let inWindow = _charge === "full" && isDashing && !isWhirling
+            && _steps - _dashedFullAt <= Balance.knight.whirlWindow
+        if (inWindow && _afford(whirlRest)) {
+            _spend(whirlRest)
+            _whirl()
+        } else if (_charge === "full") heavyAttack()
         else if (_charge === "" || _charge === "charging" || _charge === "normal") attack()
         _charge = ""
     }
