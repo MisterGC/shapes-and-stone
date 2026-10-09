@@ -206,6 +206,14 @@ QtObject {
         flashColor: "#FFFFFF"
     })
 
+    // A grunt or a guardian winding up its lunge screams like a goblin,
+    // fading with the distance as the crushing blow's growl does: the
+    // sample pitched by tierPitch semitones (weak, normal, tough) at volume
+    readonly property var scream: ({
+        tierPitch: [3, 0, -3],
+        volume: 0.7
+    })
+
     // A crushing blow (enemy.crush...) reads as its own: while it winds up
     // the enemy glows glow, white-hot, a halo of halo times its size at
     // haloOpacity around it; its ring is ringColor, thickness times the

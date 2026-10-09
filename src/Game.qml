@@ -214,6 +214,23 @@ ClayWorld2d {
         if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
     }
 
+    // A grunt or a guardian winds up its lunge: a goblin's scream, pitched
+    // by its tier (Balance.scream), fading as the growl does
+    Sound {
+        id: screamSound
+        source: "assets/goblin_scream.wav"
+        volume: muted ? 0 : Balance.scream.volume
+    }
+    function playScream(xWu, yWu, tier) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        let pitch = Balance.scream.tierPitch[Math.max(0, Math.min(2, tier))] || 0
+        if (gain > 0) screamSound.triggerNote(screamSound.rootNote + pitch, gain)
+    }
+
     Sound {
         id: innkeeperGreeting
         source: "assets/innkeeper_greeting.wav"

@@ -551,7 +551,10 @@ PhysicsItem {
     onAiStateChanged: {
         followPath.running = !remote && (aiState === "patrol" || aiState === "chase")
         // A crushing blow from its wind-up to its landing; it growls as
-        // it winds up, on every screen
+        // it winds up, on every screen. A lunge's wind-up screams
+        if (aiState === "telegraph" && enemyType !== "spitter"
+                && gameWorld && gameWorld.playScream)
+            gameWorld.playScream(xWu, yWu, tier)
         if (aiState === "crush") {
             crushing = true
             if (gameWorld && gameWorld.playCrushGrowl) gameWorld.playCrushGrowl(xWu, yWu)
