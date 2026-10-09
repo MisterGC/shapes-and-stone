@@ -75,7 +75,11 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
-block, parry, get hurt and dash at the same moment, and saves a PNG per pose:
+block, parry, get hurt, run their shields low and dry and dash at the same
+moment, and saves a PNG per pose (`hurt`, `lowMana`, `shieldBreak`,
+`charging`, `heavy`, `whirlwind`, and `sword` and `shield` for the smith's upgrades,
+on the local knight only, among them). It needs a window: offscreen it saves
+the HUD but not the world.
 
 ```
 cp build/.qsb/src/shaders/*.qsb src/shaders/
@@ -90,8 +94,11 @@ next to a `lib` link to Qt's `lib` loads them.
 A hit shakes, kicks, flashes and hit-stops only the screen of the player who
 landed or took it; the other screens draw its sparks and shards only. The
 impact bench starts a host and a joiner in one process, joins them over LAN,
-lands every kind of hit on each side and exits with the number of failed
-checks:
+lands every kind of hit on each side, then a block alone and a perfect
+block alone, then a real hit on the joiner's knight and its shield run
+dry - the screen flash, the HP chunk and the mana bar's flash stay on the
+joiner's screen, and the host draws the shards - and exits with the number
+of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
@@ -113,7 +120,11 @@ host's id, and goes on every screen once the knight's screen has judged
 it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
-five seconds, kills one from the joiner and lets the joiner's knight
+five seconds (the joiner shows the parry ring of the host's enemies),
+has one of the host's enemies wind up a crushing blow (the joiner shows
+its `"crush"` state white-hot with the doubled ring, and its lunge with no
+parry window) and the joiner's knight judge one on its held shield,
+kills one from the joiner and lets the joiner's knight
 fall, and exits with the number of failed checks:
 
 ```
@@ -124,13 +135,16 @@ The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
 connected over Local (LAN) or Cloud signaling and started on a fixed seed.
 The joiner's knight answers one of the host's enemies: it stands until the
-enemy walks into its reach and swings, parries it, blocks and dodges its
-lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
+enemy walks into its reach and swings, parries it, blocks, blocks
+perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
 kills it while the host's knight kills another. Each answer counts once,
-on both screens: the same HP, the stagger, the shove, the death and its
+on both screens: the same HP, the stagger of a parry and of a perfect
+block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
 the joiner's knight and reported to the host, and a shot that goes on the
-host's screen when the report arrives. Then both knights fight for
+host's screen when the report arrives. The enemy it answers winds up no
+crushing blow: the answers are timed on its parry window, which a
+crushing blow does not open. Then both knights fight for
 eight seconds while each screen records every enemy it shows - its id, position,
 HP and AI state - every frame. It exits with the number of failed checks;
 `--fault stale` makes the joiner apply none of the host's enemy states, and
@@ -155,7 +169,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike, RMB shield, Shift dash, E talk, 1 potion, M mute and Esc menu.
+LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, M
+mute and Esc menu.
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -232,17 +247,40 @@ claims the drops its own knight reaches, and the host gives each to the
 first claim it gets and despawns it, so a drop is picked up once, by one
 knight; each knight's gold is its own node's. In the village the
 innkeeper sells a health potion and the smith one upgrade for the run,
-more damage or more max HP, through the dialogue panel: E talks, 1 and 2
-buy what the panel offers. Outside the panel, 1 drinks a potion. The
+the sword or the shield, through the dialogue panel: E talks, 1 and 2
+buy what the panel offers, each ware named with its effect. A sharpened
+sword adds `shop.swordAtk` to the knight's attack and shows a brighter,
+wider blade edge; a reinforced shield lets `shop.shieldBlockedShare` of a
+blow through a held block instead of `knight.blockedShare`, drains
+`shop.shieldBlockDrain` mana per second instead of `knight.blockDrain`,
+and shows a lighter rim. The perfect block's window is the same with
+either. The smith sells one of the two per run and refuses a second. The
+knight reads its `upgrade` live, so in the dojo's fight scenario
+`eval player.upgrade = "sword"` (or `"shield"`, or `""`) applies it at
+once. Outside the panel, 1 drinks a potion. The
 campfire stays the healer. Gold, potions and the upgrade go with the
 knight to the next level; a new run starts without them. Prices and
 effects are the table's `shop` group. The gold bench brings one knight to
-a drop, to the innkeeper and the smith, then a host and a joiner joined
+a drop, to the innkeeper and the smith - it buys the sword, is refused the
+shield, and in the next run buys the shield, blocks a 20-attack blow and
+measures the drain - then a host and a joiner joined
 over LAN to three drops, one with both knights on it, and exits with the
 number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gold/gold.qml
+```
+
+While a dialogue is open the knight stands: movement and the dash do
+nothing, so it cannot walk off or take the stairs with the panel still up,
+and a key held when the panel closes moves it again. Esc closes the
+dialogue; only without one it opens the menu. The dialogue bench talks to
+the innkeeper, holds D and presses Space with the panel up, walks on once
+it closes, closes it again with Esc, and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 ```
 
 The HUD shows "Depth N" under the bars; a village counts as the depth of
@@ -287,8 +325,8 @@ physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
 A new fight timing belongs on the same clock. The clock bench pauses the
 game, puts an enemy into its telegraph and the knight into its cooldowns,
-single-steps them on, hit-stops them, and exits with the number of failed
-checks:
+single-steps them on, hit-stops them (the parry ring with them), and exits
+with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
@@ -297,13 +335,95 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
 Every enemy attack can be read and answered. An attack runs on the physics
 steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
-steps of a lunge are open to a parry. A hit the shield does not stop gives
-the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
-white for as long, and a lunge or a shot in it plays no hit. The shield is
-not free: raised, it drains `knight.blockDrain` mana per second, drops at
+steps of a lunge are open to a parry. The wind-up shows when: a thin
+ring in the telegraph colour closes from twice the enemy's size onto its
+outline and reaches it on the step the parry window opens, then stays
+white for the window; a spitter's shot gets the same ring, closing as the
+shot leaves, without the white. The ring runs on the physics steps, so a
+pause or a hit stop holds it; the `parryRing` group of the table holds
+its size, thickness and colour. On the other screens of a session it
+follows the host's telegraph and parry window. A hit the shield does not
+stop gives the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
+white for as long, and a lunge or a shot in it plays no hit. A hit that
+lands reads as a hurt: the knight flashes red (`hurt.color`) for
+`hurt.flash` seconds before the white flicker, plays its own hurt sound (a
+low thud, never the sword's punch), and the HP it lost stays on the HP bar
+as a pale chunk that drains away over `hurt.chunkDrain` seconds. A blow the
+shield stops reads as a success, not a smaller hit: the shield flashes
+white and bumps out, the knight's screen freezes for a moment with a kick,
+the shield sounds its own block - the impact sample pitched up, once - and
+the attacker recoils off it; the `block` group of the table holds each of
+these values. A shield raised at most `knight.perfectBlockFrames` steps
+before a blow from inside its arc blocks it perfectly: no damage, no
+chip, `knight.perfectBlockMana` mana back, and a lunging attacker
+staggers for `knight.perfectBlockStagger` seconds. It counts only if the
+shield was down at least `knight.perfectBlockRearm` steps before it rose,
+so mashing the right button does not keep the window open; the held
+shield still blocks with the chip. A perfect block flashes the shield
+longer and the knight pale blue, sparks fly around a ring on every
+screen, and the knight's own screen freezes, flashes and pulses; the
+`perfectBlock` group of the table holds these values. In co-op the
+knight's screen judges the blow and staggers the host's enemy. The shield is
+not free: raised, it drains `knight.blockDrain` mana per second (less
+with the smith's reinforced shield), drops at
 0 and cannot be raised again until a parry gives `knight.parryMana` back
 or the campfire refills it at `campfire.manaPerSecond`; mana does not come
-back on its own.
+back on its own. Below `shieldBreak.lowShare` of the mana the raised
+shield thins and blinks `shieldBreak.blink` times a second; at 0 it breaks
+into grey shards with a crack, on every screen (`acted("shieldBreak")`),
+and the mana bar flashes red. A right-click with no mana answers with a
+dull click and the same flash. The hurt flash, the HP chunk, the blink,
+the shards and the mana bar's flash count physics steps like the grace: a
+pause, a single step or the hit stop holds them. The words PARRY and
+PERFECT show over the
+struck enemy in normal play; damage numbers only with the dojo's
+Mechanics debug on.
+The left button swings when it is let go of before `knight.chargeStart`, so
+a click plays as it always did. Held longer, the knight charges a heavy
+swing: it moves at `knight.chargeSpeed` of its speed, its blade, drawn
+back, glows brighter, and at `knight.chargeTime` the charge is full - a
+ring flashes out with a high tick. Let go of then, it swings a wide heavy
+blow: `knight.heavySwing` times atk, within `knight.heavyArc` and
+`knight.heavyRange` times the swing's reach. It goes through a guardian's
+shield, which staggers, and knocks enemies back `knight.heavyKnockback`
+times as far. Let go of before it is full, it is a normal swing; held
+`knight.chargeHold` past full, the knight lets it go at normal strength,
+so no charge is carried around. A hit taken while charging, a raised
+shield or a dash cancels it, and its release swings nothing; behind the
+shield or in a dash the button swings at once, as it always did. The
+charge counts the physics steps (Clayground's `InputAction` on the
+physics world), so a pause or a hit stop holds it. The `heavy` group of the
+table holds its glow, ring, sounds and hit feedback (`impact("heavyHit")`).
+The other screens of a session see the charge in the state's `s` (4
+charging, 5 full) and the heavy swing as `acted("heavy")`.
+A full charge let go right around a dash's start - at most
+`knight.whirlWindow` physics steps before or after it - spins the knight
+forward as a whirlwind instead: the dash goes on for `knight.whirlDuration`
+seconds at `knight.whirlSpeed`, no damage taken, the glowing blade turning
+round the knight, and every standing enemy within `knight.whirlReach` of
+it is hit once, `knight.whirlSwing` times atk, through a guardian's
+shield. A heavy swing just let go of turns into the whirlwind, and an
+enemy it hit already is not hit again. Outside the window a full charge
+swings heavy and a dash still cancels the charge. The window counts
+physics steps, so a pause or a hit stop holds it. The `whirl` group of the
+table holds its look, sound and feedback (`impact("whirlwind")` as it
+starts, `impact("heavyHit")` on each enemy it hits); the other screens see
+it as `acted("whirlwind")`.
+Tough grunts and guardians now and then wind up a crushing blow instead
+of a lunge, at `enemy.crushChance` of their attacks: the wind-up takes
+`enemy.crushWindUp` seconds instead of `enemy.windUp`, the enemy glows
+white-hot, its ring is thicker and doubled, and it growls low. A held
+shield breaks against it: `enemy.crushMana` mana gone, the shield down for
+`enemy.crushLockout` seconds - held, the right button raises it again
+after that - and `enemy.crushShare` of the damage lands, a hurt with its
+grace. A perfect block takes it whole and staggers the enemy for the full
+`enemy.stagger`; a dash dodges it. It cannot be parried: its lunge opens
+no parry window and its ring never turns white. The roll comes from the
+run's seed and the level, so a seed plays the same fight. Its AI state is
+`"crush"`, replicated as any other, so every screen of a session shows the
+wind-up; the blow carries `crush` to the knight's screen, which judges it.
+The `crush` group of the table holds its look, its growl and its hit
+feedback (`impact("crushBlow")`).
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -311,8 +431,21 @@ in steps and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
 ```
 
+The ring bench steps a grunt's wind-up in the paused fight room and saves
+it as `ring-0.png`, `ring-50.png` and `ring-100.png` (the parry window
+opening), then the tough guardian's crushing wind-up half way as
+`crush-50.png`; like the knight bench it needs a window and the copied
+shaders:
+
+```
+qml -I build/bin/qml tests/ring/ring.qml -- <out dir>
+```
+
 The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
-damage dealt and taken, parries, attacks the shield stopped, kills, falls
+damage dealt and taken, parries, attacks the shield stopped and those it
+stopped perfectly (`perfectBlocks`, also counted in `blocks`), crushing
+blows that broke the held shield (`crushed`), whirlwinds that hit an
+enemy (`whirlwinds`) and the enemies they hit (`whirlHits`), kills, falls
 and the simulated seconds until no enemy stands. The fight bench plays the
 `fight` scenario with a scripted knight, stepping the paused game through
 the dojo's inspector, and prints the record as JSON; the same seed gives the
@@ -322,15 +455,48 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry] [--depth 0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
 attack: `mix` (the default) parries or blocks as the seed rolls, `block`
-always blocks, `parry` always parries. `--depth` puts the fight room at a
+always blocks, `parry` always parries, `perfect` keeps the shield down
+until a lunge is 4 steps from landing and raises it then, a perfect
+block, `heavy` meets attacks as `mix` does but holds the left button at a
+guardian instead of shield-dashing it and lets the full charge go once the
+guardian is in reach (the report counts them as `heavySwings` and
+`guardBreaks`), `whirlwind` meets attacks as `mix` does but charges a step
+back from the nearest enemy and, full, lets go and dashes at it, by turns
+just before and just after the dash's start (the report counts the
+whirlwinds that landed as `whirlwinds`, their hits as `whirlHits` and the
+ones begun as `whirlsStarted`). A crushing blow is met by the same plan, so a parry finds
+no window; the report counts the crushing wind-ups as `crushBlows`.
+`--depth` puts the fight room at a
 depth: the lineup stays the table's, the enemies hit as hard as there. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
+
+The fight bench plays the dojo's `fight` scenario, so the perfect block is
+tried the same way by hand: reload the dojo into `fight` and raise the
+shield just before a grunt's lunge lands. The hurt and the dry shield are
+tried there too: the grunts hit a knight that stands still, and
+`eval player.mana = 5` makes the raised shield low at once and breaks it
+after about 0.6 s of holding. The `knight.perfectBlock...`
+values and the `perfectBlock` group are read from `src/Balance.qml` on
+every blow, so an edit of them changes the next fight after a reload. The
+charged swing is tried there too: hold the left button while the guardian
+comes and let go once the ring has flashed. So is the crushing blow: the
+room's guardian is tough and winds one up now and then, and
+`crushChance: 1` in the table's `enemy` group, saved and reloaded, makes
+every attack of a tough enemy a crushing one. The reload bench does both
+through the inspector: it changes `knight.chargeTime` in the loaded copy
+of the table, reloads and checks that the charge fills in the new time,
+and it counts the guardian's crushing blows among its attacks before and
+after setting `enemy.crushChance` to 1:
+
+```
+python3 tests/fightbench/run_reload.py
+```
 
 The downloads under PLAY are built by `.github/workflows/package.yml`: by
 hand (*Run workflow*), on a PR that changes `packaging/`, `CMakeLists.txt` or

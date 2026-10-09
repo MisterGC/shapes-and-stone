@@ -113,8 +113,64 @@ ClayWorld2d {
         dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
+    // The shield's own sound: the impact sample pitched up, so a block
+    // never sounds like a hit, and a perfect block higher still
+    function playBlock(gain, perfect) {
+        impactSound.triggerNote(impactSound.rootNote
+                                + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
+                                gain === undefined ? 1 : gain)
+    }
+
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+    // The charged swing: the swing sample pitched down, heavier
+    function playHeavySwing(gain) {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+    // The whirlwind: the swing sample pitched further down, a long spin
+    function playWhirlwind(gain) {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+    // The charge is full: a high tick
+    Sound {
+        id: chargeTickSound
+        source: "assets/menu_change.wav"
+        volume: muted ? 0 : 0.6
+    }
+    function playChargeFull(gain) {
+        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.heavy.tickPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+
+    // The knight's own hurt: a low thud, never the punch of a sword
+    Sound {
+        id: hurtSound
+        source: "assets/knight_hurt.wav"
+        volume: muted ? 0 : 0.8
+    }
+    function playHurt(gain) {
+        hurtSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+
+    // The shield breaking at 0 mana, and the right button with no mana
+    Sound {
+        id: shieldBreakSound
+        source: "assets/shield_break.wav"
+        volume: muted ? 0 : 0.7
+    }
+    function playShieldBreak(gain) {
+        shieldBreakSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+    Sound {
+        id: shieldEmptySound
+        source: "assets/shield_empty.wav"
+        volume: muted ? 0 : 0.6
+    }
+    function playShieldEmpty() {
+        shieldEmptySound.triggerOneShot(1)
     }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
@@ -140,6 +196,22 @@ ClayWorld2d {
 
     function playSpitShot() {
         spitterSound.play()
+    }
+
+    // A tough enemy winds up a crushing blow: a low growl, the spitter's
+    // sample pitched down, fading with the distance from this knight
+    Sound {
+        id: growlSound
+        source: "assets/spitter.wav"
+        volume: muted ? 0 : 0.8
+    }
+    function playCrushGrowl(xWu, yWu) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
     }
 
     Sound {
@@ -210,8 +282,9 @@ ClayWorld2d {
     // --- Impact feedback --------------------------------------------------
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
-    //   kind: enemyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
-    //         parry, projectileHit, projectileDeflected, projectileBurst
+    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
+    //         projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
@@ -242,6 +315,11 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, 7, "#FFE6A0")
             spawnShards(x, y, nx, ny, 4, color, 0.2)
             break
+        case "heavyHit":
+            spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, Balance.heavy.sparks, Balance.heavy.glow)
+            spawnShards(x, y, nx, ny, 6, color, 0.24)
+            spawnRing(x, y, Balance.heavy.glow)
+            break
         case "enemyBlocked":
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
@@ -255,11 +333,25 @@ ClayWorld2d {
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
             break
         case "playerBlocked":
-            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            spawnSparks(x, y, -nx, -ny, Balance.block.sparks, "#CFEFFF")
+            break
+        case "perfectBlock":
+            spawnSparks(x, y, -nx, -ny, Balance.perfectBlock.sparks, "#FFFFFF")
+            spawnRing(x, y, "#BFE6FF")
+            break
+        case "crushBlow":
+            // The held shield broken: sparks and its shards along the blow
+            spawnSparks(x, y, nx, ny, Balance.crush.sparks, Balance.crush.glow)
+            spawnShards(x, y, nx, ny, 6, "#9AA4AC", 0.2)
             break
         case "parry":
             spawnSparks(x, y, nx, ny, 14, "#FFE066")
             spawnRing(x, y, "#FFD700")
+            break
+        case "whirlwind":
+            // The spin starts: a ring round the knight, sparks along the dash
+            spawnSparks(x, y, nx, ny, Balance.whirl.sparks, Balance.whirl.glow)
+            spawnRing(x, y, Balance.whirl.glow)
             break
         case "projectileHit":
         case "projectileBurst":
@@ -273,15 +365,20 @@ ClayWorld2d {
 
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
-            let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, projectileHit: 1,
-                               projectileDeflected: 0.5}[kind] || 0
+            let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
+                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5,
+                               projectileHit: 1, projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
         }
         switch (kind) {
         case "enemyHit":
             _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
+            break
+        case "heavyHit":
+            _trauma(Balance.heavy.trauma)
+            _kick(nx * Balance.heavy.kick, ny * Balance.heavy.kick)
+            _freeze(Balance.heavy.freeze * 1000)
             break
         case "enemyBlocked":
             _trauma(0.12); _freeze(30)
@@ -294,11 +391,31 @@ ClayWorld2d {
             if (screenFx) screenFx.hurt()
             break
         case "playerBlocked":
-            _trauma(0.18); _kick(nx * 0.08, ny * 0.08)
+            // A block is a success: a short freeze and a kick sell that the
+            // shield took it, still well below a hit's
+            _trauma(Balance.block.trauma)
+            _kick(nx * Balance.block.kick, ny * Balance.block.kick)
+            _freeze(Balance.block.freeze * 1000)
+            break
+        case "perfectBlock":
+            _trauma(Balance.perfectBlock.trauma)
+            _freeze(Balance.perfectBlock.freeze * 1000, Balance.perfectBlock.freezeScale)
+            if (screenFx) screenFx.perfectBlock()
+            break
+        case "crushBlow":
+            // Worse than a hit: the shield is gone with it
+            _trauma(Balance.crush.trauma)
+            _kick(nx * Balance.crush.kick, ny * Balance.crush.kick)
+            _freeze(Balance.crush.freeze * 1000)
+            if (screenFx) screenFx.hurt()
             break
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
             if (screenFx) screenFx.parry()
+            break
+        case "whirlwind":
+            _trauma(Balance.whirl.trauma)
+            _kick(nx * Balance.whirl.kick, ny * Balance.whirl.kick)
             break
         case "projectileDeflected":
             _trauma(0.12)
@@ -439,8 +556,8 @@ ClayWorld2d {
         onEnemyBlowReceived: (fromId, blow) => {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
-            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId)
-            else if (blow.kind === "stagger") e.stagger()
+            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true)
+            else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
@@ -511,7 +628,7 @@ ClayWorld2d {
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
-                                                 size: enemy.widthWu})
+                                                 size: enemy.widthWu, crush: enemy.crushing})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -522,9 +639,10 @@ ClayWorld2d {
     // physics steps, as the enemy's attack runs (issue #35); the hold is
     // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
-    // "dodged", "ignored", "out of reach" or "parried". This screen judges
-    // it by its knight's own state, and reports it to the others
-    // (issue #18).
+    // "perfect", "crushed", "dodged", "ignored", "out of reach" or
+    // "parried"; a crushing blow is never parried. This
+    // screen judges it by its knight's own state, and reports it to the
+    // others (issue #18).
     signal knightStruck(string enemyId, string result)
     // Another node's knight met a host's enemy's attack and its node judged
     // it: source "lunge" (id: the enemy's) or "shot" (id: the shot's)
@@ -562,8 +680,9 @@ ClayWorld2d {
     function _landKnightBlow(blow) {
         // The reach is checked here, against where this knight really is
         if (!player) return
+        let crush = blow.crush === true
         let at = _parriedAt[blow.id]
-        if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
+        if (!crush && at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
             _struck(blow.id, "parried")
             return
         }
@@ -573,8 +692,16 @@ ClayWorld2d {
             _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
-        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
-        if (result === "hit" || result === "blocked") playImpact()
+        // A blow sounds the shield's own block or the knight's hurt, in
+        // takeDamage
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush)
+        // A blocked one throws the host's enemy back off the shield; a
+        // perfect block staggers it, as it does an enemy of this node's,
+        // a crushing blow's for the full stagger
+        let e = _enemyById[blow.id]
+        if (result === "blocked" && e && !e.destroyed) e.recoil(player)
+        if (result === "perfect" && e && !e.destroyed)
+            e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -810,15 +937,19 @@ ClayWorld2d {
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            if (mouse.button === Qt.LeftButton) {
-                player.attack()
-            }
-            if (mouse.button === Qt.RightButton) player.isBlocking = true
+            // The left button swings on release, or charges while held
+            if (mouse.button === Qt.LeftButton) player.pressSwing(mouse)
+            if (mouse.button === Qt.RightButton) player.raiseShield()
         }
 
         onReleased: (mouse) => {
-            if (mouse.button === Qt.RightButton && player)
-                player.isBlocking = false
+            if (!player) return
+            if (mouse.button === Qt.LeftButton) player.releaseSwing(mouse)
+            if (mouse.button === Qt.RightButton) player.lowerShield()
+        }
+        onCanceled: if (player) {
+            player.dropSwing()
+            player.lowerShield()
         }
     }
 
@@ -830,8 +961,10 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        // Esc closes an open dialogue; only without one it opens the menu
         if (event.key === Qt.Key_Escape) {
-            if (screen === "game" && player && !fallen) openMenu()
+            if (talking) dialoguePanel.close()
+            else if (screen === "game" && player && !fallen) openMenu()
             event.accepted = true
             return
         }
@@ -879,14 +1012,24 @@ ClayWorld2d {
     Keys.forwardTo: gameCtrl
     function openMenu() {
         // The menu takes the keys, and the keyboard gamepad lets go of what
-        // is held when the focus moves (clayground#413); the shield is the
-        // mouse's, whose release the menu would swallow
-        if (player) player.isBlocking = false
+        // is held when the focus moves (clayground#413); the shield and the
+        // swing are the mouse's, whose release the menu would swallow
+        if (player) {
+            player.lowerShield()
+            player.dropSwing()
+        }
         menuOpen = true
     }
     function closeMenu() {
         menuOpen = false
     }
+    // Where the keys or the touch pad steer the knight, -1..1 on each axis;
+    // every level binds its knight to these. While a dialogue is open the
+    // knight stands, so it cannot walk off and leave the panel up, and a
+    // key still held moves it again once the panel closes
+    readonly property bool talking: dialoguePanel.visible
+    readonly property real knightMoveX: talking ? 0 : gameCtrl.axisX
+    readonly property real knightMoveY: talking ? 0 : -gameCtrl.axisY
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -906,7 +1049,7 @@ ClayWorld2d {
         }
 
         onButtonBPressedChanged: {
-            if (buttonBPressed && player) {
+            if (buttonBPressed && player && !world.talking) {
                 player.dash()
             }
         }
@@ -923,6 +1066,60 @@ ClayWorld2d {
         color: "#333333"
         radius: 4
         z: 1000  // Above everything
+
+        // The HP the last hit took: a pale chunk past the fill that drains
+        // away; only the hurt knight's own screen has it
+        Rectangle {
+            id: hpChunk
+            objectName: "hpChunk"
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 2
+            // The HP the chunk reaches to, never below the knight's. It
+            // drains on the physics steps from `from` to the knight's HP
+            // over Balance.hurt.chunkDrain seconds, easing in: a pause or
+            // the hit stop of the blow holds it
+            property real hp: 0
+            property real from: 0
+            property real age: 0
+            function reset() {
+                hp = player ? player.hp : 0
+                from = hp
+                age = Balance.hurt.chunkDrain
+            }
+            width: player ? (parent.width - 4) * Math.max(0, Math.min(hp, player.maxHp)) / player.maxHp : 0
+            radius: 2
+            color: "#F4E4D4"
+            opacity: 0.85
+            Connections {
+                target: player
+                function onHpChanged() {
+                    if (player.hp < hpChunk.hp) {
+                        hpChunk.from = hpChunk.hp
+                        hpChunk.age = 0
+                    } else {
+                        hpChunk.reset()
+                    }
+                }
+            }
+            Connections {
+                target: world.physics
+                function onStepped() {
+                    let d = Balance.hurt.chunkDrain
+                    if (!player || hpChunk.age >= d) return
+                    hpChunk.age = Math.min(d, hpChunk.age + world.physics.timeStep)
+                    let k = hpChunk.age / d
+                    hpChunk.hp = hpChunk.from + (player.hp - hpChunk.from) * k * k
+                }
+            }
+        }
+        // A new knight (a level, a run) starts without a chunk, also once
+        // it is given the HP it carries from the level before
+        Connections {
+            target: world
+            function onPlayerChanged() { Qt.callLater(hpChunk.reset) }
+        }
 
         Rectangle {
             id: healthFill
@@ -977,6 +1174,27 @@ ClayWorld2d {
             Behavior on width { NumberAnimation { duration: 100 } }
         }
 
+        // The shield ran dry or a right-click found no mana: the bar
+        // flashes red
+        Rectangle {
+            id: manaFlash
+            objectName: "manaFlash"
+            anchors.fill: parent
+            radius: parent.radius
+            color: Balance.shieldBreak.barColor
+            // Seconds since the flash began, on the physics steps: on for
+            // the first half of each of its barFlashes
+            property real age: Balance.shieldBreak.barFlashes * Balance.shieldBreak.barFlash
+            readonly property bool running: age < Balance.shieldBreak.barFlashes * Balance.shieldBreak.barFlash
+            opacity: running && (age % Balance.shieldBreak.barFlash) < Balance.shieldBreak.barFlash / 2 ? 0.85 : 0
+            Connections {
+                target: world.physics
+                function onStepped() {
+                    if (manaFlash.running) manaFlash.age += world.physics.timeStep
+                }
+            }
+        }
+
         Text {
             anchors.centerIn: parent
             text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
@@ -985,6 +1203,10 @@ ClayWorld2d {
             font.bold: true
         }
     }
+
+    // The mana bar's red flash, on this screen only
+    function flashManaBar() { manaFlash.age = 0 }
+    readonly property bool manaBarFlashing: manaFlash.running
 
     // How deep the knight is, under the bars
     Text {
@@ -1054,7 +1276,7 @@ ClayWorld2d {
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        text: "WASD move  •  LMB strike  •  RMB shield  •  Shift dash  •  "
+        text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
               + "E talk  •  1 potion  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
@@ -1307,6 +1529,12 @@ ClayWorld2d {
         property int damageTaken: 0
         property int parries: 0
         property int blocks: 0
+        property int perfectBlocks: 0
+        // Crushing blows that broke the held shield
+        property int crushed: 0
+        // Whirlwinds that hit an enemy, and the enemies they hit
+        property int whirlwinds: 0
+        property int whirlHits: 0
         property int kills: 0
         property int deaths: 0
         property real seconds: 0
@@ -1315,9 +1543,13 @@ ClayWorld2d {
     function resetFightRecord() {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
+        r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
         r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
     }
-    // what: dealt, taken (with the damage), parry, block, kill or fall
+    // what: dealt, taken (with the damage), parry, block, perfectBlock
+    // (counted as a block too), crushed (a crushing blow broke the held
+    // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
+    // enemy it hit), kill or fall
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -1325,6 +1557,10 @@ ClayWorld2d {
         case "taken": r.damageTaken += amount; break
         case "parry": r.parries++; break
         case "block": r.blocks++; break
+        case "perfectBlock": r.perfectBlocks++; break
+        case "crushed": r.crushed++; break
+        case "whirlwind": r.whirlwinds++; break
+        case "whirlHit": r.whirlHits++; break
         case "fall": r.deaths++; break
         case "kill":
             r.kills++
@@ -1457,6 +1693,11 @@ ClayWorld2d {
             screenFxItem.flash("#FFF0B0", 80, 0.3)
             screenFxItem.pulse(1.0, 320)
         }
+        function perfectBlock() {
+            let b = Balance.perfectBlock
+            screenFxItem.flash(b.flashColor, b.screenFlash * 1000, b.screenFlashOpacity)
+            screenFxItem.pulse(b.pulse, b.pulseTime * 1000)
+        }
     }
 
     // Where things that give off light go: above the darkness with fx on
@@ -1578,7 +1819,6 @@ ClayWorld2d {
         else
             generateDungeon()
         if (player) {
-            // The upgrade first: it raises max HP, which the HP is held to
             player.upgrade = carried.upgrade
             player.hp = carried.hp
             player.mana = carried.mana
@@ -1626,9 +1866,10 @@ ClayWorld2d {
 
     // --- The village's wares (issue #38) ---
     // Bought with this node's knight's own gold. A potion is kept for key 1;
-    // the smith's upgrade ("atk" or "hp") lasts the run
+    // the smith's upgrade ("sword" or "shield") lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
+        if (ware.id !== "potion" && player.upgrade !== "") return false
         if (player.gold < ware.price) {
             dialoguePanel.note = "You'll need " + ware.price + " gold for that."
             return false
@@ -1639,9 +1880,8 @@ ClayWorld2d {
             dialoguePanel.note = "One potion. Drink it when it counts."
         } else {
             player.upgrade = ware.id
-            if (ware.id === "hp") player.hp += Balance.shop.hpUpgrade
-            dialoguePanel.note = ware.id === "atk" ? "There. That edge will bite deeper."
-                                                   : "There. That mail will take a few more blows."
+            dialoguePanel.note = ware.id === "sword" ? "There. That edge will bite deeper."
+                                                     : "There. That shield will let less through."
         }
         dialoguePanel.wares = _offered(dialoguePanel.wares)
         console.log("[Game] Bought", ware.id, "for", ware.price, "gold,", player.gold, "left")
@@ -1770,8 +2010,8 @@ ClayWorld2d {
 
         // Bind player controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             // Mouse aiming: bind screen coords for facing calculation
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
@@ -2353,12 +2593,26 @@ ClayWorld2d {
         }
     }
 
+    // Damage numbers are for tuning: they show only in debug mode
     function spawnDamageNumber(wx, wy, amount, color) {
         if (!debugMechanics) return
         damageNumberComp.createObject(world.room, {
+            objectName: "damageNumber",
             xWu: wx, yWu: wy + 0.5,
             startYWu: wy + 0.5,
             text: "" + amount,
+            color: color,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+    }
+
+    // A word over the struck enemy - PARRY, PERFECT - shows in normal play
+    function spawnWord(wx, wy, word, color) {
+        damageNumberComp.createObject(world.room, {
+            objectName: "fightWord",
+            xWu: wx, yWu: wy + 0.5,
+            startYWu: wy + 0.5,
+            text: word,
             color: color,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
@@ -2410,6 +2664,7 @@ ClayWorld2d {
     }
 
     function clearDungeon() {
+        _attackRng = null
         exitSensor = null
         exitStairs = null
 
@@ -2560,12 +2815,14 @@ ClayWorld2d {
             { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "I can hone that edge or thicken your mail - one of the two, for this descent.",
+            "I can sharpen that sword or reinforce your shield - one of the two, for this descent.",
             "Bring gold from below and it's yours."
         ], "assets/blacksmith_greeting.wav", [
-            { id: "atk", label: "Hone the blade (+" + Balance.shop.atkUpgrade + " damage)",
+            { id: "sword", label: "Sharpened sword (+" + Balance.shop.swordAtk + " damage)",
               price: Balance.shop.upgradePrice },
-            { id: "hp", label: "Thicken the mail (+" + Balance.shop.hpUpgrade + " max HP)",
+            { id: "shield", label: "Reinforced shield (a block lets "
+                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, drains "
+                  + Balance.shop.shieldBlockDrain + " mana/s)",
               price: Balance.shop.upgradePrice }
         ])
 
@@ -2604,8 +2861,8 @@ ClayWorld2d {
 
         // Bind controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
@@ -2723,8 +2980,8 @@ ClayWorld2d {
 
         // Bind controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
@@ -2795,6 +3052,15 @@ ClayWorld2d {
         screen = "game"
         minimap.requestPaint()
         world.forceActiveFocus()
+    }
+
+    // The level's attack rolls - whether a tough enemy winds up a crushing
+    // blow - from the run's seed and the level, so a seed plays the same
+    // fight; only where the AI runs. Seeded anew with each level
+    property var _attackRng: null
+    function rollAttack() {
+        if (!_attackRng) _attackRng = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x6372)
+        return _attackRng()
     }
 
     // --- Seeded PRNG (mulberry32) ---

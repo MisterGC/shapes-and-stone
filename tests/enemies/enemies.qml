@@ -4,7 +4,12 @@
 //
 // The host's knight stands at one enemy, the joiner's at the one farthest
 // from it. For five seconds every frame compares each enemy on the two
-// screens: its position, its AI state and the knight it goes for. Then the
+// screens: its position, its AI state and the knight it goes for, and
+// that the joiner shows the parry ring of a host's enemy winding up. A
+// host's enemy winds up a crushing blow: the joiner shows its state
+// "crush", white-hot with the doubled ring, and its lunge with no parry
+// window, and the joiner's knight judges a crushing blow on its held
+// shield as one. Then the
 // joiner's knight kills an enemy, and falls: the enemies must go for the
 // host's knight, the one still standing. Prints one PASS or FAIL line per
 // check and exits with the number of failures.
@@ -14,6 +19,7 @@
 import QtQuick
 import QtQuick.Window
 import Clayground.Network
+import "../../src"
 
 Window {
     id: bench
@@ -104,7 +110,8 @@ Window {
     property var stats: null
     function startSampling() {
         stats = {n: 0, maxErr: 0, maxErrId: "", sumErr: 0, judged: 0, stateMiss: 0, targetMiss: 0,
-                 missNote: "", history: {}, states: {}, startMs: Date.now()}
+                 missNote: "", history: {}, states: {}, startMs: Date.now(),
+                 windUps: 0, ringShown: 0, ringMax: 0, windows: 0, windowsClosed: 0}
         sampler.start()
     }
     Timer {
@@ -123,6 +130,17 @@ Window {
                 st.states[he.aiState] = true
                 let je = j[id]
                 if (!je) continue
+                // The parry ring on the joiner's screen, from the host's
+                // replicated state: shown on a wind-up, closed in the window
+                if (je.aiState === "telegraph" || je.aiState === "shoot" || je.aiState === "lunge") {
+                    st.windUps++
+                    if (je.ringShows && je.ringProgress > 0) st.ringShown++
+                    st.ringMax = Math.max(st.ringMax, je.ringProgress)
+                }
+                if (je.parryWindow) {
+                    st.windows++
+                    if (je.ringProgress === 1) st.windowsClosed++
+                }
                 let err = bench.dist(he, je)
                 st.n++
                 st.sumErr += err
@@ -142,6 +160,37 @@ Window {
 
     property string idA: ""
     property string idB: ""
+    // The host's enemy that winds up a crushing blow, and what the
+    // joiner showed of it
+    property string idC: ""
+    property var crush: null
+    Timer {
+        id: crushSampler
+        interval: 16
+        repeat: true
+        onTriggered: {
+            let je = bench.byId(bench.joiner)[bench.idC]
+            if (!je) return
+            let c = bench.crush
+            if (je.aiState === "crush") {
+                c.crush++
+                if (je.crushing && bench.shows(bench.joiner, "crushGlow") && bench.shows(bench.joiner, "crushRing")
+                        && Qt.colorEqual(je.ringColor, Balance.crush.ringColor))
+                    c.looks++
+            }
+            if (je.crushing && je.aiState === "lunge") c.lunge++
+            if (je.crushing && je.parryWindow) c.windows++
+        }
+    }
+    // Every item of this name anywhere under item is visible
+    function shows(item, name) {
+        if (!item) return false
+        if (item.objectName === name && item.visible) return true
+        let kids = item.children || []
+        for (let i = 0; i < kids.length; i++)
+            if (shows(kids[i], name)) return true
+        return false
+    }
     property int hostHp0: 0
     property int joinHp0: 0
 
@@ -207,6 +256,13 @@ Window {
             let seen = Object.keys(st.states).sort()
             check(st.states["chase"] && (st.states["telegraph"] || st.states["lunge"] || st.states["shoot"]),
                   "the enemies chased and attacked meanwhile (states seen: " + seen.join(", ") + ")")
+            check(st.windUps > 0 && st.ringShown > st.windUps / 2 && st.ringMax > 0.9,
+                  "the parry ring shows on the joiner's screen for the host's enemies ("
+                  + st.ringShown + " of " + st.windUps + " wind-up samples, up to "
+                  + st.ringMax.toFixed(3) + ")")
+            check(st.windows > 0 && st.windowsClosed === st.windows,
+                  "on the joiner's screen the ring is closed while the host's parry window is open ("
+                  + st.windowsClosed + " of " + st.windows + " samples)")
             check(st.judged > 0 && st.targetMiss === 0,
                   "every enemy goes for the same knight on both screens, within " + stateLagMs
                   + " ms (" + st.targetMiss + " misses in " + st.judged + " samples)")
@@ -238,6 +294,44 @@ Window {
             check(host.player.hp < hostHp0,
                   "the host's enemies hurt the host's knight (HP " + hostHp0 + " -> " + host.player.hp + ")")
 
+            // A melee enemy of the host's winds up a crushing blow
+            let hc = Object.keys(h).map(id => h[id]).find(e => e.enemyType !== "spitter" && e.target)
+            idC = hc ? hc.objectId : ""
+            crush = {crush: 0, looks: 0, lunge: 0, windows: 0}
+            if (hc) {
+                hc.crushChance = 1
+                hc.windUp(Balance.enemy.windUp)
+                hc.crushChance = 0
+            }
+            crushSampler.start()
+        }],
+        [1500, () => {
+            crushSampler.stop()
+            let c = crush
+            check(idC !== "" && c.crush > 0 && c.looks === c.crush,
+                  "the joiner shows the host's crushing wind-up as \"crush\", white-hot with the doubled ring ("
+                  + c.looks + " of " + c.crush + " samples, enemy " + idC + ")")
+            check(c.lunge > 0 && c.windows === 0,
+                  "its crushing lunge opens no parry window on the joiner's screen ("
+                  + c.windows + " of " + c.lunge + " samples)")
+            // The joiner's knight judges a crushing blow on its held shield
+            let jp = joiner.player
+            let results = []
+            let record = (id, result) => results.push(result)
+            joiner.knightStruck.connect(record)
+            jp.graceLeft = 0
+            jp.mana = jp.maxMana
+            jp.facingAngle = 0
+            jp.raiseShield()
+            jp._raisedAt = jp._steps - Balance.knight.perfectBlockFrames - 1
+            joiner._landKnightBlow({id: idC, atk: 20, x: jp.xWu + 0.5, y: jp.yWu, size: 0.8,
+                                    crush: true, arrived: joiner._physicsSteps})
+            joiner.knightStruck.disconnect(record)
+            check(results[0] === "crushed" && Math.abs(jp.maxMana - jp.mana - Balance.enemy.crushMana) < 1e-3
+                  && !jp.isBlocking && jp.shieldLock > 0,
+                  "a crushing blow of the host's enemy breaks the held shield of the joiner's knight ("
+                  + results.join(", ") + ", mana " + jp.maxMana + " -> " + jp.mana + ")")
+            jp.lowerShield()
             // The joiner's knight strikes the enemy at it down
             let je = byId(joiner)[idB]
             if (je) je.takeDamage(100000, joiner.player.xWu, joiner.player.yWu)

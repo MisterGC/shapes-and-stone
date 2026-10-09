@@ -7,8 +7,9 @@
 // nothing may move on; single steps (Clayground.physicsStep) must carry the
 // telegraph into the lunge after the steps its wind-up takes and count the
 // cooldowns down by 1/60 s each. A full hit stop must hold them the same
-// way. Prints one PASS or FAIL line per check and exits with the number of
-// failures.
+// way, and with it the parry ring's progress and the knight's charge of
+// a heavy swing. Prints one PASS or FAIL line
+// per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/clock/clock.qml
 
@@ -63,6 +64,9 @@ Window {
     property real dashCd: 0
     property real attackTimer: 0
     property int stepsToLunge: 0
+    property real ringProgress: 0
+    property real chargeHeld: 0
+    property real chargeProgress: 0
 
     property var steps: [
         [() => game.screen === "title", () => {
@@ -97,7 +101,9 @@ Window {
                   + attackCd.toFixed(3) + " -> " + game.player.attackCooldown.toFixed(3) + " s)")
             // The AI thinks every thinkInterval of simulated time, so the
             // telegraph ends between one think before and two after the
-            // wind-up, counted in steps
+            // wind-up, counted in steps. The knight holds the left button
+            // from here: it charges a heavy swing through the hit stop below
+            game.player.pressSwing()
             telegraph()
             stepsToLunge = 0
             while (enemy.aiState === "telegraph" && stepsToLunge < 600) {
@@ -117,13 +123,19 @@ Window {
             Clayground.physicsStep(1)
             check(left > 0 && game.player.dashCooldown === 0,
                   "a dash cooldown of three steps is over on the third step")
-            // A full hit stop holds the game clock as a pause does
-            Clayground.paused = false
+            // A full hit stop holds the game clock as a pause does; the
+            // telegraph is a few steps in, so its parry ring has begun, and
+            // the knight has been charging a heavy swing since the lunge above
             telegraph()
+            Clayground.physicsStep(5)
+            Clayground.paused = false
             game.player.attackCooldown = Balance.knight.attackCooldown
             attackCd = game.player.attackCooldown
             game.hitStop(1500, 0)
             attackTimer = enemy._attackTimer
+            ringProgress = enemy.ringProgress
+            chargeHeld = game.player.chargeHeld
+            chargeProgress = game.player.chargeProgress
         }],
         [700, () => {
             check(game.hitStopActive, "the measurement ran inside the hit stop")
@@ -133,6 +145,15 @@ Window {
             check(Math.abs(game.player.attackCooldown - attackCd) < 1e-3,
                   "a full hit stop holds the knight's attack cooldown ("
                   + game.player.attackCooldown.toFixed(3) + " s)")
+            check(ringProgress > 0 && ringProgress < 1 && enemy.ringProgress === ringProgress,
+                  "a full hit stop holds the parry ring's progress ("
+                  + ringProgress.toFixed(3) + " -> " + enemy.ringProgress.toFixed(3) + ")")
+            check(game.player.isCharging && chargeProgress > 0 && chargeProgress < 1
+                  && game.player.chargeHeld === chargeHeld
+                  && game.player.chargeProgress === chargeProgress,
+                  "a full hit stop holds the knight's charge (held " + chargeHeld.toFixed(3)
+                  + " -> " + game.player.chargeHeld.toFixed(3) + " s, progress "
+                  + chargeProgress.toFixed(3) + " -> " + game.player.chargeProgress.toFixed(3) + ")")
         }],
         [() => !game.hitStopActive, () => {}],
         // Once the stop is over the clock runs on
@@ -140,6 +161,10 @@ Window {
             check(enemy.aiState !== "telegraph", "after the hit stop the telegraph goes on ("
                   + enemy.aiState + ")")
             check(game.player.attackCooldown === 0, "after the hit stop the attack cooldown runs out")
+            check(game.player.chargeHeld > chargeHeld,
+                  "after the hit stop the charge counts on (" + chargeHeld.toFixed(3) + " -> "
+                  + game.player.chargeHeld.toFixed(3) + " s held)")
+            game.player.dropSwing()
             console.log("[Clock] done,", failures, "failed")
         }],
         // Torn down before quitting, as the impact bench does

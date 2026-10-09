@@ -4,7 +4,12 @@
 // the fight room and the village and checks that the knight, every enemy,
 // the fight room lineup and the campfire carry the table's values; at
 // depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix and
-// harder blows, as the table's depth group says; the
+// harder blows, as the table's depth group says; tough grunts and
+// guardians, and no other enemy, wind up a crushing blow at
+// enemy.crushChance, for enemy.crushWindUp, and one on a held shield
+// takes enemy.crushMana, enemy.crushShare of the damage and drops the
+// shield for enemy.crushLockout; the smith sells the sword and the shield
+// for shop.upgradePrice, which take the shop's values; the
 // campfire refills a dry knight's mana, away from it nothing does, and the
 // next level, either way it is reached, keeps the knight's HP and mana. Last it
 // changes a value in the table and checks the next knight has it. Prints
@@ -64,6 +69,11 @@ Window {
             && near(e.windUpDuration, Balance.enemy.windUp)
             && near(e.shootCooldown, Balance.enemy.shootCooldown)
             && near(e.shieldArc, Balance.enemy.shieldArc)
+            && near(e.crushChance, crushChanceOf(e))
+    }
+    // Tough grunts and guardians wind up crushing blows, no other enemy
+    function crushChanceOf(e) {
+        return e.tier === 2 && e.enemyType !== "spitter" ? Balance.enemy.crushChance : 0
     }
 
     property var campfire: null
@@ -93,7 +103,7 @@ Window {
     property var steps: [
         [() => game.screen === "title", () => {
             let json = JSON.parse(JSON.stringify(Balance))
-            let groups = ["knight", "enemy", "projectile", "spawn", "depth", "campfire"]
+            let groups = ["knight", "enemy", "projectile", "spawn", "depth", "campfire", "shop"]
             check(groups.every(g => json[g] !== undefined) && json.minDamage === 1,
                   "JSON.stringify(Balance) returns the whole table ("
                   + leaves(json, "", []).length + " values)")
@@ -150,6 +160,43 @@ Window {
             check(same, "the fight room holds the table's lineup ("
                   + es.map(e => e.enemyType + "/" + e.tier).join(", ") + ")")
             check(es.every(checkEnemy), "the fight room's enemies carry the table's stats")
+
+            // The tough guardian winds up crushing blows at the table's
+            // chance, the others none; a crushing wind-up lasts crushWindUp
+            let be = Balance.enemy
+            let gd = es.find(e => e.enemyType === "guardian")
+            check(near(gd.crushChance, be.crushChance) && es.filter(e => e !== gd).every(e => e.crushChance === 0),
+                  "the tough guardian winds up crushing blows at crushChance " + gd.crushChance
+                  + ", the table says " + be.crushChance + "; the normal grunts and the spitter at "
+                  + es.filter(e => e !== gd).map(e => e.crushChance).join(", "))
+            gd.target = null
+            gd.crushChance = 1
+            gd.windUp(be.windUp)
+            let crushWindUp = gd._attackTimer, crushState = gd.aiState
+            gd.crushChance = 0
+            gd.windUp(be.windUp)
+            check(crushState === "crush" && near(crushWindUp, be.crushWindUp)
+                  && gd.aiState === "telegraph" && near(gd._attackTimer, be.windUp),
+                  "a crushing blow winds up for " + crushWindUp + " s (" + crushState + "), the table says "
+                  + be.crushWindUp + "; a lunge for " + gd._attackTimer + " s")
+            gd.aiState = "patrol"
+            gd.crushChance = be.crushChance
+            // A crushing blow on the held shield, from the front
+            let p = game.player
+            p.graceLeft = 0
+            p.mana = p.maxMana
+            p.facingAngle = 0
+            p.raiseShield()
+            p._raisedAt = p._steps - Balance.knight.perfectBlockFrames - 1
+            let hp = p.hp
+            let res = p.takeDamage(20, p.xWu + 1, p.yWu, undefined, true)
+            let share = Math.floor((20 - p.def) * be.crushShare)
+            check(res === "crushed" && near(p.maxMana - p.mana, be.crushMana) && hp - p.hp === share
+                  && near(p.shieldLock, be.crushLockout) && !p.isBlocking,
+                  "on a held shield it takes " + (p.maxMana - p.mana) + " mana (crushMana " + be.crushMana
+                  + "), " + (hp - p.hp) + " of " + (20 - p.def) + " HP (crushShare " + be.crushShare
+                  + ") and drops the shield for " + p.shieldLock + " s (crushLockout " + be.crushLockout + ")")
+            p.lowerShield()
             game.applyScenario("village")
         }],
         [() => game.player && game.levelType === "village", () => {
@@ -158,6 +205,28 @@ Window {
                   && near(campfire.manaRate, Balance.campfire.manaPerSecond)
                   && near(campfire.healRadius, Balance.campfire.healRadius),
                   "the campfire's heal rate, mana rate and radius come from the table")
+            // The smith's wares and what they do: the table's shop group
+            let shop = Balance.shop, p = game.player
+            check(shop.upgradePrice === 30 && shop.swordAtk === 5 && near(shop.shieldBlockedShare, 0.15)
+                  && shop.shieldBlockDrain === 6,
+                  "the shop's upgradePrice " + shop.upgradePrice + ", swordAtk " + shop.swordAtk
+                  + ", shieldBlockedShare " + shop.shieldBlockedShare + ", shieldBlockDrain " + shop.shieldBlockDrain)
+            let smith = game.room.children.find(c => c.objectName === "npc" && c.npcName === "Blacksmith")
+            let wares = smith ? smith.wares : []
+            check(wares.length === 2 && wares[0].id === "sword" && wares[1].id === "shield"
+                  && wares.every(w => w.price === shop.upgradePrice),
+                  "the smith sells the sword and the shield for upgradePrice ("
+                  + wares.map(w => w.id + " " + w.price).join(", ") + ")")
+            p.upgrade = "sword"
+            let sword = p.atk === Balance.knight.atk + shop.swordAtk
+                && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockDrain, Balance.knight.blockDrain)
+            p.upgrade = "shield"
+            let shield = p.atk === Balance.knight.atk && near(p.blockedShare, shop.shieldBlockedShare)
+                && near(p.blockDrain, shop.shieldBlockDrain)
+            p.upgrade = ""
+            check(sword && shield && p.atk === Balance.knight.atk
+                  && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockDrain, Balance.knight.blockDrain),
+                  "the sharpened sword adds swordAtk, the reinforced shield takes shieldBlockedShare and shieldBlockDrain")
             // Hurt and dry, away from the fire
             game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4
             game.player.yWu = campfire.yWu

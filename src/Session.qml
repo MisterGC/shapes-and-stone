@@ -43,7 +43,7 @@ Item {
     signal enemySpawned(string objectId, var props)
     signal enemyDespawned(string objectId)
     // Host: another player's knight struck an enemy; blow.kind is "damage"
-    // (amount, x, y), "stagger" or "push" (dx, dy, speed)
+    // (amount, x, y), "stagger" (seconds) or "push" (dx, dy, speed)
     signal enemyBlowReceived(string fromId, var blow)
     // An enemy of the host's lunged at this node's knight (atk, x, y, size)
     signal knightBlowReceived(var blow)
@@ -204,7 +204,9 @@ Item {
                 x: player.xWu,
                 y: player.yWu,
                 a: player.facingAngle,
-                s: player.isAttacking ? 1 : player.isBlocking ? 2 : player.isDashing ? 3 : 0,
+                // 4 while the knight charges a heavy swing, 5 once it is full
+                s: player.isAttacking ? 1 : player.isBlocking ? 2 : player.isDashing ? 3
+                   : player.chargeFull ? 5 : player.isCharging ? 4 : 0,
                 // The block on its own: s shows only one action, and a
                 // swing while blocking would hide the shield
                 b: player.isBlocking ? 1 : 0,
