@@ -35,9 +35,13 @@ QtObject {
         blockedShare: 0.3,
         blockSpeed: 0.4,    // share of move and dash speed while blocking
         // Mana a raised shield drains per second; at 0 the shield drops and
-        // does not rise again until a parry gives some back
+        // does not rise again until a parry or the rest below gives some back
         blockDrain: 8,
         parryMana: 10,
+        // With the shield down manaRegenDelay seconds, mana comes back at
+        // manaRegen per second: resting gives the block back
+        manaRegen: 4,
+        manaRegenDelay: 1.5,
         // Perfect block: a shield raised at most this many physics steps
         // before a blow takes it whole - no damage, this much mana back,
         // and a lunging attacker staggers for this many seconds. Only a

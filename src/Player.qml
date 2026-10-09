@@ -164,6 +164,10 @@ PhysicsItem {
                     isBlocking = false
                     _shieldBreak()
                 }
+            } else if (!fallen && mana < maxMana
+                       && (_steps - _loweredAt) * dt >= Balance.knight.manaRegenDelay) {
+                // Down long enough, the shield's mana comes back
+                mana = Math.min(maxMana, mana + Balance.knight.manaRegen * dt)
             }
             // A swing hits until its arc has faded, as long as the view
             // draws it, but counted in steps
