@@ -961,8 +961,10 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        // Esc closes an open dialogue; only without one it opens the menu
         if (event.key === Qt.Key_Escape) {
-            if (screen === "game" && player && !fallen) openMenu()
+            if (talking) dialoguePanel.close()
+            else if (screen === "game" && player && !fallen) openMenu()
             event.accepted = true
             return
         }
@@ -1022,9 +1024,12 @@ ClayWorld2d {
         menuOpen = false
     }
     // Where the keys or the touch pad steer the knight, -1..1 on each axis;
-    // every level binds its knight to these
-    readonly property real knightMoveX: gameCtrl.axisX
-    readonly property real knightMoveY: -gameCtrl.axisY
+    // every level binds its knight to these. While a dialogue is open the
+    // knight stands, so it cannot walk off and leave the panel up, and a
+    // key still held moves it again once the panel closes
+    readonly property bool talking: dialoguePanel.visible
+    readonly property real knightMoveX: talking ? 0 : gameCtrl.axisX
+    readonly property real knightMoveY: talking ? 0 : -gameCtrl.axisY
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -1044,7 +1049,7 @@ ClayWorld2d {
         }
 
         onButtonBPressedChanged: {
-            if (buttonBPressed && player) {
+            if (buttonBPressed && player && !world.talking) {
                 player.dash()
             }
         }
