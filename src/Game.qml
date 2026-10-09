@@ -576,6 +576,7 @@ ClayWorld2d {
         }
         onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
         onWentAgain: (seed) => _startRun(seed)
+        onLiftReceived: (fromId) => _rise("lift")
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
@@ -1499,7 +1500,11 @@ ClayWorld2d {
     // hits crisply, not only when the sampled state catches them
     Connections {
         target: player
-        function onActed(action) { session.sendAction(action) }
+        function onActed(action) {
+            session.sendAction(action)
+            // A hit on a knight lifting an ally up starts the lift over
+            if (action === "hurt") player.reviveProgress = 0
+        }
     }
 
     Connections {
@@ -1550,14 +1555,68 @@ ClayWorld2d {
         fallen = true
     }
 
+    // --- Lifting a fallen knight up (issue #100) ---
+    // In a session a knight standing within Balance.party.reviveRange of a
+    // fallen ally lifts it up: after reviveTime seconds on the physics
+    // clock its node raises it with reviveHp of its max HP. A hit on the
+    // lifting knight, a step out of range or a nearer fallen ally starts it
+    // over. Each node counts its own knight's lift and sends it with its
+    // state, so every screen draws the ring around the fallen knight.
+    // Alone there is nobody to lift, except the dojo's fakeDownedAlly()
+    function _stepRevive() {
+        if (!player) return
+        let target = player.fallen || partyFallen ? null : _fallenAllyNear()
+        let id = target ? target.nodeId : ""
+        if (id !== player.reviveTarget) {
+            player.reviveTarget = id
+            player.reviveProgress = 0
+        }
+        if (target) {
+            let before = player.reviveProgress
+            player.reviveProgress = Math.min(1, before + world.physics.timeStep / Balance.party.reviveTime)
+            // Full, the ring stays full until the ally's state says it rose
+            if (before < 1 && player.reviveProgress >= 1) {
+                console.log("[Game] Lifted up the knight of", id)
+                session.liftKnight(id)
+                countFight("lift")
+            }
+        }
+        player.reviveRing = player.fallen ? session.liftOf(session.nodeId) : 0
+        for (let rid in session.remotePlayers) {
+            let rp = session.remotePlayers[rid]
+            if (!rp) continue
+            let own = player.reviveTarget === rid ? player.reviveProgress : 0
+            rp.reviveRing = rp.remoteHp <= 0 ? Math.max(own, session.liftOf(rid)) : 0
+        }
+    }
+    // The nearest fallen knight of another node within reviveRange, or null
+    function _fallenAllyNear() {
+        let r = Balance.party.reviveRange
+        let best = null, bestD = r * r
+        for (let id in session.remotePlayers) {
+            let rp = session.remotePlayers[id]
+            if (!rp || !rp.known || rp.remoteHp > 0) continue
+            let dx = rp.xWu - player.xWu, dy = rp.yWu - player.yWu
+            let d = dx * dx + dy * dy
+            if (d <= bestD) { bestD = d; best = rp }
+        }
+        return best
+    }
     // This node's fallen knight rises with Balance.party.reviveHp of its
-    // max HP: the party reached the camp ("camp"). Once the party has
-    // fallen nobody rises
+    // max HP: an ally lifted it up ("lift"), or the party reached the camp
+    // ("camp"). Once the party has fallen nobody rises
     function _rise(how) {
         if (!player || !player.fallen || partyFallen || screen !== "game") return
         player.hp = Math.max(1, Math.round(Balance.party.reviveHp * player.maxHp))
         fallen = false
+        if (how === "lift") countFight("lifted")
         console.log("[Game] The knight rises (" + how + ") with HP", player.hp)
+    }
+    // The dojo, alone: a fallen ally beside the knight to try the lift on,
+    // eval fakeDownedAlly(); it is gone with the level
+    function fakeDownedAlly() {
+        if (!player) return null
+        return session.fakeDownedAlly(player.xWu + 1, player.yWu)
     }
 
     // --- Fight record ---
@@ -1579,6 +1638,10 @@ ClayWorld2d {
         property int whirlHits: 0
         property int kills: 0
         property int deaths: 0
+        // Fallen allies this knight lifted up, and the times an ally lifted
+        // it up (a rise at camp is neither)
+        property int lifts: 0
+        property int lifted: 0
         property real seconds: 0
         property real clearSeconds: -1
     }
@@ -1586,12 +1649,14 @@ ClayWorld2d {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
-        r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
+        r.kills = 0; r.deaths = 0; r.lifts = 0; r.lifted = 0
+        r.seconds = 0; r.clearSeconds = -1
     }
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
-    // enemy it hit), kill or fall
+    // enemy it hit), kill, fall, lift (this knight lifted an ally up) or
+    // lifted (an ally lifted it up)
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -1604,6 +1669,8 @@ ClayWorld2d {
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
         case "fall": r.deaths++; break
+        case "lift": r.lifts++; break
+        case "lifted": r.lifted++; break
         case "kill":
             r.kills++
             runKills++
@@ -1618,6 +1685,7 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world._pickUpGold()
+            world._stepRevive()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
                 world.runSeconds += world.physics.timeStep

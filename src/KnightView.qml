@@ -36,6 +36,10 @@ Item {
     // At 0 HP: the knight slumps to the floor, dark, its lantern low and
     // no aim shown - the same on every screen that draws it
     property bool downed: false
+    // How far an ally has lifted the downed knight up, 0..1: the ring
+    // around it (Balance.party)
+    property real reviveProgress: 0
+    readonly property color _ringColor: Balance.party.ringColor
     // The left button is held for a heavy swing: the blade, drawn back,
     // glows brighter with charge (0..1); when chargeFull a ring flashes out
     property bool charging: false
@@ -722,6 +726,37 @@ Item {
                 from: 0.9; to: 0
                 duration: Balance.heavy.ring * 1000
             }
+        }
+    }
+
+    // A downed knight an ally lifts up: a ring fills clockwise around it
+    // from the top, full when the knight rises. Reparented like the swing
+    Canvas {
+        id: reviveRing
+        objectName: "reviveRing"
+        parent: view.host.parent
+        width: view.host.width * Balance.party.ringRadius * 2 + Balance.party.ringWidth * 2
+        height: width
+        x: view.host.x + view.host.width / 2 - width / 2
+        y: view.host.y + view.host.height / 2 - height / 2
+        visible: view.downed && view.reviveProgress > 0
+        readonly property real progress: view.reviveProgress
+        onProgressChanged: requestPaint()
+        onVisibleChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var r = view.host.width * Balance.party.ringRadius
+            var start = -Math.PI / 2
+            ctx.lineWidth = Balance.party.ringWidth
+            ctx.strokeStyle = view._rgba(view._ringColor, 0.2)
+            ctx.beginPath()
+            ctx.arc(width / 2, height / 2, r, 0, 2 * Math.PI)
+            ctx.stroke()
+            ctx.strokeStyle = view._rgba(view._ringColor, 1)
+            ctx.beginPath()
+            ctx.arc(width / 2, height / 2, r, start, start + 2 * Math.PI * Math.min(1, progress))
+            ctx.stroke()
         }
     }
 

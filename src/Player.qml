@@ -69,6 +69,14 @@ PhysicsItem {
     // and can neither swing nor dash
     readonly property bool fallen: hp <= 0
 
+    // In a session: the fallen ally this knight lifts up (its node's id,
+    // "" for none) and how far, 0..1 (Game._stepRevive); a hit starts it
+    // over. Every screen draws the ring from it
+    property string reviveTarget: ""
+    property real reviveProgress: 0
+    // How far an ally has lifted this knight up while it is down, 0..1
+    property real reviveRing: 0
+
     // Combat state
     property bool isAttacking: false
     property real _swingTimer: 0
@@ -249,6 +257,7 @@ PhysicsItem {
         charge: player.chargeProgress
         chargeFull: player.chargeFull
         downed: player.fallen
+        reviveProgress: player.reviveRing
         upgrade: player.upgrade
     }
 

@@ -82,6 +82,9 @@ Item {
     // The host started the next run after the party had fallen: this
     // joiner goes again from depth 0 on this seed
     signal wentAgain(int seed)
+    // Another node's knight stood beside this node's fallen knight long
+    // enough: it rises (Balance.party)
+    signal liftReceived(string fromId)
 
     property var remotePlayers: ({})
     // The last state each other node sent, also while its knight is not
@@ -137,6 +140,8 @@ Item {
                 session.shotReceived(data)
             } else if (data.type === "struck") {
                 session.struckReported(fromId, data)
+            } else if (data.type === "lift") {
+                session.liftReceived(fromId)
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
             } else if (data.type === "exitReached") {
@@ -216,7 +221,7 @@ Item {
         target: world ? world.physics : null
         enabled: session.inGame && net.connected && player !== null
         function onStepped() {
-            net.broadcastState({
+            let state = {
                 x: player.xWu,
                 y: player.yWu,
                 a: player.facingAngle,
@@ -227,7 +232,14 @@ Item {
                 // swing while blocking would hide the shield
                 b: player.isBlocking ? 1 : 0,
                 h: player.hp
-            })
+            }
+            // Lifting a fallen ally up: whose knight and how far, for the
+            // ring every screen draws around it
+            if (player.reviveTarget !== "") {
+                state.v = player.reviveTarget
+                state.p = Math.round(player.reviveProgress * 1000) / 1000
+            }
+            net.broadcastState(state)
         }
     }
 
@@ -324,6 +336,27 @@ Item {
         net.broadcast(Object.assign({type: "struck"}, report))
     }
 
+    // This node's knight lifted that node's fallen knight up. A knight
+    // made without a session (fakeDownedAlly) rises here
+    function liftKnight(nodeId) {
+        if (net.connected) {
+            net.sendTo(nodeId, {type: "lift"})
+            return
+        }
+        let rp = remotePlayers[nodeId]
+        if (rp) rp.remoteHp = Math.round(Balance.party.reviveHp * Balance.knight.hp)
+    }
+    // How far the other nodes' knights have lifted that node's knight up,
+    // 0..1, from their last states: the furthest of them
+    function liftOf(nodeId) {
+        let best = 0
+        for (let id in lastStates) {
+            let st = lastStates[id]
+            if (st && st.v === nodeId && st.p > best) best = st.p
+        }
+        return best
+    }
+
     // Host: every knight is down, the run ends for everyone; nobody leaves
     // the session, so the host can start the next run (goAgain)
     function endRun() {
@@ -380,6 +413,27 @@ Item {
                         "HP:", rp.remoteHp)
             remotePlayerSpawned(nodeId, rp)
         }
+    }
+
+    // The dojo, without a session: a fallen ally beside the knight, to be
+    // lifted up as one of a session would (Balance.party). It goes with
+    // the level, as every other node's knight does
+    function fakeDownedAlly(px, py) {
+        let id = "dojo-ally"
+        if (remotePlayers[id]) remotePlayers[id].destroy()
+        let rp = remotePlayerComponent.createObject(world.room, {
+            nodeId: id,
+            playerColor: _colorOf(id),
+            xWu: px,
+            yWu: py,
+            remoteHp: 0,
+            known: true,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world
+        })
+        remotePlayers[id] = rp
+        return rp
     }
 
     function clearRemotePlayers() {

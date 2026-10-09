@@ -19,6 +19,8 @@ PhysicsItem {
     // Its node's state has come: until then where the knight is and
     // whether it is down are not known, and it is not drawn
     property bool known: false
+    // How far an ally has lifted this knight up while it is down, 0..1
+    property real reviveRing: 0
     visible: known
 
     widthWu: 1.0
@@ -183,5 +185,6 @@ PhysicsItem {
         charge: rp.remoteCharge
         chargeFull: rp.actionState === 5
         downed: rp.remoteHp <= 0
+        reviveProgress: rp.reviveRing
     }
 }
