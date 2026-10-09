@@ -76,9 +76,12 @@ Item {
     // A joiner's session ended without its leaving: the host left, crashed
     // or lost its connection. message says which, for the title
     signal hostLost(string message)
-    // The run is over for everyone: on a joiner when the host ends it, on
-    // the host once the joiners have left or endRunWaitMs has passed
+    // The run is over for everyone, the session stays: on a joiner when
+    // the host ends it, on the host at once
     signal runEnded()
+    // The host started the next run after the party had fallen: this
+    // joiner goes again from depth 0 on this seed
+    signal wentAgain(int seed)
 
     property var remotePlayers: ({})
     // The last state each other node sent, also while its knight is not
@@ -87,6 +90,9 @@ Item {
     property var lastStates: ({})
     // This node is leaving on its own: its session ending is no lost host
     property bool _leaving: false
+    // The seed of the run this node plays: a new one from the host is the
+    // next run, the same one a level of this run
+    property int runSeed: -1
 
     Network {
         id: net
@@ -101,7 +107,13 @@ Item {
         // (clayground#306)
         onSessionPropertyChanged: (name, value) => {
             if (net.isHost || name !== "run") return
+            let again = session.inGame && value.seed !== session.runSeed
+            session.runSeed = value.seed
             if (!session.inGame) session.started(value.seed, value.level)
+            else if (again) {
+                session.lastStates = ({})
+                session.wentAgain(value.seed)
+            }
             else session.levelChanged(value.level)
         }
 
@@ -169,8 +181,12 @@ Item {
         }
 
         onConnectedChanged: {
-            if (net.connected) session._leaving = false
-            else session.lastStates = ({})
+            if (net.connected) {
+                session._leaving = false
+            } else {
+                session.lastStates = ({})
+                session.runSeed = -1
+            }
         }
         // reason is "host-left" when the host left on its own, else it
         // crashed or the connection was lost (clayground#376)
@@ -217,8 +233,20 @@ Item {
 
     // Host: start the game for everyone with this seed
     function start(seed) {
+        runSeed = seed
         net.setSessionProperty("run", {seed: seed, level: 0})
         started(seed, 0)
+    }
+
+    // Host: the party has fallen, the next run starts for everyone on this
+    // seed. The last states are of the run before, whose knights were down:
+    // each knight of the next run is drawn from its first state in it (on
+    // a joiner too, when wentAgain comes)
+    function goAgain(seed) {
+        if (!net.isHost) return
+        runSeed = seed
+        lastStates = ({})
+        net.setSessionProperty("run", {seed: seed, level: 0})
     }
 
     // Reliable event so remote clients show an action crisply
@@ -296,28 +324,12 @@ Item {
         net.broadcast(Object.assign({type: "struck"}, report))
     }
 
-    // Host: every knight is down, the run ends for everyone. The joiners
-    // leave when the message arrives; the host leaves after them, so its
-    // leaving cannot cut the message off.
-    readonly property int endRunWaitMs: 2000
+    // Host: every knight is down, the run ends for everyone; nobody leaves
+    // the session, so the host can start the next run (goAgain)
     function endRun() {
-        if (!net.isHost || _endWait.running) return
+        if (!net.isHost) return
         net.broadcast({type: "runEnd"})
-        _endWait.waited = 0
-        _endWait.start()
-    }
-    Timer {
-        id: _endWait
-        property int waited: 0
-        interval: 50
-        repeat: true
-        onTriggered: {
-            waited += interval
-            if (Object.keys(session.remotePlayers).length > 0 && waited < session.endRunWaitMs)
-                return
-            stop()
-            session.runEnded()
-        }
+        runEnded()
     }
 
     // Host: tell the joiners which level comes next, and every node that

@@ -6,9 +6,10 @@
 // must draw it downed, its own screen must say "You are down" with only Esc
 // offered, and the run must go on - the host's knight stands, no screen
 // leaves the game, no enemy stops. Then the host's knight falls: the host
-// must end the run, both leave the session and both screens show the
-// party's summary - depth, kills, time and best depth - until a key, Enter
-// on one and Esc on the other, takes each to the title. In the second session the host's knight falls first and the
+// must end the run, both stay in the session and both screens show the
+// party's summary - depth, kills, time and best depth - the host's with
+// Enter to go again, the joiner's waiting for the host (issue #99), until
+// Esc takes each to the title. In the second session the host's knight falls first and the
 // joiner's last, so the host learns of the last fall over the network.
 // In both, while one knight is down the host goes down two levels, to a
 // village and to the next dungeon: on the other screen the downed knight
@@ -228,10 +229,11 @@ Window {
                 strikeDown(l)
                 fellAt = Date.now()
             }],
-            [() => host.partyFallen && joiner.partyFallen && !hostNet.connected && !joinNet.connected, () => {
+            [() => host.partyFallen && joiner.partyFallen, () => {
                 let ms = Date.now() - fellAt
-                check(ms <= endMs, "with every knight down both screens end the run and leave the session ("
+                check(ms <= endMs, "with every knight down both screens end the run ("
                       + ms + " ms after the " + lastName + "'s knight fell)")
+                check(hostNet.connected && joinNet.connected, "both stay in the session")
                 for (let [g, name] of [[host, "host"], [joiner, "joiner"]]) {
                     let fs = fallenScreen(g)
                     let text = n => fs ? find(fs, n).text : "no fallen screen"
@@ -241,15 +243,19 @@ Window {
                           && text("fallenStats").indexOf("kill") >= 0 && text("fallenBest").indexOf("est depth") >= 0,
                           "it shows the run's depth, kills, time and best depth (" + text("fallenDepth") + " | "
                           + text("fallenStats") + " | " + text("fallenBest") + ")")
-                    check(fs !== null && !fs.canGoAgain && text("fallenHint") === "Enter or Esc to the title",
-                          "it offers the title only (" + text("fallenHint") + ")")
+                    let hint = g === host ? "Enter to go again • Esc to the title"
+                                          : "Waiting for the host to go again • Esc to leave the session"
+                    check(fs !== null && fs.canGoAgain === (g === host) && text("fallenHint") === hint,
+                          "it offers " + (g === host ? "to go again" : "to wait for the host")
+                          + " (" + text("fallenHint") + ")")
                 }
                 check(host.enemies.every(e => e.halted), "the host's enemies stop")
-                press(fallenScreen(host), Qt.Key_Return)
                 press(fallenScreen(joiner), Qt.Key_Escape)
+                press(fallenScreen(host), Qt.Key_Escape)
             }],
-            [() => host.screen === "title" && joiner.screen === "title", () => {
-                check(true, "Enter on the host's summary and Esc on the joiner's go to the title")
+            [() => host.screen === "title" && joiner.screen === "title"
+                   && !hostNet.connected && !joinNet.connected, () => {
+                check(true, "Esc on both summaries goes to the title and out of the session")
                 check(host.player === null && joiner.player === null
                       && host.enemies.length === 0 && joiner.enemies.length === 0,
                       "the run is cleared on both")

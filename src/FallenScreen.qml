@@ -4,8 +4,9 @@ import QtQuick
 // the best depth kept between runs, Enter to go again, Esc back to the
 // title. In a session whose other knights still fight it says the knight
 // is down, keeps the dungeon in sight and offers only Esc, which leaves;
-// once every knight is down it shows the party's run, and Enter or Esc go
-// to the title. Takes the keyboard focus and every click.
+// once every knight is down it shows the party's run, the host's Enter
+// starts the next run for everyone and a joiner waits for it. Esc leaves
+// the session. Takes the keyboard focus and every click.
 Item {
     id: fallenScreen
     objectName: "fallenScreen"
@@ -20,9 +21,11 @@ Item {
     property int bestDepth: 0
     // This run went deeper than any before it
     property bool newBest: false
-    // A session run ends for everyone or no one: a fallen co-op player
-    // only leaves
+    // Enter starts the next run: alone, or the host once the party has
+    // fallen. A session run ends for everyone or no one
     property bool canGoAgain: true
+    // The party has fallen and this joiner waits for the host to go again
+    property bool waitsForHost: false
     // Another knight of the session still stands: this one is down, the
     // run goes on, and the dungeon stays in sight
     property bool partyFights: false
@@ -106,10 +109,10 @@ Item {
             objectName: "fallenHint"
             text: fallenScreen.canGoAgain
                   ? "Enter to go again • Esc to the title"
-                  : fallenScreen.partyFights
-                    ? "Your party fights on • Esc to leave the session"
-                    : fallenScreen.partyFallen
-                      ? "Enter or Esc to the title"
+                  : fallenScreen.waitsForHost
+                    ? "Waiting for the host to go again • Esc to leave the session"
+                    : fallenScreen.partyFights
+                      ? "Your party fights on • Esc to leave the session"
                       : "Esc to leave the session"
             color: "#888888"
             font.pixelSize: 12
@@ -122,9 +125,6 @@ Item {
         // knight ignores the rest
         if (canGoAgain && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
             goAgain()
-            event.accepted = true
-        } else if (partyFallen && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-            backToTitle()
             event.accepted = true
         } else if (event.key === Qt.Key_Escape) {
             backToTitle()

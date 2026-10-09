@@ -575,6 +575,7 @@ ClayWorld2d {
             screen = "game"
         }
         onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
+        onWentAgain: (seed) => _startRun(seed)
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
@@ -868,8 +869,9 @@ ClayWorld2d {
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
     property bool fallen: false
-    // A session's run ended with every knight down: the session is left,
-    // the fallen screen shows the run's summary and a key goes to the title
+    // A session's run ended with every knight down: the session stays, the
+    // fallen screen shows the run's summary, and the host's Enter starts
+    // the next run for everyone
     property bool partyFallen: false
     // Esc opened the menu (Resume, Title). Alone the world is paused under
     // it; in a session it runs on, since a pause would stop every other
@@ -1535,12 +1537,11 @@ ClayWorld2d {
         session.endRun()
     }
 
-    // The host ended the run: out of the session, the enemies stop, and the
-    // fallen screen shows how far the party got
+    // The host ended the run: the enemies stop and the fallen screen shows
+    // how far the party got; the session stays for the next run
     function _endPartyRun() {
-        if (screen !== "game") return
+        if (screen !== "game" || partyFallen) return
         console.log("[Game] The party has fallen at depth", depth)
-        if (session.connected) session.leave()
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
         }
@@ -1614,14 +1615,24 @@ ClayWorld2d {
         }
     }
 
-    // Enter on the fallen screen: a new run from depth 0 on a new seed
+    // Enter on the fallen screen: a new run from depth 0 on a new seed. In
+    // a session only the host starts it, for every knight
     function newRun() {
-        let oldSeed = masterSeed
+        if (session.connected && !session.isHost) return
+        let seed
         do {
-            masterSeed = Math.floor(Math.random() * 2147483647)
-        } while (masterSeed === oldSeed)
-        console.log("[Game] New run, seed:", masterSeed)
+            seed = Math.floor(Math.random() * 2147483647)
+        } while (seed === masterSeed)
+        _startRun(seed)
+    }
+    // The next run on seed, from depth 0 with a fresh knight. The host
+    // clears its enemies on every node before it tells the others the seed
+    // and spawns the next run's
+    function _startRun(seed) {
+        console.log("[Game] New run, seed:", seed)
         clearDungeon()
+        masterSeed = seed
+        if (session.connected && session.isHost) session.goAgain(seed)
         menuOpen = false
         fallen = false
         partyFallen = false
@@ -3282,7 +3293,8 @@ ClayWorld2d {
                 seconds: world.runSeconds
                 bestDepth: world.bestDepth
                 newBest: world.depth > world.runStartBest
-                canGoAgain: !session.connected && !world.partyFallen
+                canGoAgain: !session.connected || (world.partyFallen && session.isHost)
+                waitsForHost: session.connected && world.partyFallen && !session.isHost
                 partyFights: session.connected && !world.partyFallen
                 partyFallen: world.partyFallen
                 onGoAgain: world.newRun()
