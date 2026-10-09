@@ -360,6 +360,38 @@ every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
 in the dungeon at depth 4 (the village and the fight room take a depth the
 same way), and the balance bench checks depth 0, 2 and 4 against the table.
 
+Each depth is a range of difficulty, and how the last dungeon went picks
+the spot in it. A dungeon's danger is its depth plus a position in [0, 1),
+and the `depth` group adds per step of the danger, a share of a step
+between two. Leaving a dungeon moves the position half way (`danger.pull`)
+toward what it earned: 1 less the share of max HP lost in it - a potion's
+heal does not take the loss back - or 0 after a fall. Little lost puts the
+next dungeon high in its depth's range, much lost low, a fall lower still;
+a descent is always harder, since the next depth's range starts where this
+one's ends. The position goes on into the next run, not past a restart: a
+fresh game starts at `danger.start`, 0.5. In a session the host settles it
+from every knight's record: the losses averaged, and one knight's fall is
+the party's. `applyScenario("dungeon", 4.8)` lands high in depth 4's range.
+
+The dungeon shows its danger (`danger.looks`): low danger has warm torches,
+clean stones and dust in the air; middle fewer, cooler torches, cracks,
+moss and old stains; high ember-red torches, cracked stones, bones and
+glowing embers, embers in the air too. The exit stairs glow in the next
+dungeon's torch colour: in a dungeon where it would stand were the party to
+leave now, in the village where it stands. The danger bench feeds made-up
+records and plays a descent, and builds the same seed at the same danger
+twice; the looks bench saves the same dungeon at low, middle and high
+danger and the stairs at a high and a low next one as PNGs, and needs a
+window and the copied shaders, like the knight bench; the danger party
+bench plays four dungeons in a session of two processes, the host
+settling each next one from both knights' records:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
+qml -I build/bin/qml tests/looks/looks.qml -- <out dir>
+python3 tests/dangerparty/run_dangerparty.py --mode local [--shots <out dir>]
+```
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
@@ -515,7 +547,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -531,8 +563,10 @@ just before and just after the dash's start (the report counts the
 whirlwinds that landed as `whirlwinds`, their hits as `whirlHits` and the
 ones begun as `whirlsStarted`). A crushing blow is met by the same plan, so a parry finds
 no window; the report counts the crushing wind-ups as `crushBlows`.
-`--depth` puts the fight room at a
-depth: the lineup stays the table's, the enemies hit as hard as there. It
+`--danger` puts the fight room at a
+danger, a depth plus a position in its range (`2.5`), and `--depth d` at
+the bottom of depth d's: the lineup stays the table's, the enemies hit as
+hard as there, and the same seed and danger give the same numbers. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
 

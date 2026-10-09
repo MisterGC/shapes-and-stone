@@ -559,6 +559,47 @@ Alone there is nobody to lift. In the dojo, `eval fakeDownedAlly()` puts
 a fallen ally of another colour beside the knight, without a session; the
 knight lifts it up as it would a node's, and it rises on the spot.
 
+## The party's danger (issue #96)
+
+A dungeon's danger is its depth plus a position in that depth's range
+(`Game.danger`, `Balance.danger`); it decides the enemies and the look of
+the dungeon, so every screen has to build with the same one. The host
+decides it. Each node sends its knight's record of the level with every
+state: `lv` the level index, `l` the share of its max HP lost there (a
+potion does not take it back) and `f` once it fell, even if it was lifted
+up since. When the party leaves a dungeon the host settles the next
+dungeon's position from its own record and the last state of each other
+node in the same level (`Game.partyRecords`, `Game.settleDanger`): the
+losses averaged, one knight's fall a fall. It puts the positions into the
+session property `run` with the level, `{seed, level, pos, next}`: `pos`
+the position of the dungeon the level belongs to, `next` the next
+dungeon's, which a village's exit stairs show. A joiner enters the level
+at those positions, a node that joins late gets them with its welcome, and
+the next run after the party's fall (`Session.goAgain`) carries the
+position it starts at. `lv` keeps a state of the level before from
+counting in the new one.
+
+In a dungeon the exit stairs show where the next one would stand were the
+party to leave now; each screen works it out from the records it holds,
+so they show the same once the states have arrived. A new dungeon starts
+with nothing lost (`Game.generateDungeon`), so its stairs show the same on
+every screen from the start, whatever the physics clock has done yet.
+
+`tests/dangerparty/run_dangerparty.py` checks it over the network, in two
+processes. Four times the bench makes up both knights' records - 0% and
+90% lost, 5% and 10% lost with the joiner's fall, 0% and 20%, 0% and 10% -
+and the host leads the party down: the host must hold both records, both
+village screens the next position settled from both (not the one the
+host's record alone gives), and both next dungeons the same depth, danger
+and look - band, light, every torch, the floor, what lies on it, the air
+and the stairs' colour.
+
+On clayground `dee7c25` (the submodule) it exited 0 with 27 checks passed
+in 15 runs in a row. Before the new dungeon's stairs started from a fresh
+record, 3 runs in 10 failed on the stairs' colour: in the offscreen
+loaders the physics stepped about once a second, and the host's screen
+kept the colour it entered with for longer than the bench waited.
+
 `tests/revive/run_revive.py` checks it over the network, in two
 processes, with the host's enemies halted. The joiner's knight falls with
 the host's 2.5 Wu away: no ring. The host's knight stands 0.8 Wu beside
