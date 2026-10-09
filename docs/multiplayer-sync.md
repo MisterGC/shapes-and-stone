@@ -600,6 +600,27 @@ record, 3 runs in 10 failed on the stairs' colour: in the offscreen
 loaders the physics stepped about once a second, and the host's screen
 kept the colour it entered with for longer than the bench waited.
 
+## The party's size (issue #102)
+
+A dungeon's enemies grow with the knights it is built for
+(`Game.partyKnights`, `Balance.party.enemiesPerKnight` and `hpPerKnight`):
+more of them in the spawn table, more HP each. Only the host spawns
+enemies, so every screen shows the host's; the count is the host's too.
+As it enters a level the host counts the knights in the session
+(`Session.knights`, the network's node count) and puts the count into the
+session property `run` with the level and the danger,
+`{seed, level, pos, next, knights}`, so every screen knows whom the
+dungeon it shows is built for. A joiner enters the level with those
+knights, a node that joins late gets them with its welcome, and the next
+run after the party's fall carries them too. The count is fixed with the
+level: a knight that joins or leaves mid-dungeon changes the next
+dungeon, not this one. A `run` without `knights` is built for one.
+
+`tests/dangerparty/run_dangerparty.py` checks it with its two knights: in
+each of its five dungeons both screens must hold the same enemies, by
+their replicated object, built for two - as many as the spawn table gives
+two knights at the dungeon's danger, each with two knights' HP.
+
 `tests/revive/run_revive.py` checks it over the network, in two
 processes, with the host's enemies halted. The joiner's knight falls with
 the host's 2.5 Wu away: no ring. The host's knight stands 0.8 Wu beside

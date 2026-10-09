@@ -373,6 +373,25 @@ fresh game starts at `danger.start`, 0.5. In a session the host settles it
 from every knight's record: the losses averaged, and one knight's fall is
 the party's. `applyScenario("dungeon", 4.8)` lands high in depth 4's range.
 
+More knights meet more resistance. The host builds each dungeon for the
+knights in the session: each knight beyond the first adds
+`party.enemiesPerKnight` enemies to the spawn table, on top of what the
+danger adds and within `depth.enemiesCap`, and `party.hpPerKnight` of every
+enemy's HP - two more enemies and a quarter more HP per knight. Alone a
+dungeon is as it was. A knight joining or leaving mid-dungeon changes the
+next dungeon, not the one the party is in; the village's fight room stays
+the same for any party. In the dojo, `eval knightsOverride = 4` and then
+`eval applyScenario("dungeon", 2.5)` build that dungeon for four knights,
+and so the next dungeons, until `eval knightsOverride = 0` counts the
+session's knights again; `eval partyKnights` says whom the dungeon is built
+for. The party size bench builds the same seed and
+danger for 1, 2 and 4 knights and checks the enemies against the table,
+and the 1-knight dungeon against the one recorded before:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/partysize/partysize.qml
+```
+
 The dungeon shows its danger (`danger.looks`): low danger has warm torches,
 clean stones and dust in the air; middle fewer, cooler torches, cracks,
 moss and old stains; high ember-red torches, cracked stones, bones and
@@ -384,7 +403,7 @@ twice; the looks bench saves the same dungeon at low, middle and high
 danger and the stairs at a high and a low next one as PNGs, and needs a
 window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
-settling each next one from both knights' records:
+settling each next one from both knights' records and building it for two:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
