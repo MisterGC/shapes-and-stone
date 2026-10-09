@@ -15,6 +15,8 @@ layout(std140, binding = 0) uniform buf {
     float seamPx;      // gap between stones, in chunky pixels (may be < 1)
     float style;       // 0 = flagstones, 1 = earth
     float seed;
+    float crackShare;  // share of the flagstones cracked across
+    float moss;        // share of the flagstone floor moss grows over
     vec4 baseColor;
     vec4 seamColor;
 } ubuf;
@@ -71,8 +73,12 @@ vec3 flagstones(vec2 p, vec2 rawP) {
     vec2 rcell = vec2(1.0 + rwide, 1.0);
     vec2 rf = fract(rq / rcell) * rcell;
     float rEdge = min(min(rf.x, rcell.x - rf.x), min(rf.y, rcell.y - rf.y));
+    // Moss grows in patches, thickest in the seams between the stones
+    float mossy = ubuf.moss > 0.0
+        ? smoothstep(1.0 - ubuf.moss, 1.0 - ubuf.moss + 0.12, noise(p * 0.3 + 5.0)) : 0.0;
+    vec3 mossColor = vec3(0.13, 0.2, 0.09);
     if (rEdge < px * ubuf.seamPx * 0.5)
-        return ubuf.seamColor.rgb;
+        return mix(ubuf.seamColor.rgb, mossColor, mossy * 0.8);
     float edgeL = f.x;
     float edgeR = cellSize.x - f.x;
     float edgeT = cellSize.y - f.y;
@@ -82,9 +88,9 @@ vec3 flagstones(vec2 p, vec2 rawP) {
     else if (edgeB < px || edgeR < px)
         col *= 0.88;
 
-    // A jagged crack across the odd stone: straight segments that change
-    // direction at a few hashed points, never a smooth wave.
-    if (h > 0.965) {
+    // A jagged crack across crackShare of the stones: straight segments
+    // that change direction at a few hashed points, never a smooth wave.
+    if (h > 1.0 - ubuf.crackShare) {
         float seg = floor(f.x * 4.0);
         float y0 = 0.3 + 0.4 * hash(cell + seg);
         float y1 = 0.3 + 0.4 * hash(cell + seg + 1.0);
@@ -93,6 +99,9 @@ vec3 flagstones(vec2 p, vec2 rawP) {
     }
     // Pits and grit.
     if (hash(floor(p * ubuf.pixelsPerWu)) > 0.99) col *= 0.82;
+    // Moss over the stones, speckled at its edge
+    float speck = hash(floor(p * ubuf.pixelsPerWu) + 11.0);
+    col = mix(col, mossColor * (0.8 + 0.4 * speck), mossy * (0.45 + 0.25 * speck));
     return col;
 }
 

@@ -377,7 +377,26 @@ QtObject {
         // A position below low is low danger, from high on high, between
         // them middle
         low: 0.33,
-        high: 0.67
+        high: 0.67,
+        // What a dungeon looks like at low, middle and high danger:
+        // torches in torch, torchShare of the torch spots lit, the
+        // darkness's ambient and the screen's temperature; crackShare of
+        // the floor stones cracked and moss over that share of the floor;
+        // stains old stains, bones heaps of bones and embers glowing coals
+        // per room on the floor; dust and embers in the air at that
+        // density (0 for none). The exit stairs glow in the next
+        // dungeon's torch colour
+        looks: [
+            { torch: "#FFB65C", torchShare: 1.0, ambient: "#100D0C", temperature: 0.12,
+              crackShare: 0.02, moss: 0, stains: 0, bones: 0, embers: 0,
+              dust: 0.5, emberAir: 0 },
+            { torch: "#BFD0E8", torchShare: 0.6, ambient: "#090B12", temperature: -0.08,
+              crackShare: 0.14, moss: 0.35, stains: 2, bones: 0, embers: 0,
+              dust: 0.2, emberAir: 0 },
+            { torch: "#FF3A14", torchShare: 0.85, ambient: "#140707", temperature: 0.3,
+              crackShare: 0.4, moss: 0, stains: 1, bones: 2, embers: 3,
+              dust: 0, emberAir: 0.25 }
+        ]
     })
 
     // Gold: what a killed enemy drops where it fell, for a knight to pick up

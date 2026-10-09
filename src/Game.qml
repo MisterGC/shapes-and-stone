@@ -930,6 +930,10 @@ ClayWorld2d {
         let from = levelType === "village" ? nextPosition : dangerPosition
         return settleDanger(from, [{ lost: 1, fell: true }])
     }
+    // What a dungeon looks like at its danger: Balance.danger.looks of
+    // its band. The village and the fight room keep their own look
+    readonly property bool dangerLook: levelType === "dungeon" && !fightRoomActive
+    readonly property var look: Balance.danger.looks[dangerBand(dangerPosition)]
     function _setDanger(position, next) {
         if (position === undefined || isNaN(position)) return
         dangerPosition = position
@@ -1861,7 +1865,7 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : "#0c0b12"
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -1875,7 +1879,8 @@ ClayWorld2d {
         vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
         vignetteColor: "#000000"
         // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15 : 0.12
+        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15
+                     : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
         saturation: world.fx ? 1.15 : 1
@@ -2063,6 +2068,20 @@ ClayWorld2d {
             visible: Qt.binding(() => world.fx)
         })
         dungeonObjects.push(m)
+        if (!dangerLook) return
+        // The dungeon's air at its danger: dust, and embers glowing on
+        // their own
+        m.density = look.dust
+        m.visible = Qt.binding(() => world.fx && look.dust > 0)
+        if (look.emberAir <= 0) return
+        let e = motesComponent.createObject(glowParent(), {
+            widthWu: xWuMax, heightWu: yWuMax,
+            density: look.emberAir, moteSize: 0.05, drift: 0.8,
+            color: Qt.rgba(1.0, 0.33, 0.08, 0.9),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(e)
     }
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
@@ -2189,7 +2208,8 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
-        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995))
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
+        placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -2411,6 +2431,10 @@ ClayWorld2d {
             style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
             seed: (levelIndex * 0.137) % 1
         })
+        if (dangerLook) {
+            floorObj.crackShare = look.crackShare
+            floorObj.moss = look.moss
+        }
         dungeonObjects.push(floorObj)
 
         // Create merged walls using run-length encoding
@@ -2480,8 +2504,10 @@ ClayWorld2d {
 
     // Torches on the north wall of each room. Decoration draws from its own
     // generator so the layout and enemies stay identical to a seed without it.
+    // With a look (Balance.danger.looks) only its torchShare of them burn,
+    // in its torch colour
     property var torches: []
-    function placeRoomTorches(decoRng) {
+    function placeRoomTorches(decoRng, look) {
         torches = []
         for (let room of rooms) {
             let gy = room.y + room.h
@@ -2497,7 +2523,38 @@ ClayWorld2d {
                 let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
                 t += (decoRng() - 0.5) * 0.15
                 let gx = spots[Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))]
-                placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75)
+                if (look && decoRng() >= look.torchShare) continue
+                placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75,
+                           look ? look.torch : undefined)
+            }
+        }
+    }
+
+    // What lies on the floor of each room but the first at the look's
+    // danger: old stains, bones and embers, each kind look.<kind> per room
+    // on average, laid out from the level's seed
+    Component { id: debrisComponent; Debris {} }
+    function placeDebris(decoRng, look) {
+        for (let room of rooms.slice(1)) {
+            for (let kind of ["stains", "bones", "embers"]) {
+                // A whole number per room, its fraction a chance of one more
+                let n = Math.floor(look[kind] + decoRng())
+                for (let i = 0; i < n; i++) {
+                    let x = (room.x + 1 + decoRng() * (room.w - 2)) * cellSize
+                    let y = (room.y + 1 + decoRng() * (room.h - 2)) * cellSize
+                    let seed = decoRng()
+                    let props = {
+                        xWu: x, yWu: y, seed: seed,
+                        pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                        visible: Qt.binding(() => world.fx)
+                    }
+                    let o = kind === "stains"
+                        ? stainComp.createObject(world.room, Object.assign(props, {
+                              color: "#2E1A14", sizeWu: 1.0 + 0.6 * seed }))
+                        : debrisComponent.createObject(kind === "embers" ? glowParent() : world.room,
+                              Object.assign(props, { kind: kind, sizeWu: 0.8 + 0.3 * seed }))
+                    if (o) dungeonObjects.push(o)
+                }
             }
         }
     }
@@ -2873,8 +2930,12 @@ ClayWorld2d {
         })
         exitSensor.opacity = 0
         dungeonObjects.push(exitSensor)
+        // The stairs glow in the next dungeon's torch colour: in a dungeon
+        // where it would stand were the party to leave now, in the village
+        // where it stands
         exitStairs = exitStairsComponent.createObject(world.room, {
             xWu: wx, yWu: wy, widthWu: cellSize, heightWu: cellSize,
+            glow: Qt.binding(() => Balance.danger.looks[dangerBand(world.nextPosition)].torch),
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
