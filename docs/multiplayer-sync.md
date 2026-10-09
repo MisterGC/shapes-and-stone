@@ -452,8 +452,8 @@ and darkens it, hides its aim and dims its lantern. The local knight is
 down when its HP is 0 (`Player.fallen`); another player's knight when the
 HP its state carries is 0 (`RemotePlayer.remoteHp`, sent with every state,
 60 per second). A down knight takes no blow (`ignored`), the campfire does
-not heal it, and it stays down through a level change, for the rest of the
-run.
+not heal it, and it stays down through a level change until an ally lifts
+it up or the party reaches the camp (issue #100).
 
 In a session the fall does not end the run while another knight stands.
 The downed player's screen says "You are down", keeps the dungeon in sight
@@ -524,6 +524,59 @@ On clayground `dee7c25` (the submodule) it exited 0 with 85 checks passed.
 On the code before issue #99 it exits 100: the party's fall left the
 session, and the joiner's Enter took it to the title. With the shots not
 cleared with the level it exits 1, on the shot of the run before.
+
+## A fallen knight lifted up, and rising at camp (issue #100)
+
+Each node lifts with its own knight, on its own physics clock
+(`Game._stepRevive`): standing within `Balance.party.reviveRange` of
+another node's knight at 0 HP, it fills `Player.reviveProgress` by the
+step's time over `reviveTime`. A hit that lands on it (`acted("hurt")`), a
+step out of range or a nearer fallen knight starts it over. The node
+sends the lift with its state, 60 per second: `v` is the node id of the
+knight it lifts and `p` how far, 0 to 1, both left out while it lifts
+nobody. Every screen draws the ring around a fallen knight from the
+furthest lift it has of it: its own knight's, and the last state of each
+other node (`Session.liftOf`). A fallen knight's own screen draws the
+ring around it the same way.
+
+When the lift is full, the lifting node sends `lift` to the fallen
+knight's node, reliably (`Session.liftKnight`); that node raises its
+knight with `reviveHp` of its max HP (`Game._rise`) and its next state
+carries the HP, so every screen draws it standing. The full ring stays
+until then. A knight's HP stays its own node's, as with every hit (issue
+#18). Once the party has fallen nobody rises: a `lift` that arrives after
+`runEnd` is dropped.
+
+A knight still down when its node enters the village rises there with the
+same share (`Game._enterLevel`); each node raises its own, and the others
+draw it from its states. A screen that makes the knight before its first
+state in the village draws it down from its last state, then standing.
+
+The fight record counts `lifts` (fallen allies this knight lifted up) and
+`lifted` (times an ally lifted it up) per node; a rise at camp is neither.
+
+Alone there is nobody to lift. In the dojo, `eval fakeDownedAlly()` puts
+a fallen ally of another colour beside the knight, without a session; the
+knight lifts it up as it would a node's, and it rises on the spot.
+
+`tests/revive/run_revive.py` checks it over the network, in two
+processes, with the host's enemies halted. The joiner's knight falls with
+the host's 2.5 Wu away: no ring. The host's knight stands 0.8 Wu beside
+it: half way the ring is drawn on both screens; a hit on the host's knight
+that throws it nowhere starts it over on both. The joiner's knight must
+rise no sooner than `reviveTime` after the hit, with `reviveHp` of its HP
+on both screens, no fallen screen and no ring left; the host's record
+counts one lift, the joiner's one. Struck down again, with the host out of
+reach, it must rise at the village's camp on both screens.
+`tests/downed/downed.qml` walks a downed knight through the village too:
+it must rise there on both screens, is struck down again, and must be made
+downed in the next dungeon.
+
+On clayground `dee7c25` (the submodule) the revive bench exited 0 with 17
+checks passed: the ring was half full 1.53 s in on both screens, and the
+joiner's knight rose 3.00 s after the hit with 36 HP. The downed bench
+exited 0 with 56 checks passed. On the code before issue #100 the revive
+bench exits 100: no ring fills beside the fallen knight.
 
 ## Joining late, leaving and losing the host (issue #20)
 

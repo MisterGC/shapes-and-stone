@@ -220,12 +220,33 @@ again", and its Enter does nothing. Esc leaves the session for the title.
 The downed bench starts
 a host and a joiner in one process, joins them over LAN, brings down first
 one knight and then the other, twice in turn, leaves with Esc, and exits
-with the number of failed checks. Between the two falls the host goes down two levels, and the
-other screen must make the downed knight downed in each, not standing until
-its next state:
+with the number of failed checks. Between the two falls the host goes down two levels: at the
+village's camp the downed knight rises on both screens and is struck down
+again, and in the next dungeon the other screen must make it downed, not
+standing until its next state:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
+```
+
+A downed knight is not out for good. An ally that stands within
+`party.reviveRange` of it for `party.reviveTime` seconds lifts it up: a
+ring fills around the fallen knight on every screen, a hit on the ally
+starts it over, and the knight rises with `party.reviveHp` of its max HP.
+A knight still down when the party reaches the village rises at its camp
+with the same share. The fight record counts the allies each knight lifted
+(`lifts`) and the times it was lifted (`lifted`). Alone nobody is lifted;
+in the dojo `eval fakeDownedAlly()` puts a fallen ally beside the knight,
+without a session, to try the lift and the table's `party` group on. The
+revive bench checks it over the network: two processes of Clayground's
+live loader, a host and a joiner. The joiner's knight falls, the host's
+stands beside it and is hit half way, and the joiner's knight must rise
+`reviveTime` after the hit with `reviveHp` on both screens; down again, it
+must rise at the camp. It needs the live loader
+(`-DCLAYGROUND_WITH_TOOLS=ON`) and exits with the number of failed checks:
+
+```
+python3 tests/revive/run_revive.py --mode local
 ```
 
 The go-again bench checks the next run over the network: two processes of
