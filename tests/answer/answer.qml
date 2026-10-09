@@ -729,7 +729,8 @@ Window {
                 Clayground.physicsStep(1)
                 n++
             }
-            check(p.hp === hp && p.mana === mana && acts.indexOf("dash") >= 0
+            check(p.hp === hp && Math.abs(p.mana - (mana - Balance.knight.dashMana)) < 1e-6
+                  && acts.indexOf("dash") >= 0
                   && acts.indexOf("hurt") < 0 && d.aiState === "recovery",
                   "in a dash a crushing blow misses (" + hp + " -> " + p.hp + " HP, acted "
                   + acts.join(", ") + ", the guardian " + d.aiState + ")")
@@ -907,6 +908,7 @@ Window {
                 p.graceLeft = 0
                 p.attackCooldown = 0
                 p.dashCooldown = 0
+                p.mana = p.maxMana
                 p.xWu = x0
                 p.yWu = y0
                 away()
@@ -1053,6 +1055,50 @@ Window {
                   "a shield dash still breaks a guardian's guard (" + gd.aiState + ", acted "
                   + actions.join(", ") + ")")
             p.isBlocking = false
+
+            // Mana pays for a dash and a whirlwind; without it a dash does
+            // not start and a full charge swings heavy, each refusal with
+            // the word over the knight and the mana bar's flash
+            ready()
+            let m0 = p.mana
+            p.dash()
+            check(p.isDashing && Math.abs(m0 - p.mana - k.dashMana) < 1e-6,
+                  "a dash costs " + (m0 - p.mana).toFixed(2) + " mana, the table says " + k.dashMana)
+            let w = before(0)
+            check(w.whirl && Math.abs(p.maxMana - p.mana - k.whirlMana) < 1e-6,
+                  "a whirlwind costs " + (p.maxMana - p.mana).toFixed(2) + " mana with its dash, the table says "
+                  + k.whirlMana)
+            ready()
+            p.mana = k.dashMana - 1
+            let words = spawned("fightWord", k.noManaWord)
+            actions = []
+            p.dash()
+            check(!p.isDashing && actions.indexOf("dash") < 0 && p.mana === k.dashMana - 1
+                  && spawned("fightWord", k.noManaWord) === words + 1 && game.manaBarFlashing,
+                  "with " + (k.dashMana - 1) + " mana no dash starts, " + k.noManaWord
+                  + " shows and the mana bar flashes (acted " + (actions.join(", ") || "nothing") + ")")
+            ready()
+            charge()
+            p.mana = k.whirlMana - 1
+            words = spawned("fightWord", k.noManaWord)
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            actions = []
+            p.dash()
+            check(p.isDashing && !p.isWhirling && p.isHeavy && actions.indexOf("whirlwind") < 0
+                  && spawned("fightWord", k.noManaWord) === words + 1,
+                  "with " + (k.whirlMana - 1) + " mana a full charge let go into a dash swings heavy and"
+                  + " dashes, " + k.noManaWord + " shows (acted " + actions.join(", ") + ")")
+            ready()
+            charge()
+            p.dash()
+            p.mana = k.whirlMana - k.dashMana - 1
+            words = spawned("fightWord", k.noManaWord)
+            actions = []
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            check(!p.isWhirling && actions.indexOf("heavy") >= 0
+                  && spawned("fightWord", k.noManaWord) === words + 1,
+                  "a full charge held into a dash and let go short of the whirlwind's mana swings heavy, "
+                  + k.noManaWord + " shows (acted " + actions.join(", ") + ")")
 
             // A full charge held into a dash, the game paused: the window
             // counts physics steps, not the wall clock
@@ -1223,6 +1269,50 @@ Window {
                   "after the hit stop the knock-back runs on and out (moved "
                   + (kept.x - p.xWu).toFixed(3) + " wu)")
             console.log("[Answer] knock-back done,", failures, "failed")
+        }],
+        [() => true, () => {
+            // Mana: a blow the held shield stops costs blockMana, a shot it
+            // deflects too; down manaRegenDelay with nothing spent, mana
+            // comes back at manaRegen per second, and spending starts over
+            Clayground.paused = true
+            let p = game.player
+            let k = Balance.knight
+            for (let o of game.enemies) if (!o.destroyed) { o.halt(); o.target = null }
+            p.xWu = game._fightRoomCx; p.yWu = game._fightRoomCy
+            p.hp = p.maxHp; p.graceLeft = 0; p.dashCooldown = 0
+            p.facingAngle = 0
+            p.mana = p.maxMana
+            p.isBlocking = true
+            Clayground.physicsStep(k.perfectBlockFrames + 1)
+            let m0 = p.mana
+            let res = p.takeDamage(20, p.xWu + 1, p.yWu)
+            check(res === "blocked" && Math.abs(m0 - p.mana - p.blockMana) < 1e-6,
+                  "a blocked blow costs " + (m0 - p.mana).toFixed(2) + " mana, the table says " + k.blockMana)
+            m0 = p.mana
+            game.spawnProjectile(p.xWu + 20, p.yWu, -1, 0, 8)
+            let shots = game.room.children.filter(o => o.objectName === "projectile" && !o.destroyed)
+            shots[shots.length - 1].onHitPlayer({ getBody: () => ({ target: p }) })
+            check(Math.abs(m0 - p.mana - p.blockMana) < 1e-6,
+                  "a shot the shield deflects costs " + (m0 - p.mana).toFixed(2) + " mana")
+            p.isBlocking = false
+            let delay = Math.round(k.manaRegenDelay / stepS)
+            m0 = p.mana
+            Clayground.physicsStep(delay - 1)
+            let before = p.mana
+            Clayground.physicsStep(61)
+            check(before === m0 && Math.abs(p.mana - m0 - k.manaRegen) < 0.1,
+                  "the lowered shield's mana stays " + delay + " steps, then comes back "
+                  + (p.mana - m0).toFixed(2) + " in a second, the table says " + k.manaRegen)
+            p.dash()
+            m0 = p.mana
+            Clayground.physicsStep(delay - 1)
+            before = p.mana
+            Clayground.physicsStep(2)
+            check(before === m0 && p.mana > m0,
+                  "a dash starts the rest over: " + (delay - 1) + " steps after it no mana came back ("
+                  + m0.toFixed(2) + " -> " + before.toFixed(2) + "), two steps later it does ("
+                  + p.mana.toFixed(2) + ")")
+            console.log("[Answer] mana done,", failures, "failed")
         }],
         // Torn down before quitting, as the other benches do
         [300, () => game.destroy()],
