@@ -21,7 +21,8 @@
 // A raised shield drains knight.blockDrain mana per second and drops at
 // 0, where it breaks once - the view's shards, acted("shieldBreak") and
 // the mana bar's flash; it cannot be raised again without mana, and a
-// right-click then answers with the empty click and the mana bar's flash.
+// right-click then answers with the empty click, knight.noManaWord and the
+// mana bar's flash.
 // A parry gives knight.parryMana back. With debugMechanics off a parry
 // and a perfect block show their word, PARRY and PERFECT, and a hit no
 // damage number. The hurt flash, the HP chunk, the shards, the mana bar's
@@ -44,8 +45,16 @@
 // each enemy along its path once, knight.whirlSwing times atk, through a
 // guardian's shield, and not one the heavy swing it turned hit already;
 // the dash swing and the shield dash work as before, and a pause holds
-// the window. Prints one PASS or FAIL line per check and exits with the
-// number of failures.
+// the window. A dash costs knight.dashMana and a whirlwind knight.whirlMana;
+// short of it no dash starts and a full charge swings heavy, each showing
+// knight.noManaWord and the mana bar's flash. A lunge or a shot that lands
+// throws the knight knight.knockback wu along it, off the grunt; a crushing
+// blow through the shield too, a blocked, perfect or dodged blow not; a
+// wall stops it, a pause and a hit stop hold it. A blow or a shot the shield
+// stops costs knight.blockMana; down knight.manaRegenDelay with nothing
+// spent, mana comes back at knight.manaRegen, and a dash starts that over.
+// Prints one PASS or FAIL line per check and exits with the number of
+// failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
 
