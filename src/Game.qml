@@ -628,7 +628,8 @@ ClayWorld2d {
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
-                                                 size: enemy.widthWu, crush: enemy.crushing})
+                                                 size: enemy.widthWu, crush: enemy.crushing,
+                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -694,7 +695,7 @@ ClayWorld2d {
         }
         // A blow sounds the shield's own block or the knight's hurt, in
         // takeDamage
-        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush)
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
         // a crushing blow's for the full stagger

@@ -968,7 +968,8 @@ PhysicsItem {
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < Balance.enemy.lungeHitRange) {
-                let result = target.takeDamage(atk, xWu, yWu, widthWu, crushing)
+                let result = target.takeDamage(atk, xWu, yWu, widthWu, crushing,
+                                               _dirToTargetX, _dirToTargetY)
                 // A blocked blow throws it back, a perfect block staggers
                 // it, a crushing blow's for the full stagger; the knight
                 // sounds its own block or hurt, so the lunge plays nothing

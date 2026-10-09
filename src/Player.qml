@@ -135,6 +135,12 @@ PhysicsItem {
     // Seconds left of the grace after a hit, in which no damage is taken
     property real graceLeft: 0
 
+    // Thrown back by a hit (Balance.knight.knockback): seconds left of it
+    // and its velocity at the start, in wu per second, y up
+    property real _knockT: 0
+    property real _knockVx: 0
+    property real _knockVy: 0
+
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held.
     // Dash, swing and cooldowns count the time the step simulated: a pause, a
@@ -183,6 +189,11 @@ PhysicsItem {
                     isDashing = false
                     isWhirling = false
                 }
+            } else if (_knockT > 0) {
+                // Fades out step by step, like an enemy's knockback
+                let k = _knockT / Balance.knight.knockbackDuration
+                player.body.linearVelocity = Qt.point(_knockVx * k, -_knockVy * k)
+                _knockT = _knockT - dt < 1e-6 ? 0 : _knockT - dt
             } else if (isBlocking) {
                 let spd = maxSpeed * blockSpeedMultiplier
                 player.body.linearVelocity = Qt.point(moveX * spd, moveY * spd)
@@ -488,8 +499,11 @@ PhysicsItem {
     // a perfect block and a crushing blow look and sound like their own.
     // The attacker is the corner (attackerX, attackerY) of a thing
     // attackerSize Wu in size (isShieldFacing); crush is true for a
-    // crushing blow (Balance.enemy.crush...).
-    function takeDamage(amount, attackerX, attackerY, attackerSize, crush) {
+    // crushing blow (Balance.enemy.crush...). (alongX, alongY) is the way
+    // the blow travelled, y up - a lunge's or a shot's - which a hit
+    // throws the knight back along; without it, from the attacker's centre
+    // through the knight's.
+    function takeDamage(amount, attackerX, attackerY, attackerSize, crush, alongX, alongY) {
         if (fallen) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
@@ -497,7 +511,7 @@ PhysicsItem {
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
         if (blocked && perfectGuard) return _perfectBlock(attackerX, attackerY, attackerSize)
         if (blocked && crush === true)
-            return _crushed(finalDamage, attackerX, attackerY, attackerSize)
+            return _crushed(finalDamage, attackerX, attackerY, attackerSize, alongX, alongY)
         if (blocked) {
             finalDamage = Math.floor(finalDamage * blockedShare)
             // The shield's own sound, the only one a blocked blow plays
@@ -513,6 +527,7 @@ PhysicsItem {
         if (!blocked) {
             _cancelCharge()
             graceLeft = Balance.knight.hurtGrace
+            _knockBack(attackerX, attackerY, attackerSize, alongX, alongY)
             view.hurt()
             acted("hurt")
             // The knight's own hurt sound, the only one a hit plays
@@ -528,6 +543,28 @@ PhysicsItem {
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
         return blocked ? "blocked" : "hit"
+    }
+
+    // Thrown back along the blow (takeDamage), Balance.knight.knockback
+    // wu: a knockback fades out step by step, so it covers its start speed
+    // times the sum of its steps' shares of it
+    function _knockBack(attackerX, attackerY, attackerSize, alongX, alongY) {
+        let k = Balance.knight
+        if (k.knockback <= 0 || fallen) return
+        let dx = alongX, dy = alongY
+        if (dx === undefined || dy === undefined || dx * dx + dy * dy < 1e-6) {
+            let a = _centreOf(attackerX, attackerY, attackerSize)
+            dx = xWu + widthWu / 2 - a.x
+            dy = yWu - heightWu / 2 - a.y
+        }
+        let len = Math.sqrt(dx * dx + dy * dy)
+        if (len < 0.001) return
+        let dt = player.world.timeStep, per = 0
+        for (let t = k.knockbackDuration; t > 1e-9; t -= dt) per += t / k.knockbackDuration * dt
+        let speed = k.knockback / per
+        _knockVx = dx / len * speed
+        _knockVy = dy / len * speed
+        _knockT = k.knockbackDuration
     }
 
     // The shield rose just before the blow: it takes all of it and gives
@@ -555,7 +592,7 @@ PhysicsItem {
     // A crushing blow met the held shield: it breaks - crushMana mana gone,
     // down for crushLockout seconds - and crushShare of the damage lands,
     // a hurt with its grace
-    function _crushed(damage, attackerX, attackerY, attackerSize) {
+    function _crushed(damage, attackerX, attackerY, attackerSize, alongX, alongY) {
         let e = Balance.enemy
         let finalDamage = Math.max(Balance.minDamage, Math.floor(damage * e.crushShare))
         mana = Math.max(0, mana - e.crushMana)
@@ -564,6 +601,7 @@ PhysicsItem {
         hp = Math.max(0, hp - finalDamage)
         _cancelCharge()
         graceLeft = Balance.knight.hurtGrace
+        _knockBack(attackerX, attackerY, attackerSize, alongX, alongY)
         _shieldBreak()
         view.hurt()
         acted("hurt")
@@ -646,6 +684,7 @@ PhysicsItem {
         if (_charge === "full" && !whirl) _dashedFullAt = _steps
         else _cancelCharge()
         isDashing = true
+        _knockT = 0
         _hitThisSwing = new Set()
         _dashTimer = dashDuration
         dashCooldown = dashCooldownTime

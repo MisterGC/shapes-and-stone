@@ -77,6 +77,11 @@ QtObject {
         whirlSwing: 2,
         // After a hit the shield did not stop, no damage taken for this long
         hurtGrace: 0.5,
+        // A landed hit, or a crushing blow through the held shield, throws
+        // the knight knockback wu back along the blow, fading out over
+        // knockbackDuration seconds; a wall stops it
+        knockback: 1.3,
+        knockbackDuration: 0.15,
         // Dash: no damage taken while it lasts
         dashSpeed: 40.0,
         dashDuration: 0.15,
