@@ -341,8 +341,10 @@ QtObject {
         fightRoomRespawn: 2.0
     })
 
-    // Deeper is harder: each depth (counted in dungeons from 0) adds these
-    // to the spawn rolls and the enemies' attack, up to the caps
+    // Deeper is harder: each step of a dungeon's danger (its depth, counted
+    // in dungeons from 0, plus its position in the depth's range, see
+    // danger) adds these to the spawn rolls and the enemies' attack, up to
+    // the caps. A danger between two whole steps adds its share
     readonly property var depth: ({
         // More enemies: added to enemiesMin and enemiesMax, never above the
         // cap; at 2 a dungeon two depths down holds more than the one above
@@ -360,6 +362,22 @@ QtObject {
         typeCap: 0.45,
         // Harder blows: added to every enemy's atk, rounded to whole points
         atk: 0.5
+    })
+
+    // A dungeon's danger is its depth plus a position in [0, 1) in that
+    // depth's range. Leaving a dungeon moves the position pull of the way
+    // toward what it earned: 1 less the share of max HP the knights lost
+    // in it, averaged (a potion's heal does not take a loss back), or 0 if
+    // a knight fell there. The position goes on into the next run, not
+    // past a restart: a fresh game starts at start. It never reaches top
+    readonly property var danger: ({
+        start: 0.5,
+        pull: 0.5,
+        top: 0.999,
+        // A position below low is low danger, from high on high, between
+        // them middle
+        low: 0.33,
+        high: 0.67
     })
 
     // Gold: what a killed enemy drops where it fell, for a knight to pick up

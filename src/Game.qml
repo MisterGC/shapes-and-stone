@@ -568,14 +568,16 @@ ClayWorld2d {
         muted: world.muted
         // The host's run, from its start or, on a node that joins late,
         // at the level the host plays
-        onStarted: (seed, level) => {
+        onStarted: (seed, level, position, next) => {
             masterSeed = seed
             world.levelIndex = level
             world.levelType = levelTypeOf(level)
+            _setDanger(position, next)
             screen = "game"
         }
-        onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
-        onWentAgain: (seed) => _startRun(seed)
+        onLevelChanged: (newIndex, position, next) =>
+            _applyLevelChange(newIndex, {pos: position, next: next})
+        onWentAgain: (seed, position) => _startRun(seed, position)
         onLiftReceived: (fromId) => _rise("lift")
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
@@ -867,6 +869,73 @@ ClayWorld2d {
     function depthOf(index) { return Math.floor(index / 2) }
     function levelTypeOf(index) { return index % 2 === 1 ? "village" : "dungeon" }
     function levelIndexOf(d, type) { return 2 * d + (type === "village" ? 1 : 0) }
+
+    // --- Danger (issue #96) ---
+    // A dungeon's danger is its depth plus a position in [0, 1) in that
+    // depth's range, and drives what Balance.depth adds: the more the
+    // knights kept of their HP in the last dungeon, the higher the next
+    // one stands in its range (Balance.danger). In a village
+    // dangerPosition is still the dungeon's just left and nextPosition
+    // the next one's, fixed at the exit; in a dungeon nextPosition is what
+    // the next one would get were the party to leave now. After the run
+    // has ended in a fall, nextPosition is where the next run starts
+    property real dangerPosition: Balance.danger.start
+    property real nextPosition: Balance.danger.start
+    readonly property real danger: depth + dangerPosition
+    // 0 low, 1 middle, 2 high
+    function dangerBand(position) {
+        return position < Balance.danger.low ? 0 : position < Balance.danger.high ? 1 : 2
+    }
+    // The position of the next dungeon: pull of the way from position
+    // toward what the last one earned, 1 less the knights' average share
+    // of max HP lost, or 0 if any knight fell. records: [{lost, fell}]
+    function settleDanger(position, records) {
+        if (records.length === 0) return position
+        let fell = false, lost = 0
+        for (let r of records) {
+            fell = fell || r.fell === true
+            lost += Math.min(1, Math.max(0, r.lost)) / records.length
+        }
+        let earned = fell ? 0 : 1 - lost
+        let next = position + (earned - position) * Balance.danger.pull
+        return Math.max(0, Math.min(Balance.danger.top, next))
+    }
+    // This knight's record of the level: the share of its max HP it lost -
+    // a potion's heal does not take it back - and whether it fell
+    function levelRecord() {
+        let maxHp = player ? player.maxHp : Balance.knight.hp
+        return { lost: Math.min(1, fightRecord.damageTaken / maxHp), fell: fightRecord.deaths > 0 }
+    }
+    // Every knight's record of the level: this node's and, in a session,
+    // each other node's from the last state it sent
+    function partyRecords() {
+        let out = [levelRecord()]
+        for (let id in session.remotePlayers) {
+            let st = session.lastStates[id]
+            if (st && st.l !== undefined) out.push({ lost: st.l, fell: st.f === 1 })
+        }
+        return out
+    }
+    // The positions the level newIndex is entered at: out of a dungeon the
+    // next one's is settled from the party's records, out of a village the
+    // next dungeon stands where the exit fixed it
+    function _dangerFor(newIndex) {
+        if (levelTypeOf(newIndex) === "village")
+            return { pos: dangerPosition, next: settleDanger(dangerPosition, partyRecords()) }
+        return { pos: nextPosition, next: nextPosition }
+    }
+    // Where the next run starts after this one ended in a fall: a fall
+    // earns the bottom of the range
+    function _dangerAfterFall() {
+        let from = levelType === "village" ? nextPosition : dangerPosition
+        return settleDanger(from, [{ lost: 1, fell: true }])
+    }
+    function _setDanger(position, next) {
+        if (position === undefined || isNaN(position)) return
+        dangerPosition = position
+        nextPosition = next === undefined || isNaN(next) ? position : next
+        console.log("[Game] Danger", danger.toFixed(3), "next position", nextPosition.toFixed(3))
+    }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
     property bool fallen: false
@@ -958,7 +1027,7 @@ ClayWorld2d {
     function _startMultiplayerGame() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        session.start(masterSeed)
+        session.start(masterSeed, dangerPosition)
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -1519,6 +1588,7 @@ ClayWorld2d {
         fallen = true
         _keepBest()
         countFight("fall")
+        if (!session.connected) nextPosition = _dangerAfterFall()
         // In a session the enemies go for the knights still standing
         if (session.connected) {
             _checkPartyDown()
@@ -1551,6 +1621,7 @@ ClayWorld2d {
             try { if (e && e.halt) e.halt() } catch(err) {}
         }
         _keepBest()
+        nextPosition = _dangerAfterFall()
         partyFallen = true
         fallen = true
     }
@@ -1686,11 +1757,21 @@ ClayWorld2d {
             world._physicsSteps++
             world._pickUpGold()
             world._stepRevive()
+            world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
                 world.runSeconds += world.physics.timeStep
             }
         }
+    }
+
+    // In a dungeon, a few times a second, where the next one would stand
+    // were the party to leave now: the exit stairs show it. Once the run
+    // has ended nextPosition is the next run's
+    function _forecastDanger() {
+        if (levelType !== "dungeon" || fightRoomActive || !player || _physicsSteps % 10 !== 0) return
+        if (session.connected ? partyFallen : fallen) return
+        nextPosition = settleDanger(dangerPosition, partyRecords())
     }
 
     // Enter on the fallen screen: a new run from depth 0 on a new seed. In
@@ -1701,16 +1782,18 @@ ClayWorld2d {
         do {
             seed = Math.floor(Math.random() * 2147483647)
         } while (seed === masterSeed)
-        _startRun(seed)
+        _startRun(seed, nextPosition)
     }
-    // The next run on seed, from depth 0 with a fresh knight. The host
-    // clears its enemies on every node before it tells the others the seed
-    // and spawns the next run's
-    function _startRun(seed) {
+    // The next run on seed, from depth 0 with a fresh knight, its first
+    // dungeon at position in its range. The host clears its enemies on
+    // every node before it tells the others the seed and spawns the next
+    // run's
+    function _startRun(seed, position) {
         console.log("[Game] New run, seed:", seed)
         clearDungeon()
         masterSeed = seed
-        if (session.connected && session.isHost) session.goAgain(seed)
+        _setDanger(position, position)
+        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition)
         menuOpen = false
         fallen = false
         partyFallen = false
@@ -1727,8 +1810,12 @@ ClayWorld2d {
     // where the next start rolls a new seed
     function backToTitle() {
         console.log("[Game] Back to the title")
+        // The next game from the title starts where this run left the
+        // danger: after a fall or out of a village at the next position
+        let position = fallen || levelType === "village" ? nextPosition : dangerPosition
         clearDungeon()
         if (session.connected) session.leave()
+        _setDanger(position, position)
         menuOpen = false
         fallen = false
         partyFallen = false
@@ -1907,25 +1994,32 @@ ClayWorld2d {
 
     // Host-authoritative level transitions: without this every client
     // regenerates on its own and the worlds silently diverge.
+    // The host settles the next danger from every knight's record and
+    // sends it with the level
     function _hostAdvanceLevel() {
         if (resetting) return
-        session.announceLevel(levelIndex + 1)
-        _applyLevelChange(levelIndex + 1)
+        let d = _dangerFor(levelIndex + 1)
+        session.announceLevel(levelIndex + 1, d.pos, d.next)
+        _applyLevelChange(levelIndex + 1, d)
     }
 
-    function _applyLevelChange(newIndex) {
+    // d: the danger's positions the level is entered at ({pos, next})
+    function _applyLevelChange(newIndex, d) {
         if (resetting || newIndex === levelIndex) return
         resetting = true
         Qt.callLater(() => {
-            _enterLevel(newIndex)
+            _enterLevel(newIndex, d)
             resetting = false
         })
     }
 
     // The one way to the next level: what the knight carries (its HP, mana,
     // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon.
-    // In a session a knight down rises at the village's camp
-    function _enterLevel(newIndex) {
+    // In a session a knight down rises at the village's camp. d is the
+    // danger's positions it is entered at, the host's in a session; alone
+    // they are settled here, before the knight and its record are gone
+    function _enterLevel(newIndex, d) {
+        d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
                                  potions: player.potions, upgrade: player.upgrade }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
@@ -1935,6 +2029,7 @@ ClayWorld2d {
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
+        _setDanger(d.pos, d.next)
         if (levelType === "village")
             generateVillage()
         else
@@ -2114,7 +2209,7 @@ ClayWorld2d {
         // Step 9: Spawn enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            let sb = spawnRolls(depth)
+            let sb = spawnRolls(danger)
             let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
             let tiers = dealTiers(numEnemies, sb, rng)
             for (let i = 0; i < numEnemies; i++) {
@@ -2505,8 +2600,9 @@ ClayWorld2d {
         }
     }
 
-    // The spawn table at a depth: Balance.spawn with Balance.depth added
-    // once per depth, each number within its cap
+    // The spawn table at a danger: Balance.spawn with Balance.depth added
+    // once per step of it (a share of it between two), each number within
+    // its cap
     function spawnRolls(d) {
         let sb = Balance.spawn, bd = Balance.depth
         let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
@@ -2537,7 +2633,7 @@ ClayWorld2d {
         return tiers
     }
 
-    // An enemy's attack at a depth
+    // An enemy's attack at a danger
     function enemyAtk(type, d) {
         return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
     }
@@ -2548,7 +2644,7 @@ ClayWorld2d {
         type = type || "grunt"
         let stats = Balance.enemy[type]
         let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
-        let eatk = enemyAtk(type, depth)
+        let eatk = enemyAtk(type, danger)
         let edef = stats.def
         let props = {
             xWu: ex, yWu: ey,
@@ -3155,10 +3251,14 @@ ClayWorld2d {
     // captures compare the same room.
     readonly property int scenarioSeed: 424242
     function scenarios() { return ["dungeon", "village", "fight"] }
-    // depth (0 when left out) is the depth the dungeon, the village or the
-    // fight room is at, e.g. applyScenario("dungeon", 4) through eval
-    function applyScenario(name, atDepth) {
-        let d = Math.max(0, Math.floor(atDepth || 0))
+    // atDanger (0 when left out) is the danger the dungeon, the village or
+    // the fight room is at: its depth and, after the point, its position
+    // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
+    // for a dungeon high in depth 4's range. A whole number is the bottom
+    function applyScenario(name, atDanger) {
+        let dg = Math.max(0, Number(atDanger) || 0)
+        let d = Math.floor(dg)
+        _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
         muted = true
         masterSeed = scenarioSeed
         if (player) clearDungeon()

@@ -66,9 +66,11 @@ Item {
     }
     function hostUp() { net.signalingMode = _mode(); net.host() }
     function joinNet(code) { net.signalingMode = _mode(); net.join(code) }
-    // Host: start the session's game on this seed
+    // Host: start the session's game on this seed, at the bottom of depth
+    // 0's range: the checks need that dungeon's lineup, a spitter among it
     function startGame(s) {
         game.masterSeed = s
+        game.dangerPosition = 0
         game._startMultiplayerGame()
     }
     function leave() { if (net) net.leave() }
