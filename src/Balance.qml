@@ -156,7 +156,8 @@ QtObject {
     // smear covering up to smear degrees; as it starts a ring of glow
     // flashes and sparks fly along the dash, and the knight's own screen
     // takes this much trauma and a kick of kick wu. It plays the swing
-    // sample swingPitch semitones, and the knight shouts at shoutVolume;
+    // sample swingPitch semitones, and the knight shouts, shoutPitch
+    // semitones, at shoutVolume;
     // each enemy it hits takes a heavy hit's impact
     readonly property var whirl: ({
         glow: "#FFF2C0",
@@ -166,6 +167,7 @@ QtObject {
         trauma: 0.3,
         kick: 0.25,
         swingPitch: -8,
+        shoutPitch: -3,
         shoutVolume: 0.9
     })
 
@@ -211,7 +213,7 @@ QtObject {
     // fading with the distance as the crushing blow's growl does: the
     // sample pitched by tierPitch semitones (weak, normal, tough) at volume
     readonly property var scream: ({
-        tierPitch: [3, 0, -3],
+        tierPitch: [0, -3, -6],
         volume: 0.7
     })
 

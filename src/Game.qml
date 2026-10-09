@@ -139,7 +139,8 @@ ClayWorld2d {
     function playWhirlwind(gain) {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
                                     gain === undefined ? 1 : gain)
-        whirlShoutSound.triggerOneShot(gain === undefined ? 1 : gain)
+        whirlShoutSound.triggerNote(whirlShoutSound.rootNote + Balance.whirl.shoutPitch,
+                                    gain === undefined ? 1 : gain)
     }
     // The charge is full: a high tick
     Sound {
