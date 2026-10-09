@@ -271,6 +271,18 @@ number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gold/gold.qml
 ```
 
+While a dialogue is open the knight stands: movement and the dash do
+nothing, so it cannot walk off or take the stairs with the panel still up,
+and a key held when the panel closes moves it again. Esc closes the
+dialogue; only without one it opens the menu. The dialogue bench talks to
+the innkeeper, holds D and presses Space with the panel up, walks on once
+it closes, closes it again with Esc, and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
+```
+
 The HUD shows "Depth N" under the bars; a village counts as the depth of
 the dungeon before it. The fallen screen adds the run's kills and its time
 (simulated, so a pause holds it) and the best depth any run got. The best
