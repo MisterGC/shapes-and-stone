@@ -316,6 +316,9 @@ Item {
         if (game.player) {
             _stand(game.player)
             game.player.isBlocking = mode === "block"
+            // The answers are timed on the knight standing where it was
+            // put: a hit throws it nowhere
+            game.player.knockback = 0
         }
         return _byId()[id] !== undefined
     }

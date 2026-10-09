@@ -138,8 +138,11 @@ PhysicsItem {
     // Seconds left of the grace after a hit, in which no damage is taken
     property real graceLeft: 0
 
-    // Thrown back by a hit (Balance.knight.knockback): seconds left of it
-    // and its velocity at the start, in wu per second, y up
+    // How far a hit throws the knight back, in wu (Balance.knight.knockback);
+    // a bench that times its answers on a knight standing still sets 0
+    property real knockback: Balance.knight.knockback
+    // Thrown back by a hit: seconds left of it and its velocity at the
+    // start, in wu per second, y up
     property real _knockT: 0
     property real _knockVx: 0
     property real _knockVy: 0
@@ -553,12 +556,12 @@ PhysicsItem {
         return blocked ? "blocked" : "hit"
     }
 
-    // Thrown back along the blow (takeDamage), Balance.knight.knockback
-    // wu: a knockback fades out step by step, so it covers its start speed
+    // Thrown back along the blow (takeDamage), knockback wu: a knockback
+    // fades out step by step, so it covers its start speed
     // times the sum of its steps' shares of it
     function _knockBack(attackerX, attackerY, attackerSize, alongX, alongY) {
         let k = Balance.knight
-        if (k.knockback <= 0 || fallen) return
+        if (knockback <= 0 || fallen) return
         let dx = alongX, dy = alongY
         if (dx === undefined || dy === undefined || dx * dx + dy * dy < 1e-6) {
             let a = _centreOf(attackerX, attackerY, attackerSize)
@@ -569,7 +572,7 @@ PhysicsItem {
         if (len < 0.001) return
         let dt = player.world.timeStep, per = 0
         for (let t = k.knockbackDuration; t > 1e-9; t -= dt) per += t / k.knockbackDuration * dt
-        let speed = k.knockback / per
+        let speed = knockback / per
         _knockVx = dx / len * speed
         _knockVy = dy / len * speed
         _knockT = k.knockbackDuration
