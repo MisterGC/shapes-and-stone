@@ -592,7 +592,9 @@ and the host leads the party down: the host must hold both records, both
 village screens the next position settled from both (not the one the
 host's record alone gives), and both next dungeons the same depth, danger
 and look - band, light, every torch, the floor, what lies on it, the air
-and the stairs' colour.
+and the stairs' colour. The descent gauge reads the depth from the level
+the host sent, so both screens' gauges must show the same depth, large at
+each camp with the marker sunk into the next layer, small in each dungeon.
 
 On clayground `dee7c25` (the submodule) it exited 0 with 27 checks passed
 in 15 runs in a row. Before the new dungeon's stairs started from a fresh

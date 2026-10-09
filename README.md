@@ -323,8 +323,24 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 ```
 
-The HUD shows "Depth N" under the bars; a village counts as the depth of
-the dungeon before it. The fallen screen adds the run's kills and its time
+A descent gauge under the minimap shows how deep the knight is: a shaft of
+rock layers, one per depth, darker and hotter the deeper, with the
+knight's marker in its layer and "Depth N" beside it; a village counts as
+the depth of the dungeon before it. At the camp the gauge is large and the
+marker sinks into the next layer, the next dungeon's. It shows the depth
+only, never the danger's spot in the depth's range; its colours, sizes and
+timing are the table's `gauge` group. In a session every screen shows the
+party's depth. The gauge bench saves the dungeon at depth 0, 5 and 15 and
+the camp after depth 5 as PNGs (`depth0.png`, `depth5.png`, `depth15.png`,
+`camp.png`) and checks the marker and the layers' colours; the gauge is
+HUD, so offscreen it is saved too, the dungeon behind it only with a
+window and the copied shaders:
+
+```
+qml -I build/bin/qml tests/gauge/gauge.qml -- <out dir>
+```
+
+The fallen screen shows the run's depth, the run's kills and its time
 (simulated, so a pause holds it) and the best depth any run got. The best
 depth is kept with `Clayground.Storage` (`KeyValueStore` "ShapesAndStone",
 key `bestDepth`) as soon as a run gets deeper, not only when it falls. In
@@ -403,7 +419,10 @@ twice; the looks bench saves the same dungeon at low, middle and high
 danger and the stairs at a high and a low next one as PNGs, and needs a
 window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
-settling each next one from both knights' records and building it for two:
+settling each next one from both knights' records and building it for two,
+and checks that both screens' gauges show the same depth, at each camp and
+in each dungeon (`--shots` saves both screens of the first three camps
+too):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
