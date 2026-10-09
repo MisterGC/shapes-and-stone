@@ -121,6 +121,16 @@ PhysicsItem {
     property real _dashTimer: 0
     property real _dashDirX: 0
     property real _dashDirY: 0
+    // The dash under way is a whirlwind (Balance.knight.whirl...): a full
+    // charge let go within whirlWindow steps of the dash's start
+    property bool isWhirling: false
+    // The physics step a full charge swung heavy, and the one a dash
+    // started with a full charge held: the whirlwind's window
+    property int _fullLetGoAt: -1000
+    property int _dashedFullAt: -1000
+    // The enemies this whirlwind hit, and whether it hit any
+    property var _hitThisWhirl: new Set()
+    property bool _whirlLanded: false
 
     // Seconds left of the grace after a hit, in which no damage is taken
     property real graceLeft: 0
@@ -162,12 +172,17 @@ PhysicsItem {
             if (fallen) {
                 player.body.linearVelocity = Qt.point(0, 0)
             } else if (isDashing) {
-                let spd = isBlocking ? dashSpeed * blockSpeedMultiplier : dashSpeed
+                let spd = isWhirling ? Balance.knight.whirlSpeed
+                        : isBlocking ? dashSpeed * blockSpeedMultiplier : dashSpeed
                 player.body.linearVelocity = Qt.point(_dashDirX * spd, _dashDirY * spd)
                 _dashTimer -= dt
                 // Dash-push: knockback enemies instead of damage
                 if (isBlocking) pushEnemiesInRange()
-                if (_dashTimer <= 0) isDashing = false
+                if (isWhirling) whirlEnemies()
+                if (_dashTimer <= 0) {
+                    isDashing = false
+                    isWhirling = false
+                }
             } else if (isBlocking) {
                 let spd = maxSpeed * blockSpeedMultiplier
                 player.body.linearVelocity = Qt.point(moveX * spd, moveY * spd)
@@ -178,11 +193,16 @@ PhysicsItem {
                 player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
             }
             if (isAttacking) hitEnemiesInArc()
+            // A full charge held into a dash is spent once the whirlwind's
+            // window after the dash's start has passed
+            if (_charge === "full" && _dashedFullAt >= 0
+                    && _steps - _dashedFullAt > Balance.knight.whirlWindow)
+                _charge = "spent"
         }
     }
 
-    // A moment others should see: "attack", "heavy", "dash", "parry",
-    // "block", "perfectBlock", "hurt" or "shieldBreak".
+    // A moment others should see: "attack", "heavy", "whirlwind", "dash",
+    // "parry", "block", "perfectBlock", "hurt" or "shieldBreak".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -402,6 +422,34 @@ PhysicsItem {
         }
     }
 
+    // The whirlwind hits every standing enemy within whirlReach of the
+    // knight, centre to centre, once: a heavy blow, through a guardian's
+    // shield. Returns how many it hit this step
+    function whirlEnemies() {
+        if (!gameWorld || !gameWorld.enemies) return 0
+        let k = Balance.knight
+        let hitCount = 0
+        for (let e of gameWorld.enemies) {
+            if (!e || e.destroyed !== false || _hitThisWhirl.has(e)) continue
+            let dx = e.xWu + e.widthWu / 2 - (xWu + widthWu / 2)
+            let dy = e.yWu - e.heightWu / 2 - (yWu - heightWu / 2)
+            if (dx * dx + dy * dy > k.whirlReach * k.whirlReach) continue
+            let dmg = Math.floor(atk * k.whirlSwing)
+            _hitThisWhirl.add(e)
+            e.takeDamage(dmg, xWu, yWu, true)
+            hitCount++
+            gameWorld.countFight("whirlHit")
+            if (!_whirlLanded) {
+                _whirlLanded = true
+                gameWorld.countFight("whirlwind")
+            }
+            gameWorld.playImpact()
+            gameWorld.spawnDamageNumber(e.xWu, e.yWu, dmg, Balance.whirl.glow)
+            console.log("[Player] Whirlwind hit enemy for", dmg, "damage!")
+        }
+        return hitCount
+    }
+
     readonly property real shieldArcAngle: Balance.knight.shieldArc
 
     // Whether the shield faces an attacker whose corner is (attackerX,
@@ -591,7 +639,12 @@ PhysicsItem {
         if (len < 0.01) return
         _dashDirX = dirX / len
         _dashDirY = dirY / len
-        _cancelCharge()
+        // A heavy swing just let go of turns into a whirlwind; a full
+        // charge still held waits whirlWindow steps for its release
+        let whirl = isAttacking && isHeavy && _steps - _fullLetGoAt <= Balance.knight.whirlWindow
+        let kept = whirl ? new Set(_hitThisSwing) : null
+        if (_charge === "full" && !whirl) _dashedFullAt = _steps
+        else _cancelCharge()
         isDashing = true
         _hitThisSwing = new Set()
         _dashTimer = dashDuration
@@ -599,6 +652,30 @@ PhysicsItem {
         view.dash(dashDuration * 1000)
         acted("dash")
         if (gameWorld) gameWorld.playDash()
+        if (whirl) _whirl(kept)
+    }
+
+    // The whirlwind: the dash under way goes on as one, whirlDuration
+    // seconds at whirlSpeed from now. hit holds the enemies the heavy
+    // swing it turns has hit already: those it does not hit again
+    function _whirl(hit) {
+        let k = Balance.knight
+        isAttacking = false
+        isHeavy = false
+        isWhirling = true
+        _hitThisWhirl = hit || new Set()
+        _whirlLanded = false
+        _dashTimer = k.whirlDuration
+        dashCooldown = k.whirlDuration + dashCooldownTime
+        attackCooldown = k.whirlDuration
+        view.whirl(k.whirlDuration * 1000)
+        acted("whirlwind")
+        if (gameWorld) {
+            gameWorld.playWhirlwind()
+            if (gameWorld.impact)
+                gameWorld.impact("whirlwind", xWu, yWu, _dashDirX, -_dashDirY)
+        }
+        console.log("[Player] Whirlwind!")
     }
 
     function attack() {
@@ -621,6 +698,7 @@ PhysicsItem {
         if (fallen || attackCooldown > 0 || isAttacking) return false
         isAttacking = true
         isHeavy = true
+        _fullLetGoAt = _steps
         _swingTimer = attackDuration + Balance.knight.swingFade
         _hitThisSwing = new Set()
         attackCooldown = attackCooldownTime
@@ -662,13 +740,14 @@ PhysicsItem {
                                / (Balance.knight.chargeTime - Balance.knight.chargeStart)))
 
     // A hit, a raised shield or a dash ends a charge: its release swings
-    // nothing
+    // nothing. A full charge outlives a dash by the whirlwind's window
     function _cancelCharge() {
         if (isCharging) _charge = "spent"
     }
 
     function _onSwingPressed() {
         _charge = ""
+        _dashedFullAt = -1000
         if (fallen) {
             _charge = "spent"
         } else if (isBlocking || isDashing) {
@@ -697,7 +776,10 @@ PhysicsItem {
     }
 
     function _onSwingReleased() {
-        if (_charge === "full") heavyAttack()
+        // Let go of within the window after the dash started: a whirlwind
+        if (_charge === "full" && isDashing && !isWhirling
+                && _steps - _dashedFullAt <= Balance.knight.whirlWindow) _whirl()
+        else if (_charge === "full") heavyAttack()
         else if (_charge === "" || _charge === "charging" || _charge === "normal") attack()
         _charge = ""
     }

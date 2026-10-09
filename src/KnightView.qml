@@ -58,7 +58,8 @@ Item {
     // the fade of the arc after it
     property real swingDuration: Balance.knight.swingDuration
     readonly property real swingFade: Balance.knight.swingFade
-    readonly property bool swinging: attackAnimation.running
+    readonly property bool swinging: attackAnimation.running || whirlAnimation.running
+    readonly property bool whirling: whirlAnimation.running
 
     // The swing animation ended (fade included)
     signal swingFinished()
@@ -67,11 +68,26 @@ Item {
 
     // heavy: the charged swing, wider, longer and glowing
     function swing(heavy) {
+        whirlAnimation.stop()
+        attackArc.whirl = false
         attackArc.heavy = heavy === true
         attackArc.swingProgress = 0
         attackArc.swingOpacity = 0.9
         attackArc.requestPaint()
         attackAnimation.restart()
+    }
+
+    // The whirlwind: the blade spins Balance.whirl.turns times round the
+    // knight in durationMs, glowing, with the dash's afterimages
+    function whirl(durationMs) {
+        attackAnimation.stop()
+        attackArc.heavy = true
+        attackArc.whirl = true
+        attackArc.swingProgress = 0
+        attackArc.swingOpacity = 0.9
+        whirlSpin.duration = durationMs
+        whirlAnimation.restart()
+        dash(durationMs)
     }
 
     // durationMs keeps the afterimages coming when the driver's dashing
@@ -679,7 +695,7 @@ Item {
         y: view.host.y + view.host.height/2 - height/2
         width: view.host.width * 5
         height: view.host.height * 5
-        visible: attackAnimation.running
+        visible: attackAnimation.running || whirlAnimation.running
         rotation: -view.facingAngle
 
         // Swing progress: 0 = start, 1 = end
@@ -687,6 +703,9 @@ Item {
         property real swingOpacity: 0.9
         // The charged swing: its arc and reach (Balance.knight.heavy...)
         property bool heavy: false
+        // The whirlwind: full turns (Balance.whirl), the smear behind the
+        // blade no longer than Balance.whirl.smear
+        property bool whirl: false
 
         onSwingProgressChanged: requestPaint()
 
@@ -701,9 +720,11 @@ Item {
             var innerRadius = view.host.width * 0.6
 
             // Swing range 120 degrees, a heavy one twice its arc
-            var swingRange = heavy ? Balance.knight.heavyArc * Math.PI / 90 : Math.PI * 0.67
+            var swingRange = whirl ? Balance.whirl.turns * 2 * Math.PI
+                           : heavy ? Balance.knight.heavyArc * Math.PI / 90 : Math.PI * 0.67
             var startAngle = -swingRange / 2
             var currentAngle = startAngle + (swingProgress * swingRange)
+            if (whirl) startAngle = Math.max(startAngle, currentAngle - Balance.whirl.smear * Math.PI / 180)
 
             // Smear: a crescent over the path the blade has covered, brightest
             // just behind the blade, fading towards where the swing began.
@@ -817,6 +838,34 @@ Item {
 
             ScriptAction {
                 script: {
+                    attackArc.swingProgress = 0
+                    attackArc.swingOpacity = 0.9
+                    view.swingFinished()
+                }
+            }
+        }
+
+        // Whirlwind animation: one even spin, then the fade
+        SequentialAnimation {
+            id: whirlAnimation
+            PropertyAnimation {
+                id: whirlSpin
+                target: attackArc
+                property: "swingProgress"
+                from: 0
+                to: 1
+                duration: Balance.knight.whirlDuration * 1000
+            }
+            PropertyAnimation {
+                target: attackArc
+                property: "swingOpacity"
+                from: 0.9
+                to: 0
+                duration: view.swingFade * 1000
+            }
+            ScriptAction {
+                script: {
+                    attackArc.whirl = false
                     attackArc.swingProgress = 0
                     attackArc.swingOpacity = 0.9
                     view.swingFinished()

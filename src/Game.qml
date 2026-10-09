@@ -129,6 +129,11 @@ ClayWorld2d {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
                                     gain === undefined ? 1 : gain)
     }
+    // The whirlwind: the swing sample pitched further down, a long spin
+    function playWhirlwind(gain) {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
+                                    gain === undefined ? 1 : gain)
+    }
     // The charge is full: a high tick
     Sound {
         id: chargeTickSound
@@ -278,8 +283,8 @@ ClayWorld2d {
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
     //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
-    //         perfectBlock, crushBlow, parry, projectileHit, projectileDeflected,
-    //         projectileBurst
+    //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
+    //         projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
@@ -343,6 +348,11 @@ ClayWorld2d {
             spawnSparks(x, y, nx, ny, 14, "#FFE066")
             spawnRing(x, y, "#FFD700")
             break
+        case "whirlwind":
+            // The spin starts: a ring round the knight, sparks along the dash
+            spawnSparks(x, y, nx, ny, Balance.whirl.sparks, Balance.whirl.glow)
+            spawnRing(x, y, Balance.whirl.glow)
+            break
         case "projectileHit":
         case "projectileBurst":
             spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
@@ -356,8 +366,8 @@ ClayWorld2d {
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
             let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, projectileHit: 1,
-                               projectileDeflected: 0.5}[kind] || 0
+                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5,
+                               projectileHit: 1, projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
         }
@@ -402,6 +412,10 @@ ClayWorld2d {
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
             if (screenFx) screenFx.parry()
+            break
+        case "whirlwind":
+            _trauma(Balance.whirl.trauma)
+            _kick(nx * Balance.whirl.kick, ny * Balance.whirl.kick)
             break
         case "projectileDeflected":
             _trauma(0.12)
@@ -1509,6 +1523,9 @@ ClayWorld2d {
         property int perfectBlocks: 0
         // Crushing blows that broke the held shield
         property int crushed: 0
+        // Whirlwinds that hit an enemy, and the enemies they hit
+        property int whirlwinds: 0
+        property int whirlHits: 0
         property int kills: 0
         property int deaths: 0
         property real seconds: 0
@@ -1517,12 +1534,13 @@ ClayWorld2d {
     function resetFightRecord() {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
-        r.perfectBlocks = 0; r.crushed = 0
+        r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
         r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
     }
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
-    // shield), kill or fall
+    // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
+    // enemy it hit), kill or fall
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -1532,6 +1550,8 @@ ClayWorld2d {
         case "block": r.blocks++; break
         case "perfectBlock": r.perfectBlocks++; break
         case "crushed": r.crushed++; break
+        case "whirlwind": r.whirlwinds++; break
+        case "whirlHit": r.whirlHits++; break
         case "fall": r.deaths++; break
         case "kill":
             r.kills++

@@ -63,6 +63,18 @@ QtObject {
         heavyArc: 90,
         heavyRange: 1.25,
         heavyKnockback: 2,
+        // Whirlwind: a full charge let go at most whirlWindow physics steps
+        // before or after a dash starts spins the knight forward instead,
+        // whirlSpeed for whirlDuration seconds along the dash, no damage
+        // taken, and hits every standing enemy within whirlReach of it,
+        // centre to centre, once, for whirlSwing times atk, through a
+        // guardian's shield. Outside the window a full charge swings heavy
+        // and a dash cancels the charge
+        whirlWindow: 6,
+        whirlDuration: 0.35,
+        whirlSpeed: 22.0,
+        whirlReach: 1.6,
+        whirlSwing: 2,
         // After a hit the shield did not stop, no damage taken for this long
         hurtGrace: 0.5,
         // Dash: no damage taken while it lasts
@@ -132,6 +144,23 @@ QtObject {
         freeze: 0.09,
         trauma: 0.35,
         kick: 0.2
+    })
+
+    // The whirlwind (knight.whirl...) reads as a blade tornado: the blade
+    // spins turns times round the knight in glow over the whirl, its
+    // smear covering up to smear degrees; as it starts a ring of glow
+    // flashes and sparks fly along the dash, and the knight's own screen
+    // takes this much trauma and a kick of kick wu. It plays the swing
+    // sample swingPitch semitones; each enemy it hits takes a heavy hit's
+    // impact
+    readonly property var whirl: ({
+        glow: "#FFF2C0",
+        turns: 2,
+        smear: 270,
+        sparks: 14,
+        trauma: 0.3,
+        kick: 0.25,
+        swingPitch: -8
     })
 
     // A hit that lands reads as a hurt, not as the grace after it: the

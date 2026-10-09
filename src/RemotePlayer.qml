@@ -103,6 +103,9 @@ PhysicsItem {
         } else if (name === "heavy") {
             view.swing(true)
             if (gameWorld && gain > 0) gameWorld.playHeavySwing(gain)
+        } else if (name === "whirlwind") {
+            view.whirl(Balance.knight.whirlDuration * 1000)
+            if (gameWorld && gain > 0) gameWorld.playWhirlwind(gain)
         } else if (name === "dash") {
             view.dash(150)
             if (gameWorld && gain > 0) gameWorld.playDash(gain)
