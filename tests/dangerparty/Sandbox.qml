@@ -6,7 +6,8 @@
 // The instance runs the real game. The driver makes up each knight's
 // record of a dungeon, lets the host lead the party down and reads what
 // each screen shows: the danger of the level, the dungeon's look and its
-// enemies, which grow with the party (issue #102).
+// enemies, which grow with the party (issue #102), and its descent gauge
+// (issue #97).
 
 import QtQuick
 import Clayground.Network
@@ -132,6 +133,24 @@ Item {
         game.camera.target = null
         game.camera.target = game.player
         return true
+    }
+
+    // What this screen's descent gauge shows (issue #97): the depth, the
+    // depth its marker is at, large at the camp and sunk there into the
+    // next layer
+    function gauge() {
+        let g = _find(game, "depthGauge")
+        return {depth: g.depth, shown: r3(g.shown), camp: g.camp, sunk: g.sunk, visible: g.visible,
+                label: _find(g, "gaugeLabel").text}
+    }
+    function _find(root, name) {
+        if (root.objectName === name) return root
+        let kids = root.data || []
+        for (let i = 0; i < kids.length; i++) {
+            let f = _find(kids[i], name)
+            if (f) return f
+        }
+        return null
     }
 
     function r3(v) { return Math.round(v * 1000) / 1000 }

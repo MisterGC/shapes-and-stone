@@ -19,11 +19,15 @@ records of the dungeon and the host leads the party down:
 - each dungeon, the first too, is built for two knights on both screens:
   the same enemies, as many as Balance.party adds to the spawn table for
   a second knight, each with the HP it adds
+- both screens' descent gauges show the same depth: at the camp large,
+  the marker sunk into the next dungeon's layer; in the dungeon small, the
+  marker in its layer (issue #97)
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
 depth 0 is saved as <dir>/<host|joiner>-depth<N>.png, the knight in the
-room after the first; that needs a window, so --shots leaves
+room after the first, and each camp before them as
+<dir>/<host|joiner>-camp<N-1>.png; that needs a window, so --shots leaves
 QT_QPA_PLATFORM alone unless it is set.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
@@ -287,6 +291,9 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
           f"settled from both records ({lost}; host {hd['next']}, joiner {jd['next']})")
     check(abs(want - alone) > 0.01,
           f"{tag} the host's record alone would have given {alone:.3f} ({BANDS[band(alone)]})")
+    check_gauges(tag, n - 1, True, H, J, check)
+    if args.shots and n <= 3:
+        shoot(tag, f"camp{n - 1}", H, J, args, check)
 
     H.eval(["advance()"])
     if not wait_for(lambda: H.eval1("inRun()") is True and J.eval1("inRun()") is True
@@ -312,16 +319,36 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
           + ("" if hl == jl else f" (host {hl}, joiner {jl}; host {H.json('records()')} "
                                   f"{H.json('danger()')}, joiner {J.json('records()')} {J.json('danger()')})"))
     check_foes(tag, H, J, check)
+    check_gauges(tag, n, False, H, J, check)
     if args.shots and n <= 3:
-        os.makedirs(args.shots, exist_ok=True)
         for i in (H, J):
             i.eval1("showRoom()")
         time.sleep(2.0)
-        for name, i in (("host", H), ("joiner", J)):
-            path = os.path.join(os.path.abspath(args.shots), f"{name}-depth{n}.png")
-            saved, err = i.shot(path)
-            check(saved is not None, f"{tag} saved {name}-depth{n}.png ({err or saved})")
+        shoot(tag, f"depth{n}", H, J, args, check)
     return want
+
+
+def shoot(tag, what, H, J, args, check):
+    """Saves both screens as <host|joiner>-<what>.png"""
+    os.makedirs(args.shots, exist_ok=True)
+    for name, i in (("host", H), ("joiner", J)):
+        path = os.path.join(os.path.abspath(args.shots), f"{name}-{what}.png")
+        saved, err = i.shot(path)
+        check(saved is not None, f"{tag} saved {name}-{what}.png ({err or saved})")
+
+
+def check_gauges(tag, depth, camp, H, J, check):
+    """Both screens' descent gauges show the party's depth: at the camp
+    large, the marker sunk into the next layer, in a dungeon small, the
+    marker in the depth's layer"""
+    shown = depth + 1 if camp else depth
+    wait_for(lambda: all(g["sunk"] for g in (H.json("gauge()"), J.json("gauge()"))) if camp else True, 10)
+    hg, jg = H.json("gauge()"), J.json("gauge()")
+    where = "the camp" if camp else "the dungeon"
+    check(hg == jg and hg["visible"] and hg["depth"] == depth and hg["shown"] == shown and hg["camp"] == camp,
+          f"{tag} in {where} both gauges show depth {depth}, "
+          f"{'large, the marker sunk into layer' if camp else 'small, the marker in layer'} {shown}"
+          + ("" if hg == jg else f" (host {hg}, joiner {jg})"))
 
 
 def check_foes(tag, H, J, check):
