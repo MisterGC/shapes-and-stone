@@ -386,6 +386,26 @@ QtObject {
         shieldBlockMana: 4
     })
 
+    // A session's party: an ally lifts a fallen knight up, and a knight
+    // still down when the party reaches the camp rises there. Solo play
+    // has neither
+    readonly property var party: ({
+        // An ally this close to a fallen knight (centre to centre, wu)
+        // lifts it up once it has stood there reviveTime seconds, on the
+        // physics clock, without a hit landing on it; a hit, or a step out
+        // of range, starts the lift over
+        reviveRange: 1.5,
+        reviveTime: 3.0,
+        // The knight rises with this share of its max HP, lifted or at camp
+        reviveHp: 0.3,
+        // The ring that fills around the fallen knight while it is lifted:
+        // its radius as a share of the knight's size, its width in pixels
+        // and its colour
+        ringRadius: 0.9,
+        ringWidth: 3,
+        ringColor: "#F2E2A0"
+    })
+
     readonly property var campfire: ({
         healPerSecond: 5.0,
         // Mana comes back here, on top of the rest's knight.manaRegen

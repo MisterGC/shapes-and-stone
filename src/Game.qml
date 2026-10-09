@@ -1550,6 +1550,16 @@ ClayWorld2d {
         fallen = true
     }
 
+    // This node's fallen knight rises with Balance.party.reviveHp of its
+    // max HP: the party reached the camp ("camp"). Once the party has
+    // fallen nobody rises
+    function _rise(how) {
+        if (!player || !player.fallen || partyFallen || screen !== "game") return
+        player.hp = Math.max(1, Math.round(Balance.party.reviveHp * player.maxHp))
+        fallen = false
+        console.log("[Game] The knight rises (" + how + ") with HP", player.hp)
+    }
+
     // --- Fight record ---
     // How the fight went, counted where it happens: the damage the knight
     // dealt and took, its parries, the attacks its shield stopped, the
@@ -1845,7 +1855,8 @@ ClayWorld2d {
     }
 
     // The one way to the next level: what the knight carries (its HP, mana,
-    // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon
+    // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon.
+    // In a session a knight down rises at the village's camp
     function _enterLevel(newIndex) {
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
                                  potions: player.potions, upgrade: player.upgrade }
@@ -1867,6 +1878,8 @@ ClayWorld2d {
             player.gold = carried.gold
             player.potions = carried.potions
         }
+        // A knight still down when the party reaches the camp rises there
+        if (session.connected && levelType === "village") _rise("camp")
     }
 
     // Component factories

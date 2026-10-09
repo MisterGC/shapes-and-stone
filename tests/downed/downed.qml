@@ -12,9 +12,10 @@
 // Esc takes each to the title. In the second session the host's knight falls first and the
 // joiner's last, so the host learns of the last fall over the network.
 // In both, while one knight is down the host goes down two levels, to a
-// village and to the next dungeon: on the other screen the downed knight
-// must be made downed in each, not drawn standing until its next state
-// (issue #20).
+// village and to the next dungeon. At the village's camp the downed knight
+// rises with Balance.party.reviveHp of its HP on both screens (issue #100)
+// and is struck down again there; in the next dungeon the other screen
+// must make it downed, not drawn standing until its next state (issue #20).
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -24,6 +25,7 @@ import QtQuick
 import QtQuick.Window
 import QtTest
 import Clayground.Network
+import "../../src"
 
 Window {
     id: bench
@@ -155,8 +157,35 @@ Window {
             madeDowned[nodeId] = v !== null && v.downed === true
         })
     }
-    // The level after the next one: the downed knight goes through a
-    // village into a dungeon, where the enemies are
+    // The next level, a village: the downed knight rises at the camp on
+    // both screens, then falls again there for the dungeon after it
+    function goToCamp(level, f, l, firstName, lastName) {
+        let risen = Math.round(Balance.party.reviveHp * Balance.knight.hp)
+        let id = () => network(f()).nodeId
+        return [
+            [() => true, () => host._hostAdvanceLevel()],
+            [() => host.levelIndex === level && joiner.levelIndex === level && bothInGame()
+                   && f().player.hp > 0 && remoteOf(l(), id()).remoteHp > 0, () => {
+                check(host.levelType === "village" && joiner.levelType === "village",
+                      "level " + level + ": both are in the village")
+                check(f().player.hp === risen && !f().fallen && fallenScreen(f()) === null
+                      && !downedOn(f(), id()),
+                      "level " + level + ": at the camp the " + firstName + "'s knight rises with "
+                      + risen + " HP on its own screen (" + f().player.hp + "), no fallen screen")
+                check(remoteOf(l(), id()).remoteHp === risen && !downedOn(l(), id()),
+                      "level " + level + ": the " + lastName + "'s screen shows it standing with "
+                      + remoteOf(l(), id()).remoteHp + " HP")
+                strikeDown(f())
+            }],
+            [() => downedOn(host, id()) && downedOn(joiner, id()), () => {
+                check(f().player.hp === 0 && f().fallen,
+                      "level " + level + ": struck down again, the " + firstName
+                      + "'s knight is down on both screens")
+            }]
+        ]
+    }
+    // The level after it: the downed knight goes on into a dungeon, where
+    // the enemies are
     function goDown(level, f, l, firstName, lastName) {
         return [
             [() => true, () => {
@@ -213,7 +242,7 @@ Window {
                 check(fallenScreen(l) === null && !l.fallen && l.player.hp > 0,
                       "the " + lastName + "'s knight stands and its screen shows no fallen screen")
             }],
-        ].concat(goDown(1, first, last, firstName, lastName))
+        ].concat(goToCamp(1, first, last, firstName, lastName))
          .concat(goDown(2, first, last, firstName, lastName))
          .concat([
             // A second for the run to go on
