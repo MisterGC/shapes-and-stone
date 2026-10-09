@@ -1021,6 +1021,10 @@ ClayWorld2d {
     function closeMenu() {
         menuOpen = false
     }
+    // Where the keys or the touch pad steer the knight, -1..1 on each axis;
+    // every level binds its knight to these
+    readonly property real knightMoveX: gameCtrl.axisX
+    readonly property real knightMoveY: -gameCtrl.axisY
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -2001,8 +2005,8 @@ ClayWorld2d {
 
         // Bind player controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             // Mouse aiming: bind screen coords for facing calculation
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
@@ -2852,8 +2856,8 @@ ClayWorld2d {
 
         // Bind controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
@@ -2971,8 +2975,8 @@ ClayWorld2d {
 
         // Bind controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
