@@ -409,11 +409,50 @@ Item {
             var ctx = getContext("2d")
             ctx.reset()
             var w = width, h = height
-            ctx.beginPath()
-            ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
-            ctx.strokeStyle = view.accentColor
-            ctx.lineWidth = w * thickness
+            var cx = w / 2, cy = h / 2, r = w * 0.4, half = w * thickness / 2
+            var a0 = -Math.PI * 0.4, a1 = Math.PI * 0.4
+            var band = function() {
+                ctx.beginPath()
+                ctx.arc(cx, cy, r + half, a0, a1)
+                ctx.arc(cx, cy, r - half, a1, a0, true)
+                ctx.closePath()
+            }
+            // Steel: bevelled across the band, darker at both edges
+            var steel = ctx.createRadialGradient(cx, cy, r - half, cx, cy, r + half)
+            steel.addColorStop(0, "#5E6870")
+            steel.addColorStop(0.35, "#C9D2D9")
+            steel.addColorStop(0.55, "#9AA6AF")
+            steel.addColorStop(1, "#4A535A")
+            band()
+            ctx.fillStyle = steel
+            ctx.fill()
+            // A sheen from the top, fading down the arc
+            var sheen = ctx.createLinearGradient(0, cy - r - half, 0, cy + r + half)
+            sheen.addColorStop(0, "rgba(255,255,255,0.45)")
+            sheen.addColorStop(0.45, "rgba(255,255,255,0)")
+            sheen.addColorStop(1, "rgba(0,0,0,0.25)")
+            band()
+            ctx.fillStyle = sheen
+            ctx.fill()
+            // Its edge in the knight's own colour, so knights stay apart
+            band()
+            ctx.strokeStyle = Qt.darker(view.accentColor, 1.6)
+            ctx.lineWidth = Math.max(1, w * 0.025)
             ctx.stroke()
+            // Rivets along the middle of the band
+            for (var i = -1; i <= 1; i++) {
+                var ra = i * Math.PI * 0.26
+                var rx = cx + Math.cos(ra) * r, ry = cy + Math.sin(ra) * r
+                var rr = Math.max(1, w * thickness * 0.14)
+                ctx.beginPath()
+                ctx.arc(rx, ry, rr, 0, Math.PI * 2)
+                ctx.fillStyle = "#3A4248"
+                ctx.fill()
+                ctx.beginPath()
+                ctx.arc(rx - rr * 0.3, ry - rr * 0.3, rr * 0.45, 0, Math.PI * 2)
+                ctx.fillStyle = "#E8EEF2"
+                ctx.fill()
+            }
             if (view.upgrade === "shield") {
                 ctx.beginPath()
                 ctx.arc(w / 2, h / 2, w * (0.4 + thickness / 2), -Math.PI * 0.4, Math.PI * 0.4)

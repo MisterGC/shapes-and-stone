@@ -34,10 +34,25 @@ QtObject {
         shieldArc: 60,
         blockedShare: 0.3,
         blockSpeed: 0.4,    // share of move and dash speed while blocking
-        // Mana a raised shield drains per second; at 0 the shield drops and
-        // does not rise again until a parry gives some back
-        blockDrain: 8,
+        // Mana pays for what the knight does: a raised shield drains
+        // blockDrain per second, a blow it stops costs blockMana, a dash
+        // dashMana and a whirlwind whirlMana, its dash included. At 0 the
+        // shield drops and does not rise again until a parry or the rest
+        // below gives some back. Without the mana a dash does not start and
+        // a whirlwind is a heavy swing; the knight shows noManaWord in
+        // noManaColor, clicks empty and flashes the mana bar
+        blockDrain: 1,
+        blockMana: 6,
+        dashMana: 8,
+        whirlMana: 20,
+        noManaWord: "NO MANA",
+        noManaColor: "#C080FF",
         parryMana: 10,
+        // With the shield down and no mana spent for manaRegenDelay
+        // seconds, mana comes back at manaRegen per second: resting gives
+        // the block back
+        manaRegen: 4,
+        manaRegenDelay: 1.5,
         // Perfect block: a shield raised at most this many physics steps
         // before a blow takes it whole - no damage, this much mana back,
         // and a lunging attacker staggers for this many seconds. Only a
@@ -77,6 +92,11 @@ QtObject {
         whirlSwing: 2,
         // After a hit the shield did not stop, no damage taken for this long
         hurtGrace: 0.5,
+        // A landed hit, or a crushing blow through the held shield, throws
+        // the knight knockback wu back along the blow, fading out over
+        // knockbackDuration seconds; a wall stops it
+        knockback: 1.3,
+        knockbackDuration: 0.15,
         // Dash: no damage taken while it lasts
         dashSpeed: 40.0,
         dashDuration: 0.15,
@@ -89,7 +109,7 @@ QtObject {
     // hit. The shield arc flashes white for flash seconds and swells to
     // bump times its size; the knight's own screen freezes for freeze
     // seconds, takes this much trauma and a kick of kick wu; sparks fly;
-    // the impact sample plays pitch semitones up; the attacker recoils
+    // the shield's clang plays pitch semitones up; the attacker recoils
     // recoil wu off the shield
     readonly property var block: ({
         flash: 0.14,
@@ -98,7 +118,7 @@ QtObject {
         trauma: 0.2,
         kick: 0.1,
         sparks: 12,
-        pitch: 7,
+        pitch: 0,
         recoil: 0.3
     })
 
@@ -108,8 +128,8 @@ QtObject {
     // around a ring; the knight's own screen freezes for freeze seconds at
     // freezeScale of its speed, takes this much trauma, flashes
     // flashColor for screenFlash seconds at screenFlashOpacity and pulses
-    // by pulse over pulseTime seconds; the impact sample plays pitch
-    // semitones up
+    // by pulse over pulseTime seconds; the shield's clang plays pitch
+    // semitones up, brighter
     readonly property var perfectBlock: ({
         flash: 0.26,
         bump: 1.5,
@@ -123,7 +143,7 @@ QtObject {
         screenFlashOpacity: 0.22,
         pulse: 0.5,
         pulseTime: 0.22,
-        pitch: 12
+        pitch: 5
     })
 
     // The charged heavy swing (knight.charge...) reads as a commitment: the
@@ -151,8 +171,9 @@ QtObject {
     // smear covering up to smear degrees; as it starts a ring of glow
     // flashes and sparks fly along the dash, and the knight's own screen
     // takes this much trauma and a kick of kick wu. It plays the swing
-    // sample swingPitch semitones; each enemy it hits takes a heavy hit's
-    // impact
+    // sample swingPitch semitones, and the knight shouts, shoutPitch
+    // semitones, at shoutVolume;
+    // each enemy it hits takes a heavy hit's impact
     readonly property var whirl: ({
         glow: "#FFF2C0",
         turns: 2,
@@ -160,7 +181,9 @@ QtObject {
         sparks: 14,
         trauma: 0.3,
         kick: 0.25,
-        swingPitch: -8
+        swingPitch: -8,
+        shoutPitch: -3,
+        shoutVolume: 0.9
     })
 
     // A hit that lands reads as a hurt, not as the grace after it: the
@@ -199,6 +222,14 @@ QtObject {
         thickness: 0.06,
         opacity: 0.9,
         flashColor: "#FFFFFF"
+    })
+
+    // A grunt or a guardian winding up its lunge screams like a goblin,
+    // fading with the distance as the crushing blow's growl does: the
+    // sample pitched by tierPitch semitones (weak, normal, tough) at volume
+    readonly property var scream: ({
+        tierPitch: [0, -3, -6],
+        volume: 0.7
     })
 
     // A crushing blow (enemy.crush...) reads as its own: while it winds up
@@ -348,16 +379,16 @@ QtObject {
         // Sharpened sword: added to the knight's atk
         swordAtk: 5,
         // Reinforced shield: a held block lets this share through instead
-        // of knight.blockedShare, and a raised shield drains this much mana
-        // per second instead of knight.blockDrain. The perfect block's
-        // window stays the same
+        // of knight.blockedShare, and a blow it stops costs this much mana
+        // instead of knight.blockMana. The perfect block's window stays
+        // the same
         shieldBlockedShare: 0.15,
-        shieldBlockDrain: 6
+        shieldBlockMana: 4
     })
 
     readonly property var campfire: ({
         healPerSecond: 5.0,
-        // Mana comes back here, and only here or from a parry
+        // Mana comes back here, on top of the rest's knight.manaRegen
         manaPerSecond: 5.0,
         healRadius: 3.0,
         healTick: 0.2

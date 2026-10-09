@@ -8,7 +8,7 @@
 // panel, it buys a potion: the gold drops by its price, and 1 outside the
 // panel heals. The smith sells one upgrade for the run, the sharpened sword
 // (more atk) or the reinforced shield (a held block lets less through and
-// drains less mana), and refuses a second; the next level keeps gold,
+// costs less mana), and refuses a second; the next level keeps gold,
 // potions and upgrade. Then a host and a joiner in one process, joined over
 // LAN: a drop the joiner's knight killed goes to the host's knight that
 // picks it up, one the host killed to the joiner's, one both knights stand
@@ -198,7 +198,7 @@ Window {
                   && p.wares[0].id === "sword" && p.wares[1].id === "shield"
                   && p.wares[0].label.indexOf("+" + Balance.shop.swordAtk + " damage") >= 0
                   && p.wares[1].label.indexOf(Math.round(Balance.shop.shieldBlockedShare * 100) + " %") >= 0
-                  && p.wares[1].label.indexOf(Balance.shop.shieldBlockDrain + " mana/s") >= 0,
+                  && p.wares[1].label.indexOf("costs " + Balance.shop.shieldBlockMana + " mana") >= 0,
                   "the smith offers the sword and the shield, each with its effect (\""
                   + p.wares.map(w => w.label).join("\", \"") + "\")")
             gold0 = solo.player.gold
@@ -229,7 +229,7 @@ Window {
         [() => solo.player && solo.levelIndex === 0, () => {
             let k = solo.player
             check(k.gold === 0 && k.potions === 0 && k.upgrade === "" && k.atk === Balance.knight.atk
-                  && k.blockedShare === Balance.knight.blockedShare && k.blockDrain === Balance.knight.blockDrain,
+                  && k.blockedShare === Balance.knight.blockedShare && k.blockMana === Balance.knight.blockMana,
                   "a new run starts without gold, potions or upgrade")
             solo._enterLevel(1)
         }],
@@ -257,12 +257,16 @@ Window {
             k.raiseShield()
             k._raisedAt = k._steps - Balance.knight.perfectBlockFrames - 1
             let hp = k.hp
+            let manaBefore = k.mana
             let res = k.takeDamage(20, k.xWu + 1, k.yWu)
             let share = Math.floor((20 - k.def) * 0.15)
             check(res === "blocked" && hp - k.hp === share
                   && share === Math.floor((20 - k.def) * Balance.shop.shieldBlockedShare),
                   "a held block of a 20-atk blow lets " + (hp - k.hp) + " of " + (20 - k.def)
                   + " through (15 %: " + share + ")")
+            check(Math.abs(manaBefore - k.mana - 4) < 1e-6
+                  && Math.abs(manaBefore - k.mana - Balance.shop.shieldBlockMana) < 1e-6,
+                  "the blocked blow costs the reinforced shield " + (manaBefore - k.mana).toFixed(2) + " mana")
             steps0 = k._steps
         }],
         // The drain, measured once the blow's hit stop is over
@@ -279,17 +283,17 @@ Window {
             measuring = false
             let secs = drainSecs
             let drain = (mana0 - k.mana) / secs
-            check(k.isBlocking && Math.abs(drain - 6) < 0.05
-                  && Math.abs(drain - Balance.shop.shieldBlockDrain) < 0.05,
-                  "the held shield drains " + drain.toFixed(2) + " mana/s over " + secs.toFixed(2) + " s")
+            check(k.isBlocking && Math.abs(drain - Balance.knight.blockDrain) < 0.05,
+                  "the held reinforced shield drains " + drain.toFixed(2) + " mana/s over " + secs.toFixed(2)
+                  + " s, as any shield does")
             k.lowerShield()
             // The upgrade is read live: set it, and its effects follow at once
             k.upgrade = "sword"
             let sword = k.atk === 20 && k.blockedShare === Balance.knight.blockedShare
-                && k.blockDrain === Balance.knight.blockDrain
+                && k.blockMana === Balance.knight.blockMana
             k.upgrade = "shield"
             let shield = k.atk === Balance.knight.atk && k.blockedShare === Balance.shop.shieldBlockedShare
-                && k.blockDrain === Balance.shop.shieldBlockDrain
+                && k.blockMana === Balance.shop.shieldBlockMana
             check(sword && shield, "setting upgrade applies the sword or the shield at once")
         }],
         [100, () => solo.destroy()]

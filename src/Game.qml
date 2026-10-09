@@ -113,12 +113,17 @@ ClayWorld2d {
         dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
-    // The shield's own sound: the impact sample pitched up, so a block
-    // never sounds like a hit, and a perfect block higher still
+    // The shield's own sound: a metal clang, so a block never sounds like
+    // a hit, and a perfect block brighter
+    Sound {
+        id: shieldClangSound
+        source: "assets/shield_clang.wav"
+        volume: muted ? 0 : 0.7
+    }
     function playBlock(gain, perfect) {
-        impactSound.triggerNote(impactSound.rootNote
-                                + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
-                                gain === undefined ? 1 : gain)
+        shieldClangSound.triggerNote(shieldClangSound.rootNote
+                                     + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
+                                     gain === undefined ? 1 : gain)
     }
 
     function playSwordSwing(gain) {
@@ -129,9 +134,17 @@ ClayWorld2d {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
                                     gain === undefined ? 1 : gain)
     }
-    // The whirlwind: the swing sample pitched further down, a long spin
+    // The whirlwind: the swing sample pitched further down, a long spin,
+    // and the knight's shout of a special move
+    Sound {
+        id: whirlShoutSound
+        source: "assets/knight_whirl_shout.wav"
+        volume: muted ? 0 : Balance.whirl.shoutVolume
+    }
     function playWhirlwind(gain) {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
+                                    gain === undefined ? 1 : gain)
+        whirlShoutSound.triggerNote(whirlShoutSound.rootNote + Balance.whirl.shoutPitch,
                                     gain === undefined ? 1 : gain)
     }
     // The charge is full: a high tick
@@ -212,6 +225,23 @@ ClayWorld2d {
             gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
         }
         if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+    }
+
+    // A grunt or a guardian winds up its lunge: a goblin's scream, pitched
+    // by its tier (Balance.scream), fading as the growl does
+    Sound {
+        id: screamSound
+        source: "assets/goblin_scream.wav"
+        volume: muted ? 0 : Balance.scream.volume
+    }
+    function playScream(xWu, yWu, tier) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        let pitch = Balance.scream.tierPitch[Math.max(0, Math.min(2, tier))] || 0
+        if (gain > 0) screamSound.triggerNote(screamSound.rootNote + pitch, gain)
     }
 
     Sound {
@@ -628,7 +658,8 @@ ClayWorld2d {
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
-                                                 size: enemy.widthWu, crush: enemy.crushing})
+                                                 size: enemy.widthWu, crush: enemy.crushing,
+                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -694,7 +725,7 @@ ClayWorld2d {
         }
         // A blow sounds the shield's own block or the knight's hurt, in
         // takeDamage
-        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush)
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
         // a crushing blow's for the full stagger
@@ -2821,8 +2852,8 @@ ClayWorld2d {
             { id: "sword", label: "Sharpened sword (+" + Balance.shop.swordAtk + " damage)",
               price: Balance.shop.upgradePrice },
             { id: "shield", label: "Reinforced shield (a block lets "
-                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, drains "
-                  + Balance.shop.shieldBlockDrain + " mana/s)",
+                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, costs "
+                  + Balance.shop.shieldBlockMana + " mana)",
               price: Balance.shop.upgradePrice }
         ])
 

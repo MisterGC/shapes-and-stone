@@ -10,7 +10,8 @@
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
 // shield for enemy.crushLockout; the smith sells the sword and the shield
 // for shop.upgradePrice, which take the shop's values; the
-// campfire refills a dry knight's mana, away from it nothing does, and the
+// campfire refills a dry knight's mana on top of the rest's knight.manaRegen,
+// away from it only the rest does, and the
 // next level, either way it is reached, keeps the knight's HP and mana. Last it
 // changes a value in the table and checks the next knight has it. Prints
 // one PASS or FAIL line per check and exits with the number of failures.
@@ -208,9 +209,9 @@ Window {
             // The smith's wares and what they do: the table's shop group
             let shop = Balance.shop, p = game.player
             check(shop.upgradePrice === 30 && shop.swordAtk === 5 && near(shop.shieldBlockedShare, 0.15)
-                  && shop.shieldBlockDrain === 6,
+                  && shop.shieldBlockMana === 4,
                   "the shop's upgradePrice " + shop.upgradePrice + ", swordAtk " + shop.swordAtk
-                  + ", shieldBlockedShare " + shop.shieldBlockedShare + ", shieldBlockDrain " + shop.shieldBlockDrain)
+                  + ", shieldBlockedShare " + shop.shieldBlockedShare + ", shieldBlockMana " + shop.shieldBlockMana)
             let smith = game.room.children.find(c => c.objectName === "npc" && c.npcName === "Blacksmith")
             let wares = smith ? smith.wares : []
             check(wares.length === 2 && wares[0].id === "sword" && wares[1].id === "shield"
@@ -219,22 +220,25 @@ Window {
                   + wares.map(w => w.id + " " + w.price).join(", ") + ")")
             p.upgrade = "sword"
             let sword = p.atk === Balance.knight.atk + shop.swordAtk
-                && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockDrain, Balance.knight.blockDrain)
+                && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana)
             p.upgrade = "shield"
             let shield = p.atk === Balance.knight.atk && near(p.blockedShare, shop.shieldBlockedShare)
-                && near(p.blockDrain, shop.shieldBlockDrain)
+                && near(p.blockMana, shop.shieldBlockMana) && near(p.blockDrain, Balance.knight.blockDrain)
             p.upgrade = ""
             check(sword && shield && p.atk === Balance.knight.atk
-                  && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockDrain, Balance.knight.blockDrain),
-                  "the sharpened sword adds swordAtk, the reinforced shield takes shieldBlockedShare and shieldBlockDrain")
+                  && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana),
+                  "the sharpened sword adds swordAtk, the reinforced shield takes shieldBlockedShare and shieldBlockMana")
             // Hurt and dry, away from the fire
             game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4
             game.player.yWu = campfire.yWu
             game.player.mana = 0
         }],
         [1000, () => {
-            check(game.player.mana === 0,
-                  "a dry knight away from the fire gets no mana back (" + game.player.mana + ")")
+            // A second of wall clock: the rest's mana, no more
+            let rest = game.player.mana
+            check(rest >= 0.5 * Balance.knight.manaRegen && rest <= 1.3 * Balance.knight.manaRegen,
+                  "a dry knight away from the fire gets only the rest's mana back (" + rest.toFixed(2)
+                  + " in a second, the table says " + Balance.knight.manaRegen + ")")
             // Hurt and dry, at the fire
             game.player.xWu = campfire.xWu
             game.player.yWu = campfire.yWu
@@ -248,9 +252,10 @@ Window {
             check(healed >= want - 2 && healed <= want + 1,
                   "two seconds at the fire heal " + healed + " HP, the table says " + want)
             let refilled = game.player.mana
-            let wantMana = 2 * Balance.campfire.manaPerSecond
+            let wantMana = 2 * (Balance.campfire.manaPerSecond + Balance.knight.manaRegen)
             let tick = Balance.campfire.manaPerSecond * Balance.campfire.healTick
-            check(refilled >= wantMana - 2 * tick && refilled <= wantMana + tick,
+            check(refilled >= wantMana - 2 * tick - Balance.knight.manaRegen * 0.2
+                  && refilled <= wantMana + tick + Balance.knight.manaRegen * 0.2,
                   "two seconds at the fire refill " + refilled.toFixed(1)
                   + " mana, the table says " + wantMana)
             // The next level keeps what the knight had; away from the fire,
@@ -262,9 +267,13 @@ Window {
             game._applyLevelChange(game.levelIndex + 1)
         }],
         [() => game.player && game.player !== _left && !game.resetting, () => {
-            check(game.levelType === "dungeon" && game.player.hp === 70 && game.player.mana === 7,
+            // The new level's knight rests from its first step: a few
+            // steps of manaRegen on top
+            let m = game.player.mana
+            check(game.levelType === "dungeon" && game.player.hp === 70
+                  && m >= 7 && m < 7 + Balance.knight.manaRegen * 0.25,
                   "the next level keeps the knight's HP and mana (" + game.player.hp
-                  + " HP, " + game.player.mana + " mana)")
+                  + " HP, " + m.toFixed(2) + " mana, 7 and the rest's few steps)")
             game.player.hp = 80
             game.player.mana = 3
             _left = game.player
