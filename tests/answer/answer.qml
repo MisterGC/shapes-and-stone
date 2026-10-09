@@ -38,8 +38,14 @@
 // shield it takes enemy.crushMana mana and enemy.crushShare of the damage
 // and drops the shield for enemy.crushLockout, after which a held button
 // raises it again; a perfect block takes it whole and staggers the
-// guardian for enemy.stagger; a dash makes it miss. Prints one PASS or
-// FAIL line per check and exits with the number of failures.
+// guardian for enemy.stagger; a dash makes it miss. A full charge let go
+// knight.whirlWindow steps before or after a dash starts whirls, a step
+// more does not, nor does a charge that is not full; the whirlwind hits
+// each enemy along its path once, knight.whirlSwing times atk, through a
+// guardian's shield, and not one the heavy swing it turned hit already;
+// the dash swing and the shield dash work as before, and a pause holds
+// the window. Prints one PASS or FAIL line per check and exits with the
+// number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/answer/answer.qml
 
@@ -866,6 +872,208 @@ Window {
             p.acted.disconnect(record)
             Clayground.paused = false
             console.log("[Answer] charge done,", failures, "failed")
+        }],
+        // The whirlwind: a full charge let go right around a dash's start
+        [() => true, () => {
+            Clayground.paused = true
+            let p = game.player
+            let k = Balance.knight
+            let cx = game.width / 2, cy = game.height / 2
+            let win = k.whirlWindow
+            let fullSteps = Math.round(k.chargeTime / stepS)
+            let foes = game.enemies.filter(e => !e.destroyed)
+            for (let o of foes) { o.halt(); o.parryWindow = false; o.hp = 100 }
+            let gr = foes.filter(e => e.enemyType === "grunt")[0]
+            let gd = foes.find(e => e.enemyType === "guardian")
+            let sp = foes.find(e => e.enemyType === "spitter")
+            let x0 = p.xWu, y0 = p.yWu
+            // The enemies stand behind the knight, out of its way, unless a
+            // check puts one in it
+            let away = () => {
+                for (let i = 0; i < foes.length; i++) {
+                    foes[i].halt()
+                    foes[i].xWu = x0 - 6
+                    foes[i].yWu = y0 + 3 - i * 2
+                }
+            }
+            // Any swing, dash or whirlwind over, the knight back where it
+            // started, facing right, standing
+            let ready = () => {
+                p.isBlocking = false
+                p.moveX = 0
+                p.moveY = 0
+                p.facingAngle = 0
+                Clayground.physicsStep(Math.ceil((k.whirlDuration + k.swingFade) / stepS) + 2)
+                p.graceLeft = 0
+                p.attackCooldown = 0
+                p.dashCooldown = 0
+                p.xWu = x0
+                p.yWu = y0
+                away()
+                Clayground.physicsStep(1)
+            }
+            // Held until the charge is full
+            let charge = () => {
+                ready()
+                mouse.mousePress(game, cx, cy, Qt.LeftButton)
+                Clayground.physicsStep(fullSteps)
+                return p.chargeFull
+            }
+            let actions = []
+            let record = (a) => actions.push(a)
+            p.acted.connect(record)
+            let whirls0 = game.fightRecord.whirlwinds
+
+            // Let go of n steps before the dash starts
+            let before = (n) => {
+                let full = charge()
+                mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+                if (n > 0) Clayground.physicsStep(n)
+                actions = []
+                p.dash()
+                return {full: full, whirl: p.isWhirling && actions.indexOf("whirlwind") >= 0,
+                        acts: actions.join(", ")}
+            }
+            let b = before(win)
+            check(b.full && b.whirl, "a full charge let go " + win + " steps before the dash starts"
+                  + " whirls (full " + b.full + ", acted " + b.acts + ")")
+            b = before(win + 1)
+            check(b.full && !b.whirl && p.isDashing && p.isHeavy,
+                  "let go " + (win + 1) + " steps before, it swings heavy and the dash stays a dash"
+                  + " (acted " + b.acts + ", heavy " + p.isHeavy + ")")
+
+            // Let go of n steps after the dash started
+            let after = (n) => {
+                let full = charge()
+                p.dash()
+                if (n > 0) Clayground.physicsStep(n)
+                actions = []
+                mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+                return {full: full, whirl: p.isWhirling && actions.indexOf("whirlwind") >= 0,
+                        acts: actions.join(", ") || "nothing"}
+            }
+            let a = after(win)
+            check(a.full && a.whirl, "a full charge let go " + win + " steps after the dash started"
+                  + " whirls (full " + a.full + ", acted " + a.acts + ")")
+            a = after(win + 1)
+            check(a.full && !a.whirl && !p.isAttacking && a.acts === "nothing",
+                  "let go " + (win + 1) + " steps after, the dash has cancelled the charge: the"
+                  + " release swings nothing (acted " + a.acts + ")")
+
+            // A charge that is not full: the dash cancels it, and one let go
+            // just before the dash swings normally
+            ready()
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(fullSteps - 1)
+            let charging = p.isCharging && !p.chargeFull
+            p.dash()
+            actions = []
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            check(charging && !p.isWhirling && actions.length === 0,
+                  "a charge not yet full, dashed with, whirls not and swings nothing (acted "
+                  + (actions.join(", ") || "nothing") + ")")
+            ready()
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(fullSteps - 1)
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            let normal = p.isAttacking && !p.isHeavy
+            actions = []
+            p.dash()
+            check(normal && !p.isWhirling && actions.indexOf("whirlwind") < 0,
+                  "one let go just before a dash swings normally and whirls not (acted "
+                  + actions.join(", ") + ")")
+
+            // Along its path: a grunt the heavy swing hit just before, a
+            // guardian facing the knight and the other grunt; the spitter
+            // stands off the path
+            let gr2 = foes.filter(e => e.enemyType === "grunt")[1]
+            charge()
+            gr.xWu = x0 + 1.5; gr.yWu = y0
+            gd.xWu = x0 + 3.5; gd.yWu = y0 + 0.3; gd.facingAngle = 180
+            gr2.xWu = x0 + 5.5; gr2.yWu = y0 - 0.3
+            sp.xWu = x0 + 3.5; sp.yWu = y0 + 4
+            let lost0 = foes.map(e => e.hp)
+            let front = gd._isShieldFacing(p.xWu, p.yWu)
+            let hits0 = game.fightRecord.whirlHits
+            let dealt0 = game.fightRecord.damageDealt
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(2)
+            let heavyHit = 100 - gr.hp
+            actions = []
+            p.dash()
+            let n = 0
+            while (p.isDashing && n < 120) {
+                Clayground.physicsStep(1)
+                n++
+            }
+            Clayground.physicsStep(10)
+            let lost = foes.map((e, i) => lost0[i] - e.hp)
+            let whirlDmg = Math.floor(p.atk * k.whirlSwing)
+            let lostOf = (e) => lost[foes.indexOf(e)]
+            check(actions.indexOf("whirlwind") >= 0 && heavyHit === Math.floor(p.atk * k.heavySwing) - gr.def
+                  && lostOf(gr) === heavyHit,
+                  "the grunt the heavy swing hit just before is not hit again by its whirlwind (lost "
+                  + lostOf(gr) + ", the heavy hit " + heavyHit + ")")
+            check(front && lostOf(gd) === whirlDmg - gd.def && lostOf(gr2) === whirlDmg - gr2.def,
+                  "the whirlwind hits the guardian through its shield and the grunt behind it once each, "
+                  + whirlDmg + " (" + k.whirlSwing + "x atk " + p.atk + ") less def: they lost "
+                  + lostOf(gd) + " and " + lostOf(gr2) + " (shield facing " + front + ")")
+            check(lostOf(sp) === 0, "the spitter off its path is not hit (lost " + lostOf(sp) + ")")
+            check(game.fightRecord.whirlHits - hits0 === 2
+                  && game.fightRecord.whirlwinds - whirls0 === 1,
+                  "the fight record counts " + (game.fightRecord.whirlHits - hits0)
+                  + " whirlwind hits and " + (game.fightRecord.whirlwinds - whirls0)
+                  + " whirlwind that landed; the earlier ones hit nothing")
+            check(game.fightRecord.damageDealt - dealt0 === heavyHit + lostOf(gd) + lostOf(gr2),
+                  "its hits count " + (game.fightRecord.damageDealt - dealt0) + " dealt")
+            check(n <= Math.ceil((k.whirlDuration) / stepS) + 1 && !p.isWhirling,
+                  "the whirlwind lasts " + n + " steps (" + k.whirlDuration + " s)")
+
+            // The dash swing and the shield dash work as before
+            ready()
+            gr.halt(); gr.xWu = x0 + 1.5; gr.yWu = y0
+            let ghp = gr.hp
+            actions = []
+            p.dash()
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(2)
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            check(ghp - gr.hp === Math.floor(p.atk * k.dashingSwing) - gr.def
+                  && actions.indexOf("whirlwind") < 0,
+                  "a click in a dash swings the dash swing: " + (ghp - gr.hp) + " HP (acted "
+                  + actions.join(", ") + ")")
+            ready()
+            gd.halt(); gd.xWu = x0 + 1.5; gd.yWu = y0; gd.facingAngle = 180
+            p.mana = p.maxMana
+            p.isBlocking = true
+            actions = []
+            p.dash()
+            Clayground.physicsStep(3)
+            check(gd.aiState === "stagger" && actions.indexOf("whirlwind") < 0,
+                  "a shield dash still breaks a guardian's guard (" + gd.aiState + ", acted "
+                  + actions.join(", ") + ")")
+            p.isBlocking = false
+
+            // A full charge held into a dash, the game paused: the window
+            // counts physics steps, not the wall clock
+            charge()
+            p.dash()
+            kept = p
+        }],
+        [300, () => {
+            let p = kept
+            let actions = []
+            let record = (a) => actions.push(a)
+            p.acted.connect(record)
+            mouse.mouseRelease(game, game.width / 2, game.height / 2, Qt.LeftButton)
+            check(p.isWhirling && actions.indexOf("whirlwind") >= 0,
+                  "paused 300 ms after a dash with a full charge, its release still whirls (acted "
+                  + (actions.join(", ") || "nothing") + ")")
+            p.acted.disconnect(record)
+            for (let o of game.enemies) if (!o.destroyed) { o.halted = false; o.aiState = "patrol" }
+            Clayground.physicsStep(Math.ceil(Balance.knight.whirlDuration / stepS) + 2)
+            Clayground.paused = false
+            console.log("[Answer] whirlwind done,", failures, "failed")
         }],
         // Torn down before quitting, as the other benches do
         [300, () => game.destroy()],

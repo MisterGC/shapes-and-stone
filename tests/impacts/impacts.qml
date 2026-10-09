@@ -38,7 +38,7 @@ Window {
     property int failures: 0
 
     readonly property var kinds: ["enemyHit", "heavyHit", "enemyBlocked", "enemyDeath",
-        "playerHit", "playerBlocked", "perfectBlock", "parry", "projectileHit",
+        "playerHit", "playerBlocked", "perfectBlock", "parry", "whirlwind", "projectileHit",
         "projectileDeflected", "projectileBurst"]
 
     function check(ok, what) {
