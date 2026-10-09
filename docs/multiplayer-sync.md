@@ -463,13 +463,12 @@ enemies go for the knights still standing (issue #13).
 The host ends the run: whenever its own knight falls, another knight's
 HP changes (`Session.partyChanged`) or a node leaves, it checks whether
 its knight and every other one are at 0 HP. If so it broadcasts
-`runEnd`; each joiner leaves the session on it, and the host follows once
-every joiner has left, or after `Session.endRunWaitMs` (2 s), so its
-leaving cannot cut the message off. Then every screen stops its enemies
-and shows the run's summary, as the fall screen does for one knight:
-"Your party has fallen", the depth, the kills, the time and the best
-depth, which is kept as on any fall. Enter or Esc goes to the title; a
-co-op run is not started again from there.
+`runEnd` and ends the run on its own screen; each joiner ends it when the
+message arrives. Nobody leaves the session (issue #99). Every screen
+stops its enemies and shows the run's summary, as the fall screen does
+for one knight: "Your party has fallen", the depth, the kills, the time
+and the best depth, which is kept as on any fall. Esc leaves the session
+for the title.
 
 `tests/downed/downed.qml` checks it with a host and a joiner in one
 process, over LAN, in two sessions. In the first the joiner's knight
@@ -477,8 +476,9 @@ falls first: both screens draw it down, its screen says "You are down"
 and offers only Esc, the host's knight stands, the run goes on and no
 enemy stops. Then the host's knight falls: within 3 s both screens must
 be out of the session and show "Your party has fallen" with the depth,
-kills, time and best depth, and only the title offered; Enter on the
-host's and Esc on the joiner's must take each to the title. In the second the host's knight
+kills, time and best depth, still in the session, the host's offering to
+go again and the joiner's waiting for the host; Esc on both must take each
+to the title and out of the session. In the second the host's knight
 falls first and the joiner's last, so the host learns of the last fall
 through the joiner's state.
 
@@ -489,6 +489,41 @@ out the bench exits 100, waiting for the end; with `RemotePlayer` drawing
 no knight down it exits 100, waiting for the fall on the other screen;
 with Enter doing nothing on the summary it exits 100, waiting for the
 title.
+
+## The party goes again (issue #99)
+
+On the fallen party's summary the host's Enter starts the next run
+(`Game.newRun`): it rolls a new seed, clears its level - despawning its
+enemies and gold drops on every node - and sets the session property
+`run` to the new seed at level 0 (`Session.goAgain`), then builds the
+dungeon and spawns the next run's enemies. A joiner tells a new run from a
+level of this one by the seed: a `run` whose seed is not the one it plays
+(`Session.runSeed`) is the next run (`Session.wentAgain`), and it builds
+the dungeon on that seed at depth 0 with a fresh knight, as the host did.
+A joiner's Enter does nothing; its screen says "Waiting for the host to go
+again".
+
+The last state each node had of the others is of the run before, whose
+knights were down: both ends forget it when the next run starts, so each
+knight of the new run is drawn from its first state in it, not downed. A
+state of the run before that still arrives draws that knight down until
+its node has started the next run too. The shots in flight
+go with the level on every screen (`Game.clearDungeon`), as the enemies do.
+
+`tests/goagain/run_goagain.py` checks it over the network, in two
+processes. Three times in one session the host goes down to depth 1, both
+knights take gold, a potion and the sword, the host fires a shot that
+stands on both screens and meets nothing, and both knights fall; Enter on
+the joiner's screen must start nothing, Enter on the host's must bring
+both to depth 0 on the same new seed, with the same enemies by id, type,
+tier and place (within 1.5 Wu), each knight at full HP and mana with no
+gold, potion or upgrade, the other knight standing at full HP in its
+colour, and no enemy, shot or gold drop of the run before.
+
+On clayground `dee7c25` (the submodule) it exited 0 with 85 checks passed.
+On the code before issue #99 it exits 100: the party's fall left the
+session, and the joiner's Enter took it to the title. With the shots not
+cleared with the level it exits 1, on the shot of the run before.
 
 ## Joining late, leaving and losing the host (issue #20)
 

@@ -211,16 +211,35 @@ In a session a knight at 0 HP is down, drawn slumped and dark on every
 screen, and the run goes on while another knight stands: the downed
 player's screen says "You are down" and offers only Esc, which leaves the
 session. When every knight is down the host ends the run: every screen
-leaves the session and shows how far the party got, as the fall screen does
-for one knight, and Enter or Esc goes to the title. The downed bench starts
+shows how far the party got, as the fall screen does for one knight, and
+the session stays. The host's screen says "Enter to go again": its Enter
+starts the next run for every knight of the session, at depth 0 on a new
+seed, with fresh HP, mana, gold and potions and the same colours; nobody
+hosts or joins again. A joiner's screen says "Waiting for the host to go
+again", and its Enter does nothing. Esc leaves the session for the title.
+The downed bench starts
 a host and a joiner in one process, joins them over LAN, brings down first
-one knight and then the other, twice in turn, and exits with the number of
-failed checks. Between the two falls the host goes down two levels, and the
+one knight and then the other, twice in turn, leaves with Esc, and exits
+with the number of failed checks. Between the two falls the host goes down two levels, and the
 other screen must make the downed knight downed in each, not standing until
 its next state:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
+```
+
+The go-again bench checks the next run over the network: two processes of
+Clayground's live loader, a host and a joiner, connected over Local (LAN) or
+Cloud signaling. Three times in one session it takes the party to depth 1,
+lets both knights fall, presses Enter on the joiner's screen - nothing
+starts - and then on the host's, and checks that both games are at depth 0
+on the same new seed with the same enemies, each knight at full HP with no
+gold, and that nothing of the run before is left: no enemy, no shot, no
+downed knight. It needs the live loader (`-DCLAYGROUND_WITH_TOOLS=ON`) and
+exits with the number of failed checks:
+
+```
+python3 tests/goagain/run_goagain.py --mode local
 ```
 
 A session takes players in and lets them go while a run is under way. The
