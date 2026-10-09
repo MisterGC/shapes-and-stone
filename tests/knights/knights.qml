@@ -10,7 +10,8 @@
 // in shieldBreak both shields have just broken into grey shards, the local
 // knight's mana bar flashing red. In charging both hold the left button,
 // their blades drawn back and glowing; in heavy both swing the wide heavy
-// blow of a full charge. In sword the local knight swings a sharpened
+// blow of a full charge; in whirlwind both spin it round them as a full
+// charge let go at a dash's start does. In sword the local knight swings a sharpened
 // sword, its blade's edge brighter and wider, in shield it holds up a
 // reinforced shield with a lighter rim; the remote's upgrade is not sent,
 // it swings and blocks as before.
@@ -125,6 +126,17 @@ Window {
             remote.triggerAction("heavy"); remoteState = 1
         }],
         [120, () => capture("heavy")],
+        [500, () => { remoteState = 0 }],
+        // A full charge let go as the dash starts: both knights whirl, the
+        // glowing blade spinning round them
+        [300, () => { game.player.pressSwing(); remoteState = 4 }],
+        [700, () => { remoteState = 5 }],
+        [50, () => {
+            game.player.releaseSwing()
+            game.player.dash()
+            remote.triggerAction("whirlwind"); remoteState = 3
+        }],
+        [150, () => capture("whirlwind")],
         [500, () => { remoteState = 0 }],
         // A real hit on the local knight, from behind: the red flash and
         // the chunk on its HP bar
