@@ -1335,33 +1335,14 @@ ClayWorld2d {
     function flashManaBar() { manaFlash.age = 0 }
     readonly property bool manaBarFlashing: manaFlash.running
 
-    // How deep the knight is, under the bars
+    // The knight's gold, under the bars
     Text {
-        id: hudDepth
-        objectName: "hudDepth"
+        id: hudGold
+        objectName: "hudGold"
         anchors.top: manaHud.bottom
         anchors.left: parent.left
         anchors.leftMargin: 12
         anchors.topMargin: 6
-        z: 1000
-        visible: player !== null
-        text: "Depth " + depth
-        color: "#DDDDDD"
-        style: Text.Outline
-        styleColor: "#000000"
-        font.pixelSize: 14
-        font.bold: true
-        font.letterSpacing: 1
-    }
-
-    // The knight's gold, under the depth
-    Text {
-        id: hudGold
-        objectName: "hudGold"
-        anchors.top: hudDepth.bottom
-        anchors.left: parent.left
-        anchors.leftMargin: 12
-        anchors.topMargin: 2
         z: 1000
         visible: player !== null
         text: "Gold " + (player ? player.gold : 0)
@@ -1440,6 +1421,7 @@ ClayWorld2d {
 
     // Mute indicator (always visible when muted)
     Rectangle {
+        id: muteIcon
         objectName: "muteIcon"
         anchors.top: minimap.bottom
         anchors.right: parent.right
@@ -1457,6 +1439,20 @@ ClayWorld2d {
             font.pixelSize: 28
             font.bold: true
         }
+    }
+
+    // How deep the knight is, under the minimap; large at the camp
+    DepthGauge {
+        id: depthGauge
+        objectName: "depthGauge"
+        anchors.top: muteIcon.bottom
+        anchors.right: parent.right
+        anchors.topMargin: 8
+        anchors.rightMargin: 10
+        z: 1000
+        visible: player !== null
+        depth: world.depth
+        camp: levelType === "village" && !fightRoomActive
     }
 
     // DEV menu (sandbox only)

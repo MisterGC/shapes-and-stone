@@ -450,6 +450,29 @@ QtObject {
         ringColor: "#F2E2A0"
     })
 
+    // The HUD's descent gauge: a shaft of layers in view, one per depth,
+    // the knight's marker in the middle one once it is that deep. A
+    // layer's rock goes from top at depth 0 to deep at hotDepth and on,
+    // drawn glow of the way toward the seam colour there, and the seam
+    // under it glows from none at depth 0 to full at hotDepth; every other
+    // layer is alternate as bright. Small in a dungeon, large at the camp
+    // (shaft width and layer height in pixels), where the marker waits
+    // sinkDelay seconds and then sinks in sink seconds into the next layer
+    readonly property var gauge: ({
+        layers: 5,
+        top: "#9C8B6A",
+        deep: "#2A1612",
+        seam: "#FF5A1C",
+        glow: 0.4,
+        hotDepth: 20,
+        alternate: 0.88,
+        marker: "#F2E2A0",
+        small: { width: 18, layer: 14 },
+        large: { width: 56, layer: 52 },
+        sinkDelay: 0.6,
+        sink: 1.6
+    })
+
     readonly property var campfire: ({
         healPerSecond: 5.0,
         // Mana comes back here, on top of the rest's knight.manaRegen

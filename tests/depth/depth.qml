@@ -73,7 +73,7 @@ Window {
         return f && f.visible ? f : null
     }
     function fallenText(name) { return find(fallenScreen(), name).text }
-    function hud() { return find(game, "hudDepth") }
+    function hud() { return find(game, "gaugeLabel") }
 
     function strikeDown() {
         let p = game.player

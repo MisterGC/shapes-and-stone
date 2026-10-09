@@ -26,3 +26,4 @@ PauseMenu 1.0 PauseMenu.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
 Session 1.0 Session.qml
+DepthGauge 1.0 DepthGauge.qml
