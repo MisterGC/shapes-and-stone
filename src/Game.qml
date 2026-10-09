@@ -2744,9 +2744,13 @@ ClayWorld2d {
         dungeonObjects = []
         torches = []
         stains = []
-        // A blow held for the last level's enemy does not land in the next
+        // A blow held for the last level's enemy does not land in the next,
+        // nor does a shot still flying
         _heldBlows = []
         _parriedAt = {}
+        for (let id in _shotById) {
+            try { if (_shotById[id] && !_shotById[id].destroyed) _shotById[id].vanish() } catch(err) {}
+        }
         _shotById = {}
 
         grid = []
