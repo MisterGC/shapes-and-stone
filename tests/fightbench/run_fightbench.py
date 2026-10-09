@@ -10,14 +10,18 @@ every step, so the same seed gives the same numbers on every run.
 
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
-                    [--answer mix|block|parry|perfect|heavy] [--depth 0]
+                    [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0]
                     [--max-seconds 180] [--json out.json]
 
 --answer is how the scripted knight meets a grunt's or a guardian's attack:
 "mix" parries or blocks as the seed rolls, "block" always blocks, "parry"
 always parries, "perfect" raises the shield 4 physics steps before each
 lunge lands, a perfect block, "heavy" meets attacks as "mix" does but
-charges a heavy swing at a guardian instead of shield-dashing it. --depth is the depth the fight room is at:
+charges a heavy swing at a guardian instead of shield-dashing it,
+"whirlwind" meets attacks as "mix" does but goes for every enemy with a
+full charge and lets go right around a dash at it: a whirlwind. The report
+counts the whirlwinds that landed (hit an enemy), their hits and the ones
+begun. --depth is the depth the fight room is at:
 the lineup stays, the enemies hit as hard as at that depth.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
@@ -108,7 +112,7 @@ def main():
     ap.add_argument("--loader", help="path to clayliveloader")
     ap.add_argument("--seed", type=int, default=424242,
                     help="seed of the scripted knight's choices")
-    ap.add_argument("--answer", choices=("mix", "block", "parry", "perfect", "heavy"), default="mix",
+    ap.add_argument("--answer", choices=("mix", "block", "parry", "perfect", "heavy", "whirlwind"), default="mix",
                     help="how the scripted knight meets an attack")
     ap.add_argument("--depth", type=int, default=0,
                     help="depth the fight room is at")
