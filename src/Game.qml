@@ -907,12 +907,13 @@ ClayWorld2d {
         return { lost: Math.min(1, fightRecord.damageTaken / maxHp), fell: fightRecord.deaths > 0 }
     }
     // Every knight's record of the level: this node's and, in a session,
-    // each other node's from the last state it sent
+    // each other node's from the last state it sent in this level
     function partyRecords() {
         let out = [levelRecord()]
         for (let id in session.remotePlayers) {
             let st = session.lastStates[id]
-            if (st && st.l !== undefined) out.push({ lost: st.l, fell: st.f === 1 })
+            if (st && st.lv === levelIndex && st.l !== undefined)
+                out.push({ lost: st.l, fell: st.f === 1 })
         }
         return out
     }
@@ -2191,6 +2192,9 @@ ClayWorld2d {
         let levelSeed = deriveSeed(masterSeed, levelIndex)
         rng = createRng(levelSeed)
         console.log("[Game] Seed:", masterSeed, "Level:", levelIndex, "LevelSeed:", levelSeed)
+        // Nothing lost here yet: were the party to leave at once, the next
+        // dungeon would stand there, and the stairs show it from the start
+        nextPosition = settleDanger(dangerPosition, [{ lost: 0, fell: false }])
         console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
         // Step 1: Initialize grid with walls

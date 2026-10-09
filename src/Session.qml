@@ -236,10 +236,11 @@ Item {
                 b: player.isBlocking ? 1 : 0,
                 h: player.hp
             }
-            // This knight's record of the level, for the host to set the
-            // next dungeon's danger from: the share of its max HP lost (l)
-            // and, once it fell, f
+            // This knight's record of the level (lv), for the host to set
+            // the next dungeon's danger from: the share of its max HP lost
+            // (l) and, once it fell, f
             let rec = world.levelRecord()
+            state.lv = world.levelIndex
             state.l = Math.round(rec.lost * 1000) / 1000
             if (rec.fell) state.f = 1
             // Lifting a fallen ally up: whose knight and how far, for the
