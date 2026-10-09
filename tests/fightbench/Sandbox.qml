@@ -8,7 +8,7 @@
 // The numbers are the game's own fight record (Game.qml).
 //
 // Driven by run_fightbench.py (clayliveloader --sbx Sandbox.qml), which
-// calls begin(seed, answer, depth), steps and reads report().
+// calls begin(seed, answer, danger), steps and reads report().
 
 import QtQuick
 import Clayground.Common
@@ -26,12 +26,12 @@ Item {
 
     // The dojo's scenario menu reaches the game through the bench
     function scenarios() { return game.scenarios() }
-    function applyScenario(name, depth) { game.applyScenario(name, depth) }
+    function applyScenario(name, danger) { game.applyScenario(name, danger) }
 
     // ---- driver API ----
     property int seed: 0
     property string answer: "mix"
-    property int depth: 0
+    property real danger: 0
     property int steps: 0
     property var _rng: null
 
@@ -39,12 +39,13 @@ Item {
     // answer is how the knight meets an attack: "mix", "block", "parry",
     // "perfect", "heavy" (as mix, but it charges at guardians) or
     // "whirlwind" (as mix, but it whirls through every enemy);
-    // depth is the depth the fight room is at.
+    // danger is the danger the fight room is at: its depth and, after the
+    // point, the position in the depth's range (Game.applyScenario).
     function begin(s, a, d) {
         Clayground.paused = true
         seed = s
         answer = a === undefined ? "mix" : a
-        depth = d === undefined ? 0 : d
+        danger = d === undefined ? 0 : d
         steps = 0
         _rng = game.createRng(s)
         _plans = new Map()
@@ -57,7 +58,7 @@ Item {
         _crushing = new Set()
         whirlsStarted = 0
         _whirlPending = false
-        game.applyScenario("fight", depth)
+        game.applyScenario("fight", danger)
         // The bench tries the moves, not the mana they cost: plenty of it
         if (game.player) {
             game.player.maxMana = 1000
@@ -82,6 +83,7 @@ Item {
             seed: seed,
             answer: answer,
             depth: game.depth,
+            danger: round3(game.danger),
             outcome: cleared ? "cleared" : fallen ? "fallen" : "running",
             steps: steps,
             seconds: round3(r.seconds),
