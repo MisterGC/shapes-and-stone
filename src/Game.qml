@@ -129,10 +129,17 @@ ClayWorld2d {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
                                     gain === undefined ? 1 : gain)
     }
-    // The whirlwind: the swing sample pitched further down, a long spin
+    // The whirlwind: the swing sample pitched further down, a long spin,
+    // and the knight's shout of a special move
+    Sound {
+        id: whirlShoutSound
+        source: "assets/knight_whirl_shout.wav"
+        volume: muted ? 0 : Balance.whirl.shoutVolume
+    }
     function playWhirlwind(gain) {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
                                     gain === undefined ? 1 : gain)
+        whirlShoutSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
     // The charge is full: a high tick
     Sound {
