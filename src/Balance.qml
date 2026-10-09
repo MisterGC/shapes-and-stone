@@ -425,8 +425,15 @@ QtObject {
 
     // A session's party: an ally lifts a fallen knight up, and a knight
     // still down when the party reaches the camp rises there. Solo play
-    // has neither
+    // has neither. A dungeon is built for the knights the party had when
+    // it was entered: each knight beyond the first adds enemiesPerKnight
+    // to the spawn table's enemiesMin and enemiesMax, on top of what its
+    // danger adds and never above depth.enemiesCap, and hpPerKnight of
+    // each enemy's HP, rounded to whole points. One knight's dungeon has
+    // neither, nor has the village's fight room
     readonly property var party: ({
+        enemiesPerKnight: 2,
+        hpPerKnight: 0.25,
         // An ally this close to a fallen knight (centre to centre, wu)
         // lifts it up once it has stood there reviveTime seconds, on the
         // physics clock, without a hit landing on it; a hit, or a step out

@@ -25,11 +25,12 @@ Item {
     // The run is on: the host started it, or this node joined one under
     // way (also emitted on the host itself). levelIndex is the level the
     // host plays, 0 at the start; position and next are the danger's
-    // positions it plays it at (Game.dangerPosition, Game.nextPosition)
-    signal started(int seed, int levelIndex, real position, real next)
-    // Every client applies this level at the host's danger; the host is
-    // the level authority
-    signal levelChanged(int levelIndex, real position, real next)
+    // positions it plays it at (Game.dangerPosition, Game.nextPosition),
+    // knights the knights the host built the level for (Game.partyKnights)
+    signal started(int seed, int levelIndex, real position, real next, int knights)
+    // Every client applies this level at the host's danger, built for the
+    // host's knights; the host is the level authority
+    signal levelChanged(int levelIndex, real position, real next, int knights)
     // Host only: a player reached the exit, the host decides to advance
     signal advanceRequested()
     // The host pressed start in the lobby; the game picks the seed and
@@ -83,8 +84,8 @@ Item {
     signal runEnded()
     // The host started the next run after the party had fallen: this
     // joiner goes again from depth 0 on this seed, at this position in
-    // its range
-    signal wentAgain(int seed, real position)
+    // its range, its first dungeon built for knights
+    signal wentAgain(int seed, real position, int knights)
     // Another node's knight stood beside this node's fallen knight long
     // enough: it rises (Balance.party)
     signal liftReceived(string fromId)
@@ -96,6 +97,9 @@ Item {
     property var lastStates: ({})
     // This node is leaving on its own: its session ending is no lost host
     property bool _leaving: false
+    // The knights in the session, this node's among them: what the host
+    // builds the next level for
+    readonly property int knights: net.connected ? net.nodeCount : 1
     // The seed of the run this node plays: a new one from the host is the
     // next run, the same one a level of this run
     property int runSeed: -1
@@ -108,19 +112,21 @@ Item {
         autoRelay: true
 
         // The run is the session property "run", its seed, the level
-        // played and the danger's positions (pos, next): the host sets it
+        // played, the danger's positions (pos, next) and the knights it
+        // was built for (knights): the host sets it
         // when the run starts and at each level, and a node that joins
         // late gets it with its welcome (clayground#306)
         onSessionPropertyChanged: (name, value) => {
             if (net.isHost || name !== "run") return
             let again = session.inGame && value.seed !== session.runSeed
+            let knights = value.knights || 1
             session.runSeed = value.seed
-            if (!session.inGame) session.started(value.seed, value.level, value.pos, value.next)
+            if (!session.inGame) session.started(value.seed, value.level, value.pos, value.next, knights)
             else if (again) {
                 session.lastStates = ({})
-                session.wentAgain(value.seed, value.pos)
+                session.wentAgain(value.seed, value.pos, knights)
             }
-            else session.levelChanged(value.level, value.pos, value.next)
+            else session.levelChanged(value.level, value.pos, value.next, knights)
         }
 
         onMessageReceived: (fromId, data) => {
@@ -254,22 +260,24 @@ Item {
     }
 
     // Host: start the game for everyone with this seed, its first dungeon
-    // at this position in its range
-    function start(seed, position) {
+    // at this position in its range, built for knights
+    function start(seed, position, knights) {
         runSeed = seed
-        net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position})
-        started(seed, 0, position, position)
+        net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
+                                       knights: knights})
+        started(seed, 0, position, position, knights)
     }
 
     // Host: the party has fallen, the next run starts for everyone on this
     // seed. The last states are of the run before, whose knights were down:
     // each knight of the next run is drawn from its first state in it (on
     // a joiner too, when wentAgain comes)
-    function goAgain(seed, position) {
+    function goAgain(seed, position, knights) {
         if (!net.isHost) return
         runSeed = seed
         lastStates = ({})
-        net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position})
+        net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
+                                       knights: knights})
     }
 
     // Reliable event so remote clients show an action crisply
@@ -376,11 +384,13 @@ Item {
         runEnded()
     }
 
-    // Host: tell the joiners which level comes next and at which danger,
-    // and every node that joins later which one is played
-    function announceLevel(levelIndex, position, next) {
+    // Host: tell the joiners which level comes next, at which danger and
+    // for how many knights, and every node that joins later which one is
+    // played
+    function announceLevel(levelIndex, position, next, knights) {
         net.setSessionProperty("run", {seed: net.sessionProperties.run.seed,
-                                       level: levelIndex, pos: position, next: next})
+                                       level: levelIndex, pos: position, next: next,
+                                       knights: knights})
     }
 
     Component { id: remotePlayerComponent; RemotePlayer {} }

@@ -568,16 +568,17 @@ ClayWorld2d {
         muted: world.muted
         // The host's run, from its start or, on a node that joins late,
         // at the level the host plays
-        onStarted: (seed, level, position, next) => {
+        onStarted: (seed, level, position, next, knights) => {
             masterSeed = seed
             world.levelIndex = level
             world.levelType = levelTypeOf(level)
             _setDanger(position, next)
+            _setKnights(knights)
             screen = "game"
         }
-        onLevelChanged: (newIndex, position, next) =>
-            _applyLevelChange(newIndex, {pos: position, next: next})
-        onWentAgain: (seed, position) => _startRun(seed, position)
+        onLevelChanged: (newIndex, position, next, knights) =>
+            _applyLevelChange(newIndex, {pos: position, next: next, knights: knights})
+        onWentAgain: (seed, position, knights) => _startRun(seed, position, knights)
         onLiftReceived: (fromId) => _rise("lift")
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
@@ -917,13 +918,15 @@ ClayWorld2d {
         }
         return out
     }
-    // The positions the level newIndex is entered at: out of a dungeon the
-    // next one's is settled from the party's records, out of a village the
-    // next dungeon stands where the exit fixed it
+    // The positions the level newIndex is entered at and the knights it is
+    // built for: out of a dungeon the next one's position is settled from
+    // the party's records, out of a village the next dungeon stands where
+    // the exit fixed it
     function _dangerFor(newIndex) {
         if (levelTypeOf(newIndex) === "village")
-            return { pos: dangerPosition, next: settleDanger(dangerPosition, partyRecords()) }
-        return { pos: nextPosition, next: nextPosition }
+            return { pos: dangerPosition, next: settleDanger(dangerPosition, partyRecords()),
+                     knights: knightsNow() }
+        return { pos: nextPosition, next: nextPosition, knights: knightsNow() }
     }
     // Where the next run starts after this one ended in a fall: a fall
     // earns the bottom of the range
@@ -940,6 +943,21 @@ ClayWorld2d {
         dangerPosition = position
         nextPosition = next === undefined || isNaN(next) ? position : next
         console.log("[Game] Danger", danger.toFixed(3), "next position", nextPosition.toFixed(3))
+    }
+    // --- The party's size (issue #102) ---
+    // The knights the level was built for: a dungeon's enemies grow with
+    // them (Balance.party). It is fixed as the level is entered - in a
+    // session by the host, sent with the level - so a knight joining or
+    // leaving changes the next dungeon, not this one
+    property int partyKnights: 1
+    // The dojo's knights for the next level, 0 to count the session's:
+    // eval knightsOverride = 4, then eval applyScenario("dungeon", 2.5),
+    // builds that dungeon for four knights
+    property int knightsOverride: 0
+    function knightsNow() { return knightsOverride > 0 ? knightsOverride : session.knights }
+    function _setKnights(knights) {
+        partyKnights = Math.max(1, knights || 1)
+        console.log("[Game] Built for", partyKnights, partyKnights === 1 ? "knight" : "knights")
     }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
@@ -1018,6 +1036,7 @@ ClayWorld2d {
         if (screen === "game" && width > 0 && height > 0 && !player) {
             console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
+            if (!session.connected) _setKnights(knightsNow())
             // A node that joins a session late may start in a village
             if (levelType === "village") {
                 generateVillage()
@@ -1032,7 +1051,7 @@ ClayWorld2d {
     function _startMultiplayerGame() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        session.start(masterSeed, dangerPosition)
+        session.start(masterSeed, dangerPosition, knightsNow())
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -1787,18 +1806,19 @@ ClayWorld2d {
         do {
             seed = Math.floor(Math.random() * 2147483647)
         } while (seed === masterSeed)
-        _startRun(seed, nextPosition)
+        _startRun(seed, nextPosition, knightsNow())
     }
     // The next run on seed, from depth 0 with a fresh knight, its first
     // dungeon at position in its range. The host clears its enemies on
     // every node before it tells the others the seed and spawns the next
-    // run's
-    function _startRun(seed, position) {
+    // run's; its first dungeon is built for knights
+    function _startRun(seed, position, knights) {
         console.log("[Game] New run, seed:", seed)
         clearDungeon()
         masterSeed = seed
         _setDanger(position, position)
-        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition)
+        _setKnights(knights)
+        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights)
         menuOpen = false
         fallen = false
         partyFallen = false
@@ -2005,11 +2025,12 @@ ClayWorld2d {
     function _hostAdvanceLevel() {
         if (resetting) return
         let d = _dangerFor(levelIndex + 1)
-        session.announceLevel(levelIndex + 1, d.pos, d.next)
+        session.announceLevel(levelIndex + 1, d.pos, d.next, d.knights)
         _applyLevelChange(levelIndex + 1, d)
     }
 
-    // d: the danger's positions the level is entered at ({pos, next})
+    // d: the danger's positions the level is entered at and the knights it
+    // is built for ({pos, next, knights})
     function _applyLevelChange(newIndex, d) {
         if (resetting || newIndex === levelIndex) return
         resetting = true
@@ -2022,8 +2043,9 @@ ClayWorld2d {
     // The one way to the next level: what the knight carries (its HP, mana,
     // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon.
     // In a session a knight down rises at the village's camp. d is the
-    // danger's positions it is entered at, the host's in a session; alone
-    // they are settled here, before the knight and its record are gone
+    // danger's positions it is entered at and the knights it is built
+    // for, the host's in a session; alone they are settled here, before
+    // the knight and its record are gone
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
@@ -2036,6 +2058,7 @@ ClayWorld2d {
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
         _setDanger(d.pos, d.next)
+        _setKnights(d.knights)
         if (levelType === "village")
             generateVillage()
         else
@@ -2233,7 +2256,7 @@ ClayWorld2d {
         // Step 9: Spawn enemies across non-start rooms with tier variation
         if (rooms.length > 1) {
             let spawnRooms = rooms.slice(1)
-            let sb = spawnRolls(danger)
+            let sb = spawnRolls(danger, partyKnights)
             let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
             let tiers = dealTiers(numEnemies, sb, rng)
             for (let i = 0; i < numEnemies; i++) {
@@ -2246,7 +2269,7 @@ ClayWorld2d {
                 let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
                 let type = typeRoll < guardianChance ? "guardian"
                     : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
-                spawnEnemy(ex, ey, tier, type)
+                spawnEnemy(ex, ey, tier, type, partyKnights)
             }
         }
 
@@ -2663,11 +2686,12 @@ ClayWorld2d {
 
     // The spawn table at a danger: Balance.spawn with Balance.depth added
     // once per step of it (a share of it between two), each number within
-    // its cap
-    function spawnRolls(d) {
+    // its cap, and Balance.party.enemiesPerKnight for each of knights
+    // (1 when left out) beyond the first
+    function spawnRolls(d, knights) {
         let sb = Balance.spawn, bd = Balance.depth
         let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
-        let more = Math.floor(d * bd.enemies)
+        let more = Math.floor(d * bd.enemies) + _extraKnights(knights) * Balance.party.enemiesPerKnight
         return {
             enemiesMin: Math.min(bd.enemiesCap, sb.enemiesMin + more),
             enemiesMax: Math.min(bd.enemiesCap, sb.enemiesMax + more),
@@ -2698,13 +2722,21 @@ ClayWorld2d {
     function enemyAtk(type, d) {
         return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
     }
+    // An enemy's HP in a dungeon built for knights (1 when left out):
+    // Balance.party.hpPerKnight of it more for each beyond the first
+    function enemyHp(type, tier, knights) {
+        let hp = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        return Math.round(hp * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
-    function spawnEnemy(ex, ey, tier, type) {
+    // knights: the knights the dungeon is built for, 1 when left out
+    function spawnEnemy(ex, ey, tier, type, knights) {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
         let stats = Balance.enemy[type]
-        let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
+        let ehp = enemyHp(type, tier, knights)
         let eatk = enemyAtk(type, danger)
         let edef = stats.def
         let props = {
@@ -3324,6 +3356,7 @@ ClayWorld2d {
         let dg = Math.max(0, Number(atDanger) || 0)
         let d = Math.floor(dg)
         _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
+        _setKnights(knightsNow())
         muted = true
         masterSeed = scenarioSeed
         if (player) clearDungeon()
