@@ -5,7 +5,8 @@
 //
 // The instance runs the real game. The driver makes up each knight's
 // record of a dungeon, lets the host lead the party down and reads what
-// each screen shows: the danger of the level and the dungeon's look.
+// each screen shows: the danger of the level, the dungeon's look and its
+// enemies, which grow with the party (issue #102).
 
 import QtQuick
 import Clayground.Network
@@ -108,6 +109,19 @@ Item {
             else if (o.moteSize !== undefined) out.air.push(r3(o.density))
         }
         return out
+    }
+    // The enemies on this screen, by their replicated object, and the
+    // knights the dungeon was built for: per enemy its id, type, tier, max
+    // HP and the HP the table gives it for these knights; the spawn
+    // table's range of enemies at the level's danger for them and for one
+    function foes() {
+        let k = game.partyKnights, sb = game.spawnRolls(game.danger, k), one = game.spawnRolls(game.danger, 1)
+        return {knights: k, min: sb.enemiesMin, max: sb.enemiesMax,
+                soloMin: one.enemiesMin, soloMax: one.enemiesMax,
+                enemies: game.enemies.filter(e => e && !e.destroyed)
+                             .map(e => [e.objectId, e.enemyType, e.tier, e.maxHp,
+                                        game.enemyHp(e.enemyType, e.tier, k)])
+                             .sort()}
     }
     // The knight in the room after the first, where the floor carries the
     // look, and the camera on it - it follows only a knight that moves

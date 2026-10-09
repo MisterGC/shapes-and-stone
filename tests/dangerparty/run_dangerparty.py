@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Danger party bench - proves that in a session the host sets the next
 dungeon's danger from every knight's record and every screen builds and
-shows the same dungeon at it (issue #96).
+shows the same dungeon at it (issue #96), built for the party's two
+knights (issue #102).
 
 Starts tests/dangerparty/Sandbox.qml twice in Clayground's live loader, as
 two processes (a host and a joiner), connects them over Local or Cloud
@@ -15,6 +16,9 @@ records of the dungeon and the host leads the party down:
   a fall - not the one the host's record alone would give
 - in the next dungeon both screens have the same depth and danger and the
   same look: band, light, every torch, the floor, what lies on it, the air
+- each dungeon, the first too, is built for two knights on both screens:
+  the same enemies, as many as Balance.party adds to the spawn table for
+  a second knight, each with the HP it adds
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
@@ -242,6 +246,7 @@ def run(args, loader, tmp, procs, check):
         hl, jl = H.json("look()"), J.json("look()")
         check(hl == jl, "both screens build the first dungeon with the same look"
               + ("" if hl == jl else f" (host {hl}, joiner {jl})"))
+        check_foes("depth 0:", H, J, check)
 
         position = START
         for n, (host_rec, joiner_rec) in enumerate(ROUNDS, 1):
@@ -306,6 +311,7 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
           f"{len(hl['onFloor'])} things on it, air {hl['air']}, stairs {hl['stairs']}"
           + ("" if hl == jl else f" (host {hl}, joiner {jl}; host {H.json('records()')} "
                                   f"{H.json('danger()')}, joiner {J.json('records()')} {J.json('danger()')})"))
+    check_foes(tag, H, J, check)
     if args.shots and n <= 3:
         os.makedirs(args.shots, exist_ok=True)
         for i in (H, J):
@@ -316,6 +322,21 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
             saved, err = i.shot(path)
             check(saved is not None, f"{tag} saved {name}-depth{n}.png ({err or saved})")
     return want
+
+
+def check_foes(tag, H, J, check):
+    """Both screens show the same enemies, the dungeon built for two
+    knights: as many as the table gives two, each with two knights' HP"""
+    wait_for(lambda: H.json("foes()") == J.json("foes()"), 5)
+    hf, jf = H.json("foes()"), J.json("foes()")
+    n = len(hf["enemies"])
+    hp = sorted({f"{e[1]}{e[2]} {e[3]}" for e in hf["enemies"]})
+    check(hf == jf and hf["knights"] == 2 and hf["min"] <= n <= hf["max"]
+          and all(e[3] == e[4] for e in hf["enemies"]),
+          f"{tag} both screens build it for {hf['knights']} knights: the same {n} enemies, "
+          f"the table's {hf['min']} to {hf['max']} (one knight's {hf['soloMin']} to {hf['soloMax']}), "
+          f"their HP the table's ({', '.join(hp)})"
+          + ("" if hf == jf else f" (host {hf}, joiner {jf})"))
 
 
 def stop(procs):
