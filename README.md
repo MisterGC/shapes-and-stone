@@ -251,8 +251,8 @@ the sword or the shield, through the dialogue panel: E talks, 1 and 2
 buy what the panel offers, each ware named with its effect. A sharpened
 sword adds `shop.swordAtk` to the knight's attack and shows a brighter,
 wider blade edge; a reinforced shield lets `shop.shieldBlockedShare` of a
-blow through a held block instead of `knight.blockedShare`, drains
-`shop.shieldBlockDrain` mana per second instead of `knight.blockDrain`,
+blow through a held block instead of `knight.blockedShare`, a blow it
+stops costs `shop.shieldBlockMana` mana instead of `knight.blockMana`,
 and shows a lighter rim. The perfect block's window is the same with
 either. The smith sells one of the two per run and refuses a second. The
 knight reads its `upgrade` live, so in the dojo's fight scenario
@@ -342,17 +342,28 @@ white for the window; a spitter's shot gets the same ring, closing as the
 shot leaves, without the white. The ring runs on the physics steps, so a
 pause or a hit stop holds it; the `parryRing` group of the table holds
 its size, thickness and colour. On the other screens of a session it
-follows the host's telegraph and parry window. A hit the shield does not
+follows the host's telegraph and parry window. A grunt or a guardian
+winding up its lunge screams like a goblin, fading with the distance from
+the knight as the crushing blow's growl does, pitched by its tier
+(`scream.tierPitch`, weak to tough) on every screen; a spitter keeps its
+spit. A hit the shield does not
 stop gives the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
 white for as long, and a lunge or a shot in it plays no hit. A hit that
 lands reads as a hurt: the knight flashes red (`hurt.color`) for
 `hurt.flash` seconds before the white flicker, plays its own hurt sound (a
 low thud, never the sword's punch), and the HP it lost stays on the HP bar
-as a pale chunk that drains away over `hurt.chunkDrain` seconds. A blow the
+as a pale chunk that drains away over `hurt.chunkDrain` seconds. It also
+throws the knight `knight.knockback` wu back along the blow - a lunge's or
+a shot's own direction - fading out over `knight.knockbackDuration`
+seconds, so the attacker no longer covers it; a crushing blow through the
+held shield throws it too, a blocked, perfectly blocked or dodged blow
+does not. A wall stops it, a dash cancels it, and as it runs on the
+physics steps a pause or a hit stop holds it. A blow the
 shield stops reads as a success, not a smaller hit: the shield flashes
 white and bumps out, the knight's screen freezes for a moment with a kick,
-the shield sounds its own block - the impact sample pitched up, once - and
-the attacker recoils off it; the `block` group of the table holds each of
+the shield sounds its own block - a metal clang, once, `block.pitch`
+semitones up - and the attacker recoils off it; the shield is drawn as
+riveted steel, edged in the knight's own colour; the `block` group of the table holds each of
 these values. A shield raised at most `knight.perfectBlockFrames` steps
 before a blow from inside its arc blocks it perfectly: no damage, no
 chip, `knight.perfectBlockMana` mana back, and a lunging attacker
@@ -362,17 +373,25 @@ so mashing the right button does not keep the window open; the held
 shield still blocks with the chip. A perfect block flashes the shield
 longer and the knight pale blue, sparks fly around a ring on every
 screen, and the knight's own screen freezes, flashes and pulses; the
-`perfectBlock` group of the table holds these values. In co-op the
-knight's screen judges the blow and staggers the host's enemy. The shield is
-not free: raised, it drains `knight.blockDrain` mana per second (less
-with the smith's reinforced shield), drops at
-0 and cannot be raised again until a parry gives `knight.parryMana` back
-or the campfire refills it at `campfire.manaPerSecond`; mana does not come
-back on its own. Below `shieldBreak.lowShare` of the mana the raised
+`perfectBlock` group of the table holds these values, its clang
+`perfectBlock.pitch` semitones up. In co-op the
+knight's screen judges the blow and staggers the host's enemy. Mana pays
+for what the knight does: the raised shield drains `knight.blockDrain`
+per second, a blow it stops - a lunge or a shot - costs `knight.blockMana`
+(less with the smith's reinforced shield), a dash `knight.dashMana` and a
+whirlwind `knight.whirlMana` with its dash. At 0 the shield drops and
+cannot be raised until a parry gives `knight.parryMana` back, the
+campfire refills it at `campfire.manaPerSecond`, or the knight rests:
+with the shield down and nothing spent for `knight.manaRegenDelay`
+seconds, mana comes back at `knight.manaRegen` per second, on the physics
+clock. Without the mana a dash does not start and a full charge swings
+heavy instead of whirling; every move refused for lack of mana - the
+shield, the dash, the whirlwind - shows `knight.noManaWord` over the
+knight, clicks empty and flashes the mana bar. Below `shieldBreak.lowShare` of the mana the raised
 shield thins and blinks `shieldBreak.blink` times a second; at 0 it breaks
 into grey shards with a crack, on every screen (`acted("shieldBreak")`),
-and the mana bar flashes red. A right-click with no mana answers with a
-dull click and the same flash. The hurt flash, the HP chunk, the blink,
+and the mana bar flashes red. A right-click with no mana answers with
+the refusal above. The hurt flash, the HP chunk, the blink,
 the shards and the mana bar's flash count physics steps like the grace: a
 pause, a single step or the hit stop holds them. The words PARRY and
 PERFECT show over the
@@ -400,7 +419,8 @@ A full charge let go right around a dash's start - at most
 `knight.whirlWindow` physics steps before or after it - spins the knight
 forward as a whirlwind instead: the dash goes on for `knight.whirlDuration`
 seconds at `knight.whirlSpeed`, no damage taken, the glowing blade turning
-round the knight, and every standing enemy within `knight.whirlReach` of
+round the knight, the knight shouting (`whirl.shoutPitch`,
+`whirl.shoutVolume`), and every standing enemy within `knight.whirlReach` of
 it is hit once, `knight.whirlSwing` times atk, through a guardian's
 shield. A heavy swing just let go of turns into the whirlwind, and an
 enemy it hit already is not hit again. Outside the window a full charge
