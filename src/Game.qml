@@ -113,12 +113,17 @@ ClayWorld2d {
         dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
-    // The shield's own sound: the impact sample pitched up, so a block
-    // never sounds like a hit, and a perfect block higher still
+    // The shield's own sound: a metal clang, so a block never sounds like
+    // a hit, and a perfect block brighter
+    Sound {
+        id: shieldClangSound
+        source: "assets/shield_clang.wav"
+        volume: muted ? 0 : 0.7
+    }
     function playBlock(gain, perfect) {
-        impactSound.triggerNote(impactSound.rootNote
-                                + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
-                                gain === undefined ? 1 : gain)
+        shieldClangSound.triggerNote(shieldClangSound.rootNote
+                                     + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
+                                     gain === undefined ? 1 : gain)
     }
 
     function playSwordSwing(gain) {

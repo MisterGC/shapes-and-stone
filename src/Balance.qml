@@ -94,7 +94,7 @@ QtObject {
     // hit. The shield arc flashes white for flash seconds and swells to
     // bump times its size; the knight's own screen freezes for freeze
     // seconds, takes this much trauma and a kick of kick wu; sparks fly;
-    // the impact sample plays pitch semitones up; the attacker recoils
+    // the shield's clang plays pitch semitones up; the attacker recoils
     // recoil wu off the shield
     readonly property var block: ({
         flash: 0.14,
@@ -103,7 +103,7 @@ QtObject {
         trauma: 0.2,
         kick: 0.1,
         sparks: 12,
-        pitch: 7,
+        pitch: 0,
         recoil: 0.3
     })
 
@@ -113,8 +113,8 @@ QtObject {
     // around a ring; the knight's own screen freezes for freeze seconds at
     // freezeScale of its speed, takes this much trauma, flashes
     // flashColor for screenFlash seconds at screenFlashOpacity and pulses
-    // by pulse over pulseTime seconds; the impact sample plays pitch
-    // semitones up
+    // by pulse over pulseTime seconds; the shield's clang plays pitch
+    // semitones up, brighter
     readonly property var perfectBlock: ({
         flash: 0.26,
         bump: 1.5,
@@ -128,7 +128,7 @@ QtObject {
         screenFlashOpacity: 0.22,
         pulse: 0.5,
         pulseTime: 0.22,
-        pitch: 12
+        pitch: 5
     })
 
     // The charged heavy swing (knight.charge...) reads as a commitment: the

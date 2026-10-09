@@ -116,7 +116,7 @@ PhysicsItem {
         if (entity.isBlocking && entity.isShieldFacing(xWu, yWu, widthWu)) {
             let sp = entity.getShieldWorldPos()
             if (gameWorld) {
-                gameWorld.playImpact()
+                gameWorld.playBlock()
                 gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
                 gameWorld.countFight("block")
                 if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, "blocked")
