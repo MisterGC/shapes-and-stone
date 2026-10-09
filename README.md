@@ -77,7 +77,7 @@ Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
 block, parry, get hurt, run their shields low and dry and dash at the same
 moment, and saves a PNG per pose (`hurt`, `lowMana`, `shieldBreak`,
-`charging`, `heavy`, and `sword` and `shield` for the smith's upgrades,
+`charging`, `heavy`, `whirlwind`, and `sword` and `shield` for the smith's upgrades,
 on the local knight only, among them). It needs a window: offscreen it saves
 the HUD but not the world.
 
@@ -384,6 +384,19 @@ physics world), so a pause or a hit stop holds it. The `heavy` group of the
 table holds its glow, ring, sounds and hit feedback (`impact("heavyHit")`).
 The other screens of a session see the charge in the state's `s` (4
 charging, 5 full) and the heavy swing as `acted("heavy")`.
+A full charge let go right around a dash's start - at most
+`knight.whirlWindow` physics steps before or after it - spins the knight
+forward as a whirlwind instead: the dash goes on for `knight.whirlDuration`
+seconds at `knight.whirlSpeed`, no damage taken, the glowing blade turning
+round the knight, and every standing enemy within `knight.whirlReach` of
+it is hit once, `knight.whirlSwing` times atk, through a guardian's
+shield. A heavy swing just let go of turns into the whirlwind, and an
+enemy it hit already is not hit again. Outside the window a full charge
+swings heavy and a dash still cancels the charge. The window counts
+physics steps, so a pause or a hit stop holds it. The `whirl` group of the
+table holds its look, sound and feedback (`impact("whirlwind")` as it
+starts, `impact("heavyHit")` on each enemy it hits); the other screens see
+it as `acted("whirlwind")`.
 Tough grunts and guardians now and then wind up a crushing blow instead
 of a lunge, at `enemy.crushChance` of their attacks: the wind-up takes
 `enemy.crushWindUp` seconds instead of `enemy.windUp`, the enemy glows
@@ -419,7 +432,8 @@ qml -I build/bin/qml tests/ring/ring.qml -- <out dir>
 The game keeps a record of each fight (`fightRecord` in `src/Game.qml`):
 damage dealt and taken, parries, attacks the shield stopped and those it
 stopped perfectly (`perfectBlocks`, also counted in `blocks`), crushing
-blows that broke the held shield (`crushed`), kills, falls
+blows that broke the held shield (`crushed`), whirlwinds that hit an
+enemy (`whirlwinds`) and the enemies they hit (`whirlHits`), kills, falls
 and the simulated seconds until no enemy stands. The fight bench plays the
 `fight` scenario with a scripted knight, stepping the paused game through
 the dojo's inspector, and prints the record as JSON; the same seed gives the
@@ -429,7 +443,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy] [--depth 0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -439,7 +453,11 @@ until a lunge is 4 steps from landing and raises it then, a perfect
 block, `heavy` meets attacks as `mix` does but holds the left button at a
 guardian instead of shield-dashing it and lets the full charge go once the
 guardian is in reach (the report counts them as `heavySwings` and
-`guardBreaks`). A crushing blow is met by the same plan, so a parry finds
+`guardBreaks`), `whirlwind` meets attacks as `mix` does but charges a step
+back from the nearest enemy and, full, lets go and dashes at it, by turns
+just before and just after the dash's start (the report counts the
+whirlwinds that landed as `whirlwinds`, their hits as `whirlHits` and the
+ones begun as `whirlsStarted`). A crushing blow is met by the same plan, so a parry finds
 no window; the report counts the crushing wind-ups as `crushBlows`.
 `--depth` puts the fight room at a
 depth: the lineup stays the table's, the enemies hit as hard as there. It
