@@ -32,7 +32,7 @@ file(GLOB SNS_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS src/
 
 clay_app(shapes_and_stone
 
-    VERSION 0.1.0
+    VERSION 0.2.0
 
     LINK_LIBS
         Qt::Core
