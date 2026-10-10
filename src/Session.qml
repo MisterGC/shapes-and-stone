@@ -15,6 +15,7 @@ Item {
     property bool inGame: false      // the game screen is up
     property bool showLobby: false   // the lobby screen is up
     property bool muted: false       // the lobby plays no sound
+    property real soundVolume: 1     // and its sounds at this share
     // This node's knight's name, edited in the lobby (nameEdited)
     property string playerName: "Knight"
     // The record the lobby shows, Game.recordLine
@@ -545,6 +546,7 @@ Item {
             MultiplayerLobby {
                 network: net
                 muted: session.muted
+                soundVolume: session.soundVolume
                 playerName: session.playerName
                 onPlayerNameChanged: session.nameEdited(playerName)
                 names: session.names

@@ -11,6 +11,8 @@ Item {
     property var network: null
     property string playerName: "Knight"
     property bool muted: false
+    // The player's Sound setting (Game.soundVolume)
+    property real soundVolume: 1
     // Every knight's name by its node (Session.names)
     property var names: ({})
     // The record: this machine's, once connected the host's (Game.recordLine)
@@ -27,12 +29,12 @@ Item {
     Sound {
         id: menuHoverSound
         source: "assets/menu_change.wav"
-        volume: muted ? 0 : 0.5
+        volume: muted ? 0 : 0.5 * soundVolume
     }
     Sound {
         id: menuConfirmSound
         source: "assets/menu_confirm.wav"
-        volume: muted ? 0 : 0.6
+        volume: muted ? 0 : 0.6 * soundVolume
     }
 
     Connections {

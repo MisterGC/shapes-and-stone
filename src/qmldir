@@ -23,6 +23,7 @@ DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml
 FallenScreen 1.0 FallenScreen.qml
 PauseMenu 1.0 PauseMenu.qml
+KnightPanel 1.0 KnightPanel.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
 Session 1.0 Session.qml

@@ -52,6 +52,11 @@ Item {
     // shield a lighter rim along its outside
     property int swordLevel: 0
     property int shieldLevel: 0
+    // The potions and mana draughts the knight carries: a vial of each kind
+    // it has at its belt, with the count beside it. Only the local Player
+    // knows them; a remote knight carries none to show
+    property int potions: 0
+    property int draughts: 0
     readonly property color _edgeColor: Qt.lighter(accentColor, 1.6)
     readonly property color _rimColor: Qt.lighter(accentColor, 1.8)
     onSwordLevelChanged: chargeBlade.requestPaint()
@@ -333,6 +338,62 @@ Item {
             radius: parent.radius
             color: "#000000"
             opacity: view.downed ? 0.55 : 0
+        }
+    }
+
+    // The vials: at the belt, on the side away from the lantern, so the
+    // knight shows how well it is stocked. Upright like the lantern
+    Row {
+        id: belt
+        objectName: "knightBelt"
+        visible: view.potions > 0 || view.draughts > 0
+        opacity: view.downed ? 0.5 : 1
+        readonly property real angleRad: (view.facingAngle - 100) * Math.PI / 180
+        readonly property real orbit: view.width * 0.6
+        spacing: view.width * 0.08
+        x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbit
+        y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbit
+        z: view.facingAngle < 0 && view.facingAngle > -180 ? -0.5 : 1
+        Repeater {
+            model: [{n: view.potions, fill: "#5FD05F", name: "potion"},
+                    {n: view.draughts, fill: "#B080E0", name: "draught"}]
+            delegate: Item {
+                objectName: "beltVial_" + modelData.name
+                visible: modelData.n > 0
+                width: vial.width + count.width
+                height: vial.height
+                // Neck, cork and the round body
+                Item {
+                    id: vial
+                    width: view.width * 0.2
+                    height: width * 1.5
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: parent.width * 0.4; height: parent.height * 0.36
+                        color: "#C8D8E0"
+                        border.color: "#2A2420"; border.width: Math.max(1, parent.width * 0.08)
+                    }
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width; height: width
+                        radius: width / 2
+                        color: modelData.fill
+                        border.color: "#2A2420"; border.width: Math.max(1, parent.width * 0.1)
+                    }
+                }
+                Text {
+                    id: count
+                    objectName: "beltCount"
+                    anchors.bottom: parent.bottom
+                    leftPadding: 1
+                    text: modelData.n
+                    color: "#FFFFFF"
+                    style: Text.Outline
+                    styleColor: "#000000"
+                    font.pixelSize: Math.max(9, view.width * 0.28)
+                    font.bold: true
+                }
+            }
         }
     }
 

@@ -273,6 +273,8 @@ PhysicsItem {
         swingDuration: player.attackDuration
         graceLeft: player.graceLeft
         lowShield: player.mana < player.maxMana * Balance.shieldBreak.lowShare
+        potions: player.potions
+        draughts: player.draughts
         charging: player.isCharging
         charge: player.chargeProgress
         chargeFull: player.chargeFull

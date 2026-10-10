@@ -64,6 +64,7 @@ clay_app(shapes_and_stone
         src/TitleScreen.qml
         src/FallenScreen.qml
         src/PauseMenu.qml
+        src/KnightPanel.qml
         src/MultiplayerLobby.qml
         src/RemotePlayer.qml
         src/Session.qml

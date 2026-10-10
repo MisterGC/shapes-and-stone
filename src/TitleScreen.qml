@@ -8,6 +8,9 @@ Item {
     signal multiplayerSelected()
 
     property bool muted: false
+    // The player's Music and Sound settings (Game.musicVolume, soundVolume)
+    property real musicVolume: 1
+    property real soundVolume: 1
     property int _selectedIndex: 0
     // Why the game came back here, e.g. the host was lost; "" for none
     property string message: ""
@@ -18,19 +21,19 @@ Item {
     Sound {
         id: menuHoverSound
         source: "assets/menu_change.wav"
-        volume: muted ? 0 : 0.5
+        volume: muted ? 0 : 0.5 * soundVolume
     }
     Sound {
         id: menuConfirmSound
         source: "assets/menu_confirm.wav"
-        volume: muted ? 0 : 0.6
+        volume: muted ? 0 : 0.6 * soundVolume
     }
 
     // Title music
     Music {
         id: titleMusic
         source: "assets/title_music.mp3"
-        volume: muted ? 0 : 0.4
+        volume: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
     // A browser refuses to play before the first key press or click, and the

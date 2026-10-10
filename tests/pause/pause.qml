@@ -1,5 +1,5 @@
 // Pause bench - a first-time player sees the controls at depth 0, and Esc
-// opens a menu with Resume and Title (issue #39).
+// opens a menu with Resume, Music, Sound and Title (issue #39).
 //
 // Alone: at depth 0 the controls hint names LMB and its hold to charge,
 // RMB, Space for the dash (not Shift), E, M and Esc, and deeper it is gone. With D held, Esc opens
@@ -7,7 +7,7 @@
 // world stops - no enemy moves, the run's time stands still, the knight
 // lets go of D - and M still mutes. Esc and Enter on Resume both go back
 // to the game, which runs on without catching up the pause in its first
-// steps; S and Enter on Title go to the title. Esc on the fallen screen
+// steps; S down to Title and Enter go to the title. Esc on the fallen screen
 // still goes to the title, never to the menu.
 // In a session, a host and a joiner joined over LAN in one process: the
 // joiner's menu says the party fights on and pauses nothing - its knight
@@ -202,7 +202,9 @@ Window {
         }],
         [() => menu(solo) !== null && menu(solo).activeFocus, () => {
             press(menu(solo), Qt.Key_S)
-            check(menu(solo).selectedIndex === 1, "S picks Title")
+            press(menu(solo), Qt.Key_S)
+            press(menu(solo), Qt.Key_S)
+            check(menu(solo).selectedIndex === 3, "S three times picks Title, past Music and Sound")
             press(menu(solo), Qt.Key_Return)
         }],
         [() => solo.screen === "title", () => {
@@ -329,6 +331,8 @@ Window {
             press(host, Qt.Key_Escape)
         }],
         [() => menu(host) !== null && menu(host).activeFocus, () => {
+            press(menu(host), Qt.Key_S)
+            press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_Return)
         }],

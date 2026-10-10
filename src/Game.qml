@@ -30,6 +30,32 @@ ClayWorld2d {
     // Global mute, toggled with M. The dojo starts silent so reloads while
     // developing stay quiet; a native or browser start plays.
     property bool muted: Clayground.runsInSandbox
+    // The player's Music and Sound settings from the Esc menu, 0..1 in
+    // steps of a tenth: every track and sound plays at its own volume
+    // times one of them. Kept with the record (keys "musicVolume" and
+    // "soundVolume"); M still mutes both
+    property real musicVolume: 1
+    property real soundVolume: 1
+    function setVolume(which, value) {
+        let v = Math.round(Math.max(0, Math.min(1, value)) * 10) / 10
+        if (which === "music") {
+            musicVolume = v
+            records.set("musicVolume", String(v))
+        } else {
+            soundVolume = v
+            records.set("soundVolume", String(v))
+            // Heard at the new share, so the setting can be judged by ear
+            volumeTick.play()
+        }
+    }
+    function _loadVolumes() {
+        let read = key => {
+            let v = parseFloat(records.get(key, "1"))
+            return isNaN(v) ? 1 : Math.max(0, Math.min(1, v))
+        }
+        musicVolume = read("musicVolume")
+        soundVolume = read("soundVolume")
+    }
 
     // Atmosphere layer (lighting, procedural ground, screen effects).
     // V toggles it for a before/after comparison.
@@ -39,28 +65,28 @@ ClayWorld2d {
     Music {
         id: dungeonAmbience
         source: "assets/dungeon_ambience.mp3"
-        volume: muted ? 0 : 0.4
+        volume: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
 
     Music {
         id: dungeonMusic
         source: "assets/dungeon_music.mp3"
-        volume: muted ? 0 : 0.3
+        volume: muted ? 0 : 0.3 * musicVolume
         loop: true
     }
 
     Music {
         id: villageAmbience
         source: "assets/village_ambience.mp3"
-        volume: muted ? 0 : 0.4
+        volume: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
 
     Music {
         id: villageMusic
         source: "assets/village_music.mp3"
-        volume: muted ? 0 : 0.35
+        volume: muted ? 0 : 0.35 * musicVolume
         loop: true
     }
 
@@ -83,13 +109,13 @@ ClayWorld2d {
     Sound {
         id: impactSound
         source: "assets/punch_hitting.wav"
-        volume: muted ? 0 : 0.7
+        volume: muted ? 0 : 0.7 * soundVolume
     }
 
     Sound {
         id: dashSound
         source: "assets/dash.wav"
-        volume: muted ? 0 : 0.6
+        volume: muted ? 0 : 0.6 * soundVolume
     }
 
     // gain (0..1) is for sounds of another player's knight, see remoteGain()
@@ -100,13 +126,13 @@ ClayWorld2d {
     Sound {
         id: deathBurstSound
         source: "assets/burst.wav"
-        volume: muted ? 0 : 0.7
+        volume: muted ? 0 : 0.7 * soundVolume
     }
 
     Sound {
         id: swordSwingSound
         source: "assets/sword_swing.wav"
-        volume: muted ? 0 : 0.5
+        volume: muted ? 0 : 0.5 * soundVolume
     }
 
     function playDash(gain) {
@@ -118,7 +144,7 @@ ClayWorld2d {
     Sound {
         id: shieldClangSound
         source: "assets/shield_clang.wav"
-        volume: muted ? 0 : 0.7
+        volume: muted ? 0 : 0.7 * soundVolume
     }
     function playBlock(gain, perfect) {
         shieldClangSound.triggerNote(shieldClangSound.rootNote
@@ -139,7 +165,7 @@ ClayWorld2d {
     Sound {
         id: whirlShoutSound
         source: "assets/knight_whirl_shout.wav"
-        volume: muted ? 0 : Balance.whirl.shoutVolume
+        volume: muted ? 0 : Balance.whirl.shoutVolume * soundVolume
     }
     function playWhirlwind(gain) {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
@@ -151,18 +177,32 @@ ClayWorld2d {
     Sound {
         id: chargeTickSound
         source: "assets/menu_change.wav"
-        volume: muted ? 0 : 0.6
+        volume: muted ? 0 : 0.6 * soundVolume
     }
     function playChargeFull(gain) {
         chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.heavy.tickPitch,
                                     gain === undefined ? 1 : gain)
     }
 
+    // A Sound step in the Esc menu: the menu's tick at the new share
+    Sound {
+        id: volumeTick
+        source: "assets/menu_change.wav"
+        volume: muted ? 0 : 0.6 * soundVolume
+    }
+    // Gold picked up: a coin's clink, once however many drops it was
+    Sound {
+        id: coinSound
+        source: "assets/coin_pickup.wav"
+        volume: muted ? 0 : 0.5 * soundVolume
+    }
+    function _clink() { coinSound.play() }
+
     // The knight's own hurt: a low thud, never the punch of a sword
     Sound {
         id: hurtSound
         source: "assets/knight_hurt.wav"
-        volume: muted ? 0 : 0.8
+        volume: muted ? 0 : 0.8 * soundVolume
     }
     function playHurt(gain) {
         hurtSound.triggerOneShot(gain === undefined ? 1 : gain)
@@ -172,7 +212,7 @@ ClayWorld2d {
     Sound {
         id: shieldBreakSound
         source: "assets/shield_break.wav"
-        volume: muted ? 0 : 0.7
+        volume: muted ? 0 : 0.7 * soundVolume
     }
     function playShieldBreak(gain) {
         shieldBreakSound.triggerOneShot(gain === undefined ? 1 : gain)
@@ -180,7 +220,7 @@ ClayWorld2d {
     Sound {
         id: shieldEmptySound
         source: "assets/shield_empty.wav"
-        volume: muted ? 0 : 0.6
+        volume: muted ? 0 : 0.6 * soundVolume
     }
     function playShieldEmpty() {
         shieldEmptySound.triggerOneShot(1)
@@ -204,7 +244,7 @@ ClayWorld2d {
     Sound {
         id: spitterSound
         source: "assets/spitter.wav"
-        volume: muted ? 0 : 0.6
+        volume: muted ? 0 : 0.6 * soundVolume
     }
 
     function playSpitShot() {
@@ -216,7 +256,7 @@ ClayWorld2d {
     Sound {
         id: growlSound
         source: "assets/spitter.wav"
-        volume: muted ? 0 : 0.8
+        volume: muted ? 0 : 0.8 * soundVolume
     }
     function playCrushGrowl(xWu, yWu) {
         let gain = 1
@@ -232,7 +272,7 @@ ClayWorld2d {
     Sound {
         id: screamSound
         source: "assets/goblin_scream.wav"
-        volume: muted ? 0 : Balance.scream.volume
+        volume: muted ? 0 : Balance.scream.volume * soundVolume
     }
     function playScream(xWu, yWu, tier) {
         let gain = 1
@@ -247,17 +287,17 @@ ClayWorld2d {
     Sound {
         id: innkeeperGreeting
         source: "assets/innkeeper_greeting.wav"
-        volume: muted ? 0 : 0.8
+        volume: muted ? 0 : 0.8 * soundVolume
     }
     Sound {
         id: blacksmithGreeting
         source: "assets/blacksmith_greeting.wav"
-        volume: muted ? 0 : 0.8
+        volume: muted ? 0 : 0.8 * soundVolume
     }
     Sound {
         id: witchGreeting
         source: "assets/witch_greeting.wav"
-        volume: muted ? 0 : 0.8
+        volume: muted ? 0 : 0.8 * soundVolume
     }
 
     function playNpcGreeting(soundFile) {
@@ -566,6 +606,7 @@ ClayWorld2d {
         inGame: screen === "game"
         showLobby: screen === "lobby"
         muted: world.muted
+        soundVolume: world.soundVolume
         playerName: world.playerName
         recordLine: world.recordLine
         // The host's run, from its start or, on a node that joins late,
@@ -849,6 +890,7 @@ ClayWorld2d {
         if (!player) return
         player.gold += amount
         spawnDamageNumber(x, y, "+" + amount, "#E8B83A")
+        Qt.callLater(_clink)
     }
 
     // In a session every node simulates something the others see (the host
@@ -1018,6 +1060,9 @@ ClayWorld2d {
     // it; in a session it runs on, since a pause would stop every other
     // player's enemies, and only this knight stops taking input.
     property bool menuOpen: false
+    // C opened the knight panel: stats, pack and the smith's upgrades. It
+    // only shows, nothing pauses and the knight keeps the keys
+    property bool knightPanelOpen: false
     readonly property bool gamePaused: menuOpen && !session.connected
     // The title, the lobby, the pause menu and the fallen screen each take
     // the keys while they are up; when the last of them closes the game
@@ -1154,6 +1199,7 @@ ClayWorld2d {
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         _loadRecord()
+        _loadVolumes()
         runStartRecord = ownRecord.depth
         console.log("[Game] Record so far:", recordLine === "" ? "none" : recordLine)
         forceActiveFocus()
@@ -1221,15 +1267,22 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
-        // Esc closes an open dialogue; only without one it opens the menu
+        // Esc closes an open dialogue or the knight panel; only without
+        // either it opens the menu
         if (event.key === Qt.Key_Escape) {
             if (talking) dialoguePanel.close()
+            else if (knightPanelOpen) knightPanelOpen = false
             else if (screen === "game" && player && !fallen) openMenu()
             event.accepted = true
             return
         }
         if (event.key === Qt.Key_M) {
             muted = !muted
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_C) {
+            if (screen === "game" && player && !fallen) knightPanelOpen = !knightPanelOpen
             event.accepted = true
             return
         }
@@ -1540,7 +1593,7 @@ ClayWorld2d {
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
         text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
-              + "E talk  •  1 potion  •  2 draught  •  M mute  •  Esc menu"
+              + "E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -1649,7 +1702,7 @@ ClayWorld2d {
     Sound {
         id: recordChimeSound
         source: "assets/menu_confirm.wav"
-        volume: muted ? 0 : Balance.record.volume
+        volume: muted ? 0 : Balance.record.volume * soundVolume
     }
     Timer {
         id: recordChime
@@ -1813,6 +1866,7 @@ ClayWorld2d {
         if (fallen || screen !== "game") return
         console.log("[Game] The knight has fallen at depth", depth)
         menuOpen = false
+        knightPanelOpen = false
         fallen = true
         _keepRecord(true)
         if (!session.connected) _countRun()
@@ -2026,6 +2080,7 @@ ClayWorld2d {
         _setKnights(knights)
         if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights)
         menuOpen = false
+        knightPanelOpen = false
         fallen = false
         partyFallen = false
         resetting = false
@@ -2048,6 +2103,7 @@ ClayWorld2d {
         if (session.connected) session.leave()
         _setDanger(position, position)
         menuOpen = false
+        knightPanelOpen = false
         fallen = false
         partyFallen = false
         resetting = false
@@ -2325,6 +2381,19 @@ ClayWorld2d {
     // Dialogue panel (bottom-center, hidden by default)
     DialoguePanel { id: dialoguePanel; parent: world; gold: player ? player.gold : 0 }
 
+    // The knight panel (C), on the left under the gold and the potions
+    KnightPanel {
+        parent: world
+        anchors.top: hudGold.bottom
+        anchors.left: parent.left
+        anchors.topMargin: 48
+        anchors.leftMargin: 12
+        z: 1500
+        visible: knightPanelOpen && player !== null && screen === "game" && !fallen && !menuOpen
+        knight: player
+        game: world
+    }
+
     function openDialogue(name, color, lines, wares) {
         dialoguePanel.open(name, color, lines, _offered(wares || []))
     }
@@ -2361,16 +2430,24 @@ ClayWorld2d {
         if (!player || player.smithDone || smithLines.indexOf(line) < 0) return null
         let level = player[line + "Level"] + 1
         if (level > smithLimit() || level > Balance.shop.upgradePrice.length) return null
+        return { id: line, level: level, price: Balance.shop.upgradePrice[level - 1],
+                 label: smithName(line, level) + " (" + smithGives(line, level) + ")" }
+    }
+    // A level's name, "Lighter harness II" ("Lighter harness" for level
+    // 0), and what it gives, "a dash costs 4 mana": the smith's offer and
+    // the knight panel say the same
+    function smithName(line, level) {
+        let name = line === "sword" ? "Sharpened sword" : line === "shield" ? "Reinforced shield"
+            : line === "harness" ? "Lighter harness" : "Balanced blade"
+        return level < 1 ? name : name + " " + (["I", "II", "III", "IV", "V"][level - 1] || String(level))
+    }
+    function smithGives(line, level) {
         let sh = Balance.shop, i = level - 1
-        let name = ["I", "II", "III", "IV", "V"][i] || String(level)
-        let what = line === "sword" ? "Sharpened sword " + name + " (+" + sh.swordAtk[i] + " damage)"
-            : line === "shield" ? "Reinforced shield " + name + " (a block lets "
-                                  + Math.round(sh.shieldBlockedShare[i] * 100) + " % through, costs "
-                                  + sh.shieldBlockMana[i] + " mana)"
-            : line === "harness" ? "Lighter harness " + name + " (a dash costs "
-                                   + sh.harnessDashMana[i] + " mana)"
-            : "Balanced blade " + name + " (a whirlwind costs " + sh.bladeWhirlMana[i] + " mana)"
-        return { id: line, level: level, label: what, price: sh.upgradePrice[i] }
+        return line === "sword" ? "+" + sh.swordAtk[i] + " damage"
+            : line === "shield" ? "a block lets " + Math.round(sh.shieldBlockedShare[i] * 100)
+                                  + " % through, costs " + sh.shieldBlockMana[i] + " mana"
+            : line === "harness" ? "a dash costs " + sh.harnessDashMana[i] + " mana"
+            : "a whirlwind costs " + sh.bladeWhirlMana[i] + " mana"
     }
 
     // --- The village's wares (issue #38) ---
@@ -3826,6 +3903,9 @@ ClayWorld2d {
         sourceComponent: Component {
             PauseMenu {
                 inSession: session.connected
+                musicVolume: world.musicVolume
+                soundVolume: world.soundVolume
+                onVolumeSet: (which, value) => world.setVolume(which, value)
                 onResume: world.closeMenu()
                 onToTitle: world.backToTitle()
             }
@@ -3863,6 +3943,8 @@ ClayWorld2d {
         sourceComponent: Component {
             TitleScreen {
                 muted: world.muted
+                musicVolume: world.musicVolume
+                soundVolume: world.soundVolume
                 message: world.titleMessage
                 recordLine: world.recordLine
                 onSinglePlayerSelected: screen = "game"
