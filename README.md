@@ -738,7 +738,7 @@ python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10
 `.github/workflows/pages.yml` does the same with the runtime of a Clayground
 release and, when the check passes, puts `build/web/` on GitHub Pages. It
 runs by hand (*Run workflow*, with the Clayground release to take the
-runtime from, `v2026.8` by default) and when a release of the game is
+runtime from, `v2026.9` by default) and when a release of the game is
 published, never on a push. Pages must be set to deploy from GitHub Actions
 (*Settings > Pages > Source*).
 
