@@ -38,6 +38,7 @@ Window {
     property var bashFoe: null
     property real bashFrom: 0
     property real lungeFrom: 0
+    property var bashAxis: [1, 0, 0]
     property int bashSwing: 0
 
     function check(ok, what) {
@@ -238,34 +239,63 @@ Window {
                   "a whirlwind breaks the heap behind too")
             // The bash: a right-click soon after a swing shoves the enemy in
             // front back and costs Balance.bash.mana; a late one does not
-            let foe = game.enemies.find(x => !x.destroyed)
-            foe.xWu = p.xWu + 1.0
-            foe.yWu = p.yWu
+            let foe = game.enemies.find(x => !x.destroyed && x.enemyType === "grunt")
+            // The others hold still, so only the bash moves the two
+            for (let x of game.enemies) if (x !== foe && !x.destroyed) x.halted = true
+            // In the middle of the largest room, facing a way with open
+            // floor for 3 wu, so neither body is pushed out of a wall
+            let big = game.rooms.slice().sort((a, b) => b.w * b.h - a.w * a.h)[0]
+            p.xWu = (big.x + big.w / 2) * game.cellSize - p.widthWu / 2
+            p.yWu = (big.y + big.h / 2) * game.cellSize + p.heightWu / 2
+            cx = p.xWu + p.widthWu / 2
+            cy = p.yWu - p.heightWu / 2
+            let open = (ax, ay) => {
+                for (let d = 0.5; d <= 3; d += 0.5) {
+                    let gx = Math.floor((cx + ax * d) / game.cellSize)
+                    let gy = Math.floor((cy + ay * d) / game.cellSize)
+                    if (!game.grid[gy] || game.grid[gy][gx] === game.cellWall) return false
+                }
+                return true
+            }
+            let way = [[1, 0, 0], [0, 1, 90], [-1, 0, 180], [0, -1, -90]].find(w => open(w[0], w[1]))
+            check(way !== undefined, "the bench finds open floor next to the knight")
+            p.facingAngle = way[2]
+            foe.xWu = p.xWu + way[0] * 1.0
+            foe.yWu = p.yWu + way[1] * 1.0
+            bench.bashAxis = way
             p.mana = p.maxMana
             p.attackCooldown = 0
             p.isAttacking = false
             let words = countNamed(game, "fightWord")
             p.attack()
-            let fromX = p.xWu
+            let fromX = bench.bashAxis[0] !== 0 ? p.xWu : p.yWu
             p.raiseShield()
             p.lowerShield()
             check(p._lungeT > 0, "the bash starts the lunge ("
                   + p._lungeT.toFixed(2) + " s)")
             bench.lungeFrom = fromX
-            check(p.mana === p.maxMana - Balance.bash.mana && countNamed(game, "fightWord") === words + 1,
+            // At least the grunt; another enemy in the arc counts too
+            let bashWords = countNamed(game, "fightWord")
+            check(p.mana === p.maxMana - Balance.bash.mana && bashWords >= words + 1,
                   "a right-click right after a swing bashes: " + (p.maxMana - p.mana) + " mana, "
                   + (countNamed(game, "fightWord") - words) + " BASH")
             p.raiseShield()
             p.lowerShield()
-            check(countNamed(game, "fightWord") === words + 1, "a second right-click in the same swing bashes no more")
+            check(countNamed(game, "fightWord") === bashWords, "a second right-click in the same swing bashes no more")
             bench.bashFoe = foe
-            bench.bashFrom = foe.xWu
+            bench.bashFrom = bench.bashAxis[0] !== 0 ? foe.xWu : foe.yWu
         }],
         [300, () => {
-            check(game.player.xWu > bench.lungeFrom + 0.2 && game.player._lungeT === 0,
-                  "the knight lunged forward " + (game.player.xWu - bench.lungeFrom).toFixed(2) + " wu")
-            check(bench.bashFoe.xWu > bench.bashFrom + 0.3, "the bashed enemy is shoved back ("
-                  + (bench.bashFoe.xWu - bench.bashFrom).toFixed(2) + " wu)")
+            let ax = bench.bashAxis
+            let lunged = ax[0] !== 0 ? (game.player.xWu - bench.lungeFrom) * ax[0]
+                                     : (game.player.yWu - bench.lungeFrom) * ax[1]
+            check(lunged > 0.2 && game.player._lungeT === 0,
+                  "the knight lunged forward " + lunged.toFixed(2) + " wu")
+            check(bench.bashFoe.aiState === "stagger" || bench.bashFoe._attackTimer >= 0,
+                  "the bashed grunt breaks off its attack (" + bench.bashFoe.aiState + ")")
+            let shoved = ax[0] !== 0 ? (bench.bashFoe.xWu - bench.bashFrom) * ax[0]
+                                     : (bench.bashFoe.yWu - bench.bashFrom) * ax[1]
+            check(shoved > 0.3, "the bashed enemy is shoved back (" + shoved.toFixed(2) + " wu)")
             let p = game.player
             p.isAttacking = false
             p.attackCooldown = 0

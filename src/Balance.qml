@@ -234,6 +234,9 @@ QtObject {
         mana: 6,
         reach: 1.2,
         speed: 20.0,
+        // A shoved enemy breaks off its attack, staggered this long (a
+        // guardian the full enemy.stagger, its guard broken)
+        stagger: 0.4,
         // The knight lunges behind its shield: lungeSpeed wu/s along its
         // facing, fading out over lungeTime seconds, the shield up and
         // flashing, sparks sparks off its front

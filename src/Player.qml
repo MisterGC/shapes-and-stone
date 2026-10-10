@@ -785,6 +785,9 @@ PhysicsItem {
         _bashed = true
         mana -= b.mana
         _spentAt = _steps
+        // The sword lands first, then the shield: the swing's own hit and
+        // its lighter knockback must not come a step later and undo the shove
+        if (isAttacking) hitEnemiesInArc()
         let reach = attackRange * b.reach
         let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
         let shoved = 0
@@ -795,6 +798,7 @@ PhysicsItem {
             if (dx * dx + dy * dy > reach * reach || !isInAttackArc(e)) continue
             e.shove(dx, dy, b.speed)
             if (e.enemyType === "guardian") e.stagger()
+            else e.stagger(b.stagger)
             if (gameWorld.spawnWord) gameWorld.spawnWord(e.xWu, e.yWu + 0.5, b.word, b.wordColor)
             shoved++
         }
