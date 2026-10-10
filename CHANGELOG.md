@@ -4,6 +4,22 @@ All notable changes to Shapes & Stone are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the game
 uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-10-10
+
+Fights in the browser keep every key, and the dungeon is bigger and less pitch black. Built on Clayground v2026.9.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser, or download the package for your system from the [release page](https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.1) (macOS, Windows, Linux AppImage; nothing to install).
+
+### Changed
+
+- **Bigger dungeons:** a dungeon has 9 to 12 rooms and 8 to 12 enemies at depth 0, up to 22 deeper down. (#118)
+- **Very dark, not pitch black:** the dungeon outside the lamps' light stays readable. (#117)
+- **The highest danger** lies in bones and dried blood, without glowing embers on the floor or in the air. (#117)
+
+### Fixed
+
+- In the browser a key pressed or let go while a mouse button is down reaches the knight, so it no longer walks on by itself or ignores a direction during a swing. (#116)
+
 ## [0.2.0] - 2026-10-10
 
 Fights that read and reward skill, and a descent that follows the party: the dungeon grows with how well you did and how many you are, a fallen friend can be lifted up, and the camp prepares the next dungeon. Built on Clayground v2026.9.
@@ -91,5 +107,6 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
+[0.2.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.1
 [0.2.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.0
 [0.1.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.1.0
