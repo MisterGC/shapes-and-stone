@@ -1239,16 +1239,17 @@ ClayWorld2d {
             return
         }
         // 1 and 2 buy what the dialogue panel offers; without wares 1
-        // drinks a potion
+        // drinks a potion and 2 a mana draught
         if (event.key === Qt.Key_1 || event.key === Qt.Key_2) {
             let i = event.key - Qt.Key_1
             if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
                 if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
-                event.accepted = true
             } else if (event.key === Qt.Key_1) {
                 drinkPotion()
-                event.accepted = true
+            } else {
+                drinkDraught()
             }
+            event.accepted = true
             return
         }
         if (event.key === Qt.Key_E) {
@@ -1505,6 +1506,25 @@ ClayWorld2d {
         font.letterSpacing: 1
     }
 
+    // The knight's mana draughts, and the key that drinks one; under the
+    // potions, or in their place when it has none
+    Text {
+        objectName: "hudDraughts"
+        anchors.top: hudGold.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: player && player.potions > 0 ? 20 : 2
+        z: 1000
+        visible: player !== null && player.draughts > 0
+        text: "Draughts " + (player ? player.draughts : 0) + "  [2]"
+        color: "#B080E0"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
     // The controls, for a first-time player: shown at depth 0 on a keyboard
     // and mouse, out of the way of the dialogue panel and the fallen screen
     readonly property bool touchControls: Qt.platform.os === "ios" || Qt.platform.os === "android"
@@ -1518,7 +1538,7 @@ ClayWorld2d {
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
         text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
-              + "E talk  •  1 potion  •  M mute  •  Esc menu"
+              + "E talk  •  1 potion  •  2 draught  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -2225,7 +2245,7 @@ ClayWorld2d {
     }
 
     // The one way to the next level: what the knight carries (its HP, mana,
-    // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon.
+    // gold, potions, draughts and the smith's upgrade) goes with it, a village follows each dungeon.
     // In a session a knight down rises at the village's camp. d is the
     // danger's positions it is entered at and the knights it is built
     // for, the host's in a session; alone they are settled here, before
@@ -2233,11 +2253,13 @@ ClayWorld2d {
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
-                                 potions: player.potions, upgrade: player.upgrade }
+                                 potions: player.potions, draughts: player.draughts,
+                                 upgrade: player.upgrade }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
-                                 potions: 0, upgrade: "" }
+                                 potions: 0, draughts: 0, upgrade: "" }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
-                    "gold:", carried.gold, "potions:", carried.potions, "upgrade:", carried.upgrade)
+                    "gold:", carried.gold, "potions:", carried.potions, "draughts:", carried.draughts,
+                    "upgrade:", carried.upgrade)
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
@@ -2253,6 +2275,7 @@ ClayWorld2d {
             player.mana = carried.mana
             player.gold = carried.gold
             player.potions = carried.potions
+            player.draughts = carried.draughts
         }
         // A knight still down when the party reaches the camp rises there
         if (session.connected && levelType === "village") _rise("camp")
@@ -2306,15 +2329,17 @@ ClayWorld2d {
     // The smith's upgrade is one per run: once bought, the smith offers
     // neither
     function _offered(wares) {
-        return wares.filter(w => w.id === "potion" || (player && player.upgrade === ""))
+        return wares.filter(w => w.id === "potion" || w.id === "draught"
+                                 || (player && player.upgrade === ""))
     }
 
     // --- The village's wares (issue #38) ---
-    // Bought with this node's knight's own gold. A potion is kept for key 1;
-    // the smith's upgrade ("sword" or "shield") lasts the run
+    // Bought with this node's knight's own gold. A potion is kept for key 1,
+    // a draught for key 2; the smith's upgrade ("sword" or "shield") lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
-        if (ware.id !== "potion" && player.upgrade !== "") return false
+        let inn = ware.id === "potion" || ware.id === "draught"
+        if (!inn && player.upgrade !== "") return false
         if (player.gold < ware.price) {
             dialoguePanel.note = "You'll need " + ware.price + " gold for that."
             return false
@@ -2323,6 +2348,9 @@ ClayWorld2d {
         if (ware.id === "potion") {
             player.potions++
             dialoguePanel.note = "One potion. Drink it when it counts."
+        } else if (ware.id === "draught") {
+            player.draughts++
+            dialoguePanel.note = "A mana draught. It'll fill you up when the shield runs dry."
         } else {
             player.upgrade = ware.id
             dialoguePanel.note = ware.id === "sword" ? "There. That edge will bite deeper."
@@ -2337,6 +2365,12 @@ ClayWorld2d {
         let healed = player.drinkPotion()
         if (healed > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
         return healed
+    }
+    function drinkDraught() {
+        if (!player) return 0
+        let gained = player.drinkDraught()
+        if (gained > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + Math.round(gained), "#B080E0")
+        return gained
     }
 
     // Death particle
@@ -3313,10 +3347,12 @@ ClayWorld2d {
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
-            "For the road, a potion. Coin first, mind.",
+            "For the road, a potion or a mana draught. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
         ], "assets/innkeeper_greeting.wav", [
-            { id: "potion", label: "Health potion", price: Balance.shop.potionPrice }
+            { id: "potion", label: "Health potion", price: Balance.shop.potionPrice },
+            { id: "draught", label: "Mana draught (+" + Balance.shop.draughtMana + " mana)",
+              price: Balance.shop.draughtPrice }
         ])
 
         // Blacksmith building (top-right) — entrance facing south

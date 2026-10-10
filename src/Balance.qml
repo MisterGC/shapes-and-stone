@@ -408,10 +408,15 @@ QtObject {
     })
 
     // The village's wares, in gold: the innkeeper's potions, drunk with
-    // key 1, and the smith's one upgrade of the run, the sword or the shield
+    // key 1, and mana draughts, drunk with key 2, and the smith's one
+    // upgrade of the run, the sword or the shield
     readonly property var shop: ({
         potionPrice: 15,
         potionHeal: 50,
+        // A mana draught gives back this much mana, up to the knight's max:
+        // at knight.mana it refills the bar
+        draughtPrice: 20,
+        draughtMana: 40,
         upgradePrice: 30,
         // Sharpened sword: added to the knight's atk
         swordAtk: 5,

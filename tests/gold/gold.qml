@@ -155,10 +155,10 @@ Window {
         }],
         [() => panel(solo).visible, () => {
             let p = panel(solo)
-            check(p.speakerName === "Innkeeper" && p.wares.length === 1 && p.wares[0].id === "potion"
-                  && p.wares[0].price === Balance.shop.potionPrice,
+            check(p.speakerName === "Innkeeper" && p.wares.length === 2 && p.wares[0].id === "potion"
+                  && p.wares[0].price === Balance.shop.potionPrice && p.wares[1].id === "draught",
                   "E at the innkeeper opens the dialogue panel, which offers a potion for "
-                  + Balance.shop.potionPrice + " gold")
+                  + Balance.shop.potionPrice + " gold, and a mana draught")
             gold0 = solo.player.gold
             press(Qt.Key_1)
             check(solo.player.gold === gold0 - Balance.shop.potionPrice && solo.player.potions === 1,

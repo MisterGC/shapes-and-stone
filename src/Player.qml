@@ -54,6 +54,8 @@ PhysicsItem {
     property int gold: 0
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0
+    // Mana draughts bought from the innkeeper, drunk with key 2
+    property int draughts: 0
     // The smith's one upgrade of the run: "sword", "shield" or "" before
     // it. Every effect reads it live, so setting it applies it at once
     property string upgrade: ""
@@ -708,6 +710,17 @@ PhysicsItem {
         potions--
         hp += healed
         return healed
+    }
+
+    // A draught gives mana back up to max mana; none is wasted on a knight
+    // whose mana is full or that has fallen. Returns the mana it gave,
+    // 0 when none was drunk
+    function drinkDraught() {
+        if (draughts <= 0 || fallen || mana >= maxMana) return 0
+        let gained = Math.min(Balance.shop.draughtMana, maxMana - mana)
+        draughts--
+        mana += gained
+        return gained
     }
 
     function dash() {
