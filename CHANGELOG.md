@@ -24,6 +24,7 @@ Turn the music and the sound down on their own, see what your knight carries at 
 ### Changed
 
 - **Dark beyond the light again:** outside the lantern and the torches the dungeon is near black and an enemy is not seen until the light reaches it, its eyes no longer glow; a wall torch lights a smaller stretch. (4069bfd, 3d67868)
+- **The minimap** shows no enemies; in a session it always shows the other knights in their colours, also in parts no one has explored. (8e698f9)
 
 ### Fixed
 
