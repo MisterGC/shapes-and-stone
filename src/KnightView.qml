@@ -349,11 +349,12 @@ Item {
         visible: view.potions > 0 || view.draughts > 0
         opacity: view.downed ? 0.5 : 1
         readonly property real angleRad: (view.facingAngle - 100) * Math.PI / 180
-        readonly property real orbit: view.width * 0.6
+        readonly property real orbit: view.width * 0.6 + width / 2
         spacing: view.width * 0.08
         x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbit
         y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbit
-        z: view.facingAngle < 0 && view.facingAngle > -180 ? -0.5 : 1
+        // Always in front: the count must stay readable
+        z: 2
         Repeater {
             model: [{n: view.potions, fill: "#5FD05F", name: "potion"},
                     {n: view.draughts, fill: "#B080E0", name: "draught"}]
@@ -365,7 +366,7 @@ Item {
                 // Neck, cork and the round body
                 Item {
                     id: vial
-                    width: view.width * 0.2
+                    width: view.width * 0.26
                     height: width * 1.5
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -384,6 +385,7 @@ Item {
                 Text {
                     id: count
                     objectName: "beltCount"
+                    anchors.left: vial.right
                     anchors.bottom: parent.bottom
                     leftPadding: 1
                     text: modelData.n
