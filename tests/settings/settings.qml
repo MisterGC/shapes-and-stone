@@ -11,7 +11,8 @@
 // hang at the knight's belt with their counts. A knight that does not move
 // makes no footstep; walking two beats of Balance.steps plays two. A strike's damage shows as a number in normal
 // play, the knight's own hurt does not; an enemy's eyes are drawn with its
-// body, under the darkness. Prints one PASS or FAIL
+// body, under the darkness. A swing breaks a heap of bones in its arc, a
+// whirlwind every heap within its reach. Prints one PASS or FAIL
 // line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/settings/settings.qml
@@ -214,6 +215,21 @@ Window {
             // The eyes are drawn with the body, under the darkness
             let eyes = find(e, "enemyEyes")
             check(eyes !== null && eyes.parent === e, "an enemy's eyes stay with its body, under the darkness")
+            // Bones: a swing breaks a heap in its arc, not one behind the
+            // knight; a whirlwind breaks every heap within its reach
+            let p = game.player
+            p.facingAngle = 0
+            let cx = p.xWu + p.widthWu / 2, cy = p.yWu - p.heightWu / 2
+            let broke = []
+            let pile = (name, dx) => ({name: name, xWu: cx + dx, yWu: cy, destroy: () => broke.push(name)})
+            let ahead = pile("ahead", 0.8), behind = pile("behind", -0.8)
+            game.bonePiles = [ahead, behind]
+            p._breakBones(p.attackRange, true)
+            check(broke.join(",") === "ahead" && game.bonePiles.length === 1 && game.bonePiles[0] === behind,
+                  "a swing breaks the heap in its arc, not the one behind (" + broke.join(",") + ")")
+            p._breakBones(Balance.knight.whirlReach, false)
+            check(broke.join(",") === "ahead,behind" && game.bonePiles.length === 0,
+                  "a whirlwind breaks the heap behind too")
             console.log("[Settings] done,", failures, "failed")
         }],
         [300, () => game.destroy()],

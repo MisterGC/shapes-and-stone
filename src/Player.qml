@@ -267,7 +267,10 @@ PhysicsItem {
             } else {
                 player.body.linearVelocity = Qt.point(moveX * maxSpeed, moveY * maxSpeed)
             }
-            if (isAttacking) hitEnemiesInArc()
+            if (isAttacking) {
+                hitEnemiesInArc()
+                _breakBones(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
+            }
             // A full charge held into a dash is spent once the whirlwind's
             // window after the dash's start has passed
             if (_charge === "full" && _dashedFullAt >= 0
@@ -501,12 +504,28 @@ PhysicsItem {
         }
     }
 
+    // The heaps of bones a blow reaches break (Game.breakBones): within
+    // reach of the knight's centre, and in the swing's arc when inArc
+    function _breakBones(reach, inArc) {
+        if (!gameWorld || !gameWorld.bonePiles || gameWorld.bonePiles.length === 0) return
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        for (let b of gameWorld.bonePiles.slice()) {
+            let dx = b.xWu - cx, dy = b.yWu - cy
+            let d = Math.sqrt(dx * dx + dy * dy)
+            if (d > reach) continue
+            // The arc test reads a top-left corner like the knight's own
+            if (inArc && !isInAttackArc({xWu: b.xWu - widthWu / 2, yWu: b.yWu + heightWu / 2})) continue
+            gameWorld.breakBones(b, d > 0 ? dx / d : 1, d > 0 ? dy / d : 0)
+        }
+    }
+
     // The whirlwind hits every standing enemy within whirlReach of the
     // knight, centre to centre, once: a heavy blow, through a guardian's
     // shield. Returns how many it hit this step
     function whirlEnemies() {
         if (!gameWorld || !gameWorld.enemies) return 0
         let k = Balance.knight
+        _breakBones(k.whirlReach, false)
         let hitCount = 0
         for (let e of gameWorld.enemies) {
             if (!e || e.destroyed !== false || _hitThisWhirl.has(e)) continue

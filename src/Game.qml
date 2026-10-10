@@ -2948,9 +2948,24 @@ ClayWorld2d {
                         : debrisComponent.createObject(kind === "embers" ? glowParent() : world.room,
                               Object.assign(props, { kind: kind, sizeWu: 0.8 + 0.3 * seed }))
                     if (o) dungeonObjects.push(o)
+                    if (o && kind === "bones") bonePiles.push(o)
                 }
             }
         }
+    }
+    // The heaps of bones still lying on the floor: a swing or a whirlwind
+    // that reaches one breaks it (Player._breakBones), only on this screen
+    property var bonePiles: []
+    // A heap breaks: bone splinters thrown along the blow (nx, ny), a dull
+    // crack, and it is gone
+    function breakBones(pile, nx, ny) {
+        let i = bonePiles.indexOf(pile)
+        if (i < 0) return
+        bonePiles.splice(i, 1)
+        spawnShards(pile.xWu, pile.yWu, nx, ny, 9, "#D8D0BC", 0.14)
+        spawnShards(pile.xWu, pile.yWu, nx, ny, 3, "#DDD5C2", 0.22)
+        impactSound.triggerOneShot(0.35)
+        pile.destroy()
     }
 
     function placeTorch(wx, wy, color) {
@@ -3401,6 +3416,7 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        bonePiles = []
         torches = []
         stains = []
         // A blow held for the last level's enemy does not land in the next,
