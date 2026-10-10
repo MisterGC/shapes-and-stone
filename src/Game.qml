@@ -2256,18 +2256,25 @@ ClayWorld2d {
                 ctx.fill()
             }
 
-            // Draw enemies (if in explored area)
-            for (var e of enemies) {
-                if (!e || e.destroyed) continue
-                var ex = Math.floor(e.xWu / cellSize)
-                var ey = Math.floor(e.yWu / cellSize)
-                if (exploredCells[ey] && exploredCells[ey][ex]) {
-                    ctx.fillStyle = "#CC4444"
-                    ctx.beginPath()
-                    ctx.arc(e.xWu / cellSize * scale, (gridHeight - e.yWu / cellSize) * scale, 2, 0, Math.PI * 2)
-                    ctx.fill()
-                }
+            // The other knights of a session, in their colours, wherever
+            // they are - explored or not. Enemies are not shown: the map
+            // tells where you have been, not what waits there
+            var others = session.remotePlayers || {}
+            for (var id in others) {
+                var rp = others[id]
+                if (!rp) continue
+                ctx.fillStyle = String(rp.playerColor)
+                ctx.beginPath()
+                ctx.arc(rp.xWu / cellSize * scale, (gridHeight - rp.yWu / cellSize) * scale, 3, 0, Math.PI * 2)
+                ctx.fill()
             }
+        }
+        // Own moves repaint it (revealAroundPlayer); the others' moves this
+        Timer {
+            interval: 250
+            repeat: true
+            running: session.connected && screen === "game"
+            onTriggered: minimap.requestPaint()
         }
     }
 
