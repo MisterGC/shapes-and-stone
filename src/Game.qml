@@ -963,6 +963,50 @@ ClayWorld2d {
         partyKnights = Math.max(1, knights || 1)
         console.log("[Game] Built for", partyKnights, partyKnights === 1 ? "knight" : "knights")
     }
+    // --- The witch reads the next dungeon (issue #98) ---
+    // What the dungeon at level index holds, read off its seed the way
+    // generateDungeon builds it: its depth, its position's band in the
+    // depth's range and its enemies counted by tier and type. Left out,
+    // the dungeon is the next one, at nextPosition, for the knights the
+    // party has now. In a session every node reads the same: the seed,
+    // the position and the knights are the host's
+    function foretell(index, position, knights) {
+        if (index === undefined) index = levelTypeOf(levelIndex) === "village" ? levelIndex + 1
+                                                                                : levelIndex + 2
+        if (position === undefined) position = nextPosition
+        if (knights === undefined) knights = knightsNow()
+        let rand = createRng(deriveSeed(masterSeed, index))
+        let rms = planRooms(6, 8, 5, 8, rand)
+        let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
+        let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0 }
+        for (let e of enemies) {
+            out[["weak", "normal", "tough"][e.tier]]++
+            out[e.type]++
+        }
+        return out
+    }
+    // The witch's reading of the next dungeon, one line per press of E:
+    // where it sits in its depth's range and what lives there
+    function witchReading() {
+        let f = foretell()
+        let lines = ["Depth " + f.depth + " waits below. It sits "
+                     + ["low in its range - the last one cost you dearly",
+                        "in the middle of its range",
+                        "high in its range - you came through whole, it will not be kind"][f.band]
+                     + "."]
+        let tiers = [f.tough > 0 ? f.tough + " of them hulking" : "",
+                     f.weak > 0 ? f.weak + " feeble" : ""].filter(t => t !== "")
+        lines.push("I see " + f.enemies + " shapes in the dark"
+                   + (tiers.length > 0 ? ", " + tiers.join(", ") : "") + ".")
+        let kinds = [f.guardian > 0 ? f.guardian + " behind shields" : "",
+                     f.spitter > 0 ? f.spitter + (f.spitter === 1 ? " that spits" : " that spit")
+                                     + " from afar" : ""].filter(t => t !== "")
+        lines.push(kinds.length > 0 ? "Among them " + kinds.join(" and ") + "."
+                                    : "No shields, nothing that spits - only teeth.")
+        lines.push("Return to me... if you survive.")
+        return lines
+    }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
     property bool fallen: false
@@ -3310,17 +3354,12 @@ ClayWorld2d {
         tree.radius = tree.width * 0.5
         dungeonObjects.push(tree)
 
-        // Witch — fortune teller near the tree
+        // Witch — fortune teller near the tree: she reads the next dungeon
         _spawnVillageNpc(cx - 5, cy - 5, "#7B2D8E", "crystal", "Witch", [
             { x: cx - 6, y: cy - 4.5, duration: 4, text: "*gazing into crystal*" },
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
-        ], [
-            "The stones whisper of what lies below...",
-            "I see shapes in the dark — hungry ones.",
-            "Beware the hollow chamber. Something ancient stirs.",
-            "Return to me... if you survive."
-        ], "assets/witch_greeting.wav")
+        ], witchReading, "assets/witch_greeting.wav")
 
         // Spawn player at entrance
         spawnPlayer(cx, (oy + 2) * cellSize)
@@ -3370,6 +3409,7 @@ ClayWorld2d {
         }
     }
 
+    // dialogue: its lines, or a function making them when it is talked to
     function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting, wares) {
         let npc = npcComponent.createObject(world.room, {
             xWu: wx, yWu: wy,
@@ -3384,7 +3424,8 @@ ClayWorld2d {
             iconType: iconType,
             npcName: name || "",
             routine: routine || [],
-            dialogueLines: dialogue || [],
+            dialogueLines: typeof dialogue === "function" ? [] : dialogue || [],
+            speak: typeof dialogue === "function" ? dialogue : null,
             greetingSound: greeting || "",
             wares: wares || []
         })
