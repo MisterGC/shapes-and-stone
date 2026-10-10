@@ -37,6 +37,7 @@ Window {
     property int failures: 0
     property var bashFoe: null
     property real bashFrom: 0
+    property real lungeFrom: 0
     property int bashSwing: 0
 
     function check(ok, what) {
@@ -245,8 +246,12 @@ Window {
             p.isAttacking = false
             let words = countNamed(game, "fightWord")
             p.attack()
+            let fromX = p.xWu
             p.raiseShield()
             p.lowerShield()
+            check(p._lungeT > 0, "the bash starts the lunge ("
+                  + p._lungeT.toFixed(2) + " s)")
+            bench.lungeFrom = fromX
             check(p.mana === p.maxMana - Balance.bash.mana && countNamed(game, "fightWord") === words + 1,
                   "a right-click right after a swing bashes: " + (p.maxMana - p.mana) + " mana, "
                   + (countNamed(game, "fightWord") - words) + " BASH")
@@ -257,6 +262,8 @@ Window {
             bench.bashFrom = foe.xWu
         }],
         [300, () => {
+            check(game.player.xWu > bench.lungeFrom + 0.2 && game.player._lungeT === 0,
+                  "the knight lunged forward " + (game.player.xWu - bench.lungeFrom).toFixed(2) + " wu")
             check(bench.bashFoe.xWu > bench.bashFrom + 0.3, "the bashed enemy is shoved back ("
                   + (bench.bashFoe.xWu - bench.bashFrom).toFixed(2) + " wu)")
             let p = game.player
