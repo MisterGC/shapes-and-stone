@@ -71,11 +71,13 @@ Item {
     function advance() { game._hostAdvanceLevel() }
     // The knight out of the enemies' reach while the bench sets things up
     function standUp() { game.player.hp = 100000 }
-    // Gold and a potion to carry, so a new run has something to drop
+    // Gold, a potion, a draught and a smith's level to carry, so a new run
+    // has something to drop
     function enrich() {
         game.player.gold = 25
         game.player.potions = 1
-        game.player.upgrade = "sword"
+        game.player.draughts = 1
+        game.player.swordLevel = 1
     }
     // A blow no knight survives, from the side, not dashing or blocking
     function strikeDown() {
@@ -100,7 +102,8 @@ Item {
             fallen: game.fallen, partyFallen: game.partyFallen,
             connected: connected, nodes: nodeCount,
             knight: p ? {hp: p.hp, maxHp: p.maxHp, mana: p.mana, maxMana: p.maxMana, gold: p.gold,
-                         potions: p.potions, upgrade: p.upgrade,
+                         potions: p.potions, draughts: p.draughts,
+                         levels: p.swordLevel + p.shieldLevel + p.harnessLevel + p.bladeLevel,
                          downed: _viewOf(p) ? _viewOf(p).downed : null} : null,
             others: others,
             fallenScreen: _fallenScreen() ? {title: _find(_fallenScreen(), "fallenTitle").text,

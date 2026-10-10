@@ -47,16 +47,15 @@ Item {
     property bool chargeFull: false
     readonly property color _glow: Balance.heavy.glow
     onChargeFullChanged: if (chargeFull) chargeRingFlash.restart()
-    // The smith's upgrade of the run, "sword", "shield" or "": a sharpened
-    // sword's blade has a brighter, wider edge, a reinforced shield a
-    // lighter rim along its outside
-    property string upgrade: ""
+    // The smith's sword and shield levels of the run, 0 for none: a
+    // sharpened sword's blade has a brighter, wider edge, a reinforced
+    // shield a lighter rim along its outside
+    property int swordLevel: 0
+    property int shieldLevel: 0
     readonly property color _edgeColor: Qt.lighter(accentColor, 1.6)
     readonly property color _rimColor: Qt.lighter(accentColor, 1.8)
-    onUpgradeChanged: {
-        shieldArc.requestPaint()
-        chargeBlade.requestPaint()
-    }
+    onSwordLevelChanged: chargeBlade.requestPaint()
+    onShieldLevelChanged: shieldArc.requestPaint()
 
     // Seconds, from the balance table: wind up plus follow through, and
     // the fade of the arc after it
@@ -457,7 +456,7 @@ Item {
                 ctx.fillStyle = "#E8EEF2"
                 ctx.fill()
             }
-            if (view.upgrade === "shield") {
+            if (view.shieldLevel > 0) {
                 ctx.beginPath()
                 ctx.arc(w / 2, h / 2, w * (0.4 + thickness / 2), -Math.PI * 0.4, Math.PI * 0.4)
                 ctx.strokeStyle = view._rimColor
@@ -691,7 +690,7 @@ Item {
             ctx.fillStyle = "rgba(" + Math.round(r * 255) + ", " + Math.round(g * 255) + ", "
                     + Math.round(b * 255) + ", 1)"
             ctx.fill()
-            var sharp = view.upgrade === "sword"
+            var sharp = view.swordLevel > 0
             ctx.strokeStyle = view.chargeFull ? "#FFFFFF"
                                               : view._rgba(sharp ? view._edgeColor : view.accentColor, 0.9)
             ctx.lineWidth = view.chargeFull || sharp ? 2 : 1
@@ -863,7 +862,7 @@ Item {
             ctx.closePath()
             ctx.fillStyle = view._rgba(heavy ? view._glow : view.bladeColor, swingOpacity)
             ctx.fill()
-            var sharp = view.upgrade === "sword"
+            var sharp = view.swordLevel > 0
             ctx.strokeStyle = view._rgba(sharp ? view._edgeColor : view.accentColor, swingOpacity)
             ctx.lineWidth = sharp ? 2.5 : 1.5
             ctx.stroke()

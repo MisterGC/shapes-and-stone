@@ -1238,18 +1238,20 @@ ClayWorld2d {
             event.accepted = true
             return
         }
-        // 1 and 2 buy what the dialogue panel offers; without wares 1
+        // 1 to 4 buy what the dialogue panel offers; without wares 1
         // drinks a potion and 2 a mana draught
-        if (event.key === Qt.Key_1 || event.key === Qt.Key_2) {
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
             let i = event.key - Qt.Key_1
             if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
                 if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
+                event.accepted = true
             } else if (event.key === Qt.Key_1) {
                 drinkPotion()
-            } else {
+                event.accepted = true
+            } else if (event.key === Qt.Key_2) {
                 drinkDraught()
+                event.accepted = true
             }
-            event.accepted = true
             return
         }
         if (event.key === Qt.Key_E) {
@@ -2245,7 +2247,7 @@ ClayWorld2d {
     }
 
     // The one way to the next level: what the knight carries (its HP, mana,
-    // gold, potions, draughts and the smith's upgrade) goes with it, a village follows each dungeon.
+    // gold, potions, draughts and the smith's upgrades) goes with it, a village follows each dungeon.
     // In a session a knight down rises at the village's camp. d is the
     // danger's positions it is entered at and the knights it is built
     // for, the host's in a session; alone they are settled here, before
@@ -2254,12 +2256,12 @@ ClayWorld2d {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
                                  potions: player.potions, draughts: player.draughts,
-                                 upgrade: player.upgrade }
+                                 levels: smithLevels(player) }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
-                                 potions: 0, draughts: 0, upgrade: "" }
+                                 potions: 0, draughts: 0, levels: smithLevels(null) }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
                     "gold:", carried.gold, "potions:", carried.potions, "draughts:", carried.draughts,
-                    "upgrade:", carried.upgrade)
+                    "smith:", JSON.stringify(carried.levels))
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
@@ -2270,7 +2272,7 @@ ClayWorld2d {
         else
             generateDungeon()
         if (player) {
-            player.upgrade = carried.upgrade
+            for (let line of smithLines) player[line + "Level"] = carried.levels[line]
             player.hp = carried.hp
             player.mana = carried.mana
             player.gold = carried.gold
@@ -2326,25 +2328,66 @@ ClayWorld2d {
     function openDialogue(name, color, lines, wares) {
         dialoguePanel.open(name, color, lines, _offered(wares || []))
     }
-    // The smith's upgrade is one per run: once bought, the smith offers
-    // neither
+    // The innkeeper's wares are always offered; the smith's are made as he
+    // is talked to (smithWare), the next level of each upgrade he may sell
     function _offered(wares) {
-        return wares.filter(w => w.id === "potion" || w.id === "draught"
-                                 || (player && player.upgrade === ""))
+        let out = []
+        for (let w of wares) {
+            let offer = w.id === "potion" || w.id === "draught" ? w : smithWare(w.id)
+            if (offer) out.push(offer)
+        }
+        return out
+    }
+
+    // --- The smith's upgrades (issues #38, #81, #98) ---
+    // Each lasts the run and has levels (Balance.shop): one level per
+    // camp, the next above the knight's, and higher levels only deeper
+    readonly property var smithLines: ["sword", "shield", "harness", "blade"]
+    // The knight's levels, {sword, shield, harness, blade}; all 0 for none
+    function smithLevels(knight) {
+        let out = {}
+        for (let line of smithLines) out[line] = knight ? knight[line + "Level"] : 0
+        return out
+    }
+    // The highest level the smith of this camp sells: the camp after depth
+    // d reaches level L once d is levelDepth[L - 1]
+    function smithLimit() {
+        return Balance.shop.levelDepth.filter(d => d <= depth).length
+    }
+    // The ware of the next level of line, or null where the smith sells
+    // none: the knight has the last level, the next one is above this
+    // camp's limit, or it bought a level here already
+    function smithWare(line) {
+        if (!player || player.smithDone || smithLines.indexOf(line) < 0) return null
+        let level = player[line + "Level"] + 1
+        if (level > smithLimit() || level > Balance.shop.upgradePrice.length) return null
+        let sh = Balance.shop, i = level - 1
+        let name = ["I", "II", "III", "IV", "V"][i] || String(level)
+        let what = line === "sword" ? "Sharpened sword " + name + " (+" + sh.swordAtk[i] + " damage)"
+            : line === "shield" ? "Reinforced shield " + name + " (a block lets "
+                                  + Math.round(sh.shieldBlockedShare[i] * 100) + " % through, costs "
+                                  + sh.shieldBlockMana[i] + " mana)"
+            : line === "harness" ? "Lighter harness " + name + " (a dash costs "
+                                   + sh.harnessDashMana[i] + " mana)"
+            : "Balanced blade " + name + " (a whirlwind costs " + sh.bladeWhirlMana[i] + " mana)"
+        return { id: line, level: level, label: what, price: sh.upgradePrice[i] }
     }
 
     // --- The village's wares (issue #38) ---
     // Bought with this node's knight's own gold. A potion is kept for key 1,
-    // a draught for key 2; the smith's upgrade ("sword" or "shield") lasts the run
+    // a draught for key 2; a smith's level lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
         let inn = ware.id === "potion" || ware.id === "draught"
-        if (!inn && player.upgrade !== "") return false
-        if (player.gold < ware.price) {
-            dialoguePanel.note = "You'll need " + ware.price + " gold for that."
+        // The smith sells only what he offers now: a ware from before the
+        // knight bought here, or above the camp's limit, is refused
+        let offer = inn ? ware : smithWare(ware.id)
+        if (!offer) return false
+        if (player.gold < offer.price) {
+            dialoguePanel.note = "You'll need " + offer.price + " gold for that."
             return false
         }
-        player.gold -= ware.price
+        player.gold -= offer.price
         if (ware.id === "potion") {
             player.potions++
             dialoguePanel.note = "One potion. Drink it when it counts."
@@ -2352,12 +2395,18 @@ ClayWorld2d {
             player.draughts++
             dialoguePanel.note = "A mana draught. It'll fill you up when the shield runs dry."
         } else {
-            player.upgrade = ware.id
-            dialoguePanel.note = ware.id === "sword" ? "There. That edge will bite deeper."
-                                                     : "There. That shield will let less through."
+            player[ware.id + "Level"] = offer.level
+            player.smithDone = true
+            dialoguePanel.note = {
+                sword: "There. That edge will bite deeper.",
+                shield: "There. That shield will let less through.",
+                harness: "There. Lighter on your feet now.",
+                blade: "There. It'll spin true in your hand."
+            }[ware.id]
         }
         dialoguePanel.wares = _offered(dialoguePanel.wares)
-        console.log("[Game] Bought", ware.id, "for", ware.price, "gold,", player.gold, "left")
+        console.log("[Game] Bought", ware.id + (inn ? "" : " level " + offer.level), "for",
+                    offer.price, "gold,", player.gold, "left")
         return true
     }
     function drinkPotion() {
@@ -3366,16 +3415,9 @@ ClayWorld2d {
             { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "I can sharpen that sword or reinforce your shield - one of the two, for this descent.",
-            "Bring gold from below and it's yours."
-        ], "assets/blacksmith_greeting.wav", [
-            { id: "sword", label: "Sharpened sword (+" + Balance.shop.swordAtk + " damage)",
-              price: Balance.shop.upgradePrice },
-            { id: "shield", label: "Reinforced shield (a block lets "
-                  + Math.round(Balance.shop.shieldBlockedShare * 100) + " % through, costs "
-                  + Balance.shop.shieldBlockMana + " mana)",
-              price: Balance.shop.upgradePrice }
-        ])
+            "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
+            "The deeper you've been, the finer I can make it. Bring gold from below."
+        ], "assets/blacksmith_greeting.wav", smithLines.map(line => ({ id: line })))
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {

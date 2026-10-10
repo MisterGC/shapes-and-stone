@@ -408,8 +408,7 @@ QtObject {
     })
 
     // The village's wares, in gold: the innkeeper's potions, drunk with
-    // key 1, and mana draughts, drunk with key 2, and the smith's one
-    // upgrade of the run, the sword or the shield
+    // key 1, and mana draughts, drunk with key 2, and the smith's upgrades
     readonly property var shop: ({
         potionPrice: 15,
         potionHeal: 50,
@@ -417,15 +416,28 @@ QtObject {
         // at knight.mana it refills the bar
         draughtPrice: 20,
         draughtMana: 40,
-        upgradePrice: 30,
+        // The smith's upgrades last the run and have levels: the sword,
+        // the shield, the harness and the blade. At each camp he sells one
+        // level of one of them, the next above the knight's; the camp
+        // after depth d offers level L only once d reaches levelDepth[L - 1].
+        // Level L costs upgradePrice[L - 1] and gives the L-th entry of
+        // its effect below
+        levelDepth: [0, 2, 4],
+        upgradePrice: [30, 45, 60],
         // Sharpened sword: added to the knight's atk
-        swordAtk: 5,
+        swordAtk: [5, 9, 12],
         // Reinforced shield: a held block lets this share through instead
         // of knight.blockedShare, and a blow it stops costs this much mana
         // instead of knight.blockMana. The perfect block's window stays
         // the same
-        shieldBlockedShare: 0.15,
-        shieldBlockMana: 4
+        shieldBlockedShare: [0.15, 0.1, 0.05],
+        shieldBlockMana: [4, 3, 2],
+        // Lighter harness: a dash costs this much mana instead of
+        // knight.dashMana, the whirlwind's dash too
+        harnessDashMana: [6, 4, 3],
+        // Balanced blade: a whirlwind costs this much mana, its dash
+        // included, instead of knight.whirlMana
+        bladeWhirlMana: [15, 12, 9]
     })
 
     // A session's party: an ally lifts a fallen knight up, and a knight

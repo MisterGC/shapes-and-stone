@@ -45,7 +45,7 @@ PhysicsItem {
     readonly property real maxSpeed: Balance.knight.moveSpeed
     property int hp: Balance.knight.hp
     property int maxHp: Balance.knight.hp
-    property int atk: Balance.knight.atk + (upgrade === "sword" ? Balance.shop.swordAtk : 0)
+    property int atk: Balance.knight.atk + _level(Balance.shop.swordAtk, swordLevel, 0)
     property int def: Balance.knight.def
     // A raised shield drains mana, a parry gives some back
     property real mana: Balance.knight.mana
@@ -56,15 +56,33 @@ PhysicsItem {
     property int potions: 0
     // Mana draughts bought from the innkeeper, drunk with key 2
     property int draughts: 0
-    // The smith's one upgrade of the run: "sword", "shield" or "" before
-    // it. Every effect reads it live, so setting it applies it at once
-    property string upgrade: ""
+    // The smith's upgrades of the run, each a level from 0 (none) to the
+    // table's last (Balance.shop): the sharpened sword, the reinforced
+    // shield, the lighter harness and the balanced blade. Every effect
+    // reads them live, so setting one applies it at once
+    property int swordLevel: 0
+    property int shieldLevel: 0
+    property int harnessLevel: 0
+    property int bladeLevel: 0
+    // A level bought from the smith at this camp: he sells one per camp,
+    // and the knight of the next level starts without it
+    property bool smithDone: false
+    // An upgrade's effect at level: its table's entry, base at level 0
+    function _level(table, level, base) {
+        return level > 0 ? table[Math.min(level, table.length) - 1] : base
+    }
     // The share of a blow a held block lets through, and the mana a blow
     // the shield stops costs: a reinforced shield's are lower
-    readonly property real blockedShare: upgrade === "shield" ? Balance.shop.shieldBlockedShare
-                                                              : Balance.knight.blockedShare
-    readonly property real blockMana: upgrade === "shield" ? Balance.shop.shieldBlockMana
-                                                           : Balance.knight.blockMana
+    readonly property real blockedShare: _level(Balance.shop.shieldBlockedShare, shieldLevel,
+                                                Balance.knight.blockedShare)
+    readonly property real blockMana: _level(Balance.shop.shieldBlockMana, shieldLevel,
+                                             Balance.knight.blockMana)
+    // The mana a dash costs, and a whirlwind with its dash: a lighter
+    // harness's and a balanced blade's are lower
+    readonly property real dashMana: _level(Balance.shop.harnessDashMana, harnessLevel,
+                                            Balance.knight.dashMana)
+    readonly property real whirlMana: _level(Balance.shop.bladeWhirlMana, bladeLevel,
+                                             Balance.knight.whirlMana)
     readonly property real blockDrain: Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
@@ -260,7 +278,8 @@ PhysicsItem {
         chargeFull: player.chargeFull
         downed: player.fallen
         reviveProgress: player.reviveRing
-        upgrade: player.upgrade
+        swordLevel: player.swordLevel
+        shieldLevel: player.shieldLevel
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -742,12 +761,12 @@ PhysicsItem {
         let whirl = isAttacking && isHeavy && _steps - _fullLetGoAt <= Balance.knight.whirlWindow
         // A dash costs dashMana, a whirlwind whirlMana with its dash;
         // without the whirlwind's, the dash goes on as one
-        if (!_afford(Balance.knight.dashMana)) return
-        if (whirl && mana < Balance.knight.whirlMana) {
+        if (!_afford(dashMana)) return
+        if (whirl && mana < whirlMana) {
             whirl = false
             _noMana()
         }
-        _spend(whirl ? Balance.knight.whirlMana : Balance.knight.dashMana)
+        _spend(whirl ? whirlMana : dashMana)
         let kept = whirl ? new Set(_hitThisSwing) : null
         if (_charge === "full" && !whirl) _dashedFullAt = _steps
         else _cancelCharge()
@@ -886,7 +905,7 @@ PhysicsItem {
         // Let go of within the window after the dash started: a whirlwind
         // its dash paid dashMana already, the whirlwind the rest of
         // whirlMana; without it, the charge swings heavy
-        let whirlRest = Balance.knight.whirlMana - Balance.knight.dashMana
+        let whirlRest = Math.max(0, whirlMana - dashMana)
         let inWindow = _charge === "full" && isDashing && !isWhirling
             && _steps - _dashedFullAt <= Balance.knight.whirlWindow
         if (inWindow && _afford(whirlRest)) {

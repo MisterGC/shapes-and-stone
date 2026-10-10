@@ -18,8 +18,9 @@ session:
 - Enter on the joiner's screen does nothing: both stay fallen on the old seed
 - Enter on the host's screen starts the next run on both: depth 0 in a
   dungeon, on the same new seed, with the same enemies (by id, type, tier
-  and place), each knight at full HP and mana with no gold, potions or
-  upgrade, the other knight standing, at full HP, in the colour it had.
+  and place), each knight at full HP and mana with no gold, potions,
+  draughts or smith's levels, the other knight standing, at full HP, in the
+  colour it had.
   Nothing of the run before is left: no enemy of it, no shot, no downed
   knight, no gold drop
 
@@ -310,9 +311,10 @@ def fall_and_go_again(n, H, J, host_id, joiner_id, colors, check):
         check(k.get("hp") == k.get("maxHp") == KNIGHT_HP and k.get("mana") == k.get("maxMana") == KNIGHT_MANA,
               f"{tag} the {name}'s knight has full HP and mana ({k.get('hp')}/{k.get('maxHp')}, "
               f"{k.get('mana')}/{k.get('maxMana')})")
-        check(k.get("gold") == 0 and k.get("potions") == 0 and k.get("upgrade") == "",
-              f"{tag} the {name}'s knight has 0 gold, no potion, no upgrade "
-              f"({k.get('gold')}, {k.get('potions')}, '{k.get('upgrade')}')")
+        check(k.get("gold") == 0 and k.get("potions") == 0 and k.get("draughts") == 0
+              and k.get("levels") == 0,
+              f"{tag} the {name}'s knight has 0 gold, no potion, no draught, no smith's level "
+              f"({k.get('gold')}, {k.get('potions')}, {k.get('draughts')}, {k.get('levels')})")
         check(not r["fallen"] and not r["partyFallen"] and r["fallenScreen"] is None
               and k.get("downed") is False,
               f"{tag} the {name}'s screen shows no fallen screen and its knight stands")

@@ -8,8 +8,9 @@
 // guardians, and no other enemy, wind up a crushing blow at
 // enemy.crushChance, for enemy.crushWindUp, and one on a held shield
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
-// shield for enemy.crushLockout; the smith sells the sword and the shield
-// for shop.upgradePrice, which take the shop's values; the
+// shield for enemy.crushLockout; the smith sells level I of the sword,
+// the shield, the harness and the blade for shop.upgradePrice, each
+// level taking the shop's values; the
 // campfire refills a dry knight's mana on top of the rest's knight.manaRegen,
 // away from it only the rest does, and the
 // next level, either way it is reached, keeps the knight's HP and mana. Last it
@@ -208,26 +209,37 @@ Window {
                   "the campfire's heal rate, mana rate and radius come from the table")
             // The smith's wares and what they do: the table's shop group
             let shop = Balance.shop, p = game.player
-            check(shop.upgradePrice === 30 && shop.swordAtk === 5 && near(shop.shieldBlockedShare, 0.15)
-                  && shop.shieldBlockMana === 4,
-                  "the shop's upgradePrice " + shop.upgradePrice + ", swordAtk " + shop.swordAtk
-                  + ", shieldBlockedShare " + shop.shieldBlockedShare + ", shieldBlockMana " + shop.shieldBlockMana)
+            let same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+            check(same(shop.levelDepth, [0, 2, 4]) && same(shop.upgradePrice, [30, 45, 60])
+                  && same(shop.swordAtk, [5, 9, 12]) && same(shop.shieldBlockedShare, [0.15, 0.1, 0.05])
+                  && same(shop.shieldBlockMana, [4, 3, 2]) && same(shop.harnessDashMana, [6, 4, 3])
+                  && same(shop.bladeWhirlMana, [15, 12, 9]),
+                  "the shop's levelDepth " + shop.levelDepth + ", upgradePrice " + shop.upgradePrice
+                  + ", swordAtk " + shop.swordAtk + ", shieldBlockedShare " + shop.shieldBlockedShare
+                  + ", shieldBlockMana " + shop.shieldBlockMana + ", harnessDashMana " + shop.harnessDashMana
+                  + ", bladeWhirlMana " + shop.bladeWhirlMana)
             let smith = game.room.children.find(c => c.objectName === "npc" && c.npcName === "Blacksmith")
-            let wares = smith ? smith.wares : []
-            check(wares.length === 2 && wares[0].id === "sword" && wares[1].id === "shield"
-                  && wares.every(w => w.price === shop.upgradePrice),
-                  "the smith sells the sword and the shield for upgradePrice ("
-                  + wares.map(w => w.id + " " + w.price).join(", ") + ")")
-            p.upgrade = "sword"
-            let sword = p.atk === Balance.knight.atk + shop.swordAtk
-                && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana)
-            p.upgrade = "shield"
-            let shield = p.atk === Balance.knight.atk && near(p.blockedShare, shop.shieldBlockedShare)
-                && near(p.blockMana, shop.shieldBlockMana) && near(p.blockDrain, Balance.knight.blockDrain)
-            p.upgrade = ""
-            check(sword && shield && p.atk === Balance.knight.atk
-                  && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana),
-                  "the sharpened sword adds swordAtk, the reinforced shield takes shieldBlockedShare and shieldBlockMana")
+            let wares = smith ? game._offered(smith.wares) : []
+            check(wares.map(w => w.id).join(" ") === "sword shield harness blade"
+                  && wares.every(w => w.level === 1 && w.price === shop.upgradePrice[0]),
+                  "the first camp's smith sells level I of the sword, the shield, the harness and the blade for "
+                  + "upgradePrice[0] (" + wares.map(w => w.id + " " + w.level + " " + w.price).join(", ") + ")")
+            // Each level takes its entry of the table, every effect read live
+            let levels = [1, 2, 3].every(l => {
+                let i = l - 1
+                p.swordLevel = l; p.shieldLevel = l; p.harnessLevel = l; p.bladeLevel = l
+                return p.atk === Balance.knight.atk + shop.swordAtk[i]
+                    && near(p.blockedShare, shop.shieldBlockedShare[i]) && near(p.blockMana, shop.shieldBlockMana[i])
+                    && near(p.dashMana, shop.harnessDashMana[i]) && near(p.whirlMana, shop.bladeWhirlMana[i])
+                    && near(p.blockDrain, Balance.knight.blockDrain)
+            })
+            p.swordLevel = 0; p.shieldLevel = 0; p.harnessLevel = 0; p.bladeLevel = 0
+            check(levels && p.atk === Balance.knight.atk
+                  && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana)
+                  && near(p.dashMana, Balance.knight.dashMana) && near(p.whirlMana, Balance.knight.whirlMana),
+                  "levels I to III of the sword add swordAtk, of the shield take shieldBlockedShare and "
+                  + "shieldBlockMana, of the harness harnessDashMana and of the blade bladeWhirlMana; "
+                  + "level 0 the knight's own")
             // Hurt and dry, away from the fire
             game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4
             game.player.yWu = campfire.yWu

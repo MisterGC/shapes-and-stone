@@ -13,7 +13,7 @@
 // blow of a full charge; in whirlwind both spin it round them as a full
 // charge let go at a dash's start does. In sword the local knight swings a sharpened
 // sword, its blade's edge brighter and wider, in shield it holds up a
-// reinforced shield with a lighter rim; the remote's upgrade is not sent,
+// reinforced shield with a lighter rim; the remote's upgrades are not sent,
 // it swings and blocks as before.
 //
 //   qml -I <build>/bin/qml tests/knights/knights.qml -- <out dir>
@@ -167,17 +167,18 @@ Window {
         [500, () => { game.player.mana = game.player.maxMana }],
         // The smith's upgrades, on the local knight: the sharpened sword's
         // brighter edge in a swing, the reinforced shield's lighter rim
-        [300, () => { game.player.upgrade = "sword"; game.player.attack(); remote.triggerAction("attack") }],
+        [300, () => { game.player.swordLevel = 1; game.player.attack(); remote.triggerAction("attack") }],
         [120, () => capture("sword")],
         [500, () => {
-            game.player.upgrade = "shield"
+            game.player.swordLevel = 0
+            game.player.shieldLevel = 1
             game.player.isBlocking = true
             remoteState = 2; remoteBlock = true
         }],
         [250, () => capture("shield")],
         [100, () => {
             game.player.isBlocking = false
-            game.player.upgrade = ""
+            game.player.shieldLevel = 0
             remoteState = 0; remoteBlock = false
         }],
         [600, () => {
