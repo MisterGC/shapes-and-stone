@@ -55,8 +55,8 @@ Window {
     // Today's dungeon for one knight, before issue #102: the fingerprint
     // hash and enemy count at each danger, on the scenario seed
     readonly property var today: ({
-        "0.5": { hash: "beb00666", enemies: 9 },
-        "1.5": { hash: "752e4f25", enemies: 11 }
+        "0.5": { hash: "e480e841", enemies: 9 },
+        "1.5": { hash: "603ab0e5", enemies: 11 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
@@ -65,8 +65,9 @@ Window {
         let out = [JSON.stringify(game.rooms)]
         for (let o of game.dungeonObjects) {
             if (!o) continue
-            // The type without the number QML gives it in load order
-            let parts = [String(o).split("(")[0].replace(/_QMLTYPE_\d+$/, "")]
+            // The type without the number QML gives it, or an inline
+            // type of Game.qml, in load order: a new type shifts it
+            let parts = [String(o).split("(")[0].replace(/_QML(TYPE)?_\d+$/, "")]
             for (let k of ["xWu", "yWu", "widthWu", "heightWu", "sizeWu", "seed", "color",
                            "flameColor", "style", "crackShare", "moss", "density", "kind"])
                 if (o[k] !== undefined) parts.push(k + "=" + (typeof o[k] === "number" ? f3(o[k]) : String(o[k])))
