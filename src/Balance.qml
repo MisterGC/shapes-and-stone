@@ -234,6 +234,12 @@ QtObject {
         mana: 6,
         reach: 1.2,
         speed: 20.0,
+        // The knight lunges behind its shield: lungeSpeed wu/s along its
+        // facing, fading out over lungeTime seconds, the shield up and
+        // flashing, sparks sparks off its front
+        lungeSpeed: 8.0,
+        lungeTime: 0.12,
+        sparks: 6,
         word: "BASH",
         wordColor: "#9FD4E8"
     })
@@ -280,11 +286,11 @@ QtObject {
 
     readonly property var enemy: ({
         // Base HP by tier: weak, normal, tough
-        tierHp: [18, 30, 42],
+        tierHp: [22, 36, 50],
         // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 0, atk: 10, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        guardian: { hpBonus: 10, atk: 10, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        spitter: { hpBonus: -6, atk: 8, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        grunt: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        guardian: { hpBonus: 10, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        spitter: { hpBonus: -6, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -351,8 +357,8 @@ QtObject {
         roomSizeMin: 5,
         roomSizeMax: 8,
         // Enemies per dungeon at depth 0, rolled evenly from min to max
-        enemiesMin: 8,
-        enemiesMax: 12,
+        enemiesMin: 10,
+        enemiesMax: 15,
         // Tier mix of a dungeon, dealt not rolled: weakChance of its enemies
         // (rounded) are weak, those above normalChance tough, the rest normal
         weakChance: 0.2,
@@ -380,7 +386,7 @@ QtObject {
         // More enemies: added to enemiesMin and enemiesMax, never above the
         // cap; at 2 a dungeon two depths down holds more than the one above
         enemies: 2,
-        enemiesCap: 22,
+        enemiesCap: 26,
         // Fewer weak: weakChance falls by this, not below 0
         weakChance: -0.05,
         // More tough: the tough share (above normalChance) grows by this

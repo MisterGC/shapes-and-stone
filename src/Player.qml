@@ -187,7 +187,7 @@ PhysicsItem {
         _lastY = yWu
         let beat = 1 / Balance.steps.perSecond
         // Walking at a fifth of the move speed or more counts
-        let walking = !isNaN(dx) && !fallen && !isDashing && _knockT <= 0
+        let walking = !isNaN(dx) && !fallen && !isDashing && _knockT <= 0 && _lungeT <= 0
             && Math.sqrt(dx * dx + dy * dy) >= maxSpeed * 0.2 * dt
         if (!walking) {
             _stepClock = beat / 2
@@ -253,6 +253,11 @@ PhysicsItem {
                     isDashing = false
                     isWhirling = false
                 }
+            } else if (_lungeT > 0) {
+                // The bash's lunge, fading out like a knockback
+                let k = _lungeT / Balance.bash.lungeTime
+                player.body.linearVelocity = Qt.point(_lungeVx * k, -_lungeVy * k)
+                _lungeT = _lungeT - dt < 1e-6 ? 0 : _lungeT - dt
             } else if (_knockT > 0) {
                 // Fades out step by step, like an enemy's knockback
                 let k = _knockT / Balance.knight.knockbackDuration
@@ -295,7 +300,8 @@ PhysicsItem {
         facingAngle: player.facingAngle
         moveX: player.moveX
         moveAmount: Math.min(1, Math.sqrt(player.moveX * player.moveX + player.moveY * player.moveY))
-        blocking: player.isBlocking
+        // Up through the bash's lunge too, however short the right-click
+        blocking: player.isBlocking || player._lungeT > 0
         dashing: player.isDashing
         healing: player.isHealing
         dashCooldownProgress: 1.0 - (player.dashCooldown / player.dashCooldownTime)
@@ -768,6 +774,10 @@ PhysicsItem {
     // arc. Once a swing; returns how many it shoved
     property int _swungAt: -1000000
     property bool _bashed: true
+    // The bash's lunge: seconds left and its start velocity, wu/s (y up)
+    property real _lungeT: 0
+    property real _lungeVx: 0
+    property real _lungeVy: 0
     function _tryBash() {
         let b = Balance.bash
         if (_bashed || isHeavy || isDashing || mana < b.mana) return 0
@@ -788,6 +798,14 @@ PhysicsItem {
             if (gameWorld.spawnWord) gameWorld.spawnWord(e.xWu, e.yWu + 0.5, b.word, b.wordColor)
             shoved++
         }
+        let rad = facingAngle * Math.PI / 180
+        _lungeVx = Math.cos(rad) * b.lungeSpeed
+        _lungeVy = Math.sin(rad) * b.lungeSpeed
+        _lungeT = b.lungeTime
+        view.block()
+        if (gameWorld && gameWorld.spawnSparks)
+            gameWorld.spawnSparks(cx + Math.cos(rad) * widthWu * 0.7, cy + Math.sin(rad) * heightWu * 0.7,
+                                  Math.cos(rad), Math.sin(rad), b.sparks, b.wordColor)
         if (gameWorld && gameWorld.playBlock) gameWorld.playBlock()
         console.log("[Player] Bash! Shoved", shoved)
         return shoved

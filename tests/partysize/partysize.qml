@@ -48,15 +48,15 @@ Window {
     function f3(v) { return Number(v).toFixed(3) }
 
     // The dungeons the bench builds: dangers on the scenario seed; with
-    // the cap at 22 neither reaches it, four knights at 1.5 come to 21
+    // the cap at 26 neither reaches it, four knights at 1.5 come to 24
     readonly property var dangers: [0.5, 1.5]
     readonly property var parties: [1, 2, 4]
-    // Today's dungeon for one knight (9 to 12 rooms, 8 to 12 enemies at
+    // Today's dungeon for one knight (9 to 12 rooms, 10 to 15 enemies at
     // depth 0): the fingerprint hash and enemy count at each danger, on
     // the scenario seed
     readonly property var today: ({
-        "0.5": { hash: "80de3f3c", enemies: 13 },
-        "1.5": { hash: "55091890", enemies: 15 }
+        "0.5": { hash: "c87fe15c", enemies: 15 },
+        "1.5": { hash: "886b113c", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
