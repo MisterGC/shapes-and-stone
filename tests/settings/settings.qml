@@ -12,7 +12,9 @@
 // makes no footstep; walking two beats of Balance.steps plays two. A strike's damage shows as a number in normal
 // play, the knight's own hurt does not; an enemy's eyes are drawn with its
 // body, under the darkness. A swing breaks a heap of bones in its arc, a
-// whirlwind every heap within its reach. Prints one PASS or FAIL
+// whirlwind every heap within its reach. A right-click right after a swing
+// bashes: the enemy in front is shoved back for Balance.bash.mana, once a
+// swing, and not after the window. Prints one PASS or FAIL
 // line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/settings/settings.qml
@@ -33,6 +35,9 @@ Window {
     readonly property string storeName: "ShapesAndStoneSettingsBench"
     property var game: null
     property int failures: 0
+    property var bashFoe: null
+    property real bashFrom: 0
+    property int bashSwing: 0
 
     function check(ok, what) {
         console.log("[Settings]", ok ? "PASS" : "FAIL", what)
@@ -230,6 +235,42 @@ Window {
             p._breakBones(Balance.knight.whirlReach, false)
             check(broke.join(",") === "ahead,behind" && game.bonePiles.length === 0,
                   "a whirlwind breaks the heap behind too")
+            // The bash: a right-click soon after a swing shoves the enemy in
+            // front back and costs Balance.bash.mana; a late one does not
+            let foe = game.enemies.find(x => !x.destroyed)
+            foe.xWu = p.xWu + 1.0
+            foe.yWu = p.yWu
+            p.mana = p.maxMana
+            p.attackCooldown = 0
+            p.isAttacking = false
+            let words = countNamed(game, "fightWord")
+            p.attack()
+            p.raiseShield()
+            p.lowerShield()
+            check(p.mana === p.maxMana - Balance.bash.mana && countNamed(game, "fightWord") === words + 1,
+                  "a right-click right after a swing bashes: " + (p.maxMana - p.mana) + " mana, "
+                  + (countNamed(game, "fightWord") - words) + " BASH")
+            p.raiseShield()
+            p.lowerShield()
+            check(countNamed(game, "fightWord") === words + 1, "a second right-click in the same swing bashes no more")
+            bench.bashFoe = foe
+            bench.bashFrom = foe.xWu
+        }],
+        [300, () => {
+            check(bench.bashFoe.xWu > bench.bashFrom + 0.3, "the bashed enemy is shoved back ("
+                  + (bench.bashFoe.xWu - bench.bashFrom).toFixed(2) + " wu)")
+            let p = game.player
+            p.isAttacking = false
+            p.attackCooldown = 0
+            p.mana = p.maxMana
+            p.attack()
+            bench.bashSwing = p._steps
+        }],
+        [() => (game.player._steps - bench.bashSwing) * game.player.world.timeStep > Balance.bash.window + 0.05, () => {
+            let p = game.player
+            p.raiseShield()
+            p.lowerShield()
+            check(p.mana > p.maxMana - Balance.bash.mana, "a right-click after the window only raises the shield")
             console.log("[Settings] done,", failures, "failed")
         }],
         [300, () => game.destroy()],

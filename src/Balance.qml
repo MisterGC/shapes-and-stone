@@ -224,6 +224,20 @@ QtObject {
         flashColor: "#FFFFFF"
     })
 
+    // The sword-and-shield combo: the right button within window seconds of
+    // a normal swing's start bashes with the shield. Every standing enemy
+    // within reach times the knight's attackRange and in the swing's arc
+    // is shoved back at speed wu/s, as the dash push does, and a guardian's
+    // guard breaks. It costs mana; without it the shield only rises
+    readonly property var bash: ({
+        window: 0.35,
+        mana: 6,
+        reach: 1.2,
+        speed: 20.0,
+        word: "BASH",
+        wordColor: "#9FD4E8"
+    })
+
     // The knight's footsteps: perSecond of them while it walks, the same
     // beat as the view's step bob; a knight that does not really move, held
     // by a wall, makes none. At volume, the sample pitched by the next of

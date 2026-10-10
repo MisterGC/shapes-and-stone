@@ -756,12 +756,43 @@ PhysicsItem {
         _shieldWanted = true
         // Broken by a crushing blow: it rises when the lockout is over
         if (shieldLock > 0) return
+        _tryBash()
         if (mana <= 0) {
             _noMana()
             return
         }
         isBlocking = true
     }
+    // The sword-and-shield combo (Balance.bash): the right button soon
+    // after a normal swing's start shoves back what stands in the swing's
+    // arc. Once a swing; returns how many it shoved
+    property int _swungAt: -1000000
+    property bool _bashed: true
+    function _tryBash() {
+        let b = Balance.bash
+        if (_bashed || isHeavy || isDashing || mana < b.mana) return 0
+        if ((_steps - _swungAt) * player.world.timeStep > b.window) return 0
+        _bashed = true
+        mana -= b.mana
+        _spentAt = _steps
+        let reach = attackRange * b.reach
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let shoved = 0
+        for (let e of (gameWorld && gameWorld.enemies) || []) {
+            if (!e || e.destroyed !== false) continue
+            let dx = e.xWu + e.widthWu / 2 - cx
+            let dy = e.yWu - e.heightWu / 2 - cy
+            if (dx * dx + dy * dy > reach * reach || !isInAttackArc(e)) continue
+            e.shove(dx, dy, b.speed)
+            if (e.enemyType === "guardian") e.stagger()
+            if (gameWorld.spawnWord) gameWorld.spawnWord(e.xWu, e.yWu + 0.5, b.word, b.wordColor)
+            shoved++
+        }
+        if (gameWorld && gameWorld.playBlock) gameWorld.playBlock()
+        console.log("[Player] Bash! Shoved", shoved)
+        return shoved
+    }
+
     // The right button is let go of
     function lowerShield() {
         _shieldWanted = false
@@ -858,6 +889,8 @@ PhysicsItem {
             _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
             attackCooldown = attackCooldownTime
+            _swungAt = _steps
+            _bashed = false
             view.swing()
             acted("attack")
             if (!isDashing && gameWorld) gameWorld.playSwordSwing()
