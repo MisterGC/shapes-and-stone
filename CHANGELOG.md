@@ -4,11 +4,11 @@ All notable changes to Shapes & Stone are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the game
 uses [Semantic Versioning](https://semver.org/).
 
-## [0.2.2] - 2026-10-10
+## [Unreleased]
 
 Turn the music and the sound down on their own, see what your knight carries at a glance, and fight by lantern light again. Built on Clayground v2026.9.
 
-**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser, or download the package for your system from the [release page](https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.2) (macOS, Windows, Linux AppImage; nothing to install).
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser; it is deployed from main on every push.
 
 ### Added
 
@@ -124,7 +124,7 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[0.2.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.2
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.2.1...HEAD
 [0.2.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.1
 [0.2.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.0
 [0.1.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.1.0
