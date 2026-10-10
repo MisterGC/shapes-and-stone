@@ -473,6 +473,18 @@ QtObject {
         sink: 1.6
     })
 
+    // The record of the deepest descent: a run that goes deeper raises a
+    // banner over the dungeon for banner seconds, fading in and out in
+    // fade seconds, and plays a chime at volume: the menu's confirm sound
+    // once per note of chime (semitones over its own), step seconds apart
+    readonly property var record: ({
+        banner: 2.5,
+        fade: 0.3,
+        volume: 0.7,
+        chime: [0, 4, 7, 12],
+        step: 0.12
+    })
+
     readonly property var campfire: ({
         healPerSecond: 5.0,
         // Mana comes back here, on top of the rest's knight.manaRegen

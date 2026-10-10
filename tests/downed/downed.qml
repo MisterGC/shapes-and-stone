@@ -269,9 +269,10 @@ Window {
                     check(fs !== null && g.screen === "game" && text("fallenTitle") === "Your party has fallen",
                           "the " + name + "'s screen says \"Your party has fallen\" (" + text("fallenTitle") + ")")
                     check(fs !== null && text("fallenDepth") === "Depth " + g.depth
-                          && text("fallenStats").indexOf("kill") >= 0 && text("fallenBest").indexOf("est depth") >= 0,
-                          "it shows the run's depth, kills, time and best depth (" + text("fallenDepth") + " | "
-                          + text("fallenStats") + " | " + text("fallenBest") + ")")
+                          && text("fallenStats").indexOf("kill") >= 0
+                          && /^(New record|Record \d+)/.test(text("fallenRecord")),
+                          "it shows the run's depth, kills, time and the record (" + text("fallenDepth") + " | "
+                          + text("fallenStats") + " | " + text("fallenRecord") + ")")
                     let hint = g === host ? "Enter to go again • Esc to the title"
                                           : "Waiting for the host to go again • Esc to leave the session"
                     check(fs !== null && fs.canGoAgain === (g === host) && text("fallenHint") === hint,

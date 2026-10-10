@@ -11,6 +11,8 @@ Item {
     property int _selectedIndex: 0
     // Why the game came back here, e.g. the host was lost; "" for none
     property string message: ""
+    // The deepest descent kept on this machine (Game.recordLine); "" for none
+    property string recordLine: ""
 
     // Menu sounds
     Sound {
@@ -66,6 +68,19 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: parent.height * 0.08
         spacing: 12
+
+        Text {
+            objectName: "titleRecord"
+            visible: titleScreen.recordLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.recordLine
+            color: "#E8C35A"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 15
+            font.bold: true
+            font.letterSpacing: 1
+        }
 
         Text {
             objectName: "titleMessage"

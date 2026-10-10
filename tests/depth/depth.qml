@@ -1,11 +1,11 @@
 // Depth bench - the HUD shows how deep the knight is, the fallen screen
-// shows the run's depth, kills and time, and the best depth is kept
-// between runs (issue #37).
+// shows the run's depth, kills and time, and the record of the deepest
+// descent is kept between runs (issues #37, #101).
 //
 // Runs twice, as two processes, to cross a restart. The first run clears
 // the bench's record, checks the HUD at depth 0 and 2, kills an enemy and
 // falls at depth 2: a new best. The second run must load best depth 2 from
-// the store, show it on the fallen screen after a fall at depth 0, and keep
+// the store, show its record on the fallen screen after a fall at depth 0, and keep
 // depth 3 as soon as a new run gets there. Prints one PASS or FAIL line per
 // check and exits with the number of failures.
 //
@@ -43,9 +43,10 @@ Window {
 
     Component.onCompleted: {
         console.log("[Depth] phase", phase)
-        if (phase === "first")
+        if (phase === "first") {
             record.remove("bestDepth")
-        else
+            record.remove("record")
+        } else
             check(record.get("bestDepth", "none") === "2",
                   "the store holds best depth 2 from the first run (" + record.get("bestDepth", "none") + ")")
         let c = Qt.createComponent(Qt.resolvedUrl("../../src/Game.qml"))
@@ -106,8 +107,8 @@ Window {
             let stats = fallenText("fallenStats")
             check(/^1 kill  •  0:\d\d$/.test(stats), "the fallen screen shows 1 kill and the time (" + stats + ")")
             check(game.runSeconds > 0, "the run's time ran (" + game.runSeconds.toFixed(2) + " s)")
-            check(fallenText("fallenBest") === "New best depth",
-                  "a first fall at depth 2 is a new best (" + fallenText("fallenBest") + ")")
+            check(fallenText("fallenRecord") === "New record",
+                  "a first fall at depth 2 is a new record (" + fallenText("fallenRecord") + ")")
             check(game.bestDepth === 2, "the game's best depth is 2")
         }]
     ]
@@ -126,8 +127,8 @@ Window {
             check(fallenText("fallenDepth") === "Depth 0", "the fall is at depth 0 (" + fallenText("fallenDepth") + ")")
             check(/^0 kills  •  0:\d\d$/.test(fallenText("fallenStats")),
                   "no kills this run (" + fallenText("fallenStats") + ")")
-            check(fallenText("fallenBest") === "Best depth 2",
-                  "the fallen screen shows the previous best, depth 2 (" + fallenText("fallenBest") + ")")
+            check(fallenText("fallenRecord").startsWith("Record 2  •  "),
+                  "the fallen screen shows the previous record, depth 2 (" + fallenText("fallenRecord") + ")")
             press(Qt.Key_Return)
         }],
         [() => game.player && !game.fallen, () => {
@@ -139,8 +140,8 @@ Window {
             strikeDown()
         }],
         [() => fallenScreen() !== null, () => {
-            check(fallenText("fallenBest") === "New best depth",
-                  "a fall below the old best is a new best (" + fallenText("fallenBest") + ")")
+            check(fallenText("fallenRecord") === "New record",
+                  "a fall below the old record is a new record (" + fallenText("fallenRecord") + ")")
             press(Qt.Key_Escape)
         }],
         [() => game.screen === "title", () => {

@@ -1,7 +1,8 @@
 import QtQuick
 
 // Shown when the knight falls: how deep the run got, its kills and time,
-// the best depth kept between runs, Enter to go again, Esc back to the
+// the record of the deepest descent, this session's runs with the depth
+// and time of each, newest first, Enter to go again, Esc back to the
 // title. In a session whose other knights still fight it says the knight
 // is down, keeps the dungeon in sight and offers only Esc, which leaves;
 // once every knight is down it shows the party's run, the host's Enter
@@ -18,9 +19,12 @@ Item {
     property int kills: 0
     // Simulated seconds the run lasted
     property real seconds: 0
-    property int bestDepth: 0
-    // This run went deeper than any before it
-    property bool newBest: false
+    // The record (Game.recordLine)
+    property string recordLine: ""
+    // This run went deeper than the record
+    property bool newRecord: false
+    // The session's runs, newest first: {depth, seconds}
+    property var runs: []
     // Enter starts the next run: alone, or the host once the party has
     // fallen. A session run ends for everyone or no one
     property bool canGoAgain: true
@@ -87,19 +91,44 @@ Item {
             objectName: "fallenStats"
             anchors.horizontalCenter: parent.horizontalCenter
             text: fallenScreen.kills + (fallenScreen.kills === 1 ? " kill" : " kills")
-                  + "  •  " + Math.floor(fallenScreen.seconds / 60) + ":"
-                  + String(Math.floor(fallenScreen.seconds % 60)).padStart(2, "0")
+                  + "  •  " + fallenScreen.clock(fallenScreen.seconds)
             color: "#AAAAAA"
             font.pixelSize: 14
         }
 
         Text {
-            objectName: "fallenBest"
+            objectName: "fallenRecord"
             anchors.horizontalCenter: parent.horizontalCenter
-            text: fallenScreen.newBest ? "New best depth" : "Best depth " + fallenScreen.bestDepth
-            color: fallenScreen.newBest ? "#E8C35A" : "#AAAAAA"
+            text: fallenScreen.newRecord ? "New record" : fallenScreen.recordLine
+            color: fallenScreen.newRecord ? "#E8C35A" : "#AAAAAA"
             font.pixelSize: 14
-            font.bold: fallenScreen.newBest
+            font.bold: fallenScreen.newRecord
+        }
+
+        // Tonight's runs, newest first, numbered from the first
+        Column {
+            objectName: "fallenRuns"
+            visible: fallenScreen.runs.length > 0
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 2
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "This session"
+                color: "#888888"
+                font.pixelSize: 11
+                font.letterSpacing: 1
+            }
+            Repeater {
+                model: fallenScreen.runs
+                Text {
+                    objectName: "fallenRun"
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "Run " + (fallenScreen.runs.length - index) + "  •  Depth " + modelData.depth
+                          + "  •  " + fallenScreen.clock(modelData.seconds)
+                    color: index === 0 ? "#CCCCCC" : "#888888"
+                    font.pixelSize: 12
+                }
+            }
         }
 
         Item { width: 1; height: 12 }
@@ -118,6 +147,11 @@ Item {
             font.pixelSize: 12
             font.italic: true
         }
+    }
+
+    // Seconds as m:ss
+    function clock(seconds) {
+        return Math.floor(seconds / 60) + ":" + String(Math.floor(seconds % 60)).padStart(2, "0")
     }
 
     Keys.onPressed: (event) => {

@@ -566,6 +566,8 @@ ClayWorld2d {
         inGame: screen === "game"
         showLobby: screen === "lobby"
         muted: world.muted
+        playerName: world.playerName
+        recordLine: world.recordLine
         // The host's run, from its start or, on a node that joins late,
         // at the level the host plays
         onStarted: (seed, level, position, next, knights) => {
@@ -580,6 +582,8 @@ ClayWorld2d {
             _applyLevelChange(newIndex, {pos: position, next: next, knights: knights})
         onWentAgain: (seed, position, knights) => _startRun(seed, position, knights)
         onLiftReceived: (fromId) => _rise("lift")
+        onRecordBroken: (banner) => _hostRecordBroken(banner)
+        onNameEdited: (name) => world.playerName = name
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
@@ -992,25 +996,110 @@ ClayWorld2d {
     // simulated seconds since it started (a pause holds them)
     property int runKills: 0
     property real runSeconds: 0
-    // The deepest any run got on this machine (-1 before the first), kept
-    // with Clayground.Storage; runStartBest is what it was when this run
-    // started, so the fallen screen can tell a new best
-    property int bestDepth: -1
-    property int runStartBest: -1
+    // The record of the deepest descent on this machine: the depth (-1
+    // before the first), the knights' names and the date, kept with
+    // Clayground.Storage as soon as a run gets deeper (key "record", and
+    // its depth alone under "bestDepth"). A joiner keeps the party's
+    // descent in its own record too
+    property var ownRecord: ({depth: -1, names: [], date: ""})
+    readonly property int bestDepth: ownRecord.depth
+    // The record every screen shows: alone this machine's, in a session
+    // the host's, the party's
+    readonly property var record: session.connected && !session.isHost
+                                  ? (session.hostRecord || {depth: -1, names: [], date: ""})
+                                  : ownRecord
+    readonly property string recordLine: record.depth < 0 ? ""
+        : "Record " + record.depth + (record.names && record.names.length > 0
+                                      ? "  •  " + record.names.join(", ") : "")
+          + (record.date ? "  •  " + record.date : "")
+    // This machine's record's depth when this run started, and whether
+    // the run went deeper: alone and on the host the first dungeon deeper
+    // than it raises the banner, on a joiner the host's word does
+    property int runStartRecord: -1
+    property bool recordPassed: false
+    // The banner was raised: once per run, on the step the depth passes
+    // the record, on every screen of a session
+    signal recordBanner(int depth)
+    // This session's runs, newest first ({depth, seconds}): alone since
+    // the game started, in a session the host's since it was hosted
+    property var ownRuns: []
+    readonly property var sessionRuns: session.connected && !session.isHost ? session.hostRuns : ownRuns
+    // The lobby's name of this machine's knight, kept with the record
+    property string playerName: "Knight"
     // A bench keeps its record apart from the player's with its own name
     property string recordStoreName: "ShapesAndStone"
     KeyValueStore { id: records; name: world.recordStoreName }
     function _startRunRecord() {
         runKills = 0
         runSeconds = 0
-        runStartBest = bestDepth
+        runStartRecord = ownRecord.depth
+        recordPassed = false
     }
-    function _keepBest() {
-        if (depth <= bestDepth) return
-        bestDepth = depth
-        records.set("bestDepth", String(bestDepth))
+    function _today() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
+    // The knights of this run: alone this one, in a session every node's
+    function _partyNames() { return session.connected ? session.partyNames() : [playerName] }
+    // The run is at a new depth or has ended: deeper than this machine's
+    // record, it is kept at once with the knights' names. Alone and on the
+    // host, the run went deeper than the record it started with: in the
+    // dungeon the banner goes up, once, on every screen; at the run's end
+    // (atEnd) the fallen screen says so without it
+    function _keepRecord(atEnd) {
+        if (screen !== "game" && !atEnd) return
+        if (depth > ownRecord.depth) {
+            ownRecord = {depth: depth, names: _partyNames(), date: _today()}
+            records.set("record", JSON.stringify(ownRecord))
+            records.set("bestDepth", String(depth))
+            if (session.connected && session.isHost) session.publishRecord(ownRecord)
+        }
+        if (session.connected && !session.isHost) return
+        if (recordPassed || depth <= runStartRecord) return
+        recordPassed = true
+        console.log("[Game] New record: depth", depth)
+        if (session.connected) session.announceRecord(!atEnd)
+        if (!atEnd) _raiseRecordBanner()
     }
-    onDepthChanged: _keepBest()
+    onDepthChanged: _keepRecord(false)
+    // Joiner: the host's party went deeper than the host's record
+    function _hostRecordBroken(banner) {
+        if (recordPassed) return
+        recordPassed = true
+        if (banner && screen === "game") _raiseRecordBanner()
+    }
+    function _raiseRecordBanner() {
+        recordBannerShow.restart()
+        recordChime.step = 0
+        recordChime.restart()
+        recordBanner(depth)
+    }
+    // A run is over: the first of this session's runs on the fallen screen
+    function _countRun() {
+        ownRuns = [{depth: depth, seconds: Math.round(runSeconds * 10) / 10}].concat(ownRuns)
+        if (session.connected && session.isHost) session.publishRuns(ownRuns)
+    }
+    function _loadRecord() {
+        let r = null
+        try { r = JSON.parse(records.get("record", "null")) } catch (err) { r = null }
+        if (!r || typeof r.depth !== "number")
+            r = {depth: parseInt(records.get("bestDepth", "-1")), names: [], date: ""}
+        if (isNaN(r.depth)) r.depth = -1
+        ownRecord = {depth: r.depth, names: Array.isArray(r.names) ? r.names : [],
+                     date: r.date ? String(r.date) : ""}
+        playerName = records.get("playerName", "Knight")
+    }
+    onPlayerNameChanged: records.set("playerName", playerName)
+    // A session hosted, joined or left starts its own list of runs; the
+    // host's record is the party's from the start
+    Connections {
+        target: session
+        function onConnectedChanged() {
+            world.ownRuns = []
+            // Later: a host can set no session property before its
+            // connectedChanged is over
+            if (session.connected) Qt.callLater(() => {
+                if (session.connected && session.isHost) session.publishRecord(world.ownRecord)
+            })
+        }
+    }
 
     // Collision categories
     readonly property int catWall: Box.Category1
@@ -1020,9 +1109,9 @@ ClayWorld2d {
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
-        bestDepth = parseInt(records.get("bestDepth", "-1"))
-        runStartBest = bestDepth
-        console.log("[Game] Best depth so far:", bestDepth)
+        _loadRecord()
+        runStartRecord = ownRecord.depth
+        console.log("[Game] Record so far:", recordLine === "" ? "none" : recordLine)
         forceActiveFocus()
     }
 
@@ -1453,6 +1542,59 @@ ClayWorld2d {
         visible: player !== null
         depth: world.depth
         camp: levelType === "village" && !fightRoomActive
+        record: world.record.depth
+    }
+
+    // The party went deeper than the record: a short banner over the
+    // dungeon on every screen, and a chime (Balance.record)
+    Text {
+        id: recordBannerText
+        objectName: "recordBanner"
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height * 0.22
+        z: 1000
+        visible: opacity > 0
+        opacity: 0
+        text: "New record"
+        color: "#E8C35A"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 40
+        font.bold: true
+        font.letterSpacing: 3
+
+        Text {
+            anchors.top: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "Depth " + world.depth
+            color: "#DDDDDD"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 18
+            font.bold: true
+        }
+    }
+    SequentialAnimation {
+        id: recordBannerShow
+        NumberAnimation { target: recordBannerText; property: "opacity"; to: 1; duration: Balance.record.fade * 1000 }
+        PauseAnimation { duration: Math.max(0, Balance.record.banner - 2 * Balance.record.fade) * 1000 }
+        NumberAnimation { target: recordBannerText; property: "opacity"; to: 0; duration: Balance.record.fade * 1000 }
+    }
+    Sound {
+        id: recordChimeSound
+        source: "assets/menu_confirm.wav"
+        volume: muted ? 0 : Balance.record.volume
+    }
+    Timer {
+        id: recordChime
+        property int step: 0
+        interval: Balance.record.step * 1000
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            recordChimeSound.triggerNote(recordChimeSound.rootNote + Balance.record.chime[step], 1)
+            if (++step >= Balance.record.chime.length) stop()
+        }
     }
 
     // DEV menu (sandbox only)
@@ -1606,7 +1748,8 @@ ClayWorld2d {
         console.log("[Game] The knight has fallen at depth", depth)
         menuOpen = false
         fallen = true
-        _keepBest()
+        _keepRecord(true)
+        if (!session.connected) _countRun()
         countFight("fall")
         if (!session.connected) nextPosition = _dangerAfterFall()
         // In a session the enemies go for the knights still standing
@@ -1640,7 +1783,8 @@ ClayWorld2d {
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
         }
-        _keepBest()
+        _keepRecord(true)
+        if (session.isHost) _countRun()
         nextPosition = _dangerAfterFall()
         partyFallen = true
         fallen = true
@@ -3361,6 +3505,8 @@ ClayWorld2d {
         // Generate before leaving the title: with a player in place,
         // _tryStartGame() does not build a second level on top.
         let type = name === "village" ? "village" : "dungeon"
+        // Landing at a depth is no descent past the record: no banner
+        recordPassed = true
         levelIndex = levelIndexOf(d, type)
         levelType = type
         _startRunRecord()
@@ -3566,8 +3712,9 @@ ClayWorld2d {
                 depth: world.depth
                 kills: world.runKills
                 seconds: world.runSeconds
-                bestDepth: world.bestDepth
-                newBest: world.depth > world.runStartBest
+                recordLine: world.recordLine
+                newRecord: world.recordPassed
+                runs: world.sessionRuns
                 canGoAgain: !session.connected || (world.partyFallen && session.isHost)
                 waitsForHost: session.connected && world.partyFallen && !session.isHost
                 partyFights: session.connected && !world.partyFallen
@@ -3587,6 +3734,7 @@ ClayWorld2d {
             TitleScreen {
                 muted: world.muted
                 message: world.titleMessage
+                recordLine: world.recordLine
                 onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
             }

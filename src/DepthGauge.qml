@@ -11,6 +11,8 @@ Item {
     property int depth: 0
     // At the camp between two dungeons
     property bool camp: false
+    // The record's depth, under the depth; -1 for none
+    property int record: -1
 
     // The depth the marker is at; at the camp it goes from depth to depth + 1
     property real shown: depth
@@ -152,5 +154,18 @@ Item {
         font.pixelSize: gauge.camp ? 18 : 14
         font.bold: true
         font.letterSpacing: 1
+    }
+    // The record to pass, under the depth
+    Text {
+        objectName: "gaugeRecord"
+        visible: gauge.record >= 0
+        anchors.top: label.bottom
+        anchors.right: label.right
+        text: "record " + gauge.record
+        color: "#E8C35A"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: gauge.camp ? 13 : 11
+        font.bold: true
     }
 }

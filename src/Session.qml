@@ -15,6 +15,10 @@ Item {
     property bool inGame: false      // the game screen is up
     property bool showLobby: false   // the lobby screen is up
     property bool muted: false       // the lobby plays no sound
+    // This node's knight's name, edited in the lobby (nameEdited)
+    property string playerName: "Knight"
+    // The record the lobby shows, Game.recordLine
+    property string recordLine: ""
 
     readonly property bool connected: net.connected
     readonly property bool isHost: net.isHost
@@ -89,6 +93,26 @@ Item {
     // Another node's knight stood beside this node's fallen knight long
     // enough: it rises (Balance.party)
     signal liftReceived(string fromId)
+    // The name was edited in the lobby
+    signal nameEdited(string name)
+    // Joiner: the host's party went deeper than the host's record, with
+    // the banner in the dungeon or, at the run's end, without it
+    signal recordBroken(bool banner)
+
+    // Every knight's name by its node, the session property "names": each
+    // node sends its own to the host, which sets it
+    readonly property var names: net.connected && net.sessionProperties.names
+                                 ? net.sessionProperties.names : ({})
+    // The host's record, the party's ({depth, names, date}), the session
+    // property "record"; null before the host has set it
+    readonly property var hostRecord: net.connected && net.sessionProperties.record
+                                      ? net.sessionProperties.record : null
+    // The session's runs the host counted, newest first ({depth, seconds}),
+    // the session property "runs"
+    readonly property var hostRuns: net.connected && net.sessionProperties.runs
+                                    ? net.sessionProperties.runs : []
+    // Host: the names it has been sent
+    property var _names: ({})
 
     property var remotePlayers: ({})
     // The last state each other node sent, also while its knight is not
@@ -151,6 +175,10 @@ Item {
                 session.struckReported(fromId, data)
             } else if (data.type === "lift") {
                 session.liftReceived(fromId)
+            } else if (data.type === "name") {
+                if (net.isHost) session._setName(fromId, data.name)
+            } else if (data.type === "newRecord") {
+                if (!net.isHost) session.recordBroken(data.banner === true)
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
             } else if (data.type === "exitReached") {
@@ -190,6 +218,10 @@ Item {
                 delete remotePlayers[nodeId]
             }
             delete lastStates[nodeId]
+            if (net.isHost && _names[nodeId] !== undefined) {
+                delete _names[nodeId]
+                net.setSessionProperty("names", _names)
+            }
             session.playerLeft(nodeId)
             session.partyChanged()
         }
@@ -197,9 +229,13 @@ Item {
         onConnectedChanged: {
             if (net.connected) {
                 session._leaving = false
+                // Later: a host can set no session property before its
+                // connectedChanged is over
+                Qt.callLater(session._sendName)
             } else {
                 session.lastStates = ({})
                 session.runSeed = -1
+                session._names = ({})
             }
         }
         // reason is "host-left" when the host left on its own, else it
@@ -278,6 +314,43 @@ Item {
         lastStates = ({})
         net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
                                        knights: knights})
+    }
+
+    // The name goes to the host, which sets it for every node; the host's
+    // own straight into the session property
+    onPlayerNameChanged: _sendName()
+    function _sendName() {
+        if (!net.connected) return
+        if (net.isHost) _setName(net.nodeId, playerName)
+        else net.sendTo(net.hostId, {type: "name", name: playerName})
+    }
+    function _setName(nodeId, name) {
+        _names[nodeId] = String(name).slice(0, 16)
+        net.setSessionProperty("names", _names)
+    }
+    // A node's knight's name; "Knight" before it has sent one
+    function nameOf(nodeId) {
+        let n = names[nodeId]
+        return n ? n : "Knight"
+    }
+    // The names of every knight in the session, from the host's list: the
+    // host's first, the others by their node, so each screen has them in
+    // the same order
+    function partyNames() {
+        let others = Object.keys(names).filter(id => id !== net.hostId).sort()
+        return [nameOf(net.hostId)].concat(others.map(id => names[id]))
+    }
+    // Host: its record is the party's, for every screen
+    function publishRecord(record) {
+        if (net.isHost) net.setSessionProperty("record", record)
+    }
+    // Host: the session's runs, newest first, for every fallen screen
+    function publishRuns(runs) {
+        if (net.isHost) net.setSessionProperty("runs", runs)
+    }
+    // Host: the party went deeper than the record, every screen tells it
+    function announceRecord(banner) {
+        if (net.isHost) net.broadcast({type: "newRecord", banner: banner})
     }
 
     // Reliable event so remote clients show an action crisply
@@ -472,6 +545,10 @@ Item {
             MultiplayerLobby {
                 network: net
                 muted: session.muted
+                playerName: session.playerName
+                onPlayerNameChanged: session.nameEdited(playerName)
+                names: session.names
+                recordLine: session.recordLine
                 onStartGame: session.lobbyStartRequested()
                 onBack: { net.leave(); session.lobbyLeft() }
             }
