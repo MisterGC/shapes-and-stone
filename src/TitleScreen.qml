@@ -33,13 +33,30 @@ Item {
         volume: muted ? 0 : 0.4
         loop: true
     }
+    // A browser refuses to play before the first key press or click, and the
+    // refused play() is not tried again: there the first gesture starts it.
+    property bool _musicStarted: false
+    function _startMusic() {
+        if (_musicStarted) return
+        _musicStarted = true
+        titleMusic.play()
+    }
     // Deferred: Game and the canvas both take focus while they are created;
     // grabbing it now would lose it to them and Enter would do nothing.
-    Component.onCompleted: { titleMusic.play(); Qt.callLater(forceActiveFocus) }
+    Component.onCompleted: {
+        if (Qt.platform.os !== "wasm") _startMusic()
+        Qt.callLater(forceActiveFocus)
+    }
     Component.onDestruction: titleMusic.stop()
 
     // Background (fills area not covered by image)
     Rectangle { anchors.fill: parent; color: "#0a0a14" }
+
+    // A click anywhere counts as the browser's first gesture
+    MouseArea {
+        anchors.fill: parent
+        onPressed: (mouse) => { titleScreen._startMusic(); mouse.accepted = false }
+    }
 
     // Cover art — full height, centered
     Image {
@@ -128,7 +145,7 @@ Item {
                             menuHoverSound.play()
                         }
                     }
-                    onClicked: titleScreen._confirm()
+                    onClicked: { titleScreen._startMusic(); titleScreen._confirm() }
                 }
             }
         }
@@ -144,6 +161,7 @@ Item {
 
     // Keyboard navigation
     Keys.onPressed: (event) => {
+        _startMusic()
         if (event.key === Qt.Key_W || event.key === Qt.Key_Up) {
             if (_selectedIndex > 0) { _selectedIndex--; menuHoverSound.play() }
             event.accepted = true
