@@ -8,8 +8,8 @@
 // opens the knight panel: a harness bought from the smith shows with what
 // its level gives, the potions with their count; C closes it, and Esc
 // closes it before it would open the menu. Bought potions and draughts
-// hang at the knight's belt with their counts. A step's length walked plays a
-// footstep, less does not. A strike's damage shows as a number in normal
+// hang at the knight's belt with their counts. A knight that does not move
+// makes no footstep; walking two beats of Balance.steps plays two. A strike's damage shows as a number in normal
 // play, the knight's own hurt does not; an enemy's eyes are drawn with its
 // body, under the darkness. Prints one PASS or FAIL
 // line per check and exits with the number of failures.
@@ -183,17 +183,26 @@ Window {
         }],
         [100, () => {
             check(shown("knightBelt") === null, "an empty belt shows no vials")
-            // Footsteps: a step's length really walked plays one
-            let p = game.player
-            p._countSteps()
-            p.xWu += Balance.steps.length * 0.6
-            p._countSteps()
-            check(!tracks(game)["footstep.wav"].playing, "less than a step's length plays no step")
-            p.xWu += Balance.steps.length * 0.6
-            p._countSteps()
+            // Footsteps: held where it is, a knight makes none; walking, the
+            // first comes half a beat in
+            let p = game.player, dt = 1 / 60, beat = 1 / Balance.steps.perSecond
+            let played = 0
+            // A stand-in counts the steps; the knight's view reads only these
+            p.gameWorld = {fx: game.fx, levelType: game.levelType, playStep: () => played++}
+            p._countSteps(dt)
+            for (let i = 0; i < 120; i++) p._countSteps(dt)
+            check(played === 0, "a knight that does not move makes no step (" + played + ")")
+            let n = Math.round(2 * beat / dt)
+            for (let i = 0; i < n; i++) {
+                p.xWu += p.maxSpeed * dt
+                p._countSteps(dt)
+            }
+            check(played === 2, "walking two beats plays " + played + " steps, 2 wanted")
+            p.gameWorld = game
+            game.playStep()
         }],
         [() => tracks(game)["footstep.wav"].playing, () => {
-            check(true, "a step's length walked plays a footstep")
+            check(true, "a footstep is heard")
             // Strike numbers show in normal play, the knight's own hurt not
             game.debugMechanics = false
             let before = countNamed(game, "damageNumber")

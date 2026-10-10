@@ -175,22 +175,27 @@ PhysicsItem {
     property real _knockVx: 0
     property real _knockVy: 0
 
-    // Footsteps: the way really walked since the last one, wu; a dash, a
-    // knockback or a fall makes none and starts the count again
-    property real _walked: 0
+    // Footsteps (Balance.steps): a beat that runs while the knight really
+    // walks, dt seconds a physics step; standing, held by a wall, dashing,
+    // thrown back or down it waits half a beat before the first step
+    property real _stepClock: 0
     property real _lastX: NaN
     property real _lastY: NaN
-    function _countSteps() {
+    function _countSteps(dt) {
         let dx = xWu - _lastX, dy = yWu - _lastY
         _lastX = xWu
         _lastY = yWu
-        if (isNaN(dx) || fallen || isDashing || _knockT > 0) {
-            _walked = 0
+        let beat = 1 / Balance.steps.perSecond
+        // Walking at a fifth of the move speed or more counts
+        let walking = !isNaN(dx) && !fallen && !isDashing && _knockT <= 0
+            && Math.sqrt(dx * dx + dy * dy) >= maxSpeed * 0.2 * dt
+        if (!walking) {
+            _stepClock = beat / 2
             return
         }
-        _walked += Math.sqrt(dx * dx + dy * dy)
-        if (_walked >= Balance.steps.length) {
-            _walked = 0
+        _stepClock += dt
+        if (_stepClock >= beat) {
+            _stepClock -= beat
             if (gameWorld && gameWorld.playStep) gameWorld.playStep()
         }
     }
@@ -204,7 +209,7 @@ PhysicsItem {
         function onStepped() {
             let dt = player.world.timeStep
             _steps++
-            _countSteps()
+            _countSteps(dt)
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
             if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt

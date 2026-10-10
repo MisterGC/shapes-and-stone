@@ -187,7 +187,8 @@ Item {
         loops: Animation.Infinite
     }
     readonly property real _breath: Math.sin(_lifeT * 2.4) * (1 - moveAmount)
-    readonly property real _step: Math.abs(Math.sin(_lifeT * 11)) * moveAmount
+    // One bob a footstep, at the beat the footsteps sound (Balance.steps)
+    readonly property real _step: Math.abs(Math.sin(_lifeT * Math.PI * Balance.steps.perSecond)) * moveAmount
 
     Rectangle {
         id: visual

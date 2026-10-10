@@ -224,12 +224,13 @@ QtObject {
         flashColor: "#FFFFFF"
     })
 
-    // The knight's footsteps: one each time it has really moved length wu,
-    // so a knight held by a wall makes none, at volume, the sample pitched
-    // by the next of pitches semitones in turn, left and right foot
+    // The knight's footsteps: perSecond of them while it walks, the same
+    // beat as the view's step bob; a knight that does not really move, held
+    // by a wall, makes none. At volume, the sample pitched by the next of
+    // pitches semitones in turn, left and right foot
     readonly property var steps: ({
-        length: 1.9,
-        volume: 0.35,
+        perSecond: 2.6,
+        volume: 0.15,
         pitches: [0, -2]
     })
 
