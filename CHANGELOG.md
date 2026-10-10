@@ -16,10 +16,16 @@ Turn the music and the sound down on their own, see what your knight carries at 
 - **The knight panel** on C: HP, mana, damage, depth, gold, potions, draughts and the smith's upgrades with what each level gives; the game runs on while it is open. (c0b4b89)
 - **Potions and mana draughts at the belt:** a vial of each the knight carries hangs beside it with the count. (c0b4b89, f1a6c5d)
 - **Gold clinks** when it is picked up. (c0b4b89)
+- **Footsteps** while the knight walks; one held at a wall makes none. (3d67868)
+- **Strike numbers:** the damage of a hit shows over the enemy, and healing and gold picked up show over the knight, in normal play. (3d67868)
 
 ### Changed
 
-- **Dark beyond the light again:** outside the lantern and the torches the dungeon is near black and an enemy shows only its glowing eyes; a wall torch lights a smaller stretch. (4069bfd)
+- **Dark beyond the light again:** outside the lantern and the torches the dungeon is near black and an enemy is not seen until the light reaches it, its eyes no longer glow; a wall torch lights a smaller stretch. (4069bfd, 3d67868)
+
+### Fixed
+
+- In the browser the music of the camp, the dungeon and the title loops instead of falling silent after one pass. (3d67868)
 
 ## [0.2.1] - 2026-10-10
 
