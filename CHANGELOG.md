@@ -17,6 +17,7 @@ Turn the music and the sound down on their own, see what your knight carries at 
 - **Potions and mana draughts at the belt:** a vial of each the knight carries hangs beside it with the count. (c0b4b89, f1a6c5d)
 - **Gold clinks** when it is picked up. (c0b4b89)
 - **Footsteps** while the knight walks; one held at a wall makes none. (3d67868)
+- **Breakable bones:** a swing or a whirlwind that reaches a heap of bones breaks it into splinters. (e40a44b)
 - **Strike numbers:** the damage of a hit shows over the enemy, and healing and gold picked up show over the knight, in normal play. (3d67868)
 
 ### Changed
