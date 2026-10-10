@@ -26,10 +26,12 @@ Item {
         offsetYWu: -0.5
         radius: torch.lightRadius
         color: torch.flameColor
-        intensity: 1.0
+        intensity: 0.75
         flicker: 0.45
     }
-    property real lightRadius: 8
+    // A wall torch lights its own stretch of the corridor; the dark between
+    // torches is the knight's lantern's to push back
+    property real lightRadius: 6
 
     // Bracket
     Rectangle {

@@ -2142,8 +2142,9 @@ ClayWorld2d {
 
     // --- Atmosphere: light and screen treatment (fx on) ---------------------
     // Coloured lights with wall shadows replace the single lantern mask. The
-    // ambient is how much of an unlit spot still shows: very dark in the
-    // dungeon, but never pitch black; a moonlit dusk in the village.
+    // ambient is how much of an unlit spot still shows: in the dungeon next
+    // to nothing, so what lies beyond the lantern and the torches stays
+    // unseen but for the enemies' glowing eyes; a moonlit dusk in the village.
     LightLayer2d {
         id: lighting
         world: world
