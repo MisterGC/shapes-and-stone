@@ -330,15 +330,13 @@ PhysicsItem {
     }
     Binding { target: visual; property: "scale"; value: enemy._poseScale * enemy._squash }
 
-    // Eyes that glow in the dark: drawn above the darkness, so an enemy
-    // beyond the light is a pair of eyes coming closer. They sit on the
-    // icon's eyes and blink now and then.
+    // Eyes: they sit on the icon's eyes and blink now and then. Drawn
+    // under the darkness like the body, so an enemy beyond the lantern and
+    // the torches is not seen at all until the light reaches it.
     Item {
         id: glowEyes
-        parent: enemy._fx && gameWorld && gameWorld.glowParent ? gameWorld.glowParent() : enemy
+        objectName: "enemyEyes"
         visible: enemy._fx && enemy.aiState !== "stagger"
-        x: parent === enemy ? 0 : enemy.x
-        y: parent === enemy ? 0 : enemy.y
         width: enemy.width
         height: enemy.height
         scale: visual.scale

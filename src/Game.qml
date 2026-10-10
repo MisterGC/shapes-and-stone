@@ -62,28 +62,28 @@ ClayWorld2d {
     property bool fx: true
 
     // Audio — switches based on levelType
-    Music {
+    LoopMusic {
         id: dungeonAmbience
         source: "assets/dungeon_ambience.mp3"
         volume: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
 
-    Music {
+    LoopMusic {
         id: dungeonMusic
         source: "assets/dungeon_music.mp3"
         volume: muted ? 0 : 0.3 * musicVolume
         loop: true
     }
 
-    Music {
+    LoopMusic {
         id: villageAmbience
         source: "assets/village_ambience.mp3"
         volume: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
 
-    Music {
+    LoopMusic {
         id: villageMusic
         source: "assets/village_music.mp3"
         volume: muted ? 0 : 0.35 * musicVolume
@@ -92,15 +92,15 @@ ClayWorld2d {
 
     onLevelTypeChanged: {
         if (levelType === "village") {
-            dungeonAmbience.stop()
-            dungeonMusic.stop()
-            villageAmbience.play()
-            villageMusic.play()
+            dungeonAmbience.halt()
+            dungeonMusic.halt()
+            villageAmbience.start()
+            villageMusic.start()
         } else {
-            villageAmbience.stop()
-            villageMusic.stop()
-            dungeonAmbience.play()
-            dungeonMusic.play()
+            villageAmbience.halt()
+            villageMusic.halt()
+            dungeonAmbience.start()
+            dungeonMusic.start()
         }
     }
 
@@ -161,6 +161,17 @@ ClayWorld2d {
                                     gain === undefined ? 1 : gain)
     }
     // The whirlwind: the swing sample pitched further down, a long spin,
+    // The knight's footsteps (Balance.steps), only this node's own
+    Sound {
+        id: footstepSound
+        source: "assets/footstep.wav"
+        volume: muted ? 0 : Balance.steps.volume * soundVolume
+    }
+    property int _foot: 0
+    function playStep() {
+        let p = Balance.steps.pitches
+        footstepSound.triggerNote(footstepSound.rootNote + p[_foot++ % p.length], 1)
+    }
     // and the knight's shout of a special move
     Sound {
         id: whirlShoutSound
@@ -1221,8 +1232,8 @@ ClayWorld2d {
                 generateVillage()
                 return
             }
-            dungeonAmbience.play()
-            dungeonMusic.play()
+            dungeonAmbience.start()
+            dungeonMusic.start()
             generateDungeon()
         }
     }
@@ -2112,10 +2123,10 @@ ClayWorld2d {
         levelIndex = 0
         levelType = "dungeon"
         _startRunRecord()
-        dungeonAmbience.stop()
-        dungeonMusic.stop()
-        villageAmbience.stop()
-        villageMusic.stop()
+        dungeonAmbience.halt()
+        dungeonMusic.halt()
+        villageAmbience.halt()
+        villageMusic.halt()
         screen = "title"
     }
 
@@ -3261,10 +3272,11 @@ ClayWorld2d {
         }
     }
 
-    // Damage numbers are for tuning: they show only in debug mode
+    // A number over what was hit, healed or picked up: how hard a strike
+    // landed shows in normal play. Above the darkness, readable where the
+    // light does not reach
     function spawnDamageNumber(wx, wy, amount, color) {
-        if (!debugMechanics) return
-        damageNumberComp.createObject(world.room, {
+        damageNumberComp.createObject(glowParent(), {
             objectName: "damageNumber",
             xWu: wx, yWu: wy + 0.5,
             startYWu: wy + 0.5,
@@ -3272,6 +3284,12 @@ ClayWorld2d {
             color: color,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
+    }
+
+    // The knight's own hurt is told by its flash and the HP bar's chunk:
+    // a number over it is for tuning, in debug mode only
+    function spawnHurtNumber(wx, wy, amount, color) {
+        if (debugMechanics) spawnDamageNumber(wx, wy, amount, color)
     }
 
     // A word over the struck enemy - PARRY, PERFECT - shows in normal play

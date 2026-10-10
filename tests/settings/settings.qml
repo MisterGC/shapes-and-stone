@@ -8,7 +8,10 @@
 // opens the knight panel: a harness bought from the smith shows with what
 // its level gives, the potions with their count; C closes it, and Esc
 // closes it before it would open the menu. Bought potions and draughts
-// hang at the knight's belt with their counts. Prints one PASS or FAIL
+// hang at the knight's belt with their counts. A step's length walked plays a
+// footstep, less does not. A strike's damage shows as a number in normal
+// play, the knight's own hurt does not; an enemy's eyes are drawn with its
+// body, under the darkness. Prints one PASS or FAIL
 // line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/settings/settings.qml
@@ -17,6 +20,7 @@ import QtQuick
 import QtQuick.Window
 import QtTest
 import Clayground.Storage
+import "../../src"
 
 Window {
     id: bench
@@ -74,6 +78,12 @@ Window {
     function shown(name) {
         let f = find(game, name)
         return f && f.visible ? f : null
+    }
+    function countNamed(root, name) {
+        let n = root.objectName === name ? 1 : 0
+        let kids = root.data || []
+        for (let i = 0; i < kids.length; i++) n += countNamed(kids[i], name)
+        return n
     }
     function textsUnder(item, out) {
         out = out || []
@@ -173,6 +183,28 @@ Window {
         }],
         [100, () => {
             check(shown("knightBelt") === null, "an empty belt shows no vials")
+            // Footsteps: a step's length really walked plays one
+            let p = game.player
+            p._countSteps()
+            p.xWu += Balance.steps.length * 0.6
+            p._countSteps()
+            check(!tracks(game)["footstep.wav"].playing, "less than a step's length plays no step")
+            p.xWu += Balance.steps.length * 0.6
+            p._countSteps()
+        }],
+        [() => tracks(game)["footstep.wav"].playing, () => {
+            check(true, "a step's length walked plays a footstep")
+            // Strike numbers show in normal play, the knight's own hurt not
+            game.debugMechanics = false
+            let before = countNamed(game, "damageNumber")
+            game.spawnHurtNumber(game.player.xWu, game.player.yWu, 7, "#FF4444")
+            check(countNamed(game, "damageNumber") === before, "the knight's own hurt shows no number")
+            let e = game.enemies.find(x => !x.destroyed)
+            game.spawnDamageNumber(e.xWu, e.yWu, 12, "#FFD700")
+            check(countNamed(game, "damageNumber") === before + 1, "a strike's damage shows over the enemy")
+            // The eyes are drawn with the body, under the darkness
+            let eyes = find(e, "enemyEyes")
+            check(eyes !== null && eyes.parent === e, "an enemy's eyes stay with its body, under the darkness")
             console.log("[Settings] done,", failures, "failed")
         }],
         [300, () => game.destroy()],

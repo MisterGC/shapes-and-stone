@@ -30,7 +30,7 @@ Item {
     }
 
     // Title music
-    Music {
+    LoopMusic {
         id: titleMusic
         source: "assets/title_music.mp3"
         volume: muted ? 0 : 0.4 * musicVolume
@@ -42,7 +42,7 @@ Item {
     function _startMusic() {
         if (_musicStarted) return
         _musicStarted = true
-        titleMusic.play()
+        titleMusic.start()
     }
     // Deferred: Game and the canvas both take focus while they are created;
     // grabbing it now would lose it to them and Enter would do nothing.
@@ -50,7 +50,7 @@ Item {
         if (Qt.platform.os !== "wasm") _startMusic()
         Qt.callLater(forceActiveFocus)
     }
-    Component.onDestruction: titleMusic.stop()
+    Component.onDestruction: titleMusic.halt()
 
     // Background (fills area not covered by image)
     Rectangle { anchors.fill: parent; color: "#0a0a14" }

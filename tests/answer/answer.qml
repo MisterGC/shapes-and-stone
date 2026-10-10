@@ -389,7 +389,8 @@ Window {
                 playHurt: () => shown.push("hurt sound"),
                 impact: (kind) => shown.push(kind),
                 countFight: () => {},
-                spawnDamageNumber: () => shown.push("damage number")
+                spawnDamageNumber: () => shown.push("damage number"),
+                spawnHurtNumber: () => shown.push("damage number")
             }
             let g = game.enemies.find(x => x.enemyType === "grunt" && !x.destroyed)
             let realWorld = g.gameWorld
@@ -430,7 +431,8 @@ Window {
                 playBlock: () => played.push("playBlock"),
                 impact: () => {},
                 countFight: () => {},
-                spawnDamageNumber: () => {}
+                spawnDamageNumber: () => {},
+                spawnHurtNumber: () => {}
             }
             // The shield is held: raised longer ago than a perfect block's
             // window

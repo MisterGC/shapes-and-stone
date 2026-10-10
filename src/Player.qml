@@ -175,6 +175,26 @@ PhysicsItem {
     property real _knockVx: 0
     property real _knockVy: 0
 
+    // Footsteps: the way really walked since the last one, wu; a dash, a
+    // knockback or a fall makes none and starts the count again
+    property real _walked: 0
+    property real _lastX: NaN
+    property real _lastY: NaN
+    function _countSteps() {
+        let dx = xWu - _lastX, dy = yWu - _lastY
+        _lastX = xWu
+        _lastY = yWu
+        if (isNaN(dx) || fallen || isDashing || _knockT > 0) {
+            _walked = 0
+            return
+        }
+        _walked += Math.sqrt(dx * dx + dy * dy)
+        if (_walked >= Balance.steps.length) {
+            _walked = 0
+            if (gameWorld && gameWorld.playStep) gameWorld.playStep()
+        }
+    }
+
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held.
     // Dash, swing and cooldowns count the time the step simulated: a pause, a
@@ -184,6 +204,7 @@ PhysicsItem {
         function onStepped() {
             let dt = player.world.timeStep
             _steps++
+            _countSteps()
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
             if (graceLeft > 0) graceLeft = graceLeft - dt < 1e-6 ? 0 : graceLeft - dt
@@ -583,7 +604,7 @@ PhysicsItem {
                                  xWu + widthWu / 2 - a.x, yWu - heightWu / 2 - a.y)
             else
                 gameWorld.shake(blocked ? 1 : 3)
-            gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
+            gameWorld.spawnHurtNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
         return blocked ? "blocked" : "hit"
     }
@@ -658,7 +679,7 @@ PhysicsItem {
                                  xWu + widthWu / 2 - a.x, yWu - heightWu / 2 - a.y)
             else
                 gameWorld.shake(3)
-            gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, "#FF4444")
+            gameWorld.spawnHurtNumber(xWu, yWu, finalDamage, "#FF4444")
         }
         return "crushed"
     }

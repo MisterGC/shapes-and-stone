@@ -130,7 +130,7 @@ PhysicsItem {
         if (gameWorld) {
             if (result === "hit" || result === "blocked") {
                 gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)
-                gameWorld.spawnDamageNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
+                gameWorld.spawnHurtNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
             }
             if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, result)
         }
