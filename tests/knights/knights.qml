@@ -3,7 +3,18 @@
 //
 // Loads the real game in the dungeon scenario, spawns a RemotePlayer next
 // to the player and drives it the way Session.qml does (pushState and
-// triggerAction), without a network. Each pose is saved as <out>/<pose>.png.
+// triggerAction), without a network. Each pose is saved as <out>/<pose>.png;
+// in 3-block both shields have just taken a blow and flash white. In hurt a
+// hit has just landed on the local knight: it flashes red and its HP bar
+// shows the lost chunk. In lowMana its raised shield is thin on 5 mana, and
+// in shieldBreak both shields have just broken into grey shards, the local
+// knight's mana bar flashing red. In charging both hold the left button,
+// their blades drawn back and glowing; in heavy both swing the wide heavy
+// blow of a full charge; in whirlwind both spin it round them as a full
+// charge let go at a dash's start does. In sword the local knight swings a sharpened
+// sword, its blade's edge brighter and wider, in shield it holds up a
+// reinforced shield with a lighter rim; the remote's upgrades are not sent,
+// it swings and blocks as before.
 //
 //   qml -I <build>/bin/qml tests/knights/knights.qml -- <out dir>
 
@@ -94,7 +105,9 @@ Window {
         [100, () => { game.player.attack(); remote.triggerAction("attack") }],
         [120, () => capture("2-swing")],
         [600, () => { game.player.isBlocking = true; remoteState = 2; remoteBlock = true }],
-        [250, () => capture("3-block")],
+        // The shields take a blow: both flash white and bump out
+        [250, () => { let v = view(game.player); if (v) v.block(); remote.triggerAction("block") }],
+        [10, () => capture("3-block")],
         // Swinging while blocking: the state's s says attack, b keeps the shield
         [100, () => { game.player.attack(); remote.triggerAction("attack"); remoteState = 1 }],
         [120, () => capture("3b-block-swing")],
@@ -102,13 +115,72 @@ Window {
         [100, () => { let v = view(game.player); if (v) v.parry(); remote.triggerAction("parry") }],
         [40, () => capture("4-parry")],
         [400, () => { game.player.isBlocking = false; remoteState = 0; remoteBlock = false }],
-        [300, () => {
-            let v = view(game.player); if (v) v.hurt(); remote.triggerAction("hurt")
-            game.player.graceLeft = Balance.knight.hurtGrace
+        // Holding the left button: both blades drawn back and glowing,
+        // the remote's from its state's s (4 charging, 5 full)
+        [300, () => { game.player.pressSwing(); remoteState = 4 }],
+        [450, () => capture("charging")],
+        // Full, then let go: the wide heavy swing, on both knights
+        [250, () => { remoteState = 5 }],
+        [100, () => {
+            game.player.releaseSwing()
+            remote.triggerAction("heavy"); remoteState = 1
         }],
-        [30, () => capture("5-hurt")],
+        [120, () => capture("heavy")],
+        [500, () => { remoteState = 0 }],
+        // A full charge let go as the dash starts: both knights whirl, the
+        // glowing blade spinning round them
+        [300, () => { game.player.pressSwing(); remoteState = 4 }],
+        [700, () => { remoteState = 5 }],
+        [50, () => {
+            game.player.releaseSwing()
+            game.player.dash()
+            remote.triggerAction("whirlwind"); remoteState = 3
+        }],
+        [150, () => capture("whirlwind")],
+        [500, () => { remoteState = 0 }],
+        // A real hit on the local knight, from behind: the red flash and
+        // the chunk on its HP bar
+        [300, () => {
+            let p = game.player
+            p.takeDamage(20, p.xWu, p.yWu - 1.5)
+            remote.triggerAction("hurt")
+        }],
+        [20, () => capture("hurt")],
         // The grace after the hit: both knights flicker until it is over
         [220, () => capture("5b-grace")],
+        // Low on mana the local shield thins and blinks; the remote's mana
+        // is not sent, its shield stays as it is
+        [600, () => {
+            game.player.mana = 5
+            game.player.isBlocking = true
+            remoteState = 2; remoteBlock = true
+        }],
+        [60, () => capture("lowMana")],
+        // The local shield runs dry on the next step and breaks, the remote's
+        // breaks as its action says
+        [400, () => {
+            game.player.mana = 0.01
+            remote.triggerAction("shieldBreak")
+            remoteState = 0; remoteBlock = false
+        }],
+        [60, () => capture("shieldBreak")],
+        [500, () => { game.player.mana = game.player.maxMana }],
+        // The smith's upgrades, on the local knight: the sharpened sword's
+        // brighter edge in a swing, the reinforced shield's lighter rim
+        [300, () => { game.player.swordLevel = 1; game.player.attack(); remote.triggerAction("attack") }],
+        [120, () => capture("sword")],
+        [500, () => {
+            game.player.swordLevel = 0
+            game.player.shieldLevel = 1
+            game.player.isBlocking = true
+            remoteState = 2; remoteBlock = true
+        }],
+        [250, () => capture("shield")],
+        [100, () => {
+            game.player.isBlocking = false
+            game.player.shieldLevel = 0
+            remoteState = 0; remoteBlock = false
+        }],
         [600, () => {
             game.player.dash(); remote.triggerAction("dash"); remoteState = 3
             dashMove.start()
@@ -131,7 +203,10 @@ Window {
             let v = view(game.player); if (v) v.downed = true
         }],
         [500, () => capture("8-downed")],
-        [500, () => { console.log("[Knights] done"); Qt.exit(0) }]
+        // Torn down before quitting, as the other benches do: the game
+        // crashes when Qt quits with it still up
+        [500, () => { console.log("[Knights] done"); remote.destroy(); game.destroy() }],
+        [300, () => Qt.exit(0)]
     ]
 
     // The remote dashes the same way as the local knight: up at dash speed

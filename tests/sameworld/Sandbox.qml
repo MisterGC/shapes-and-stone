@@ -6,8 +6,8 @@
 // The instance runs the real game. Once the session is in the dungeon the
 // driver puts the host's knight beside an enemy and the joiner's in sight of
 // another. The joiner's knight stands until that enemy walks into its reach
-// and swings, parries it, blocks and dodges its lunges, blocks, dodges and
-// takes a spitter's shots, shield-pushes it; then each knight kills an
+// and swings, parries it, blocks, blocks perfectly and dodges its lunges,
+// blocks, dodges and takes a spitter's shots, shield-pushes it; then each knight kills an
 // enemy, and both fight: each goes for the nearest enemy and swings at it.
 // Meanwhile every frame records every enemy this screen shows - its object
 // id, position, HP and AI state - stamped with the wall clock, and the
@@ -66,9 +66,13 @@ Item {
     }
     function hostUp() { net.signalingMode = _mode(); net.host() }
     function joinNet(code) { net.signalingMode = _mode(); net.join(code) }
-    // Host: start the session's game on this seed
+    // Host: start the session's game on this seed, at the bottom of depth
+    // 0's range and built for one knight, not the session's two (issue
+    // #102): the checks need that dungeon's lineup, a spitter among it
     function startGame(s) {
         game.masterSeed = s
+        game.dangerPosition = 0
+        game.knightsOverride = 1
         game._startMultiplayerGame()
     }
     function leave() { if (net) net.leave() }
@@ -123,13 +127,14 @@ Item {
     // id, kind, what it was on this screen when it arrived]
     // (Session.enemyBlowReceived); a push's carries its direction (dx, dy),
     // the enemy's position and the sender's knight's as this screen shows
-    // them
+    // them, a stagger's its length in seconds
     property var received: []
     Connections {
         target: bench.session
         function onEnemyBlowReceived(fromId, blow) {
             let e = bench._byId()[blow.id], k = bench.session.remotePlayers[fromId]
-            let at = blow.kind !== "push" ? null
+            let at = blow.kind === "stagger" ? {seconds: blow.seconds === undefined ? null : blow.seconds}
+                   : blow.kind !== "push" ? null
                    : {dx: bench.r3(blow.dx), dy: bench.r3(blow.dy),
                       enemy: e ? [bench.r3(e.xWu), bench.r3(e.yWu)] : null,
                       knight: k ? [bench.r3(k.xWu), bench.r3(k.yWu)] : null}
@@ -288,11 +293,20 @@ Item {
     // only into its parry window, from the window's late-th frame on this
     // screen, until one parry; "push": raises the shield
     // and dashes into it once it is in reach; "block": holds the shield up
-    // toward it; "dodge": dashes at it from its parry window's late-th
+    // toward it; "perfect": keeps the shield down until its parry window's
+    // late-th frame on this screen and raises it then, just before the
+    // lunge lands, and holds it; "dodge": dashes at it from its parry window's late-th
     // frame on this screen, once; "dodgeShot": dashes into shot shotToDodge
     // once it comes within 1.2 Wu, once; "stand": faces it and stands, the
     // shield down. The knight never walks. The log says what it did: when
     // (wall clock), how it stood and what it saw.
+    // The enemy answered winds up no crushing blow (issue #80): the answers
+    // are timed on its parry window, which a crushing blow does not open
+    function noCrush(id) {
+        let e = _byId()[id]
+        if (e) e.crushChance = 0
+        return e !== undefined
+    }
     property string guardMode: ""
     property string guardId: ""
     property var guardLog: ({})
@@ -306,6 +320,9 @@ Item {
         if (game.player) {
             _stand(game.player)
             game.player.isBlocking = mode === "block"
+            // The answers are timed on the knight standing where it was
+            // put: a hit throws it nowhere
+            game.player.knockback = 0
         }
         return _byId()[id] !== undefined
     }
@@ -352,6 +369,15 @@ Item {
         } else if (guardMode === "block") {
             p.mana = p.maxMana
             p.isBlocking = true
+        } else if (guardMode === "perfect" && !e.parryWindow) {
+            log.windowFrames = 0
+        } else if (guardMode === "perfect" && ++log.windowFrames >= log.late) {
+            log.raise = what
+            p.mana = p.maxMana
+            p.isBlocking = true
+            guardMode = "raised"
+        } else if (guardMode === "raised") {
+            p.mana = p.maxMana
         } else if (guardMode === "dodge" && !e.parryWindow) {
             log.windowFrames = 0
         } else if (guardMode === "dodge" && ++log.windowFrames >= log.late && p.dashCooldown <= 0) {

@@ -19,6 +19,8 @@ PhysicsItem {
     // Its node's state has come: until then where the knight is and
     // whether it is down are not known, and it is not drawn
     property bool known: false
+    // How far an ally has lifted this knight up while it is down, 0..1
+    property real reviveRing: 0
     visible: known
 
     widthWu: 1.0
@@ -100,15 +102,31 @@ PhysicsItem {
         if (name === "attack") {
             view.swing()
             if (gameWorld && gain > 0 && actionState !== 3) gameWorld.playSwordSwing(gain)
+        } else if (name === "heavy") {
+            view.swing(true)
+            if (gameWorld && gain > 0) gameWorld.playHeavySwing(gain)
+        } else if (name === "whirlwind") {
+            view.whirl(Balance.knight.whirlDuration * 1000)
+            if (gameWorld && gain > 0) gameWorld.playWhirlwind(gain)
         } else if (name === "dash") {
             view.dash(150)
             if (gameWorld && gain > 0) gameWorld.playDash(gain)
         } else if (name === "parry") {
             view.parry()
             if (gameWorld && gain > 0) gameWorld.playImpact(gain)
+        } else if (name === "block") {
+            view.block()
+            if (gameWorld && gain > 0) gameWorld.playBlock(gain)
+        } else if (name === "perfectBlock") {
+            view.perfectBlock()
+            if (gameWorld && gain > 0) gameWorld.playBlock(gain, true)
         } else if (name === "hurt") {
             view.hurt()
             _grace.restart()
+            if (gameWorld && gain > 0) gameWorld.playHurt(gain)
+        } else if (name === "shieldBreak") {
+            view.shieldBreak()
+            if (gameWorld && gain > 0) gameWorld.playShieldBreak(gain)
         }
     }
     // The grace after a hit, on this screen's clock: the other knight
@@ -123,7 +141,31 @@ PhysicsItem {
     }
 
     // A swing the event has not shown yet
-    onActionStateChanged: if (actionState === 1 && !view.swinging) view.swing()
+    onActionStateChanged: {
+        if (actionState === 1 && !view.swinging) view.swing()
+        // The charge: s says charging (4) and full (5); the glow grows on
+        // this screen's clock, as long as the knight's takes to fill
+        if (actionState === 4 && !_chargeGrow.running && remoteCharge === 0) _chargeGrow.start()
+        if (actionState === 5) {
+            _chargeGrow.stop()
+            remoteCharge = 1
+            let gain = gameWorld ? gameWorld.remoteGain(xWu, yWu) : 0
+            if (gameWorld && gain > 0) gameWorld.playChargeFull(gain)
+        }
+        if (actionState !== 4 && actionState !== 5) {
+            _chargeGrow.stop()
+            remoteCharge = 0
+        }
+    }
+    property real remoteCharge: 0
+    NumberAnimation {
+        id: _chargeGrow
+        target: rp
+        property: "remoteCharge"
+        from: 0
+        to: 1
+        duration: (Balance.knight.chargeTime - Balance.knight.chargeStart) * 1000
+    }
 
     KnightView {
         id: view
@@ -139,6 +181,10 @@ PhysicsItem {
         moveAmount: rp._moveAmount
         blocking: rp.remoteBlocking
         dashing: rp.actionState === 3
+        charging: rp.actionState === 4 || rp.actionState === 5
+        charge: rp.remoteCharge
+        chargeFull: rp.actionState === 5
         downed: rp.remoteHp <= 0
+        reviveProgress: rp.reviveRing
     }
 }

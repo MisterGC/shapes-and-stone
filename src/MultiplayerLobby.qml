@@ -11,6 +11,10 @@ Item {
     property var network: null
     property string playerName: "Knight"
     property bool muted: false
+    // Every knight's name by its node (Session.names)
+    property var names: ({})
+    // The record: this machine's, once connected the host's (Game.recordLine)
+    property string recordLine: ""
 
     // Signaling: LAN runs the host's embedded signaling server (no internet,
     // same network only, native builds only); Internet goes through the
@@ -59,6 +63,15 @@ Item {
             font.pixelSize: 24
             font.bold: true
             font.letterSpacing: 2
+        }
+
+        Text {
+            objectName: "lobbyRecord"
+            visible: lobby.recordLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: lobby.recordLine
+            color: "#E8C35A"
+            font.pixelSize: 13
         }
 
         // Player name
@@ -262,7 +275,8 @@ Item {
             Repeater {
                 model: network.nodes
                 delegate: Text {
-                    text: "\u2022 " + modelData + (modelData === network.nodeId ? " (you)" : "")
+                    text: "\u2022 " + (lobby.names[modelData] || modelData)
+                          + (modelData === network.nodeId ? " (you)" : "")
                     color: "#CCCCCC"
                     font.pixelSize: 12
                     font.family: "monospace"

@@ -113,8 +113,77 @@ ClayWorld2d {
         dashSound.triggerOneShot(gain === undefined ? 1 : gain)
     }
 
+    // The shield's own sound: a metal clang, so a block never sounds like
+    // a hit, and a perfect block brighter
+    Sound {
+        id: shieldClangSound
+        source: "assets/shield_clang.wav"
+        volume: muted ? 0 : 0.7
+    }
+    function playBlock(gain, perfect) {
+        shieldClangSound.triggerNote(shieldClangSound.rootNote
+                                     + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
+                                     gain === undefined ? 1 : gain)
+    }
+
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+    // The charged swing: the swing sample pitched down, heavier
+    function playHeavySwing(gain) {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+    // The whirlwind: the swing sample pitched further down, a long spin,
+    // and the knight's shout of a special move
+    Sound {
+        id: whirlShoutSound
+        source: "assets/knight_whirl_shout.wav"
+        volume: muted ? 0 : Balance.whirl.shoutVolume
+    }
+    function playWhirlwind(gain) {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.whirl.swingPitch,
+                                    gain === undefined ? 1 : gain)
+        whirlShoutSound.triggerNote(whirlShoutSound.rootNote + Balance.whirl.shoutPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+    // The charge is full: a high tick
+    Sound {
+        id: chargeTickSound
+        source: "assets/menu_change.wav"
+        volume: muted ? 0 : 0.6
+    }
+    function playChargeFull(gain) {
+        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.heavy.tickPitch,
+                                    gain === undefined ? 1 : gain)
+    }
+
+    // The knight's own hurt: a low thud, never the punch of a sword
+    Sound {
+        id: hurtSound
+        source: "assets/knight_hurt.wav"
+        volume: muted ? 0 : 0.8
+    }
+    function playHurt(gain) {
+        hurtSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+
+    // The shield breaking at 0 mana, and the right button with no mana
+    Sound {
+        id: shieldBreakSound
+        source: "assets/shield_break.wav"
+        volume: muted ? 0 : 0.7
+    }
+    function playShieldBreak(gain) {
+        shieldBreakSound.triggerOneShot(gain === undefined ? 1 : gain)
+    }
+    Sound {
+        id: shieldEmptySound
+        source: "assets/shield_empty.wav"
+        volume: muted ? 0 : 0.6
+    }
+    function playShieldEmpty() {
+        shieldEmptySound.triggerOneShot(1)
     }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
@@ -140,6 +209,39 @@ ClayWorld2d {
 
     function playSpitShot() {
         spitterSound.play()
+    }
+
+    // A tough enemy winds up a crushing blow: a low growl, the spitter's
+    // sample pitched down, fading with the distance from this knight
+    Sound {
+        id: growlSound
+        source: "assets/spitter.wav"
+        volume: muted ? 0 : 0.8
+    }
+    function playCrushGrowl(xWu, yWu) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+    }
+
+    // A grunt or a guardian winds up its lunge: a goblin's scream, pitched
+    // by its tier (Balance.scream), fading as the growl does
+    Sound {
+        id: screamSound
+        source: "assets/goblin_scream.wav"
+        volume: muted ? 0 : Balance.scream.volume
+    }
+    function playScream(xWu, yWu, tier) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        let pitch = Balance.scream.tierPitch[Math.max(0, Math.min(2, tier))] || 0
+        if (gain > 0) screamSound.triggerNote(screamSound.rootNote + pitch, gain)
     }
 
     Sound {
@@ -210,8 +312,9 @@ ClayWorld2d {
     // --- Impact feedback --------------------------------------------------
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
-    //   kind: enemyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
-    //         parry, projectileHit, projectileDeflected, projectileBurst
+    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
+    //         projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
@@ -242,6 +345,11 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, 7, "#FFE6A0")
             spawnShards(x, y, nx, ny, 4, color, 0.2)
             break
+        case "heavyHit":
+            spawnSparks(x - nx * 0.3, y - ny * 0.3, nx, ny, Balance.heavy.sparks, Balance.heavy.glow)
+            spawnShards(x, y, nx, ny, 6, color, 0.24)
+            spawnRing(x, y, Balance.heavy.glow)
+            break
         case "enemyBlocked":
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
@@ -255,11 +363,25 @@ ClayWorld2d {
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
             break
         case "playerBlocked":
-            spawnSparks(x, y, -nx, -ny, 8, "#A0D8F0")
+            spawnSparks(x, y, -nx, -ny, Balance.block.sparks, "#CFEFFF")
+            break
+        case "perfectBlock":
+            spawnSparks(x, y, -nx, -ny, Balance.perfectBlock.sparks, "#FFFFFF")
+            spawnRing(x, y, "#BFE6FF")
+            break
+        case "crushBlow":
+            // The held shield broken: sparks and its shards along the blow
+            spawnSparks(x, y, nx, ny, Balance.crush.sparks, Balance.crush.glow)
+            spawnShards(x, y, nx, ny, 6, "#9AA4AC", 0.2)
             break
         case "parry":
             spawnSparks(x, y, nx, ny, 14, "#FFE066")
             spawnRing(x, y, "#FFD700")
+            break
+        case "whirlwind":
+            // The spin starts: a ring round the knight, sparks along the dash
+            spawnSparks(x, y, nx, ny, Balance.whirl.sparks, Balance.whirl.glow)
+            spawnRing(x, y, Balance.whirl.glow)
             break
         case "projectileHit":
         case "projectileBurst":
@@ -273,15 +395,20 @@ ClayWorld2d {
 
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
-            let legacyShake = {enemyHit: 1.5, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, projectileHit: 1,
-                               projectileDeflected: 0.5}[kind] || 0
+            let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
+                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5,
+                               projectileHit: 1, projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
         }
         switch (kind) {
         case "enemyHit":
             _trauma(0.22); _kick(nx * 0.12, ny * 0.12); _freeze(55)
+            break
+        case "heavyHit":
+            _trauma(Balance.heavy.trauma)
+            _kick(nx * Balance.heavy.kick, ny * Balance.heavy.kick)
+            _freeze(Balance.heavy.freeze * 1000)
             break
         case "enemyBlocked":
             _trauma(0.12); _freeze(30)
@@ -294,11 +421,31 @@ ClayWorld2d {
             if (screenFx) screenFx.hurt()
             break
         case "playerBlocked":
-            _trauma(0.18); _kick(nx * 0.08, ny * 0.08)
+            // A block is a success: a short freeze and a kick sell that the
+            // shield took it, still well below a hit's
+            _trauma(Balance.block.trauma)
+            _kick(nx * Balance.block.kick, ny * Balance.block.kick)
+            _freeze(Balance.block.freeze * 1000)
+            break
+        case "perfectBlock":
+            _trauma(Balance.perfectBlock.trauma)
+            _freeze(Balance.perfectBlock.freeze * 1000, Balance.perfectBlock.freezeScale)
+            if (screenFx) screenFx.perfectBlock()
+            break
+        case "crushBlow":
+            // Worse than a hit: the shield is gone with it
+            _trauma(Balance.crush.trauma)
+            _kick(nx * Balance.crush.kick, ny * Balance.crush.kick)
+            _freeze(Balance.crush.freeze * 1000)
+            if (screenFx) screenFx.hurt()
             break
         case "parry":
             _trauma(0.3); _freeze(140, 0.12)
             if (screenFx) screenFx.parry()
+            break
+        case "whirlwind":
+            _trauma(Balance.whirl.trauma)
+            _kick(nx * Balance.whirl.kick, ny * Balance.whirl.kick)
             break
         case "projectileDeflected":
             _trauma(0.12)
@@ -419,16 +566,24 @@ ClayWorld2d {
         inGame: screen === "game"
         showLobby: screen === "lobby"
         muted: world.muted
+        playerName: world.playerName
+        recordLine: world.recordLine
         // The host's run, from its start or, on a node that joins late,
         // at the level the host plays
-        onStarted: (seed, level) => {
+        onStarted: (seed, level, position, next, knights) => {
             masterSeed = seed
             world.levelIndex = level
             world.levelType = levelTypeOf(level)
+            _setDanger(position, next)
+            _setKnights(knights)
             screen = "game"
-            world.forceActiveFocus()
         }
-        onLevelChanged: (newIndex) => _applyLevelChange(newIndex)
+        onLevelChanged: (newIndex, position, next, knights) =>
+            _applyLevelChange(newIndex, {pos: position, next: next, knights: knights})
+        onWentAgain: (seed, position, knights) => _startRun(seed, position, knights)
+        onLiftReceived: (fromId) => _rise("lift")
+        onRecordBroken: (banner) => _hostRecordBroken(banner)
+        onNameEdited: (name) => world.playerName = name
         onAdvanceRequested: _hostAdvanceLevel()
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
@@ -440,8 +595,8 @@ ClayWorld2d {
         onEnemyBlowReceived: (fromId, blow) => {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
-            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId)
-            else if (blow.kind === "stagger") e.stagger()
+            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true)
+            else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
@@ -512,7 +667,8 @@ ClayWorld2d {
     function strikeKnight(knight, enemy, atk, x, y) {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
-                                                 size: enemy.widthWu})
+                                                 size: enemy.widthWu, crush: enemy.crushing,
+                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -523,9 +679,10 @@ ClayWorld2d {
     // physics steps, as the enemy's attack runs (issue #35); the hold is
     // wall clock, as this screen renders the enemy.
     // knightStruck says what became of each blow: "hit", "blocked",
-    // "dodged", "ignored", "out of reach" or "parried". This screen judges
-    // it by its knight's own state, and reports it to the others
-    // (issue #18).
+    // "perfect", "crushed", "dodged", "ignored", "out of reach" or
+    // "parried"; a crushing blow is never parried. This
+    // screen judges it by its knight's own state, and reports it to the
+    // others (issue #18).
     signal knightStruck(string enemyId, string result)
     // Another node's knight met a host's enemy's attack and its node judged
     // it: source "lunge" (id: the enemy's) or "shot" (id: the shot's)
@@ -563,8 +720,9 @@ ClayWorld2d {
     function _landKnightBlow(blow) {
         // The reach is checked here, against where this knight really is
         if (!player) return
+        let crush = blow.crush === true
         let at = _parriedAt[blow.id]
-        if (at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
+        if (!crush && at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
             _struck(blow.id, "parried")
             return
         }
@@ -574,8 +732,16 @@ ClayWorld2d {
             _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
-        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size)
-        if (result === "hit" || result === "blocked") playImpact()
+        // A blow sounds the shield's own block or the knight's hurt, in
+        // takeDamage
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
+        // A blocked one throws the host's enemy back off the shield; a
+        // perfect block staggers it, as it does an enemy of this node's,
+        // a crushing blow's for the full stagger
+        let e = _enemyById[blow.id]
+        if (result === "blocked" && e && !e.destroyed) e.recoil(player)
+        if (result === "perfect" && e && !e.destroyed)
+            e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -708,17 +874,156 @@ ClayWorld2d {
     function depthOf(index) { return Math.floor(index / 2) }
     function levelTypeOf(index) { return index % 2 === 1 ? "village" : "dungeon" }
     function levelIndexOf(d, type) { return 2 * d + (type === "village" ? 1 : 0) }
+
+    // --- Danger (issue #96) ---
+    // A dungeon's danger is its depth plus a position in [0, 1) in that
+    // depth's range, and drives what Balance.depth adds: the more the
+    // knights kept of their HP in the last dungeon, the higher the next
+    // one stands in its range (Balance.danger). In a village
+    // dangerPosition is still the dungeon's just left and nextPosition
+    // the next one's, fixed at the exit; in a dungeon nextPosition is what
+    // the next one would get were the party to leave now. After the run
+    // has ended in a fall, nextPosition is where the next run starts
+    property real dangerPosition: Balance.danger.start
+    property real nextPosition: Balance.danger.start
+    readonly property real danger: depth + dangerPosition
+    // 0 low, 1 middle, 2 high
+    function dangerBand(position) {
+        return position < Balance.danger.low ? 0 : position < Balance.danger.high ? 1 : 2
+    }
+    // The position of the next dungeon: pull of the way from position
+    // toward what the last one earned, 1 less the knights' average share
+    // of max HP lost, or 0 if any knight fell. records: [{lost, fell}]
+    function settleDanger(position, records) {
+        if (records.length === 0) return position
+        let fell = false, lost = 0
+        for (let r of records) {
+            fell = fell || r.fell === true
+            lost += Math.min(1, Math.max(0, r.lost)) / records.length
+        }
+        let earned = fell ? 0 : 1 - lost
+        let next = position + (earned - position) * Balance.danger.pull
+        return Math.max(0, Math.min(Balance.danger.top, next))
+    }
+    // This knight's record of the level: the share of its max HP it lost -
+    // a potion's heal does not take it back - and whether it fell
+    function levelRecord() {
+        let maxHp = player ? player.maxHp : Balance.knight.hp
+        return { lost: Math.min(1, fightRecord.damageTaken / maxHp), fell: fightRecord.deaths > 0 }
+    }
+    // Every knight's record of the level: this node's and, in a session,
+    // each other node's from the last state it sent in this level
+    function partyRecords() {
+        let out = [levelRecord()]
+        for (let id in session.remotePlayers) {
+            let st = session.lastStates[id]
+            if (st && st.lv === levelIndex && st.l !== undefined)
+                out.push({ lost: st.l, fell: st.f === 1 })
+        }
+        return out
+    }
+    // The positions the level newIndex is entered at and the knights it is
+    // built for: out of a dungeon the next one's position is settled from
+    // the party's records, out of a village the next dungeon stands where
+    // the exit fixed it
+    function _dangerFor(newIndex) {
+        if (levelTypeOf(newIndex) === "village")
+            return { pos: dangerPosition, next: settleDanger(dangerPosition, partyRecords()),
+                     knights: knightsNow() }
+        return { pos: nextPosition, next: nextPosition, knights: knightsNow() }
+    }
+    // Where the next run starts after this one ended in a fall: a fall
+    // earns the bottom of the range
+    function _dangerAfterFall() {
+        let from = levelType === "village" ? nextPosition : dangerPosition
+        return settleDanger(from, [{ lost: 1, fell: true }])
+    }
+    // What a dungeon looks like at its danger: Balance.danger.looks of
+    // its band. The village and the fight room keep their own look
+    readonly property bool dangerLook: levelType === "dungeon" && !fightRoomActive
+    readonly property var look: Balance.danger.looks[dangerBand(dangerPosition)]
+    function _setDanger(position, next) {
+        if (position === undefined || isNaN(position)) return
+        dangerPosition = position
+        nextPosition = next === undefined || isNaN(next) ? position : next
+        console.log("[Game] Danger", danger.toFixed(3), "next position", nextPosition.toFixed(3))
+    }
+    // --- The party's size (issue #102) ---
+    // The knights the level was built for: a dungeon's enemies grow with
+    // them (Balance.party). It is fixed as the level is entered - in a
+    // session by the host, sent with the level - so a knight joining or
+    // leaving changes the next dungeon, not this one
+    property int partyKnights: 1
+    // The dojo's knights for the next level, 0 to count the session's:
+    // eval knightsOverride = 4, then eval applyScenario("dungeon", 2.5),
+    // builds that dungeon for four knights
+    property int knightsOverride: 0
+    function knightsNow() { return knightsOverride > 0 ? knightsOverride : session.knights }
+    function _setKnights(knights) {
+        partyKnights = Math.max(1, knights || 1)
+        console.log("[Game] Built for", partyKnights, partyKnights === 1 ? "knight" : "knights")
+    }
+    // --- The witch reads the next dungeon (issue #98) ---
+    // What the dungeon at level index holds, read off its seed the way
+    // generateDungeon builds it: its depth, its position's band in the
+    // depth's range and its enemies counted by tier and type. Left out,
+    // the dungeon is the next one, at nextPosition, for the knights the
+    // party has now. In a session every node reads the same: the seed,
+    // the position and the knights are the host's
+    function foretell(index, position, knights) {
+        if (index === undefined) index = levelTypeOf(levelIndex) === "village" ? levelIndex + 1
+                                                                                : levelIndex + 2
+        if (position === undefined) position = nextPosition
+        if (knights === undefined) knights = knightsNow()
+        let rand = createRng(deriveSeed(masterSeed, index))
+        let rms = planRooms(6, 8, 5, 8, rand)
+        let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
+        let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0 }
+        for (let e of enemies) {
+            out[["weak", "normal", "tough"][e.tier]]++
+            out[e.type]++
+        }
+        return out
+    }
+    // The witch's reading of the next dungeon, one line per press of E:
+    // where it sits in its depth's range and what lives there
+    function witchReading() {
+        let f = foretell()
+        let lines = ["Depth " + f.depth + " waits below. It sits "
+                     + ["low in its range - the last one cost you dearly",
+                        "in the middle of its range",
+                        "high in its range - you came through whole, it will not be kind"][f.band]
+                     + "."]
+        let tiers = [f.tough > 0 ? f.tough + " of them hulking" : "",
+                     f.weak > 0 ? f.weak + " feeble" : ""].filter(t => t !== "")
+        lines.push("I see " + f.enemies + " shapes in the dark"
+                   + (tiers.length > 0 ? ", " + tiers.join(", ") : "") + ".")
+        let kinds = [f.guardian > 0 ? f.guardian + " behind shields" : "",
+                     f.spitter > 0 ? f.spitter + (f.spitter === 1 ? " that spits" : " that spit")
+                                     + " from afar" : ""].filter(t => t !== "")
+        lines.push(kinds.length > 0 ? "Among them " + kinds.join(" and ") + "."
+                                    : "No shields, nothing that spits - only teeth.")
+        lines.push("Return to me... if you survive.")
+        return lines
+    }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
     property bool fallen: false
-    // A session's run ended with every knight down: the session is left,
-    // the fallen screen shows the run's summary and a key goes to the title
+    // A session's run ended with every knight down: the session stays, the
+    // fallen screen shows the run's summary, and the host's Enter starts
+    // the next run for everyone
     property bool partyFallen: false
     // Esc opened the menu (Resume, Title). Alone the world is paused under
     // it; in a session it runs on, since a pause would stop every other
     // player's enemies, and only this knight stops taking input.
     property bool menuOpen: false
     readonly property bool gamePaused: menuOpen && !session.connected
+    // The title, the lobby, the pause menu and the fallen screen each take
+    // the keys while they are up; when the last of them closes the game
+    // takes them back, so the knight answers the keys without a click
+    readonly property bool overlayUp: screen !== "game" || menuOpen || fallen
+    onOverlayUpChanged: if (!overlayUp) world.forceActiveFocus()
     // Paused by stopping the world: the first step after resuming is one
     // frame long, not the whole pause (clayground#338), so no cooldown or
     // AI timer runs out on it.
@@ -735,25 +1040,110 @@ ClayWorld2d {
     // simulated seconds since it started (a pause holds them)
     property int runKills: 0
     property real runSeconds: 0
-    // The deepest any run got on this machine (-1 before the first), kept
-    // with Clayground.Storage; runStartBest is what it was when this run
-    // started, so the fallen screen can tell a new best
-    property int bestDepth: -1
-    property int runStartBest: -1
+    // The record of the deepest descent on this machine: the depth (-1
+    // before the first), the knights' names and the date, kept with
+    // Clayground.Storage as soon as a run gets deeper (key "record", and
+    // its depth alone under "bestDepth"). A joiner keeps the party's
+    // descent in its own record too
+    property var ownRecord: ({depth: -1, names: [], date: ""})
+    readonly property int bestDepth: ownRecord.depth
+    // The record every screen shows: alone this machine's, in a session
+    // the host's, the party's
+    readonly property var record: session.connected && !session.isHost
+                                  ? (session.hostRecord || {depth: -1, names: [], date: ""})
+                                  : ownRecord
+    readonly property string recordLine: record.depth < 0 ? ""
+        : "Record " + record.depth + (record.names && record.names.length > 0
+                                      ? "  •  " + record.names.join(", ") : "")
+          + (record.date ? "  •  " + record.date : "")
+    // This machine's record's depth when this run started, and whether
+    // the run went deeper: alone and on the host the first dungeon deeper
+    // than it raises the banner, on a joiner the host's word does
+    property int runStartRecord: -1
+    property bool recordPassed: false
+    // The banner was raised: once per run, on the step the depth passes
+    // the record, on every screen of a session
+    signal recordBanner(int depth)
+    // This session's runs, newest first ({depth, seconds}): alone since
+    // the game started, in a session the host's since it was hosted
+    property var ownRuns: []
+    readonly property var sessionRuns: session.connected && !session.isHost ? session.hostRuns : ownRuns
+    // The lobby's name of this machine's knight, kept with the record
+    property string playerName: "Knight"
     // A bench keeps its record apart from the player's with its own name
     property string recordStoreName: "ShapesAndStone"
     KeyValueStore { id: records; name: world.recordStoreName }
     function _startRunRecord() {
         runKills = 0
         runSeconds = 0
-        runStartBest = bestDepth
+        runStartRecord = ownRecord.depth
+        recordPassed = false
     }
-    function _keepBest() {
-        if (depth <= bestDepth) return
-        bestDepth = depth
-        records.set("bestDepth", String(bestDepth))
+    function _today() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
+    // The knights of this run: alone this one, in a session every node's
+    function _partyNames() { return session.connected ? session.partyNames() : [playerName] }
+    // The run is at a new depth or has ended: deeper than this machine's
+    // record, it is kept at once with the knights' names. Alone and on the
+    // host, the run went deeper than the record it started with: in the
+    // dungeon the banner goes up, once, on every screen; at the run's end
+    // (atEnd) the fallen screen says so without it
+    function _keepRecord(atEnd) {
+        if (screen !== "game" && !atEnd) return
+        if (depth > ownRecord.depth) {
+            ownRecord = {depth: depth, names: _partyNames(), date: _today()}
+            records.set("record", JSON.stringify(ownRecord))
+            records.set("bestDepth", String(depth))
+            if (session.connected && session.isHost) session.publishRecord(ownRecord)
+        }
+        if (session.connected && !session.isHost) return
+        if (recordPassed || depth <= runStartRecord) return
+        recordPassed = true
+        console.log("[Game] New record: depth", depth)
+        if (session.connected) session.announceRecord(!atEnd)
+        if (!atEnd) _raiseRecordBanner()
     }
-    onDepthChanged: _keepBest()
+    onDepthChanged: _keepRecord(false)
+    // Joiner: the host's party went deeper than the host's record
+    function _hostRecordBroken(banner) {
+        if (recordPassed) return
+        recordPassed = true
+        if (banner && screen === "game") _raiseRecordBanner()
+    }
+    function _raiseRecordBanner() {
+        recordBannerShow.restart()
+        recordChime.step = 0
+        recordChime.restart()
+        recordBanner(depth)
+    }
+    // A run is over: the first of this session's runs on the fallen screen
+    function _countRun() {
+        ownRuns = [{depth: depth, seconds: Math.round(runSeconds * 10) / 10}].concat(ownRuns)
+        if (session.connected && session.isHost) session.publishRuns(ownRuns)
+    }
+    function _loadRecord() {
+        let r = null
+        try { r = JSON.parse(records.get("record", "null")) } catch (err) { r = null }
+        if (!r || typeof r.depth !== "number")
+            r = {depth: parseInt(records.get("bestDepth", "-1")), names: [], date: ""}
+        if (isNaN(r.depth)) r.depth = -1
+        ownRecord = {depth: r.depth, names: Array.isArray(r.names) ? r.names : [],
+                     date: r.date ? String(r.date) : ""}
+        playerName = records.get("playerName", "Knight")
+    }
+    onPlayerNameChanged: records.set("playerName", playerName)
+    // A session hosted, joined or left starts its own list of runs; the
+    // host's record is the party's from the start
+    Connections {
+        target: session
+        function onConnectedChanged() {
+            world.ownRuns = []
+            // Later: a host can set no session property before its
+            // connectedChanged is over
+            if (session.connected) Qt.callLater(() => {
+                if (session.connected && session.isHost) session.publishRecord(world.ownRecord)
+            })
+        }
+    }
 
     // Collision categories
     readonly property int catWall: Box.Category1
@@ -763,9 +1153,9 @@ ClayWorld2d {
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
-        bestDepth = parseInt(records.get("bestDepth", "-1"))
-        runStartBest = bestDepth
-        console.log("[Game] Best depth so far:", bestDepth)
+        _loadRecord()
+        runStartRecord = ownRecord.depth
+        console.log("[Game] Record so far:", recordLine === "" ? "none" : recordLine)
         forceActiveFocus()
     }
 
@@ -779,6 +1169,7 @@ ClayWorld2d {
         if (screen === "game" && width > 0 && height > 0 && !player) {
             console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
+            if (!session.connected) _setKnights(knightsNow())
             // A node that joins a session late may start in a village
             if (levelType === "village") {
                 generateVillage()
@@ -793,7 +1184,7 @@ ClayWorld2d {
     function _startMultiplayerGame() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        session.start(masterSeed)
+        session.start(masterSeed, dangerPosition, knightsNow())
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -806,15 +1197,19 @@ ClayWorld2d {
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            if (mouse.button === Qt.LeftButton) {
-                player.attack()
-            }
-            if (mouse.button === Qt.RightButton) player.isBlocking = true
+            // The left button swings on release, or charges while held
+            if (mouse.button === Qt.LeftButton) player.pressSwing(mouse)
+            if (mouse.button === Qt.RightButton) player.raiseShield()
         }
 
         onReleased: (mouse) => {
-            if (mouse.button === Qt.RightButton && player)
-                player.isBlocking = false
+            if (!player) return
+            if (mouse.button === Qt.LeftButton) player.releaseSwing(mouse)
+            if (mouse.button === Qt.RightButton) player.lowerShield()
+        }
+        onCanceled: if (player) {
+            player.dropSwing()
+            player.lowerShield()
         }
     }
 
@@ -826,8 +1221,10 @@ ClayWorld2d {
 
     // Input handling
     Keys.onPressed: (event) => {
+        // Esc closes an open dialogue; only without one it opens the menu
         if (event.key === Qt.Key_Escape) {
-            if (screen === "game" && player && !fallen) openMenu()
+            if (talking) dialoguePanel.close()
+            else if (screen === "game" && player && !fallen) openMenu()
             event.accepted = true
             return
         }
@@ -841,15 +1238,18 @@ ClayWorld2d {
             event.accepted = true
             return
         }
-        // 1 and 2 buy what the dialogue panel offers; without wares 1
-        // drinks a potion
-        if (event.key === Qt.Key_1 || event.key === Qt.Key_2) {
+        // 1 to 4 buy what the dialogue panel offers; without wares 1
+        // drinks a potion and 2 a mana draught
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
             let i = event.key - Qt.Key_1
             if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
                 if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
                 event.accepted = true
             } else if (event.key === Qt.Key_1) {
                 drinkPotion()
+                event.accepted = true
+            } else if (event.key === Qt.Key_2) {
+                drinkDraught()
                 event.accepted = true
             }
             return
@@ -874,19 +1274,25 @@ ClayWorld2d {
     }
     Keys.forwardTo: gameCtrl
     function openMenu() {
-        // The menu takes the keys from here on: what is held now would
-        // never see its release
-        gameCtrl.axisX = 0
-        gameCtrl.axisY = 0
-        gameCtrl.buttonAPressed = false
-        gameCtrl.buttonBPressed = false
-        if (player) player.isBlocking = false
+        // The menu takes the keys, and the keyboard gamepad lets go of what
+        // is held when the focus moves (clayground#413); the shield and the
+        // swing are the mouse's, whose release the menu would swallow
+        if (player) {
+            player.lowerShield()
+            player.dropSwing()
+        }
         menuOpen = true
     }
     function closeMenu() {
         menuOpen = false
-        world.forceActiveFocus()
     }
+    // Where the keys or the touch pad steer the knight, -1..1 on each axis;
+    // every level binds its knight to these. While a dialogue is open the
+    // knight stands, so it cannot walk off and leave the panel up, and a
+    // key still held moves it again once the panel closes
+    readonly property bool talking: dialoguePanel.visible
+    readonly property real knightMoveX: talking ? 0 : gameCtrl.axisX
+    readonly property real knightMoveY: talking ? 0 : -gameCtrl.axisY
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -906,7 +1312,7 @@ ClayWorld2d {
         }
 
         onButtonBPressedChanged: {
-            if (buttonBPressed && player) {
+            if (buttonBPressed && player && !world.talking) {
                 player.dash()
             }
         }
@@ -923,6 +1329,60 @@ ClayWorld2d {
         color: "#333333"
         radius: 4
         z: 1000  // Above everything
+
+        // The HP the last hit took: a pale chunk past the fill that drains
+        // away; only the hurt knight's own screen has it
+        Rectangle {
+            id: hpChunk
+            objectName: "hpChunk"
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.margins: 2
+            // The HP the chunk reaches to, never below the knight's. It
+            // drains on the physics steps from `from` to the knight's HP
+            // over Balance.hurt.chunkDrain seconds, easing in: a pause or
+            // the hit stop of the blow holds it
+            property real hp: 0
+            property real from: 0
+            property real age: 0
+            function reset() {
+                hp = player ? player.hp : 0
+                from = hp
+                age = Balance.hurt.chunkDrain
+            }
+            width: player ? (parent.width - 4) * Math.max(0, Math.min(hp, player.maxHp)) / player.maxHp : 0
+            radius: 2
+            color: "#F4E4D4"
+            opacity: 0.85
+            Connections {
+                target: player
+                function onHpChanged() {
+                    if (player.hp < hpChunk.hp) {
+                        hpChunk.from = hpChunk.hp
+                        hpChunk.age = 0
+                    } else {
+                        hpChunk.reset()
+                    }
+                }
+            }
+            Connections {
+                target: world.physics
+                function onStepped() {
+                    let d = Balance.hurt.chunkDrain
+                    if (!player || hpChunk.age >= d) return
+                    hpChunk.age = Math.min(d, hpChunk.age + world.physics.timeStep)
+                    let k = hpChunk.age / d
+                    hpChunk.hp = hpChunk.from + (player.hp - hpChunk.from) * k * k
+                }
+            }
+        }
+        // A new knight (a level, a run) starts without a chunk, also once
+        // it is given the HP it carries from the level before
+        Connections {
+            target: world
+            function onPlayerChanged() { Qt.callLater(hpChunk.reset) }
+        }
 
         Rectangle {
             id: healthFill
@@ -977,6 +1437,27 @@ ClayWorld2d {
             Behavior on width { NumberAnimation { duration: 100 } }
         }
 
+        // The shield ran dry or a right-click found no mana: the bar
+        // flashes red
+        Rectangle {
+            id: manaFlash
+            objectName: "manaFlash"
+            anchors.fill: parent
+            radius: parent.radius
+            color: Balance.shieldBreak.barColor
+            // Seconds since the flash began, on the physics steps: on for
+            // the first half of each of its barFlashes
+            property real age: Balance.shieldBreak.barFlashes * Balance.shieldBreak.barFlash
+            readonly property bool running: age < Balance.shieldBreak.barFlashes * Balance.shieldBreak.barFlash
+            opacity: running && (age % Balance.shieldBreak.barFlash) < Balance.shieldBreak.barFlash / 2 ? 0.85 : 0
+            Connections {
+                target: world.physics
+                function onStepped() {
+                    if (manaFlash.running) manaFlash.age += world.physics.timeStep
+                }
+            }
+        }
+
         Text {
             anchors.centerIn: parent
             text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
@@ -986,33 +1467,18 @@ ClayWorld2d {
         }
     }
 
-    // How deep the knight is, under the bars
+    // The mana bar's red flash, on this screen only
+    function flashManaBar() { manaFlash.age = 0 }
+    readonly property bool manaBarFlashing: manaFlash.running
+
+    // The knight's gold, under the bars
     Text {
-        id: hudDepth
-        objectName: "hudDepth"
+        id: hudGold
+        objectName: "hudGold"
         anchors.top: manaHud.bottom
         anchors.left: parent.left
         anchors.leftMargin: 12
         anchors.topMargin: 6
-        z: 1000
-        visible: player !== null
-        text: "Depth " + depth
-        color: "#DDDDDD"
-        style: Text.Outline
-        styleColor: "#000000"
-        font.pixelSize: 14
-        font.bold: true
-        font.letterSpacing: 1
-    }
-
-    // The knight's gold, under the depth
-    Text {
-        id: hudGold
-        objectName: "hudGold"
-        anchors.top: hudDepth.bottom
-        anchors.left: parent.left
-        anchors.leftMargin: 12
-        anchors.topMargin: 2
         z: 1000
         visible: player !== null
         text: "Gold " + (player ? player.gold : 0)
@@ -1042,6 +1508,25 @@ ClayWorld2d {
         font.letterSpacing: 1
     }
 
+    // The knight's mana draughts, and the key that drinks one; under the
+    // potions, or in their place when it has none
+    Text {
+        objectName: "hudDraughts"
+        anchors.top: hudGold.bottom
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.topMargin: player && player.potions > 0 ? 20 : 2
+        z: 1000
+        visible: player !== null && player.draughts > 0
+        text: "Draughts " + (player ? player.draughts : 0) + "  [2]"
+        color: "#B080E0"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
     // The controls, for a first-time player: shown at depth 0 on a keyboard
     // and mouse, out of the way of the dialogue panel and the fallen screen
     readonly property bool touchControls: Qt.platform.os === "ios" || Qt.platform.os === "android"
@@ -1054,8 +1539,8 @@ ClayWorld2d {
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        text: "WASD move  •  LMB strike  •  RMB shield  •  Shift dash  •  "
-              + "E talk  •  1 potion  •  M mute  •  Esc menu"
+        text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
+              + "E talk  •  1 potion  •  2 draught  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -1091,6 +1576,7 @@ ClayWorld2d {
 
     // Mute indicator (always visible when muted)
     Rectangle {
+        id: muteIcon
         objectName: "muteIcon"
         anchors.top: minimap.bottom
         anchors.right: parent.right
@@ -1107,6 +1593,73 @@ ClayWorld2d {
             color: "#CC6666"
             font.pixelSize: 28
             font.bold: true
+        }
+    }
+
+    // How deep the knight is, under the minimap; large at the camp
+    DepthGauge {
+        id: depthGauge
+        objectName: "depthGauge"
+        anchors.top: muteIcon.bottom
+        anchors.right: parent.right
+        anchors.topMargin: 8
+        anchors.rightMargin: 10
+        z: 1000
+        visible: player !== null
+        depth: world.depth
+        camp: levelType === "village" && !fightRoomActive
+        record: world.record.depth
+    }
+
+    // The party went deeper than the record: a short banner over the
+    // dungeon on every screen, and a chime (Balance.record)
+    Text {
+        id: recordBannerText
+        objectName: "recordBanner"
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height * 0.22
+        z: 1000
+        visible: opacity > 0
+        opacity: 0
+        text: "New record"
+        color: "#E8C35A"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 40
+        font.bold: true
+        font.letterSpacing: 3
+
+        Text {
+            anchors.top: parent.bottom
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "Depth " + world.depth
+            color: "#DDDDDD"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 18
+            font.bold: true
+        }
+    }
+    SequentialAnimation {
+        id: recordBannerShow
+        NumberAnimation { target: recordBannerText; property: "opacity"; to: 1; duration: Balance.record.fade * 1000 }
+        PauseAnimation { duration: Math.max(0, Balance.record.banner - 2 * Balance.record.fade) * 1000 }
+        NumberAnimation { target: recordBannerText; property: "opacity"; to: 0; duration: Balance.record.fade * 1000 }
+    }
+    Sound {
+        id: recordChimeSound
+        source: "assets/menu_confirm.wav"
+        volume: muted ? 0 : Balance.record.volume
+    }
+    Timer {
+        id: recordChime
+        property int step: 0
+        interval: Balance.record.step * 1000
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            recordChimeSound.triggerNote(recordChimeSound.rootNote + Balance.record.chime[step], 1)
+            if (++step >= Balance.record.chime.length) stop()
         }
     }
 
@@ -1244,7 +1797,11 @@ ClayWorld2d {
     // hits crisply, not only when the sampled state catches them
     Connections {
         target: player
-        function onActed(action) { session.sendAction(action) }
+        function onActed(action) {
+            session.sendAction(action)
+            // A hit on a knight lifting an ally up starts the lift over
+            if (action === "hurt") player.reviveProgress = 0
+        }
     }
 
     Connections {
@@ -1257,8 +1814,10 @@ ClayWorld2d {
         console.log("[Game] The knight has fallen at depth", depth)
         menuOpen = false
         fallen = true
-        _keepBest()
+        _keepRecord(true)
+        if (!session.connected) _countRun()
         countFight("fall")
+        if (!session.connected) nextPosition = _dangerAfterFall()
         // In a session the enemies go for the knights still standing
         if (session.connected) {
             _checkPartyDown()
@@ -1282,18 +1841,83 @@ ClayWorld2d {
         session.endRun()
     }
 
-    // The host ended the run: out of the session, the enemies stop, and the
-    // fallen screen shows how far the party got
+    // The host ended the run: the enemies stop and the fallen screen shows
+    // how far the party got; the session stays for the next run
     function _endPartyRun() {
-        if (screen !== "game") return
+        if (screen !== "game" || partyFallen) return
         console.log("[Game] The party has fallen at depth", depth)
-        if (session.connected) session.leave()
         for (let e of enemies) {
             try { if (e && e.halt) e.halt() } catch(err) {}
         }
-        _keepBest()
+        _keepRecord(true)
+        if (session.isHost) _countRun()
+        nextPosition = _dangerAfterFall()
         partyFallen = true
         fallen = true
+    }
+
+    // --- Lifting a fallen knight up (issue #100) ---
+    // In a session a knight standing within Balance.party.reviveRange of a
+    // fallen ally lifts it up: after reviveTime seconds on the physics
+    // clock its node raises it with reviveHp of its max HP. A hit on the
+    // lifting knight, a step out of range or a nearer fallen ally starts it
+    // over. Each node counts its own knight's lift and sends it with its
+    // state, so every screen draws the ring around the fallen knight.
+    // Alone there is nobody to lift, except the dojo's fakeDownedAlly()
+    function _stepRevive() {
+        if (!player) return
+        let target = player.fallen || partyFallen ? null : _fallenAllyNear()
+        let id = target ? target.nodeId : ""
+        if (id !== player.reviveTarget) {
+            player.reviveTarget = id
+            player.reviveProgress = 0
+        }
+        if (target) {
+            let before = player.reviveProgress
+            player.reviveProgress = Math.min(1, before + world.physics.timeStep / Balance.party.reviveTime)
+            // Full, the ring stays full until the ally's state says it rose
+            if (before < 1 && player.reviveProgress >= 1) {
+                console.log("[Game] Lifted up the knight of", id)
+                session.liftKnight(id)
+                countFight("lift")
+            }
+        }
+        player.reviveRing = player.fallen ? session.liftOf(session.nodeId) : 0
+        for (let rid in session.remotePlayers) {
+            let rp = session.remotePlayers[rid]
+            if (!rp) continue
+            let own = player.reviveTarget === rid ? player.reviveProgress : 0
+            rp.reviveRing = rp.remoteHp <= 0 ? Math.max(own, session.liftOf(rid)) : 0
+        }
+    }
+    // The nearest fallen knight of another node within reviveRange, or null
+    function _fallenAllyNear() {
+        let r = Balance.party.reviveRange
+        let best = null, bestD = r * r
+        for (let id in session.remotePlayers) {
+            let rp = session.remotePlayers[id]
+            if (!rp || !rp.known || rp.remoteHp > 0) continue
+            let dx = rp.xWu - player.xWu, dy = rp.yWu - player.yWu
+            let d = dx * dx + dy * dy
+            if (d <= bestD) { bestD = d; best = rp }
+        }
+        return best
+    }
+    // This node's fallen knight rises with Balance.party.reviveHp of its
+    // max HP: an ally lifted it up ("lift"), or the party reached the camp
+    // ("camp"). Once the party has fallen nobody rises
+    function _rise(how) {
+        if (!player || !player.fallen || partyFallen || screen !== "game") return
+        player.hp = Math.max(1, Math.round(Balance.party.reviveHp * player.maxHp))
+        fallen = false
+        if (how === "lift") countFight("lifted")
+        console.log("[Game] The knight rises (" + how + ") with HP", player.hp)
+    }
+    // The dojo, alone: a fallen ally beside the knight to try the lift on,
+    // eval fakeDownedAlly(); it is gone with the level
+    function fakeDownedAlly() {
+        if (!player) return null
+        return session.fakeDownedAlly(player.xWu + 1, player.yWu)
     }
 
     // --- Fight record ---
@@ -1307,17 +1931,33 @@ ClayWorld2d {
         property int damageTaken: 0
         property int parries: 0
         property int blocks: 0
+        property int perfectBlocks: 0
+        // Crushing blows that broke the held shield
+        property int crushed: 0
+        // Whirlwinds that hit an enemy, and the enemies they hit
+        property int whirlwinds: 0
+        property int whirlHits: 0
         property int kills: 0
         property int deaths: 0
+        // Fallen allies this knight lifted up, and the times an ally lifted
+        // it up (a rise at camp is neither)
+        property int lifts: 0
+        property int lifted: 0
         property real seconds: 0
         property real clearSeconds: -1
     }
     function resetFightRecord() {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
-        r.kills = 0; r.deaths = 0; r.seconds = 0; r.clearSeconds = -1
+        r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
+        r.kills = 0; r.deaths = 0; r.lifts = 0; r.lifted = 0
+        r.seconds = 0; r.clearSeconds = -1
     }
-    // what: dealt, taken (with the damage), parry, block, kill or fall
+    // what: dealt, taken (with the damage), parry, block, perfectBlock
+    // (counted as a block too), crushed (a crushing blow broke the held
+    // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
+    // enemy it hit), kill, fall, lift (this knight lifted an ally up) or
+    // lifted (an ally lifted it up)
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -1325,7 +1965,13 @@ ClayWorld2d {
         case "taken": r.damageTaken += amount; break
         case "parry": r.parries++; break
         case "block": r.blocks++; break
+        case "perfectBlock": r.perfectBlocks++; break
+        case "crushed": r.crushed++; break
+        case "whirlwind": r.whirlwinds++; break
+        case "whirlHit": r.whirlHits++; break
         case "fall": r.deaths++; break
+        case "lift": r.lifts++; break
+        case "lifted": r.lifted++; break
         case "kill":
             r.kills++
             runKills++
@@ -1340,6 +1986,8 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world._pickUpGold()
+            world._stepRevive()
+            world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
                 world.runSeconds += world.physics.timeStep
@@ -1347,14 +1995,36 @@ ClayWorld2d {
         }
     }
 
-    // Enter on the fallen screen: a new run from depth 0 on a new seed
+    // In a dungeon, a few times a second, where the next one would stand
+    // were the party to leave now: the exit stairs show it. Once the run
+    // has ended nextPosition is the next run's
+    function _forecastDanger() {
+        if (levelType !== "dungeon" || fightRoomActive || !player || _physicsSteps % 10 !== 0) return
+        if (session.connected ? partyFallen : fallen) return
+        nextPosition = settleDanger(dangerPosition, partyRecords())
+    }
+
+    // Enter on the fallen screen: a new run from depth 0 on a new seed. In
+    // a session only the host starts it, for every knight
     function newRun() {
-        let oldSeed = masterSeed
+        if (session.connected && !session.isHost) return
+        let seed
         do {
-            masterSeed = Math.floor(Math.random() * 2147483647)
-        } while (masterSeed === oldSeed)
-        console.log("[Game] New run, seed:", masterSeed)
+            seed = Math.floor(Math.random() * 2147483647)
+        } while (seed === masterSeed)
+        _startRun(seed, nextPosition, knightsNow())
+    }
+    // The next run on seed, from depth 0 with a fresh knight, its first
+    // dungeon at position in its range. The host clears its enemies on
+    // every node before it tells the others the seed and spawns the next
+    // run's; its first dungeon is built for knights
+    function _startRun(seed, position, knights) {
+        console.log("[Game] New run, seed:", seed)
         clearDungeon()
+        masterSeed = seed
+        _setDanger(position, position)
+        _setKnights(knights)
+        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights)
         menuOpen = false
         fallen = false
         partyFallen = false
@@ -1365,15 +2035,18 @@ ClayWorld2d {
         _startRunRecord()
         generateDungeon()
         minimap.requestPaint()
-        world.forceActiveFocus()
     }
 
     // Esc on the fallen screen: leave the run (and a session) for the title,
     // where the next start rolls a new seed
     function backToTitle() {
         console.log("[Game] Back to the title")
+        // The next game from the title starts where this run left the
+        // danger: after a fall or out of a village at the next position
+        let position = fallen || levelType === "village" ? nextPosition : dangerPosition
         clearDungeon()
         if (session.connected) session.leave()
+        _setDanger(position, position)
         menuOpen = false
         fallen = false
         partyFallen = false
@@ -1419,7 +2092,7 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : "#0c0b12"
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -1433,7 +2106,8 @@ ClayWorld2d {
         vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
         vignetteColor: "#000000"
         // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15 : 0.12
+        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15
+                     : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
         saturation: world.fx ? 1.15 : 1
@@ -1457,6 +2131,11 @@ ClayWorld2d {
         function parry() {
             screenFxItem.flash("#FFF0B0", 80, 0.3)
             screenFxItem.pulse(1.0, 320)
+        }
+        function perfectBlock() {
+            let b = Balance.perfectBlock
+            screenFxItem.flash(b.flashColor, b.screenFlash * 1000, b.screenFlashOpacity)
+            screenFxItem.pulse(b.pulse, b.pulseTime * 1000)
         }
     }
 
@@ -1547,45 +2226,61 @@ ClayWorld2d {
 
     // Host-authoritative level transitions: without this every client
     // regenerates on its own and the worlds silently diverge.
+    // The host settles the next danger from every knight's record and
+    // sends it with the level
     function _hostAdvanceLevel() {
         if (resetting) return
-        session.announceLevel(levelIndex + 1)
-        _applyLevelChange(levelIndex + 1)
+        let d = _dangerFor(levelIndex + 1)
+        session.announceLevel(levelIndex + 1, d.pos, d.next, d.knights)
+        _applyLevelChange(levelIndex + 1, d)
     }
 
-    function _applyLevelChange(newIndex) {
+    // d: the danger's positions the level is entered at and the knights it
+    // is built for ({pos, next, knights})
+    function _applyLevelChange(newIndex, d) {
         if (resetting || newIndex === levelIndex) return
         resetting = true
         Qt.callLater(() => {
-            _enterLevel(newIndex)
+            _enterLevel(newIndex, d)
             resetting = false
         })
     }
 
     // The one way to the next level: what the knight carries (its HP, mana,
-    // gold, potions and the smith's upgrade) goes with it, a village follows each dungeon
-    function _enterLevel(newIndex) {
+    // gold, potions, draughts and the smith's upgrades) goes with it, a village follows each dungeon.
+    // In a session a knight down rises at the village's camp. d is the
+    // danger's positions it is entered at and the knights it is built
+    // for, the host's in a session; alone they are settled here, before
+    // the knight and its record are gone
+    function _enterLevel(newIndex, d) {
+        d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
-                                 potions: player.potions, upgrade: player.upgrade }
+                                 potions: player.potions, draughts: player.draughts,
+                                 levels: smithLevels(player) }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
-                                 potions: 0, upgrade: "" }
+                                 potions: 0, draughts: 0, levels: smithLevels(null) }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
-                    "gold:", carried.gold, "potions:", carried.potions, "upgrade:", carried.upgrade)
+                    "gold:", carried.gold, "potions:", carried.potions, "draughts:", carried.draughts,
+                    "smith:", JSON.stringify(carried.levels))
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
+        _setDanger(d.pos, d.next)
+        _setKnights(d.knights)
         if (levelType === "village")
             generateVillage()
         else
             generateDungeon()
         if (player) {
-            // The upgrade first: it raises max HP, which the HP is held to
-            player.upgrade = carried.upgrade
+            for (let line of smithLines) player[line + "Level"] = carried.levels[line]
             player.hp = carried.hp
             player.mana = carried.mana
             player.gold = carried.gold
             player.potions = carried.potions
+            player.draughts = carried.draughts
         }
+        // A knight still down when the party reaches the camp rises there
+        if (session.connected && levelType === "village") _rise("camp")
     }
 
     // Component factories
@@ -1606,6 +2301,20 @@ ClayWorld2d {
             visible: Qt.binding(() => world.fx)
         })
         dungeonObjects.push(m)
+        if (!dangerLook) return
+        // The dungeon's air at its danger: dust, and embers glowing on
+        // their own
+        m.density = look.dust
+        m.visible = Qt.binding(() => world.fx && look.dust > 0)
+        if (look.emberAir <= 0) return
+        let e = motesComponent.createObject(glowParent(), {
+            widthWu: xWuMax, heightWu: yWuMax,
+            density: look.emberAir, moteSize: 0.05, drift: 0.8,
+            color: Qt.rgba(1.0, 0.33, 0.08, 0.9),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(e)
     }
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
@@ -1619,33 +2328,85 @@ ClayWorld2d {
     function openDialogue(name, color, lines, wares) {
         dialoguePanel.open(name, color, lines, _offered(wares || []))
     }
-    // The smith's upgrade is one per run: once bought, the smith offers
-    // neither
+    // The innkeeper's wares are always offered; the smith's are made as he
+    // is talked to (smithWare), the next level of each upgrade he may sell
     function _offered(wares) {
-        return wares.filter(w => w.id === "potion" || (player && player.upgrade === ""))
+        let out = []
+        for (let w of wares) {
+            let offer = w.id === "potion" || w.id === "draught" ? w : smithWare(w.id)
+            if (offer) out.push(offer)
+        }
+        return out
+    }
+
+    // --- The smith's upgrades (issues #38, #81, #98) ---
+    // Each lasts the run and has levels (Balance.shop): one level per
+    // camp, the next above the knight's, and higher levels only deeper
+    readonly property var smithLines: ["sword", "shield", "harness", "blade"]
+    // The knight's levels, {sword, shield, harness, blade}; all 0 for none
+    function smithLevels(knight) {
+        let out = {}
+        for (let line of smithLines) out[line] = knight ? knight[line + "Level"] : 0
+        return out
+    }
+    // The highest level the smith of this camp sells: the camp after depth
+    // d reaches level L once d is levelDepth[L - 1]
+    function smithLimit() {
+        return Balance.shop.levelDepth.filter(d => d <= depth).length
+    }
+    // The ware of the next level of line, or null where the smith sells
+    // none: the knight has the last level, the next one is above this
+    // camp's limit, or it bought a level here already
+    function smithWare(line) {
+        if (!player || player.smithDone || smithLines.indexOf(line) < 0) return null
+        let level = player[line + "Level"] + 1
+        if (level > smithLimit() || level > Balance.shop.upgradePrice.length) return null
+        let sh = Balance.shop, i = level - 1
+        let name = ["I", "II", "III", "IV", "V"][i] || String(level)
+        let what = line === "sword" ? "Sharpened sword " + name + " (+" + sh.swordAtk[i] + " damage)"
+            : line === "shield" ? "Reinforced shield " + name + " (a block lets "
+                                  + Math.round(sh.shieldBlockedShare[i] * 100) + " % through, costs "
+                                  + sh.shieldBlockMana[i] + " mana)"
+            : line === "harness" ? "Lighter harness " + name + " (a dash costs "
+                                   + sh.harnessDashMana[i] + " mana)"
+            : "Balanced blade " + name + " (a whirlwind costs " + sh.bladeWhirlMana[i] + " mana)"
+        return { id: line, level: level, label: what, price: sh.upgradePrice[i] }
     }
 
     // --- The village's wares (issue #38) ---
-    // Bought with this node's knight's own gold. A potion is kept for key 1;
-    // the smith's upgrade ("atk" or "hp") lasts the run
+    // Bought with this node's knight's own gold. A potion is kept for key 1,
+    // a draught for key 2; a smith's level lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
-        if (player.gold < ware.price) {
-            dialoguePanel.note = "You'll need " + ware.price + " gold for that."
+        let inn = ware.id === "potion" || ware.id === "draught"
+        // The smith sells only what he offers now: a ware from before the
+        // knight bought here, or above the camp's limit, is refused
+        let offer = inn ? ware : smithWare(ware.id)
+        if (!offer) return false
+        if (player.gold < offer.price) {
+            dialoguePanel.note = "You'll need " + offer.price + " gold for that."
             return false
         }
-        player.gold -= ware.price
+        player.gold -= offer.price
         if (ware.id === "potion") {
             player.potions++
             dialoguePanel.note = "One potion. Drink it when it counts."
+        } else if (ware.id === "draught") {
+            player.draughts++
+            dialoguePanel.note = "A mana draught. It'll fill you up when the shield runs dry."
         } else {
-            player.upgrade = ware.id
-            if (ware.id === "hp") player.hp += Balance.shop.hpUpgrade
-            dialoguePanel.note = ware.id === "atk" ? "There. That edge will bite deeper."
-                                                   : "There. That mail will take a few more blows."
+            player[ware.id + "Level"] = offer.level
+            player.smithDone = true
+            dialoguePanel.note = {
+                sword: "There. That edge will bite deeper.",
+                shield: "There. That shield will let less through.",
+                harness: "There. Lighter on your feet now.",
+                blade: "There. It'll spin true in your hand."
+            }[ware.id]
         }
         dialoguePanel.wares = _offered(dialoguePanel.wares)
-        console.log("[Game] Bought", ware.id, "for", ware.price, "gold,", player.gold, "left")
+        console.log("[Game] Bought", ware.id + (inn ? "" : " level " + offer.level), "for",
+                    offer.price, "gold,", player.gold, "left")
         return true
     }
     function drinkPotion() {
@@ -1653,6 +2414,12 @@ ClayWorld2d {
         let healed = player.drinkPotion()
         if (healed > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
         return healed
+    }
+    function drinkDraught() {
+        if (!player) return 0
+        let gained = player.drinkDraught()
+        if (gained > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + Math.round(gained), "#B080E0")
+        return gained
     }
 
     // Death particle
@@ -1715,6 +2482,9 @@ ClayWorld2d {
         let levelSeed = deriveSeed(masterSeed, levelIndex)
         rng = createRng(levelSeed)
         console.log("[Game] Seed:", masterSeed, "Level:", levelIndex, "LevelSeed:", levelSeed)
+        // Nothing lost here yet: were the party to leave at once, the next
+        // dungeon would stand there, and the stairs show it from the start
+        nextPosition = settleDanger(dangerPosition, [{ lost: 0, fell: false }])
         console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
         // Step 1: Initialize grid with walls
@@ -1732,7 +2502,8 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
-        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995))
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
+        placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -1750,29 +2521,13 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        if (rooms.length > 1) {
-            let spawnRooms = rooms.slice(1)
-            let sb = spawnRolls(depth)
-            let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
-            let tiers = dealTiers(numEnemies, sb, rng)
-            for (let i = 0; i < numEnemies; i++) {
-                let room = spawnRooms[i % spawnRooms.length]
-                let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
-                let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
-                let tier = tiers[i]
-                // Enemy type: guardian, spitter, else grunt
-                let typeRoll = rng()
-                let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
-                let type = typeRoll < guardianChance ? "guardian"
-                    : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
-                spawnEnemy(ex, ey, tier, type)
-            }
-        }
+        for (let e of rollEnemies(rooms, spawnRolls(danger, partyKnights), rng))
+            spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
 
         // Bind player controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             // Mouse aiming: bind screen coords for facing calculation
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
@@ -1835,25 +2590,39 @@ ClayWorld2d {
     }
 
     function placeRooms(minRooms, maxRooms, minSize, maxSize) {
-        rooms = []
-        let numRooms = minRooms + Math.floor(rng() * (maxRooms - minRooms + 1))
+        rooms = planRooms(minRooms, maxRooms, minSize, maxSize, rng)
+        // Carve the rooms into the grid
+        for (let room of rooms)
+            for (let y = room.y; y < room.y + room.h; y++)
+                for (let x = room.x; x < room.x + room.w; x++)
+                    grid[y][x] = cellRoom
+        console.log("[Game] Placed", rooms.length, "rooms")
+    }
+
+    // The rooms of a dungeon, drawn from rand without touching the grid,
+    // sorted by Y position (bottom to top) for the spanning tree. Only
+    // they and rollEnemies draw from the level's rng, so the witch can
+    // read the next dungeon's enemies off its seed (foretell)
+    function planRooms(minRooms, maxRooms, minSize, maxSize, rand) {
+        let out = []
+        let numRooms = minRooms + Math.floor(rand() * (maxRooms - minRooms + 1))
         let attempts = 0
         let maxAttempts = 100
 
-        while (rooms.length < numRooms && attempts < maxAttempts) {
+        while (out.length < numRooms && attempts < maxAttempts) {
             attempts++
 
             // Random room size (in cells)
-            let rw = minSize + Math.floor(rng() * (maxSize - minSize + 1))
-            let rh = minSize + Math.floor(rng() * (maxSize - minSize + 1))
+            let rw = minSize + Math.floor(rand() * (maxSize - minSize + 1))
+            let rh = minSize + Math.floor(rand() * (maxSize - minSize + 1))
 
             // Random position (leave 1 cell border for walls)
-            let rx = 1 + Math.floor(rng() * (gridWidth - rw - 2))
-            let ry = 1 + Math.floor(rng() * (gridHeight - rh - 2))
+            let rx = 1 + Math.floor(rand() * (gridWidth - rw - 2))
+            let ry = 1 + Math.floor(rand() * (gridHeight - rh - 2))
 
             // Check if room overlaps with existing rooms (with 1 cell padding)
             let overlaps = false
-            for (let room of rooms) {
+            for (let room of out) {
                 if (rx < room.x + room.w + 1 &&
                     rx + rw + 1 > room.x &&
                     ry < room.y + room.h + 1 &&
@@ -1862,22 +2631,35 @@ ClayWorld2d {
                     break
                 }
             }
-
-            if (!overlaps) {
-                rooms.push({x: rx, y: ry, w: rw, h: rh})
-                // Carve room into grid
-                for (let y = ry; y < ry + rh; y++) {
-                    for (let x = rx; x < rx + rw; x++) {
-                        grid[y][x] = cellRoom
-                    }
-                }
-                console.log("[Game] Placed room", rooms.length, "at", rx, ry, "size", rw, "x", rh)
-            }
+            if (!overlaps) out.push({x: rx, y: ry, w: rw, h: rh})
         }
 
-        // Sort rooms by Y position (bottom to top) for spanning tree
-        rooms.sort((a, b) => a.y - b.y)
-        console.log("[Game] Placed", rooms.length, "rooms")
+        out.sort((a, b) => a.y - b.y)
+        return out
+    }
+
+    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls),
+    // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
+    // first, the knights' start, with the table's tier mix
+    function rollEnemies(rms, sb, rand) {
+        let out = []
+        if (rms.length < 2) return out
+        let spawnRooms = rms.slice(1)
+        let numEnemies = sb.enemiesMin + Math.floor(rand() * (sb.enemiesMax - sb.enemiesMin + 1))
+        let tiers = dealTiers(numEnemies, sb, rand)
+        for (let i = 0; i < numEnemies; i++) {
+            let room = spawnRooms[i % spawnRooms.length]
+            let ex = (room.x + 1 + rand() * (room.w - 2)) * cellSize
+            let ey = (room.y + 1 + rand() * (room.h - 2)) * cellSize
+            let tier = tiers[i]
+            // Enemy type: guardian, spitter, else grunt
+            let typeRoll = rand()
+            let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
+            let type = typeRoll < guardianChance ? "guardian"
+                : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
+            out.push({x: ex, y: ey, tier: tier, type: type})
+        }
+        return out
     }
 
     function connectRooms() {
@@ -1954,6 +2736,10 @@ ClayWorld2d {
             style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
             seed: (levelIndex * 0.137) % 1
         })
+        if (dangerLook) {
+            floorObj.crackShare = look.crackShare
+            floorObj.moss = look.moss
+        }
         dungeonObjects.push(floorObj)
 
         // Create merged walls using run-length encoding
@@ -2023,8 +2809,10 @@ ClayWorld2d {
 
     // Torches on the north wall of each room. Decoration draws from its own
     // generator so the layout and enemies stay identical to a seed without it.
+    // With a look (Balance.danger.looks) only its torchShare of them burn,
+    // in its torch colour
     property var torches: []
-    function placeRoomTorches(decoRng) {
+    function placeRoomTorches(decoRng, look) {
         torches = []
         for (let room of rooms) {
             let gy = room.y + room.h
@@ -2040,7 +2828,38 @@ ClayWorld2d {
                 let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
                 t += (decoRng() - 0.5) * 0.15
                 let gx = spots[Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))]
-                placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75)
+                if (look && decoRng() >= look.torchShare) continue
+                placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75,
+                           look ? look.torch : undefined)
+            }
+        }
+    }
+
+    // What lies on the floor of each room but the first at the look's
+    // danger: old stains, bones and embers, each kind look.<kind> per room
+    // on average, laid out from the level's seed
+    Component { id: debrisComponent; Debris {} }
+    function placeDebris(decoRng, look) {
+        for (let room of rooms.slice(1)) {
+            for (let kind of ["stains", "bones", "embers"]) {
+                // A whole number per room, its fraction a chance of one more
+                let n = Math.floor(look[kind] + decoRng())
+                for (let i = 0; i < n; i++) {
+                    let x = (room.x + 1 + decoRng() * (room.w - 2)) * cellSize
+                    let y = (room.y + 1 + decoRng() * (room.h - 2)) * cellSize
+                    let seed = decoRng()
+                    let props = {
+                        xWu: x, yWu: y, seed: seed,
+                        pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                        visible: Qt.binding(() => world.fx)
+                    }
+                    let o = kind === "stains"
+                        ? stainComp.createObject(world.room, Object.assign(props, {
+                              color: "#2E1A14", sizeWu: 1.0 + 0.6 * seed }))
+                        : debrisComponent.createObject(kind === "embers" ? glowParent() : world.room,
+                              Object.assign(props, { kind: kind, sizeWu: 0.8 + 0.3 * seed }))
+                    if (o) dungeonObjects.push(o)
+                }
             }
         }
     }
@@ -2143,12 +2962,14 @@ ClayWorld2d {
         }
     }
 
-    // The spawn table at a depth: Balance.spawn with Balance.depth added
-    // once per depth, each number within its cap
-    function spawnRolls(d) {
+    // The spawn table at a danger: Balance.spawn with Balance.depth added
+    // once per step of it (a share of it between two), each number within
+    // its cap, and Balance.party.enemiesPerKnight for each of knights
+    // (1 when left out) beyond the first
+    function spawnRolls(d, knights) {
         let sb = Balance.spawn, bd = Balance.depth
         let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
-        let more = Math.floor(d * bd.enemies)
+        let more = Math.floor(d * bd.enemies) + _extraKnights(knights) * Balance.party.enemiesPerKnight
         return {
             enemiesMin: Math.min(bd.enemiesCap, sb.enemiesMin + more),
             enemiesMax: Math.min(bd.enemiesCap, sb.enemiesMax + more),
@@ -2175,18 +2996,26 @@ ClayWorld2d {
         return tiers
     }
 
-    // An enemy's attack at a depth
+    // An enemy's attack at a danger
     function enemyAtk(type, d) {
         return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
     }
+    // An enemy's HP in a dungeon built for knights (1 when left out):
+    // Balance.party.hpPerKnight of it more for each beyond the first
+    function enemyHp(type, tier, knights) {
+        let hp = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        return Math.round(hp * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
-    function spawnEnemy(ex, ey, tier, type) {
+    // knights: the knights the dungeon is built for, 1 when left out
+    function spawnEnemy(ex, ey, tier, type, knights) {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
         let stats = Balance.enemy[type]
-        let ehp = Balance.enemy.tierHp[tier] + stats.hpBonus
-        let eatk = enemyAtk(type, depth)
+        let ehp = enemyHp(type, tier, knights)
+        let eatk = enemyAtk(type, danger)
         let edef = stats.def
         let props = {
             xWu: ex, yWu: ey,
@@ -2354,12 +3183,26 @@ ClayWorld2d {
         }
     }
 
+    // Damage numbers are for tuning: they show only in debug mode
     function spawnDamageNumber(wx, wy, amount, color) {
         if (!debugMechanics) return
         damageNumberComp.createObject(world.room, {
+            objectName: "damageNumber",
             xWu: wx, yWu: wy + 0.5,
             startYWu: wy + 0.5,
             text: "" + amount,
+            color: color,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+    }
+
+    // A word over the struck enemy - PARRY, PERFECT - shows in normal play
+    function spawnWord(wx, wy, word, color) {
+        damageNumberComp.createObject(world.room, {
+            objectName: "fightWord",
+            xWu: wx, yWu: wy + 0.5,
+            startYWu: wy + 0.5,
+            text: word,
             color: color,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
@@ -2401,8 +3244,12 @@ ClayWorld2d {
         })
         exitSensor.opacity = 0
         dungeonObjects.push(exitSensor)
+        // The stairs glow in the next dungeon's torch colour: in a dungeon
+        // where it would stand were the party to leave now, in the village
+        // where it stands
         exitStairs = exitStairsComponent.createObject(world.room, {
             xWu: wx, yWu: wy, widthWu: cellSize, heightWu: cellSize,
+            glow: Qt.binding(() => Balance.danger.looks[dangerBand(world.nextPosition)].torch),
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -2411,6 +3258,7 @@ ClayWorld2d {
     }
 
     function clearDungeon() {
+        _attackRng = null
         exitSensor = null
         exitStairs = null
 
@@ -2459,9 +3307,13 @@ ClayWorld2d {
         dungeonObjects = []
         torches = []
         stains = []
-        // A blow held for the last level's enemy does not land in the next
+        // A blow held for the last level's enemy does not land in the next,
+        // nor does a shot still flying
         _heldBlows = []
         _parriedAt = {}
+        for (let id in _shotById) {
+            try { if (_shotById[id] && !_shotById[id].destroyed) _shotById[id].vanish() } catch(err) {}
+        }
         _shotById = {}
 
         grid = []
@@ -2544,10 +3396,12 @@ ClayWorld2d {
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
-            "For the road, a potion. Coin first, mind.",
+            "For the road, a potion or a mana draught. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
         ], "assets/innkeeper_greeting.wav", [
-            { id: "potion", label: "Health potion", price: Balance.shop.potionPrice }
+            { id: "potion", label: "Health potion", price: Balance.shop.potionPrice },
+            { id: "draught", label: "Mana draught (+" + Balance.shop.draughtMana + " mana)",
+              price: Balance.shop.draughtPrice }
         ])
 
         // Blacksmith building (top-right) — entrance facing south
@@ -2561,14 +3415,9 @@ ClayWorld2d {
             { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "I can hone that edge or thicken your mail - one of the two, for this descent.",
-            "Bring gold from below and it's yours."
-        ], "assets/blacksmith_greeting.wav", [
-            { id: "atk", label: "Hone the blade (+" + Balance.shop.atkUpgrade + " damage)",
-              price: Balance.shop.upgradePrice },
-            { id: "hp", label: "Thicken the mail (+" + Balance.shop.hpUpgrade + " max HP)",
-              price: Balance.shop.upgradePrice }
-        ])
+            "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
+            "The deeper you've been, the finer I can make it. Bring gold from below."
+        ], "assets/blacksmith_greeting.wav", smithLines.map(line => ({ id: line })))
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {
@@ -2583,17 +3432,12 @@ ClayWorld2d {
         tree.radius = tree.width * 0.5
         dungeonObjects.push(tree)
 
-        // Witch — fortune teller near the tree
+        // Witch — fortune teller near the tree: she reads the next dungeon
         _spawnVillageNpc(cx - 5, cy - 5, "#7B2D8E", "crystal", "Witch", [
             { x: cx - 6, y: cy - 4.5, duration: 4, text: "*gazing into crystal*" },
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
-        ], [
-            "The stones whisper of what lies below...",
-            "I see shapes in the dark — hungry ones.",
-            "Beware the hollow chamber. Something ancient stirs.",
-            "Return to me... if you survive."
-        ], "assets/witch_greeting.wav")
+        ], witchReading, "assets/witch_greeting.wav")
 
         // Spawn player at entrance
         spawnPlayer(cx, (oy + 2) * cellSize)
@@ -2605,8 +3449,8 @@ ClayWorld2d {
 
         // Bind controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
@@ -2643,6 +3487,7 @@ ClayWorld2d {
         }
     }
 
+    // dialogue: its lines, or a function making them when it is talked to
     function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting, wares) {
         let npc = npcComponent.createObject(world.room, {
             xWu: wx, yWu: wy,
@@ -2657,7 +3502,8 @@ ClayWorld2d {
             iconType: iconType,
             npcName: name || "",
             routine: routine || [],
-            dialogueLines: dialogue || [],
+            dialogueLines: typeof dialogue === "function" ? [] : dialogue || [],
+            speak: typeof dialogue === "function" ? dialogue : null,
             greetingSound: greeting || "",
             wares: wares || []
         })
@@ -2724,8 +3570,8 @@ ClayWorld2d {
 
         // Bind controls
         if (player) {
-            player.moveX = Qt.binding(() => gameCtrl.axisX)
-            player.moveY = Qt.binding(() => -gameCtrl.axisY)
+            player.moveX = Qt.binding(() => knightMoveX)
+            player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
             player.playerScreenX = Qt.binding(() => playerScreenX)
@@ -2772,10 +3618,15 @@ ClayWorld2d {
     // captures compare the same room.
     readonly property int scenarioSeed: 424242
     function scenarios() { return ["dungeon", "village", "fight"] }
-    // depth (0 when left out) is the depth the dungeon, the village or the
-    // fight room is at, e.g. applyScenario("dungeon", 4) through eval
-    function applyScenario(name, atDepth) {
-        let d = Math.max(0, Math.floor(atDepth || 0))
+    // atDanger (0 when left out) is the danger the dungeon, the village or
+    // the fight room is at: its depth and, after the point, its position
+    // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
+    // for a dungeon high in depth 4's range. A whole number is the bottom
+    function applyScenario(name, atDanger) {
+        let dg = Math.max(0, Number(atDanger) || 0)
+        let d = Math.floor(dg)
+        _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
+        _setKnights(knightsNow())
         muted = true
         masterSeed = scenarioSeed
         if (player) clearDungeon()
@@ -2784,6 +3635,8 @@ ClayWorld2d {
         // Generate before leaving the title: with a player in place,
         // _tryStartGame() does not build a second level on top.
         let type = name === "village" ? "village" : "dungeon"
+        // Landing at a depth is no descent past the record: no banner
+        recordPassed = true
         levelIndex = levelIndexOf(d, type)
         levelType = type
         _startRunRecord()
@@ -2796,6 +3649,15 @@ ClayWorld2d {
         screen = "game"
         minimap.requestPaint()
         world.forceActiveFocus()
+    }
+
+    // The level's attack rolls - whether a tough enemy winds up a crushing
+    // blow - from the run's seed and the level, so a seed plays the same
+    // fight; only where the AI runs. Seeded anew with each level
+    property var _attackRng: null
+    function rollAttack() {
+        if (!_attackRng) _attackRng = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x6372)
+        return _attackRng()
     }
 
     // --- Seeded PRNG (mulberry32) ---
@@ -2980,9 +3842,11 @@ ClayWorld2d {
                 depth: world.depth
                 kills: world.runKills
                 seconds: world.runSeconds
-                bestDepth: world.bestDepth
-                newBest: world.depth > world.runStartBest
-                canGoAgain: !session.connected && !world.partyFallen
+                recordLine: world.recordLine
+                newRecord: world.recordPassed
+                runs: world.sessionRuns
+                canGoAgain: !session.connected || (world.partyFallen && session.isHost)
+                waitsForHost: session.connected && world.partyFallen && !session.isHost
                 partyFights: session.connected && !world.partyFallen
                 partyFallen: world.partyFallen
                 onGoAgain: world.newRun()
@@ -3000,7 +3864,8 @@ ClayWorld2d {
             TitleScreen {
                 muted: world.muted
                 message: world.titleMessage
-                onSinglePlayerSelected: { screen = "game"; world.forceActiveFocus() }
+                recordLine: world.recordLine
+                onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
             }
         }

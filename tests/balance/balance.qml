@@ -4,8 +4,15 @@
 // the fight room and the village and checks that the knight, every enemy,
 // the fight room lineup and the campfire carry the table's values; at
 // depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix and
-// harder blows, as the table's depth group says; the
-// campfire refills a dry knight's mana, away from it nothing does, and the
+// harder blows, as the table's depth group says; tough grunts and
+// guardians, and no other enemy, wind up a crushing blow at
+// enemy.crushChance, for enemy.crushWindUp, and one on a held shield
+// takes enemy.crushMana, enemy.crushShare of the damage and drops the
+// shield for enemy.crushLockout; the smith sells level I of the sword,
+// the shield, the harness and the blade for shop.upgradePrice, each
+// level taking the shop's values; the
+// campfire refills a dry knight's mana on top of the rest's knight.manaRegen,
+// away from it only the rest does, and the
 // next level, either way it is reached, keeps the knight's HP and mana. Last it
 // changes a value in the table and checks the next knight has it. Prints
 // one PASS or FAIL line per check and exits with the number of failures.
@@ -64,6 +71,11 @@ Window {
             && near(e.windUpDuration, Balance.enemy.windUp)
             && near(e.shootCooldown, Balance.enemy.shootCooldown)
             && near(e.shieldArc, Balance.enemy.shieldArc)
+            && near(e.crushChance, crushChanceOf(e))
+    }
+    // Tough grunts and guardians wind up crushing blows, no other enemy
+    function crushChanceOf(e) {
+        return e.tier === 2 && e.enemyType !== "spitter" ? Balance.enemy.crushChance : 0
     }
 
     property var campfire: null
@@ -93,7 +105,7 @@ Window {
     property var steps: [
         [() => game.screen === "title", () => {
             let json = JSON.parse(JSON.stringify(Balance))
-            let groups = ["knight", "enemy", "projectile", "spawn", "depth", "campfire"]
+            let groups = ["knight", "enemy", "projectile", "spawn", "depth", "campfire", "shop"]
             check(groups.every(g => json[g] !== undefined) && json.minDamage === 1,
                   "JSON.stringify(Balance) returns the whole table ("
                   + leaves(json, "", []).length + " values)")
@@ -150,6 +162,43 @@ Window {
             check(same, "the fight room holds the table's lineup ("
                   + es.map(e => e.enemyType + "/" + e.tier).join(", ") + ")")
             check(es.every(checkEnemy), "the fight room's enemies carry the table's stats")
+
+            // The tough guardian winds up crushing blows at the table's
+            // chance, the others none; a crushing wind-up lasts crushWindUp
+            let be = Balance.enemy
+            let gd = es.find(e => e.enemyType === "guardian")
+            check(near(gd.crushChance, be.crushChance) && es.filter(e => e !== gd).every(e => e.crushChance === 0),
+                  "the tough guardian winds up crushing blows at crushChance " + gd.crushChance
+                  + ", the table says " + be.crushChance + "; the normal grunts and the spitter at "
+                  + es.filter(e => e !== gd).map(e => e.crushChance).join(", "))
+            gd.target = null
+            gd.crushChance = 1
+            gd.windUp(be.windUp)
+            let crushWindUp = gd._attackTimer, crushState = gd.aiState
+            gd.crushChance = 0
+            gd.windUp(be.windUp)
+            check(crushState === "crush" && near(crushWindUp, be.crushWindUp)
+                  && gd.aiState === "telegraph" && near(gd._attackTimer, be.windUp),
+                  "a crushing blow winds up for " + crushWindUp + " s (" + crushState + "), the table says "
+                  + be.crushWindUp + "; a lunge for " + gd._attackTimer + " s")
+            gd.aiState = "patrol"
+            gd.crushChance = be.crushChance
+            // A crushing blow on the held shield, from the front
+            let p = game.player
+            p.graceLeft = 0
+            p.mana = p.maxMana
+            p.facingAngle = 0
+            p.raiseShield()
+            p._raisedAt = p._steps - Balance.knight.perfectBlockFrames - 1
+            let hp = p.hp
+            let res = p.takeDamage(20, p.xWu + 1, p.yWu, undefined, true)
+            let share = Math.floor((20 - p.def) * be.crushShare)
+            check(res === "crushed" && near(p.maxMana - p.mana, be.crushMana) && hp - p.hp === share
+                  && near(p.shieldLock, be.crushLockout) && !p.isBlocking,
+                  "on a held shield it takes " + (p.maxMana - p.mana) + " mana (crushMana " + be.crushMana
+                  + "), " + (hp - p.hp) + " of " + (20 - p.def) + " HP (crushShare " + be.crushShare
+                  + ") and drops the shield for " + p.shieldLock + " s (crushLockout " + be.crushLockout + ")")
+            p.lowerShield()
             game.applyScenario("village")
         }],
         [() => game.player && game.levelType === "village", () => {
@@ -158,14 +207,50 @@ Window {
                   && near(campfire.manaRate, Balance.campfire.manaPerSecond)
                   && near(campfire.healRadius, Balance.campfire.healRadius),
                   "the campfire's heal rate, mana rate and radius come from the table")
+            // The smith's wares and what they do: the table's shop group
+            let shop = Balance.shop, p = game.player
+            let same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+            check(same(shop.levelDepth, [0, 2, 4]) && same(shop.upgradePrice, [30, 45, 60])
+                  && same(shop.swordAtk, [5, 9, 12]) && same(shop.shieldBlockedShare, [0.15, 0.1, 0.05])
+                  && same(shop.shieldBlockMana, [4, 3, 2]) && same(shop.harnessDashMana, [6, 4, 3])
+                  && same(shop.bladeWhirlMana, [15, 12, 9]),
+                  "the shop's levelDepth " + shop.levelDepth + ", upgradePrice " + shop.upgradePrice
+                  + ", swordAtk " + shop.swordAtk + ", shieldBlockedShare " + shop.shieldBlockedShare
+                  + ", shieldBlockMana " + shop.shieldBlockMana + ", harnessDashMana " + shop.harnessDashMana
+                  + ", bladeWhirlMana " + shop.bladeWhirlMana)
+            let smith = game.room.children.find(c => c.objectName === "npc" && c.npcName === "Blacksmith")
+            let wares = smith ? game._offered(smith.wares) : []
+            check(wares.map(w => w.id).join(" ") === "sword shield harness blade"
+                  && wares.every(w => w.level === 1 && w.price === shop.upgradePrice[0]),
+                  "the first camp's smith sells level I of the sword, the shield, the harness and the blade for "
+                  + "upgradePrice[0] (" + wares.map(w => w.id + " " + w.level + " " + w.price).join(", ") + ")")
+            // Each level takes its entry of the table, every effect read live
+            let levels = [1, 2, 3].every(l => {
+                let i = l - 1
+                p.swordLevel = l; p.shieldLevel = l; p.harnessLevel = l; p.bladeLevel = l
+                return p.atk === Balance.knight.atk + shop.swordAtk[i]
+                    && near(p.blockedShare, shop.shieldBlockedShare[i]) && near(p.blockMana, shop.shieldBlockMana[i])
+                    && near(p.dashMana, shop.harnessDashMana[i]) && near(p.whirlMana, shop.bladeWhirlMana[i])
+                    && near(p.blockDrain, Balance.knight.blockDrain)
+            })
+            p.swordLevel = 0; p.shieldLevel = 0; p.harnessLevel = 0; p.bladeLevel = 0
+            check(levels && p.atk === Balance.knight.atk
+                  && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana)
+                  && near(p.dashMana, Balance.knight.dashMana) && near(p.whirlMana, Balance.knight.whirlMana),
+                  "levels I to III of the sword add swordAtk, of the shield take shieldBlockedShare and "
+                  + "shieldBlockMana, of the harness harnessDashMana and of the blade bladeWhirlMana; "
+                  + "level 0 the knight's own")
             // Hurt and dry, away from the fire
             game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4
             game.player.yWu = campfire.yWu
             game.player.mana = 0
         }],
         [1000, () => {
-            check(game.player.mana === 0,
-                  "a dry knight away from the fire gets no mana back (" + game.player.mana + ")")
+            // A second of wall clock: the rest's mana, no more
+            let rest = game.player.mana
+            check(rest >= 0.5 * Balance.knight.manaRegen && rest <= 1.3 * Balance.knight.manaRegen,
+                  "a dry knight away from the fire gets only the rest's mana back (" + rest.toFixed(2)
+                  + " in a second, the table says " + Balance.knight.manaRegen + ")")
             // Hurt and dry, at the fire
             game.player.xWu = campfire.xWu
             game.player.yWu = campfire.yWu
@@ -179,9 +264,10 @@ Window {
             check(healed >= want - 2 && healed <= want + 1,
                   "two seconds at the fire heal " + healed + " HP, the table says " + want)
             let refilled = game.player.mana
-            let wantMana = 2 * Balance.campfire.manaPerSecond
+            let wantMana = 2 * (Balance.campfire.manaPerSecond + Balance.knight.manaRegen)
             let tick = Balance.campfire.manaPerSecond * Balance.campfire.healTick
-            check(refilled >= wantMana - 2 * tick && refilled <= wantMana + tick,
+            check(refilled >= wantMana - 2 * tick - Balance.knight.manaRegen * 0.2
+                  && refilled <= wantMana + tick + Balance.knight.manaRegen * 0.2,
                   "two seconds at the fire refill " + refilled.toFixed(1)
                   + " mana, the table says " + wantMana)
             // The next level keeps what the knight had; away from the fire,
@@ -193,9 +279,13 @@ Window {
             game._applyLevelChange(game.levelIndex + 1)
         }],
         [() => game.player && game.player !== _left && !game.resetting, () => {
-            check(game.levelType === "dungeon" && game.player.hp === 70 && game.player.mana === 7,
+            // The new level's knight rests from its first step: a few
+            // steps of manaRegen on top
+            let m = game.player.mana
+            check(game.levelType === "dungeon" && game.player.hp === 70
+                  && m >= 7 && m < 7 + Balance.knight.manaRegen * 0.25,
                   "the next level keeps the knight's HP and mana (" + game.player.hp
-                  + " HP, " + game.player.mana + " mana)")
+                  + " HP, " + m.toFixed(2) + " mana, 7 and the rest's few steps)")
             game.player.hp = 80
             game.player.mana = 3
             _left = game.player

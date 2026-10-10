@@ -42,12 +42,13 @@ PhysicsItem {
         id: replica
         network: enemy.network
         objectId: enemy.objectId
-        properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId"]
+        properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId",
+                     "windUpLength"]
         interpolate: true
         interpolator.autoDelay: true
         // HP switches with its state, never blended between two of the
-        // host's (clayground#368)
-        steppedProperties: ["hp"]
+        // host's (clayground#368); so does a wind-up's length
+        steppedProperties: ["hp", "windUpLength"]
         interpolator.angleKeys: ["facingAngle"]
     }
 
@@ -107,8 +108,54 @@ PhysicsItem {
     property bool parryWindow: false
     property int _lungeSteps: 0     // physics steps until the lunge lands
 
-    // AI state: patrol, chase, telegraph, lunge, stagger, recovery, kite, shoot
+    // AI state: patrol, chase, telegraph, crush, lunge, stagger, recovery,
+    // kite, shoot
     property string aiState: "patrol"
+
+    // The crushing blow (issue #80): a tough grunt or guardian winds one up
+    // instead of a lunge at this share of its attacks - aiState "crush",
+    // a longer telegraph - and lunges as usual, with no parry window. Its
+    // own chance, so a bench can set it; 0 for every other enemy
+    property real crushChance: tier === 2 && enemyType !== "spitter" ? Balance.enemy.crushChance : 0
+    // The attack under way is a crushing blow, from its wind-up to its
+    // landing; on every screen, from the replicated aiState
+    property bool crushing: false
+
+    // The parry ring (issue #78): while it winds up, a ring closes on it
+    // and reaches its outline on the step the lunge's parry window opens,
+    // or as a shot leaves. ringProgress runs from 0 to 1 on the physics
+    // steps, so a pause or a hit stop holds it. windUpLength is the
+    // telegraph or shot wind-up under way, in seconds, sent to the other
+    // screens: there the ring counts its own steps from the host's
+    // telegraph and closes when the host's parryWindow opens
+    property real windUpLength: 0
+    property real _ringT: 0
+    // The step length the ring counts a lunge's steps in: the world's at
+    // the start of the wind-up, never 0 as it is in a full hit stop
+    property real _ringStep: 1 / 60
+    readonly property bool ringShows: aiState === "telegraph" || aiState === "crush"
+                                      || aiState === "shoot" || aiState === "lunge"
+    readonly property color ringColor: parryWindow ? Balance.parryRing.flashColor
+        : crushing ? Balance.crush.ringColor
+        : enemyType === "spitter" ? "#F2D13A" : "#FF8C00"
+    // Seconds of a lunge after its first step until the parry window opens
+    readonly property real _ringLunge: aiState === "shoot" ? 0
+        : Math.max(0, lungeStepCount(_ringStep) - 1 - Balance.enemy.parryFrames) * _ringStep
+    readonly property real ringProgress: {
+        if (!ringShows) return 0
+        if (parryWindow) return 1
+        let total = windUpLength + _ringLunge
+        if (total <= 0) return 1
+        let left = remote ? total - _ringT
+            : aiState === "lunge" ? Math.max(0, _lungeSteps - Balance.enemy.parryFrames) * _ringStep
+            : _attackTimer + _ringLunge
+        return Math.max(0, Math.min(1, 1 - left / total))
+    }
+    Connections {
+        target: enemy.world
+        enabled: enemy.remote && enemy.ringShows
+        function onStepped() { enemy._ringT += enemy.world.timeStep }
+    }
 
     // Internal state
     property real _spawnXWu: 0
@@ -183,6 +230,8 @@ PhysicsItem {
             // coming, like the melee telegraph, and far from its kiting green
             case "shoot": base = "#F2D13A"; break
             case "telegraph": base = "#FF8C00"; break
+            // A crushing blow winds up white-hot
+            case "crush": return Balance.crush.glow
             case "lunge": base = "#FF4444"; break
             case "stagger": base = "#666666"; break
             default: base = isSpitter ? "#6B8E4A" : "#8B3A3A"
@@ -270,7 +319,7 @@ PhysicsItem {
 
     // Squash on a hit, crouch while winding up, stretch into the lunge
     property real _poseScale: !_fx ? 1
-        : aiState === "telegraph" || aiState === "shoot" ? 0.8
+        : aiState === "telegraph" || aiState === "crush" || aiState === "shoot" ? 0.8
         : aiState === "lunge" ? 1.15 : 1
     Behavior on _poseScale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
     property real _squash: 1
@@ -295,7 +344,8 @@ PhysicsItem {
         scale: visual.scale
         readonly property bool spitter: enemy.enemyType === "spitter"
         readonly property color eyeColor: spitter ? "#D8FF80"
-            : enemy.aiState === "telegraph" || enemy.aiState === "lunge" ? "#FFF2C0" : "#FFB040"
+            : enemy.aiState === "telegraph" || enemy.aiState === "crush" || enemy.aiState === "lunge"
+            ? "#FFF2C0" : "#FFB040"
         property real open: 1
         SequentialAnimation on open {
             loops: Animation.Infinite
@@ -354,6 +404,58 @@ PhysicsItem {
         color: "white"
         opacity: parryWindow ? 0.4 : 0
         Behavior on opacity { NumberAnimation { duration: 50 } }
+    }
+
+    // The parry ring: above the darkness with fx on, as the eyes are, in
+    // the telegraph colour, white while the parry window is open
+    Rectangle {
+        id: parryRing
+        objectName: "parryRing"
+        parent: enemy._fx && gameWorld && gameWorld.glowParent ? gameWorld.glowParent() : enemy
+        visible: enemy.ringShows
+        readonly property real size: enemy.width * visual.scale
+            * (Balance.parryRing.from - (Balance.parryRing.from - 1) * enemy.ringProgress)
+        width: size
+        height: size
+        radius: size / 2
+        x: (parent === enemy ? 0 : enemy.x) + (enemy.width - size) / 2
+        y: (parent === enemy ? 0 : enemy.y) + (enemy.height - size) / 2
+        color: "transparent"
+        border.width: Math.max(1.5, enemy.width * Balance.parryRing.thickness)
+            * (enemy.crushing ? Balance.crush.thickness : 1)
+        border.color: enemy.ringColor
+        opacity: Balance.parryRing.opacity
+    }
+    // A crushing blow's ring is doubled: a second one around the first
+    Rectangle {
+        objectName: "crushRing"
+        parent: parryRing.parent
+        visible: enemy.ringShows && enemy.crushing
+        readonly property real size: parryRing.size * Balance.crush.gap
+        width: size
+        height: size
+        radius: size / 2
+        x: parryRing.x + (parryRing.size - size) / 2
+        y: parryRing.y + (parryRing.size - size) / 2
+        color: "transparent"
+        border.width: parryRing.border.width
+        border.color: enemy.ringColor
+        opacity: Balance.parryRing.opacity
+    }
+    // And the enemy glows white-hot while it winds one up, above the
+    // darkness as the eyes are
+    Rectangle {
+        objectName: "crushGlow"
+        parent: parryRing.parent
+        visible: enemy.aiState === "crush"
+        readonly property real size: enemy.width * visual.scale * Balance.crush.halo
+        width: size
+        height: size
+        radius: size / 2
+        x: (parent === enemy ? 0 : enemy.x) + (enemy.width - size) / 2
+        y: (parent === enemy ? 0 : enemy.y) + (enemy.height - size) / 2
+        color: Balance.crush.glow
+        opacity: Balance.crush.haloOpacity
     }
 
     // Stagger wobble animation
@@ -448,6 +550,24 @@ PhysicsItem {
     // broken by FollowPath's internal "running = false" on path completion.
     onAiStateChanged: {
         followPath.running = !remote && (aiState === "patrol" || aiState === "chase")
+        // A crushing blow from its wind-up to its landing; it growls as
+        // it winds up, on every screen. A lunge's wind-up screams
+        if (aiState === "telegraph" && enemyType !== "spitter"
+                && gameWorld && gameWorld.playScream)
+            gameWorld.playScream(xWu, yWu, tier)
+        if (aiState === "crush") {
+            crushing = true
+            if (gameWorld && gameWorld.playCrushGrowl) gameWorld.playCrushGrowl(xWu, yWu)
+        } else if (aiState !== "lunge") {
+            crushing = false
+        }
+        // A wind-up starts the parry ring: its length where the AI runs, a
+        // count of steps where it is shown
+        if (aiState === "telegraph" || aiState === "crush" || aiState === "shoot") {
+            if (world && world.timeStep > 0) _ringStep = world.timeStep
+            if (remote) _ringT = 0
+            else windUpLength = _attackTimer
+        }
         // A remote enemy wobbles while the host's staggers
         if (remote) {
             if (aiState === "stagger") staggerWobble.restart()
@@ -564,6 +684,7 @@ PhysicsItem {
             _attackTimer = _attackTimer - dt < 1e-6 ? 0 : _attackTimer - dt
         switch (aiState) {
         case "telegraph":
+        case "crush":
             if (_attackTimer <= 0) _startLunge()
             break
         case "shoot":
@@ -591,12 +712,19 @@ PhysicsItem {
         _dirToTargetX = lungeDx / len
         _dirToTargetY = lungeDy / len
         _lungeSpeed = lungeDist / lungeDuration
-        _lungeSteps = Math.max(1, Math.round(lungeDuration / world.timeStep))
+        _lungeSteps = lungeStepCount(world.timeStep)
         aiState = "lunge"
         _stepLunge()
     }
 
-    // Dash forward, the last parryFrames steps open to a parry, then land
+    // Physics steps a lunge takes at steps of this length, the first one
+    // included
+    function lungeStepCount(step) {
+        return Math.max(1, Math.round(lungeDuration / step))
+    }
+
+    // Dash forward, the last parryFrames steps open to a parry - none of a
+    // crushing blow's - then land
     function _stepLunge() {
         // Negate Y for world-to-screen
         body.linearVelocity = Qt.point(
@@ -604,12 +732,14 @@ PhysicsItem {
             -_dirToTargetY * _lungeSpeed)
         _lungeSteps--
         if (_lungeSteps > 0) {
-            parryWindow = _lungeSteps <= Balance.enemy.parryFrames
+            parryWindow = !crushing && _lungeSteps <= Balance.enemy.parryFrames
             return
         }
         parryWindow = false
         body.linearVelocity = Qt.point(0, 0)
         performAttack()
+        // A blow blocked perfectly staggered it: no recovery over that
+        if (aiState !== "lunge") return
         aiState = "recovery"
         attackCooldown = Balance.enemy.recovery
     }
@@ -633,7 +763,7 @@ PhysicsItem {
         targetId = ""
         parryWindow = false
         _attackTimer = 0
-        if (["telegraph", "lunge", "shoot", "chase", "kite"].indexOf(aiState) >= 0) {
+        if (["telegraph", "crush", "lunge", "shoot", "chase", "kite"].indexOf(aiState) >= 0) {
             aiState = "patrol"
             followPath.running = false
             followPath.wpsWu = []
@@ -647,7 +777,8 @@ PhysicsItem {
         // In a session it goes for the nearest knight still standing; an
         // attack under way stays on the knight it wound up against
         if (gameWorld && gameWorld.enemiesChooseTarget
-            && aiState !== "telegraph" && aiState !== "lunge" && aiState !== "shoot") {
+            && aiState !== "telegraph" && aiState !== "crush" && aiState !== "lunge"
+            && aiState !== "shoot") {
             target = gameWorld.nearestKnight(xWu, yWu)
             targetId = gameWorld.knightIdOf(target)
         }
@@ -694,8 +825,7 @@ PhysicsItem {
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
                     _dirToTargetY = dy / len
-                    _attackTimer = telegraphTime(windUpDuration)
-                    aiState = "telegraph"
+                    windUp(windUpDuration)
                 } else if (_pathRecalcTimer <= 0) {
                     _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
                     _recalcChasePath()
@@ -746,6 +876,7 @@ PhysicsItem {
             break
 
         case "telegraph":
+        case "crush":
             // Pull backward (wind-up) — negate Y for world-to-screen;
             // _stepAttack starts the lunge, which it also runs
             body.linearVelocity = Qt.point(
@@ -769,6 +900,16 @@ PhysicsItem {
                 aiState = "chase"
             break
         }
+    }
+
+    // Winds up a lunge of seconds, or now and then a crushing blow of
+    // Balance.enemy.crushWindUp; the roll is the level's, so a seed plays
+    // the same fight
+    function windUp(seconds) {
+        let crush = crushChance > 0 && gameWorld && gameWorld.rollAttack
+            && gameWorld.rollAttack() < crushChance
+        _attackTimer = telegraphTime(crush ? Balance.enemy.crushWindUp : seconds)
+        aiState = crush ? "crush" : "telegraph"
     }
 
     function _lerpFacing(dy, dx, dt) {
@@ -830,12 +971,33 @@ PhysicsItem {
             let dy = target.yWu - yWu
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < Balance.enemy.lungeHitRange) {
-                let result = target.takeDamage(atk, xWu, yWu, widthWu)
-                if (result !== "hit" && result !== "blocked") return
-                if (gameWorld) gameWorld.playImpact()
+                let result = target.takeDamage(atk, xWu, yWu, widthWu, crushing,
+                                               _dirToTargetX, _dirToTargetY)
+                // A blocked blow throws it back, a perfect block staggers
+                // it, a crushing blow's for the full stagger; the knight
+                // sounds its own block or hurt, so the lunge plays nothing
+                // here
+                if (result === "blocked") recoil(target)
+                if (result === "perfect") stagger(perfectStagger())
+                if (result !== "hit") return
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
         }
+    }
+
+    // Thrown back off a knight's shield that stopped its blow, by
+    // Balance.block.recoil wu. A knockback fades out step by step, so it
+    // covers speed times the sum of its steps' shares of the speed
+    function recoil(knight) {
+        if (Balance.block.recoil <= 0) return
+        let dt = world.timeStep, per = 0
+        for (let t = knockDuration; t > 1e-9; t -= dt) per += t / knockDuration * dt
+        shove(xWu - knight.xWu, yWu - knight.yWu, Balance.block.recoil / per)
+    }
+
+    // How long a perfect block of the attack under way staggers it
+    function perfectStagger() {
+        return crushing ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger
     }
 
     function fireProjectile() {
@@ -846,13 +1008,15 @@ PhysicsItem {
         }
     }
 
-    function stagger() {
+    // Staggered for seconds, for the table's enemy.stagger without them
+    function stagger(seconds) {
+        let t = seconds === undefined ? Balance.enemy.stagger : seconds
         if (remote) {
-            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger"})
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger", seconds: t})
             return
         }
         parryWindow = false
-        _attackTimer = Balance.enemy.stagger
+        _attackTimer = t
         aiState = "stagger"
         staggerWobble.restart()
     }
@@ -870,12 +1034,13 @@ PhysicsItem {
     }
 
     // What a blow of amount from (attackerX, attackerY) does: the damage
-    // and whether a guardian's shield took it
-    function _blow(amount, attackerX, attackerY) {
+    // and whether a guardian's shield took it. A heavy blow (the knight's
+    // charged swing) goes through the shield
+    function _blow(amount, attackerX, attackerY, heavy) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
-        if (enemyType === "guardian" && aiState !== "stagger"
+        if (enemyType === "guardian" && aiState !== "stagger" && heavy !== true
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
@@ -883,20 +1048,26 @@ PhysicsItem {
         return {damage: finalDamage, blocked: blocked}
     }
 
-    // This node's knight struck the enemy
-    function takeDamage(amount, attackerX, attackerY) {
+    // The impact a blow makes: a heavy one its own
+    function _hitKind(blocked, heavy) {
+        return blocked ? "enemyBlocked" : heavy === true ? "heavyHit" : "enemyHit"
+    }
+
+    // This node's knight struck the enemy; heavy for its charged swing
+    function takeDamage(amount, attackerX, attackerY, heavy) {
         if (!remote) {
-            _takeBlow(amount, attackerX, attackerY, "")
+            _takeBlow(amount, attackerX, attackerY, "", heavy)
             return
         }
         // Remote: the hit looks and counts here, the host applies it
-        let b = _blow(amount, attackerX, attackerY)
+        let b = _blow(amount, attackerX, attackerY, heavy)
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
         let hdy = attackerY !== undefined ? yWu - attackerY : 0
         if (gameWorld) {
             gameWorld.countFight("dealt", b.damage)
-            gameWorld.impact(b.blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
-            gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY})
+            gameWorld.impact(_hitKind(b.blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
+            gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY,
+                                          heavy: heavy === true})
         }
         hitFlashAnimation.restart()
         if (_fx) hitSquash.restart()
@@ -904,13 +1075,13 @@ PhysicsItem {
 
     // Host: the knight of node byId struck the enemy; that node drew the
     // hit and counted it
-    function takeRemoteBlow(amount, attackerX, attackerY, byId) {
-        _takeBlow(amount, attackerX, attackerY, byId)
+    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy) {
+        _takeBlow(amount, attackerX, attackerY, byId, heavy)
     }
 
     // A blow from this node's knight (byId "") or another node's
-    function _takeBlow(amount, attackerX, attackerY, byId) {
-        let b = _blow(amount, attackerX, attackerY)
+    function _takeBlow(amount, attackerX, attackerY, byId, heavy) {
+        let b = _blow(amount, attackerX, attackerY, heavy)
         let finalDamage = b.damage
         let blocked = b.blocked
         let own = byId === ""
@@ -925,23 +1096,25 @@ PhysicsItem {
         _lastHitDy = hdy
         if (gameWorld && own) {
             if (gameWorld.impact)
-                gameWorld.impact(blocked ? "enemyBlocked" : "enemyHit", xWu, yWu, hdx, hdy, visual.color)
+                gameWorld.impact(_hitKind(blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
             else
                 gameWorld.shake(blocked ? 0.5 : 1.5)
         }
-        if (!blocked && hp > 0 && _fx) knockback(hdx, hdy, Balance.enemy.knockbackSpeed)
+        if (!blocked && hp > 0 && _fx)
+            knockback(hdx, hdy, Balance.enemy.knockbackSpeed
+                                * (heavy === true ? Balance.knight.heavyKnockback : 1))
 
         // Guardian counter-attacks after blocking
-        if (blocked && aiState !== "telegraph" && aiState !== "lunge") {
+        if (blocked && aiState !== "telegraph" && aiState !== "crush" && aiState !== "lunge") {
             if (target) {
                 let dx = target.xWu - xWu
                 let dy = target.yWu - yWu
                 let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
-                // Faster counter, but no shorter than any telegraph
-                _attackTimer = telegraphTime(windUpDuration * Balance.enemy.counterWindUp)
-                aiState = "telegraph"
+                // Faster counter, but no shorter than any telegraph; a
+                // tough one may wind up a crushing blow instead
+                windUp(windUpDuration * Balance.enemy.counterWindUp)
             }
         }
 

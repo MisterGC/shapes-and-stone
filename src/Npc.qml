@@ -11,6 +11,9 @@ PhysicsItem {
     property color npcColor: "#C9A227"
     property string iconType: ""  // "mug", "hammer", "crystal"
     property var dialogueLines: []
+    // Lines made when it is talked to, instead of dialogueLines: a
+    // function returning them (the witch's reading), or null
+    property var speak: null
     // What it sells through the dialogue panel: [{id, label, price}]
     property var wares: []
     property string greetingSound: ""
@@ -240,10 +243,11 @@ PhysicsItem {
     }
 
     function interact() {
-        if (gameWorld && dialogueLines.length > 0) {
+        let lines = speak ? speak() : dialogueLines
+        if (gameWorld && lines.length > 0) {
             if (greetingSound !== "" && gameWorld.playNpcGreeting)
                 gameWorld.playNpcGreeting(greetingSound)
-            gameWorld.openDialogue(npcName, npcColor, dialogueLines, wares)
+            gameWorld.openDialogue(npcName, npcColor, lines, wares)
         }
     }
 }

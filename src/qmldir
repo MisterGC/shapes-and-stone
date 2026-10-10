@@ -11,6 +11,7 @@ Torch 1.0 Torch.qml
 Motes 1.0 Motes.qml
 FxParticle 1.0 FxParticle.qml
 Stain 1.0 Stain.qml
+Debris 1.0 Debris.qml
 GoldDrop 1.0 GoldDrop.qml
 BodyShade 1.0 BodyShade.qml
 ExitStairs 1.0 ExitStairs.qml
@@ -25,3 +26,4 @@ PauseMenu 1.0 PauseMenu.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
 Session 1.0 Session.qml
+DepthGauge 1.0 DepthGauge.qml

@@ -98,6 +98,8 @@ Window {
             check(find(f, "fallenTitle").text === "You have fallen", "the screen says \"You have fallen\"")
             check(find(f, "fallenDepth").text === "Depth 2", "the screen shows how deep the run got ("
                   + find(f, "fallenDepth").text + ")")
+            check(find(f, "fallenHint").text === "Enter to go again • Esc to the title",
+                  "the screen offers Enter to go again (" + find(f, "fallenHint").text + ")")
             let halted = game.enemies.every(e => e.halted && e.target === null && e.aiState === "idle")
             check(halted, "every enemy has stopped (" + game.enemies.length + " enemies)")
             strikeDown()

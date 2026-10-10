@@ -1,8 +1,9 @@
 // Pause bench - a first-time player sees the controls at depth 0, and Esc
 // opens a menu with Resume and Title (issue #39).
 //
-// Alone: at depth 0 the controls hint names LMB, RMB, Shift, E, M and Esc,
-// and deeper it is gone. With D held, Esc opens the "Paused" menu: the
+// Alone: at depth 0 the controls hint names LMB and its hold to charge,
+// RMB, Space for the dash (not Shift), E, M and Esc, and deeper it is gone. With D held, Esc opens
+// the "Paused" menu: the
 // world stops - no enemy moves, the run's time stands still, the knight
 // lets go of D - and M still mutes. Esc and Enter on Resume both go back
 // to the game, which runs on without catching up the pause in its first
@@ -135,8 +136,10 @@ Window {
             let hint = shown(solo, "controlsHint")
             let text = hint ? hint.text : ""
             check(hint !== null && solo.depth === 0, "at depth 0 the controls hint is shown")
-            for (let k of ["LMB", "RMB", "Shift", "E talk", "M mute", "Esc"])
+            for (let k of ["LMB", "hold to charge", "RMB", "Space dash", "E talk", "M mute", "Esc"])
                 check(text.indexOf(k) >= 0, "the hint names " + k + " (" + text + ")")
+            // Space dashes (KeyboardGamepad sets buttonB from the A key), Shift does nothing
+            check(text.indexOf("Shift") < 0, "the hint does not name Shift (" + text + ")")
             check(menu(solo) === null && !solo.menuOpen, "no menu before Esc")
             hold(solo, Qt.Key_D)
         }],
