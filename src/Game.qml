@@ -976,7 +976,7 @@ ClayWorld2d {
         if (position === undefined) position = nextPosition
         if (knights === undefined) knights = knightsNow()
         let rand = createRng(deriveSeed(masterSeed, index))
-        let rms = planRooms(6, 8, 5, 8, rand)
+        let rms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax, rand)
         let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
                     weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0 }
@@ -2086,8 +2086,8 @@ ClayWorld2d {
 
     // --- Atmosphere: light and screen treatment (fx on) ---------------------
     // Coloured lights with wall shadows replace the single lantern mask. The
-    // ambient is how much of an unlit spot still shows: next to nothing deep
-    // in the dungeon, a moonlit dusk in the village.
+    // ambient is how much of an unlit spot still shows: very dark in the
+    // dungeon, but never pitch black; a moonlit dusk in the village.
     LightLayer2d {
         id: lighting
         world: world
@@ -2492,7 +2492,7 @@ ClayWorld2d {
         initExploredCells()
 
         // Step 2: Place rooms
-        placeRooms(6, 8, 5, 8)  // minRooms, maxRooms, minSize, maxSize (in cells)
+        placeRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax)
 
         // Step 3: Connect rooms with spanning tree
         connectRooms()

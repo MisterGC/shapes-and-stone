@@ -67,12 +67,26 @@ def copy_runtime(runtime, out):
         raise SystemExit(f"no clayground.wasm in {runtime} - not a starter bundle")
 
 
+# A mouse press on the game lets the browser move the keyboard focus to
+# <body> until the button comes up, so a key pressed or let go while the
+# button is down never reaches Qt: a knight held a direction its player had
+# let go of. Cancelling the press's default keeps the focus on Qt's input;
+# Qt reads the pointer events, which this leaves alone.
+KEEP_FOCUS = """<script>
+document.getElementById('screen').addEventListener('mousedown', e => e.preventDefault(), true);
+</script>
+</body>"""
+
+
 def name_page(out):
     # The starter's page is titled for a sample game; the tab says ours.
     path = os.path.join(out, "index.html")
     with open(path, encoding="utf-8") as f:
         html = f.read()
     html = re.sub(r"<title>.*?</title>", "<title>Shapes &amp; Stone</title>", html, count=1)
+    if "</body>" not in html:
+        raise SystemExit(f"no </body> in {path} - cannot keep the focus on the game")
+    html = html.replace("</body>", KEEP_FOCUS, 1)
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
 

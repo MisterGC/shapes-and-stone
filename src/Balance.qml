@@ -319,9 +319,16 @@ QtObject {
     })
 
     readonly property var spawn: ({
+        // Rooms per dungeon, rolled evenly from roomsMin to roomsMax, each
+        // roomSizeMin to roomSizeMax cells a side; the build and the witch's
+        // reading both take these
+        roomsMin: 9,
+        roomsMax: 12,
+        roomSizeMin: 5,
+        roomSizeMax: 8,
         // Enemies per dungeon at depth 0, rolled evenly from min to max
-        enemiesMin: 5,
-        enemiesMax: 8,
+        enemiesMin: 8,
+        enemiesMax: 12,
         // Tier mix of a dungeon, dealt not rolled: weakChance of its enemies
         // (rounded) are weak, those above normalChance tough, the rest normal
         weakChance: 0.2,
@@ -349,7 +356,7 @@ QtObject {
         // More enemies: added to enemiesMin and enemiesMax, never above the
         // cap; at 2 a dungeon two depths down holds more than the one above
         enemies: 2,
-        enemiesCap: 14,
+        enemiesCap: 22,
         // Fewer weak: weakChance falls by this, not below 0
         weakChance: -0.05,
         // More tough: the tough share (above normalChance) grows by this
@@ -387,15 +394,15 @@ QtObject {
         // density (0 for none). The exit stairs glow in the next
         // dungeon's torch colour
         looks: [
-            { torch: "#FFB65C", torchShare: 1.0, ambient: "#100D0C", temperature: 0.12,
+            { torch: "#FFB65C", torchShare: 1.0, ambient: "#2B2420", temperature: 0.12,
               crackShare: 0.02, moss: 0, stains: 0, bones: 0, embers: 0,
               dust: 0.5, emberAir: 0 },
-            { torch: "#BFD0E8", torchShare: 0.6, ambient: "#090B12", temperature: -0.08,
+            { torch: "#BFD0E8", torchShare: 0.6, ambient: "#1C2130", temperature: -0.08,
               crackShare: 0.14, moss: 0.35, stains: 2, bones: 0, embers: 0,
               dust: 0.2, emberAir: 0 },
-            { torch: "#FF3A14", torchShare: 0.85, ambient: "#140707", temperature: 0.3,
-              crackShare: 0.4, moss: 0, stains: 1, bones: 2, embers: 3,
-              dust: 0, emberAir: 0.25 }
+            { torch: "#FF3A14", torchShare: 0.85, ambient: "#2E1B18", temperature: 0.3,
+              crackShare: 0.4, moss: 0, stains: 3, bones: 2, embers: 0,
+              dust: 0, emberAir: 0 }
         ]
     })
 
