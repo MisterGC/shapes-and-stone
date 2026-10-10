@@ -66,9 +66,13 @@ Item {
     }
     function hostUp() { net.signalingMode = _mode(); net.host() }
     function joinNet(code) { net.signalingMode = _mode(); net.join(code) }
-    // Host: start the session's game on this seed
+    // Host: start the session's game on this seed, at the bottom of depth
+    // 0's range and built for one knight, not the session's two (issue
+    // #102): the checks need that dungeon's lineup, a spitter among it
     function startGame(s) {
         game.masterSeed = s
+        game.dangerPosition = 0
+        game.knightsOverride = 1
         game._startMultiplayerGame()
     }
     function leave() { if (net) net.leave() }
@@ -316,6 +320,9 @@ Item {
         if (game.player) {
             _stand(game.player)
             game.player.isBlocking = mode === "block"
+            // The answers are timed on the knight standing where it was
+            // put: a hit throws it nowhere
+            game.player.knockback = 0
         }
         return _byId()[id] !== undefined
     }

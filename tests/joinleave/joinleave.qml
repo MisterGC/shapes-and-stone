@@ -3,7 +3,8 @@
 // leaving it and losing the host each end somewhere sensible (issue #20).
 //
 // The host starts a run with the joiner, whose knight goes down, and goes
-// down two levels. Then the late joiner joins: it must start in the host's
+// down two levels; at the village's camp the joiner's knight rises and is
+// struck down again (issue #100). Then the late joiner joins: it must start in the host's
 // level on the host's seed, with the host's live enemies, draw the downed
 // knight downed from the start, and its knight must show on the host's and
 // the joiner's screens. Its knight then stands at one of the host's enemies
@@ -151,7 +152,9 @@ Window {
             strikeDown(joiner)
         }],
         [() => downedOn(host, joinNet.nodeId), () => host._hostAdvanceLevel()],
-        [() => inLevel(host, 1) && inLevel(joiner, 1), () => host._hostAdvanceLevel()],
+        // At the camp the joiner's knight rises: down again for the next level
+        [() => inLevel(host, 1) && inLevel(joiner, 1) && joiner.player.hp > 0, () => strikeDown(joiner)],
+        [() => downedOn(host, joinNet.nodeId) && joiner.player.hp === 0, () => host._hostAdvanceLevel()],
         [() => inLevel(host, joinLevel) && inLevel(joiner, joinLevel) && liveEnemies(host).length > 0, () => {
             console.log("[JoinLeave] host and joiner at level", joinLevel, "- the late joiner joins")
             joinedAt = Date.now()

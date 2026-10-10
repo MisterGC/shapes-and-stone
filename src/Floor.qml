@@ -18,6 +18,10 @@ Rectangle {
     // "stone" (dungeon flagstones) or "earth" (village ground)
     property string style: "stone"
     property real seed: 0
+    // The flagstones' wear (Balance.danger.looks): the share of them
+    // cracked across, and the share of the floor moss grows over
+    property real crackShare: 0.035
+    property real moss: 0
 
     // Beneath stains, walls and everything that moves
     z: -2
@@ -55,6 +59,8 @@ Rectangle {
         property real seamPx: 0.5
         property real style: floor.style === "earth" ? 1 : 0
         property real seed: floor.seed
+        property real crackShare: floor.crackShare
+        property real moss: floor.moss
         property color baseColor: floor.color
         property color seamColor: Qt.darker(floor.color, 1.45)
     }

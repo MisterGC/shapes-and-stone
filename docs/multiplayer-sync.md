@@ -452,8 +452,8 @@ and darkens it, hides its aim and dims its lantern. The local knight is
 down when its HP is 0 (`Player.fallen`); another player's knight when the
 HP its state carries is 0 (`RemotePlayer.remoteHp`, sent with every state,
 60 per second). A down knight takes no blow (`ignored`), the campfire does
-not heal it, and it stays down through a level change, for the rest of the
-run.
+not heal it, and it stays down through a level change until an ally lifts
+it up or the party reaches the camp (issue #100).
 
 In a session the fall does not end the run while another knight stands.
 The downed player's screen says "You are down", keeps the dungeon in sight
@@ -463,13 +463,12 @@ enemies go for the knights still standing (issue #13).
 The host ends the run: whenever its own knight falls, another knight's
 HP changes (`Session.partyChanged`) or a node leaves, it checks whether
 its knight and every other one are at 0 HP. If so it broadcasts
-`runEnd`; each joiner leaves the session on it, and the host follows once
-every joiner has left, or after `Session.endRunWaitMs` (2 s), so its
-leaving cannot cut the message off. Then every screen stops its enemies
-and shows the run's summary, as the fall screen does for one knight:
-"Your party has fallen", the depth, the kills, the time and the best
-depth, which is kept as on any fall. Enter or Esc goes to the title; a
-co-op run is not started again from there.
+`runEnd` and ends the run on its own screen; each joiner ends it when the
+message arrives. Nobody leaves the session (issue #99). Every screen
+stops its enemies and shows the run's summary, as the fall screen does
+for one knight: "Your party has fallen", the depth, the kills, the time
+and the best depth, which is kept as on any fall. Esc leaves the session
+for the title.
 
 `tests/downed/downed.qml` checks it with a host and a joiner in one
 process, over LAN, in two sessions. In the first the joiner's knight
@@ -477,8 +476,9 @@ falls first: both screens draw it down, its screen says "You are down"
 and offers only Esc, the host's knight stands, the run goes on and no
 enemy stops. Then the host's knight falls: within 3 s both screens must
 be out of the session and show "Your party has fallen" with the depth,
-kills, time and best depth, and only the title offered; Enter on the
-host's and Esc on the joiner's must take each to the title. In the second the host's knight
+kills, time and best depth, still in the session, the host's offering to
+go again and the joiner's waiting for the host; Esc on both must take each
+to the title and out of the session. In the second the host's knight
 falls first and the joiner's last, so the host learns of the last fall
 through the joiner's state.
 
@@ -489,6 +489,158 @@ out the bench exits 100, waiting for the end; with `RemotePlayer` drawing
 no knight down it exits 100, waiting for the fall on the other screen;
 with Enter doing nothing on the summary it exits 100, waiting for the
 title.
+
+## The party goes again (issue #99)
+
+On the fallen party's summary the host's Enter starts the next run
+(`Game.newRun`): it rolls a new seed, clears its level - despawning its
+enemies and gold drops on every node - and sets the session property
+`run` to the new seed at level 0 (`Session.goAgain`), then builds the
+dungeon and spawns the next run's enemies. A joiner tells a new run from a
+level of this one by the seed: a `run` whose seed is not the one it plays
+(`Session.runSeed`) is the next run (`Session.wentAgain`), and it builds
+the dungeon on that seed at depth 0 with a fresh knight, as the host did.
+A joiner's Enter does nothing; its screen says "Waiting for the host to go
+again".
+
+The last state each node had of the others is of the run before, whose
+knights were down: both ends forget it when the next run starts, so each
+knight of the new run is drawn from its first state in it, not downed. A
+state of the run before that still arrives draws that knight down until
+its node has started the next run too. The shots in flight
+go with the level on every screen (`Game.clearDungeon`), as the enemies do.
+
+`tests/goagain/run_goagain.py` checks it over the network, in two
+processes. Three times in one session the host goes down to depth 1, both
+knights take gold, a potion and the sword, the host fires a shot that
+stands on both screens and meets nothing, and both knights fall; Enter on
+the joiner's screen must start nothing, Enter on the host's must bring
+both to depth 0 on the same new seed, with the same enemies by id, type,
+tier and place (within 1.5 Wu), each knight at full HP and mana with no
+gold, potion, draught or smith's level, the other knight standing at full HP in its
+colour, and no enemy, shot or gold drop of the run before.
+
+On clayground `dee7c25` (the submodule) it exited 0 with 85 checks passed.
+On the code before issue #99 it exits 100: the party's fall left the
+session, and the joiner's Enter took it to the title. With the shots not
+cleared with the level it exits 1, on the shot of the run before.
+
+## A fallen knight lifted up, and rising at camp (issue #100)
+
+Each node lifts with its own knight, on its own physics clock
+(`Game._stepRevive`): standing within `Balance.party.reviveRange` of
+another node's knight at 0 HP, it fills `Player.reviveProgress` by the
+step's time over `reviveTime`. A hit that lands on it (`acted("hurt")`), a
+step out of range or a nearer fallen knight starts it over. The node
+sends the lift with its state, 60 per second: `v` is the node id of the
+knight it lifts and `p` how far, 0 to 1, both left out while it lifts
+nobody. Every screen draws the ring around a fallen knight from the
+furthest lift it has of it: its own knight's, and the last state of each
+other node (`Session.liftOf`). A fallen knight's own screen draws the
+ring around it the same way.
+
+When the lift is full, the lifting node sends `lift` to the fallen
+knight's node, reliably (`Session.liftKnight`); that node raises its
+knight with `reviveHp` of its max HP (`Game._rise`) and its next state
+carries the HP, so every screen draws it standing. The full ring stays
+until then. A knight's HP stays its own node's, as with every hit (issue
+#18). Once the party has fallen nobody rises: a `lift` that arrives after
+`runEnd` is dropped.
+
+A knight still down when its node enters the village rises there with the
+same share (`Game._enterLevel`); each node raises its own, and the others
+draw it from its states. A screen that makes the knight before its first
+state in the village draws it down from its last state, then standing.
+
+The fight record counts `lifts` (fallen allies this knight lifted up) and
+`lifted` (times an ally lifted it up) per node; a rise at camp is neither.
+
+Alone there is nobody to lift. In the dojo, `eval fakeDownedAlly()` puts
+a fallen ally of another colour beside the knight, without a session; the
+knight lifts it up as it would a node's, and it rises on the spot.
+
+## The party's danger (issue #96)
+
+A dungeon's danger is its depth plus a position in that depth's range
+(`Game.danger`, `Balance.danger`); it decides the enemies and the look of
+the dungeon, so every screen has to build with the same one. The host
+decides it. Each node sends its knight's record of the level with every
+state: `lv` the level index, `l` the share of its max HP lost there (a
+potion does not take it back) and `f` once it fell, even if it was lifted
+up since. When the party leaves a dungeon the host settles the next
+dungeon's position from its own record and the last state of each other
+node in the same level (`Game.partyRecords`, `Game.settleDanger`): the
+losses averaged, one knight's fall a fall. It puts the positions into the
+session property `run` with the level, `{seed, level, pos, next}`: `pos`
+the position of the dungeon the level belongs to, `next` the next
+dungeon's, which a village's exit stairs show. A joiner enters the level
+at those positions, a node that joins late gets them with its welcome, and
+the next run after the party's fall (`Session.goAgain`) carries the
+position it starts at. `lv` keeps a state of the level before from
+counting in the new one.
+
+In a dungeon the exit stairs show where the next one would stand were the
+party to leave now; each screen works it out from the records it holds,
+so they show the same once the states have arrived. A new dungeon starts
+with nothing lost (`Game.generateDungeon`), so its stairs show the same on
+every screen from the start, whatever the physics clock has done yet.
+
+`tests/dangerparty/run_dangerparty.py` checks it over the network, in two
+processes. Four times the bench makes up both knights' records - 0% and
+90% lost, 5% and 10% lost with the joiner's fall, 0% and 20%, 0% and 10% -
+and the host leads the party down: the host must hold both records, both
+village screens the next position settled from both (not the one the
+host's record alone gives), and both next dungeons the same depth, danger
+and look - band, light, every torch, the floor, what lies on it, the air
+and the stairs' colour. The descent gauge reads the depth from the level
+the host sent, so both screens' gauges must show the same depth, large at
+each camp with the marker sunk into the next layer, small in each dungeon.
+
+On clayground `dee7c25` (the submodule) it exited 0 with 27 checks passed
+in 15 runs in a row. Before the new dungeon's stairs started from a fresh
+record, 3 runs in 10 failed on the stairs' colour: in the offscreen
+loaders the physics stepped about once a second, and the host's screen
+kept the colour it entered with for longer than the bench waited.
+
+## The party's size (issue #102)
+
+A dungeon's enemies grow with the knights it is built for
+(`Game.partyKnights`, `Balance.party.enemiesPerKnight` and `hpPerKnight`):
+more of them in the spawn table, more HP each. Only the host spawns
+enemies, so every screen shows the host's; the count is the host's too.
+As it enters a level the host counts the knights in the session
+(`Session.knights`, the network's node count) and puts the count into the
+session property `run` with the level and the danger,
+`{seed, level, pos, next, knights}`, so every screen knows whom the
+dungeon it shows is built for. A joiner enters the level with those
+knights, a node that joins late gets them with its welcome, and the next
+run after the party's fall carries them too. The count is fixed with the
+level: a knight that joins or leaves mid-dungeon changes the next
+dungeon, not this one. A `run` without `knights` is built for one.
+
+`tests/dangerparty/run_dangerparty.py` checks it with its two knights: in
+each of its five dungeons both screens must hold the same enemies, by
+their replicated object, built for two - as many as the spawn table gives
+two knights at the dungeon's danger, each with two knights' HP.
+
+`tests/revive/run_revive.py` checks it over the network, in two
+processes, with the host's enemies halted. The joiner's knight falls with
+the host's 2.5 Wu away: no ring. The host's knight stands 0.8 Wu beside
+it: half way the ring is drawn on both screens; a hit on the host's knight
+that throws it nowhere starts it over on both. The joiner's knight must
+rise no sooner than `reviveTime` after the hit, with `reviveHp` of its HP
+on both screens, no fallen screen and no ring left; the host's record
+counts one lift, the joiner's one. Struck down again, with the host out of
+reach, it must rise at the village's camp on both screens.
+`tests/downed/downed.qml` walks a downed knight through the village too:
+it must rise there on both screens, is struck down again, and must be made
+downed in the next dungeon.
+
+On clayground `dee7c25` (the submodule) the revive bench exited 0 with 17
+checks passed: the ring was half full 1.53 s in on both screens, and the
+joiner's knight rose 3.00 s after the hit with 36 HP. The downed bench
+exited 0 with 56 checks passed. On the code before issue #100 the revive
+bench exits 100: no ring fills beside the fallen knight.
 
 ## Joining late, leaving and losing the host (issue #20)
 
@@ -573,9 +725,12 @@ own knight stands on a drop and claims it (`goldClaim`, sent to the host;
 the host's own claim is answered at once). The host takes the first claim
 it gets for a drop, despawns the drop on every node and tells the
 claimer's node the amount (`goldGrant`); a later claim finds no drop and
-gets nothing. The gold, the potions and the smith's upgrade are each
-knight's own and live on its own node, as its HP does; the others never
-see them. A drop the host leaves behind at a level change is despawned
+gets nothing. The gold, the potions, the draughts and the smith's levels
+are each knight's own and live on its own node, as its HP does; the
+others never see them. The witch's reading is not sent: each node reads
+the next dungeon off the run's seed, the next position and the knights,
+all three the host's, so every knight hears the same (the camp bench
+checks it with a host and a joiner over LAN). A drop the host leaves behind at a level change is despawned
 with the level, as its enemies are.
 
 The gold bench joins a host and a joiner over LAN and puts both knights on

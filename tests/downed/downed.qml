@@ -6,14 +6,16 @@
 // must draw it downed, its own screen must say "You are down" with only Esc
 // offered, and the run must go on - the host's knight stands, no screen
 // leaves the game, no enemy stops. Then the host's knight falls: the host
-// must end the run, both leave the session and both screens show the
-// party's summary - depth, kills, time and best depth - until a key, Enter
-// on one and Esc on the other, takes each to the title. In the second session the host's knight falls first and the
+// must end the run, both stay in the session and both screens show the
+// party's summary - depth, kills, time and best depth - the host's with
+// Enter to go again, the joiner's waiting for the host (issue #99), until
+// Esc takes each to the title. In the second session the host's knight falls first and the
 // joiner's last, so the host learns of the last fall over the network.
 // In both, while one knight is down the host goes down two levels, to a
-// village and to the next dungeon: on the other screen the downed knight
-// must be made downed in each, not drawn standing until its next state
-// (issue #20).
+// village and to the next dungeon. At the village's camp the downed knight
+// rises with Balance.party.reviveHp of its HP on both screens (issue #100)
+// and is struck down again there; in the next dungeon the other screen
+// must make it downed, not drawn standing until its next state (issue #20).
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -23,6 +25,7 @@ import QtQuick
 import QtQuick.Window
 import QtTest
 import Clayground.Network
+import "../../src"
 
 Window {
     id: bench
@@ -154,8 +157,35 @@ Window {
             madeDowned[nodeId] = v !== null && v.downed === true
         })
     }
-    // The level after the next one: the downed knight goes through a
-    // village into a dungeon, where the enemies are
+    // The next level, a village: the downed knight rises at the camp on
+    // both screens, then falls again there for the dungeon after it
+    function goToCamp(level, f, l, firstName, lastName) {
+        let risen = Math.round(Balance.party.reviveHp * Balance.knight.hp)
+        let id = () => network(f()).nodeId
+        return [
+            [() => true, () => host._hostAdvanceLevel()],
+            [() => host.levelIndex === level && joiner.levelIndex === level && bothInGame()
+                   && f().player.hp > 0 && remoteOf(l(), id()).remoteHp > 0, () => {
+                check(host.levelType === "village" && joiner.levelType === "village",
+                      "level " + level + ": both are in the village")
+                check(f().player.hp === risen && !f().fallen && fallenScreen(f()) === null
+                      && !downedOn(f(), id()),
+                      "level " + level + ": at the camp the " + firstName + "'s knight rises with "
+                      + risen + " HP on its own screen (" + f().player.hp + "), no fallen screen")
+                check(remoteOf(l(), id()).remoteHp === risen && !downedOn(l(), id()),
+                      "level " + level + ": the " + lastName + "'s screen shows it standing with "
+                      + remoteOf(l(), id()).remoteHp + " HP")
+                strikeDown(f())
+            }],
+            [() => downedOn(host, id()) && downedOn(joiner, id()), () => {
+                check(f().player.hp === 0 && f().fallen,
+                      "level " + level + ": struck down again, the " + firstName
+                      + "'s knight is down on both screens")
+            }]
+        ]
+    }
+    // The level after it: the downed knight goes on into a dungeon, where
+    // the enemies are
     function goDown(level, f, l, firstName, lastName) {
         return [
             [() => true, () => {
@@ -212,7 +242,7 @@ Window {
                 check(fallenScreen(l) === null && !l.fallen && l.player.hp > 0,
                       "the " + lastName + "'s knight stands and its screen shows no fallen screen")
             }],
-        ].concat(goDown(1, first, last, firstName, lastName))
+        ].concat(goToCamp(1, first, last, firstName, lastName))
          .concat(goDown(2, first, last, firstName, lastName))
          .concat([
             // A second for the run to go on
@@ -228,28 +258,34 @@ Window {
                 strikeDown(l)
                 fellAt = Date.now()
             }],
-            [() => host.partyFallen && joiner.partyFallen && !hostNet.connected && !joinNet.connected, () => {
+            [() => host.partyFallen && joiner.partyFallen, () => {
                 let ms = Date.now() - fellAt
-                check(ms <= endMs, "with every knight down both screens end the run and leave the session ("
+                check(ms <= endMs, "with every knight down both screens end the run ("
                       + ms + " ms after the " + lastName + "'s knight fell)")
+                check(hostNet.connected && joinNet.connected, "both stay in the session")
                 for (let [g, name] of [[host, "host"], [joiner, "joiner"]]) {
                     let fs = fallenScreen(g)
                     let text = n => fs ? find(fs, n).text : "no fallen screen"
                     check(fs !== null && g.screen === "game" && text("fallenTitle") === "Your party has fallen",
                           "the " + name + "'s screen says \"Your party has fallen\" (" + text("fallenTitle") + ")")
                     check(fs !== null && text("fallenDepth") === "Depth " + g.depth
-                          && text("fallenStats").indexOf("kill") >= 0 && text("fallenBest").indexOf("est depth") >= 0,
-                          "it shows the run's depth, kills, time and best depth (" + text("fallenDepth") + " | "
-                          + text("fallenStats") + " | " + text("fallenBest") + ")")
-                    check(fs !== null && !fs.canGoAgain && text("fallenHint") === "Enter or Esc to the title",
-                          "it offers the title only (" + text("fallenHint") + ")")
+                          && text("fallenStats").indexOf("kill") >= 0
+                          && /^(New record|Record \d+)/.test(text("fallenRecord")),
+                          "it shows the run's depth, kills, time and the record (" + text("fallenDepth") + " | "
+                          + text("fallenStats") + " | " + text("fallenRecord") + ")")
+                    let hint = g === host ? "Enter to go again • Esc to the title"
+                                          : "Waiting for the host to go again • Esc to leave the session"
+                    check(fs !== null && fs.canGoAgain === (g === host) && text("fallenHint") === hint,
+                          "it offers " + (g === host ? "to go again" : "to wait for the host")
+                          + " (" + text("fallenHint") + ")")
                 }
                 check(host.enemies.every(e => e.halted), "the host's enemies stop")
-                press(fallenScreen(host), Qt.Key_Return)
                 press(fallenScreen(joiner), Qt.Key_Escape)
+                press(fallenScreen(host), Qt.Key_Escape)
             }],
-            [() => host.screen === "title" && joiner.screen === "title", () => {
-                check(true, "Enter on the host's summary and Esc on the joiner's go to the title")
+            [() => host.screen === "title" && joiner.screen === "title"
+                   && !hostNet.connected && !joinNet.connected, () => {
+                check(true, "Esc on both summaries goes to the title and out of the session")
                 check(host.player === null && joiner.player === null
                       && host.enemies.length === 0 && joiner.enemies.length === 0,
                       "the run is cleared on both")

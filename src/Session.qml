@@ -15,6 +15,10 @@ Item {
     property bool inGame: false      // the game screen is up
     property bool showLobby: false   // the lobby screen is up
     property bool muted: false       // the lobby plays no sound
+    // This node's knight's name, edited in the lobby (nameEdited)
+    property string playerName: "Knight"
+    // The record the lobby shows, Game.recordLine
+    property string recordLine: ""
 
     readonly property bool connected: net.connected
     readonly property bool isHost: net.isHost
@@ -24,10 +28,13 @@ Item {
 
     // The run is on: the host started it, or this node joined one under
     // way (also emitted on the host itself). levelIndex is the level the
-    // host plays, 0 at the start
-    signal started(int seed, int levelIndex)
-    // Every client applies this level; the host is the level authority
-    signal levelChanged(int levelIndex)
+    // host plays, 0 at the start; position and next are the danger's
+    // positions it plays it at (Game.dangerPosition, Game.nextPosition),
+    // knights the knights the host built the level for (Game.partyKnights)
+    signal started(int seed, int levelIndex, real position, real next, int knights)
+    // Every client applies this level at the host's danger, built for the
+    // host's knights; the host is the level authority
+    signal levelChanged(int levelIndex, real position, real next, int knights)
     // Host only: a player reached the exit, the host decides to advance
     signal advanceRequested()
     // The host pressed start in the lobby; the game picks the seed and
@@ -76,9 +83,36 @@ Item {
     // A joiner's session ended without its leaving: the host left, crashed
     // or lost its connection. message says which, for the title
     signal hostLost(string message)
-    // The run is over for everyone: on a joiner when the host ends it, on
-    // the host once the joiners have left or endRunWaitMs has passed
+    // The run is over for everyone, the session stays: on a joiner when
+    // the host ends it, on the host at once
     signal runEnded()
+    // The host started the next run after the party had fallen: this
+    // joiner goes again from depth 0 on this seed, at this position in
+    // its range, its first dungeon built for knights
+    signal wentAgain(int seed, real position, int knights)
+    // Another node's knight stood beside this node's fallen knight long
+    // enough: it rises (Balance.party)
+    signal liftReceived(string fromId)
+    // The name was edited in the lobby
+    signal nameEdited(string name)
+    // Joiner: the host's party went deeper than the host's record, with
+    // the banner in the dungeon or, at the run's end, without it
+    signal recordBroken(bool banner)
+
+    // Every knight's name by its node, the session property "names": each
+    // node sends its own to the host, which sets it
+    readonly property var names: net.connected && net.sessionProperties.names
+                                 ? net.sessionProperties.names : ({})
+    // The host's record, the party's ({depth, names, date}), the session
+    // property "record"; null before the host has set it
+    readonly property var hostRecord: net.connected && net.sessionProperties.record
+                                      ? net.sessionProperties.record : null
+    // The session's runs the host counted, newest first ({depth, seconds}),
+    // the session property "runs"
+    readonly property var hostRuns: net.connected && net.sessionProperties.runs
+                                    ? net.sessionProperties.runs : []
+    // Host: the names it has been sent
+    property var _names: ({})
 
     property var remotePlayers: ({})
     // The last state each other node sent, also while its knight is not
@@ -87,6 +121,12 @@ Item {
     property var lastStates: ({})
     // This node is leaving on its own: its session ending is no lost host
     property bool _leaving: false
+    // The knights in the session, this node's among them: what the host
+    // builds the next level for
+    readonly property int knights: net.connected ? net.nodeCount : 1
+    // The seed of the run this node plays: a new one from the host is the
+    // next run, the same one a level of this run
+    property int runSeed: -1
 
     Network {
         id: net
@@ -95,14 +135,22 @@ Item {
         signalingMode: Network.SignalingMode.Cloud
         autoRelay: true
 
-        // The run is the session property "run", its seed and the level
-        // played: the host sets it when the run starts and at each level,
-        // and a node that joins late gets it with its welcome
-        // (clayground#306)
+        // The run is the session property "run", its seed, the level
+        // played, the danger's positions (pos, next) and the knights it
+        // was built for (knights): the host sets it
+        // when the run starts and at each level, and a node that joins
+        // late gets it with its welcome (clayground#306)
         onSessionPropertyChanged: (name, value) => {
             if (net.isHost || name !== "run") return
-            if (!session.inGame) session.started(value.seed, value.level)
-            else session.levelChanged(value.level)
+            let again = session.inGame && value.seed !== session.runSeed
+            let knights = value.knights || 1
+            session.runSeed = value.seed
+            if (!session.inGame) session.started(value.seed, value.level, value.pos, value.next, knights)
+            else if (again) {
+                session.lastStates = ({})
+                session.wentAgain(value.seed, value.pos, knights)
+            }
+            else session.levelChanged(value.level, value.pos, value.next, knights)
         }
 
         onMessageReceived: (fromId, data) => {
@@ -125,6 +173,12 @@ Item {
                 session.shotReceived(data)
             } else if (data.type === "struck") {
                 session.struckReported(fromId, data)
+            } else if (data.type === "lift") {
+                session.liftReceived(fromId)
+            } else if (data.type === "name") {
+                if (net.isHost) session._setName(fromId, data.name)
+            } else if (data.type === "newRecord") {
+                if (!net.isHost) session.recordBroken(data.banner === true)
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
             } else if (data.type === "exitReached") {
@@ -164,13 +218,25 @@ Item {
                 delete remotePlayers[nodeId]
             }
             delete lastStates[nodeId]
+            if (net.isHost && _names[nodeId] !== undefined) {
+                delete _names[nodeId]
+                net.setSessionProperty("names", _names)
+            }
             session.playerLeft(nodeId)
             session.partyChanged()
         }
 
         onConnectedChanged: {
-            if (net.connected) session._leaving = false
-            else session.lastStates = ({})
+            if (net.connected) {
+                session._leaving = false
+                // Later: a host can set no session property before its
+                // connectedChanged is over
+                Qt.callLater(session._sendName)
+            } else {
+                session.lastStates = ({})
+                session.runSeed = -1
+                session._names = ({})
+            }
         }
         // reason is "host-left" when the host left on its own, else it
         // crashed or the connection was lost (clayground#376)
@@ -200,7 +266,7 @@ Item {
         target: world ? world.physics : null
         enabled: session.inGame && net.connected && player !== null
         function onStepped() {
-            net.broadcastState({
+            let state = {
                 x: player.xWu,
                 y: player.yWu,
                 a: player.facingAngle,
@@ -211,14 +277,80 @@ Item {
                 // swing while blocking would hide the shield
                 b: player.isBlocking ? 1 : 0,
                 h: player.hp
-            })
+            }
+            // This knight's record of the level (lv), for the host to set
+            // the next dungeon's danger from: the share of its max HP lost
+            // (l) and, once it fell, f
+            let rec = world.levelRecord()
+            state.lv = world.levelIndex
+            state.l = Math.round(rec.lost * 1000) / 1000
+            if (rec.fell) state.f = 1
+            // Lifting a fallen ally up: whose knight and how far, for the
+            // ring every screen draws around it
+            if (player.reviveTarget !== "") {
+                state.v = player.reviveTarget
+                state.p = Math.round(player.reviveProgress * 1000) / 1000
+            }
+            net.broadcastState(state)
         }
     }
 
-    // Host: start the game for everyone with this seed
-    function start(seed) {
-        net.setSessionProperty("run", {seed: seed, level: 0})
-        started(seed, 0)
+    // Host: start the game for everyone with this seed, its first dungeon
+    // at this position in its range, built for knights
+    function start(seed, position, knights) {
+        runSeed = seed
+        net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
+                                       knights: knights})
+        started(seed, 0, position, position, knights)
+    }
+
+    // Host: the party has fallen, the next run starts for everyone on this
+    // seed. The last states are of the run before, whose knights were down:
+    // each knight of the next run is drawn from its first state in it (on
+    // a joiner too, when wentAgain comes)
+    function goAgain(seed, position, knights) {
+        if (!net.isHost) return
+        runSeed = seed
+        lastStates = ({})
+        net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
+                                       knights: knights})
+    }
+
+    // The name goes to the host, which sets it for every node; the host's
+    // own straight into the session property
+    onPlayerNameChanged: _sendName()
+    function _sendName() {
+        if (!net.connected) return
+        if (net.isHost) _setName(net.nodeId, playerName)
+        else net.sendTo(net.hostId, {type: "name", name: playerName})
+    }
+    function _setName(nodeId, name) {
+        _names[nodeId] = String(name).slice(0, 16)
+        net.setSessionProperty("names", _names)
+    }
+    // A node's knight's name; "Knight" before it has sent one
+    function nameOf(nodeId) {
+        let n = names[nodeId]
+        return n ? n : "Knight"
+    }
+    // The names of every knight in the session, from the host's list: the
+    // host's first, the others by their node, so each screen has them in
+    // the same order
+    function partyNames() {
+        let others = Object.keys(names).filter(id => id !== net.hostId).sort()
+        return [nameOf(net.hostId)].concat(others.map(id => names[id]))
+    }
+    // Host: its record is the party's, for every screen
+    function publishRecord(record) {
+        if (net.isHost) net.setSessionProperty("record", record)
+    }
+    // Host: the session's runs, newest first, for every fallen screen
+    function publishRuns(runs) {
+        if (net.isHost) net.setSessionProperty("runs", runs)
+    }
+    // Host: the party went deeper than the record, every screen tells it
+    function announceRecord(banner) {
+        if (net.isHost) net.broadcast({type: "newRecord", banner: banner})
     }
 
     // Reliable event so remote clients show an action crisply
@@ -296,35 +428,42 @@ Item {
         net.broadcast(Object.assign({type: "struck"}, report))
     }
 
-    // Host: every knight is down, the run ends for everyone. The joiners
-    // leave when the message arrives; the host leaves after them, so its
-    // leaving cannot cut the message off.
-    readonly property int endRunWaitMs: 2000
-    function endRun() {
-        if (!net.isHost || _endWait.running) return
-        net.broadcast({type: "runEnd"})
-        _endWait.waited = 0
-        _endWait.start()
-    }
-    Timer {
-        id: _endWait
-        property int waited: 0
-        interval: 50
-        repeat: true
-        onTriggered: {
-            waited += interval
-            if (Object.keys(session.remotePlayers).length > 0 && waited < session.endRunWaitMs)
-                return
-            stop()
-            session.runEnded()
+    // This node's knight lifted that node's fallen knight up. A knight
+    // made without a session (fakeDownedAlly) rises here
+    function liftKnight(nodeId) {
+        if (net.connected) {
+            net.sendTo(nodeId, {type: "lift"})
+            return
         }
+        let rp = remotePlayers[nodeId]
+        if (rp) rp.remoteHp = Math.round(Balance.party.reviveHp * Balance.knight.hp)
+    }
+    // How far the other nodes' knights have lifted that node's knight up,
+    // 0..1, from their last states: the furthest of them
+    function liftOf(nodeId) {
+        let best = 0
+        for (let id in lastStates) {
+            let st = lastStates[id]
+            if (st && st.v === nodeId && st.p > best) best = st.p
+        }
+        return best
     }
 
-    // Host: tell the joiners which level comes next, and every node that
-    // joins later which one is played
-    function announceLevel(levelIndex) {
+    // Host: every knight is down, the run ends for everyone; nobody leaves
+    // the session, so the host can start the next run (goAgain)
+    function endRun() {
+        if (!net.isHost) return
+        net.broadcast({type: "runEnd"})
+        runEnded()
+    }
+
+    // Host: tell the joiners which level comes next, at which danger and
+    // for how many knights, and every node that joins later which one is
+    // played
+    function announceLevel(levelIndex, position, next, knights) {
         net.setSessionProperty("run", {seed: net.sessionProperties.run.seed,
-                                       level: levelIndex})
+                                       level: levelIndex, pos: position, next: next,
+                                       knights: knights})
     }
 
     Component { id: remotePlayerComponent; RemotePlayer {} }
@@ -370,6 +509,27 @@ Item {
         }
     }
 
+    // The dojo, without a session: a fallen ally beside the knight, to be
+    // lifted up as one of a session would (Balance.party). It goes with
+    // the level, as every other node's knight does
+    function fakeDownedAlly(px, py) {
+        let id = "dojo-ally"
+        if (remotePlayers[id]) remotePlayers[id].destroy()
+        let rp = remotePlayerComponent.createObject(world.room, {
+            nodeId: id,
+            playerColor: _colorOf(id),
+            xWu: px,
+            yWu: py,
+            remoteHp: 0,
+            known: true,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world
+        })
+        remotePlayers[id] = rp
+        return rp
+    }
+
     function clearRemotePlayers() {
         for (let id in remotePlayers) {
             try { if (remotePlayers[id]) remotePlayers[id].destroy() } catch(err) {}
@@ -385,6 +545,10 @@ Item {
             MultiplayerLobby {
                 network: net
                 muted: session.muted
+                playerName: session.playerName
+                onPlayerNameChanged: session.nameEdited(playerName)
+                names: session.names
+                recordLine: session.recordLine
                 onStartGame: session.lobbyStartRequested()
                 onBack: { net.leave(); session.lobbyLeft() }
             }

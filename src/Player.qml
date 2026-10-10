@@ -45,7 +45,7 @@ PhysicsItem {
     readonly property real maxSpeed: Balance.knight.moveSpeed
     property int hp: Balance.knight.hp
     property int maxHp: Balance.knight.hp
-    property int atk: Balance.knight.atk + (upgrade === "sword" ? Balance.shop.swordAtk : 0)
+    property int atk: Balance.knight.atk + _level(Balance.shop.swordAtk, swordLevel, 0)
     property int def: Balance.knight.def
     // A raised shield drains mana, a parry gives some back
     property real mana: Balance.knight.mana
@@ -54,19 +54,48 @@ PhysicsItem {
     property int gold: 0
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0
-    // The smith's one upgrade of the run: "sword", "shield" or "" before
-    // it. Every effect reads it live, so setting it applies it at once
-    property string upgrade: ""
-    // The share of a blow a held block lets through, and the mana a raised
-    // shield drains per second: a reinforced shield's are lower
-    readonly property real blockedShare: upgrade === "shield" ? Balance.shop.shieldBlockedShare
-                                                              : Balance.knight.blockedShare
-    readonly property real blockDrain: upgrade === "shield" ? Balance.shop.shieldBlockDrain
-                                                            : Balance.knight.blockDrain
+    // Mana draughts bought from the innkeeper, drunk with key 2
+    property int draughts: 0
+    // The smith's upgrades of the run, each a level from 0 (none) to the
+    // table's last (Balance.shop): the sharpened sword, the reinforced
+    // shield, the lighter harness and the balanced blade. Every effect
+    // reads them live, so setting one applies it at once
+    property int swordLevel: 0
+    property int shieldLevel: 0
+    property int harnessLevel: 0
+    property int bladeLevel: 0
+    // A level bought from the smith at this camp: he sells one per camp,
+    // and the knight of the next level starts without it
+    property bool smithDone: false
+    // An upgrade's effect at level: its table's entry, base at level 0
+    function _level(table, level, base) {
+        return level > 0 ? table[Math.min(level, table.length) - 1] : base
+    }
+    // The share of a blow a held block lets through, and the mana a blow
+    // the shield stops costs: a reinforced shield's are lower
+    readonly property real blockedShare: _level(Balance.shop.shieldBlockedShare, shieldLevel,
+                                                Balance.knight.blockedShare)
+    readonly property real blockMana: _level(Balance.shop.shieldBlockMana, shieldLevel,
+                                             Balance.knight.blockMana)
+    // The mana a dash costs, and a whirlwind with its dash: a lighter
+    // harness's and a balanced blade's are lower
+    readonly property real dashMana: _level(Balance.shop.harnessDashMana, harnessLevel,
+                                            Balance.knight.dashMana)
+    readonly property real whirlMana: _level(Balance.shop.bladeWhirlMana, bladeLevel,
+                                             Balance.knight.whirlMana)
+    readonly property real blockDrain: Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
     readonly property bool fallen: hp <= 0
+
+    // In a session: the fallen ally this knight lifts up (its node's id,
+    // "" for none) and how far, 0..1 (Game._stepRevive); a hit starts it
+    // over. Every screen draws the ring from it
+    property string reviveTarget: ""
+    property real reviveProgress: 0
+    // How far an ally has lifted this knight up while it is down, 0..1
+    property real reviveRing: 0
 
     // Combat state
     property bool isAttacking: false
@@ -97,6 +126,8 @@ PhysicsItem {
     property int _steps: 0
     property int _raisedAt: -1000
     property int _loweredAt: -1000
+    // The physics step mana was last spent on: the rest starts over
+    property int _spentAt: -1000
     // The shield was down long enough before it rose
     property bool _rearmed: true
     // A blow the shield meets now is blocked perfectly
@@ -135,6 +166,15 @@ PhysicsItem {
     // Seconds left of the grace after a hit, in which no damage is taken
     property real graceLeft: 0
 
+    // How far a hit throws the knight back, in wu (Balance.knight.knockback);
+    // a bench that times its answers on a knight standing still sets 0
+    property real knockback: Balance.knight.knockback
+    // Thrown back by a hit: seconds left of it and its velocity at the
+    // start, in wu per second, y up
+    property real _knockT: 0
+    property real _knockVx: 0
+    property real _knockVy: 0
+
     // Movement - set velocity every physics step so collision response
     // doesn't permanently zero a component while the key is held.
     // Dash, swing and cooldowns count the time the step simulated: a pause, a
@@ -158,6 +198,10 @@ PhysicsItem {
                     isBlocking = false
                     _shieldBreak()
                 }
+            } else if (!fallen && mana < maxMana
+                       && (_steps - Math.max(_loweredAt, _spentAt)) * dt >= Balance.knight.manaRegenDelay) {
+                // Down long enough, the shield's mana comes back
+                mana = Math.min(maxMana, mana + Balance.knight.manaRegen * dt)
             }
             // A swing hits until its arc has faded, as long as the view
             // draws it, but counted in steps
@@ -183,6 +227,11 @@ PhysicsItem {
                     isDashing = false
                     isWhirling = false
                 }
+            } else if (_knockT > 0) {
+                // Fades out step by step, like an enemy's knockback
+                let k = _knockT / Balance.knight.knockbackDuration
+                player.body.linearVelocity = Qt.point(_knockVx * k, -_knockVy * k)
+                _knockT = _knockT - dt < 1e-6 ? 0 : _knockT - dt
             } else if (isBlocking) {
                 let spd = maxSpeed * blockSpeedMultiplier
                 player.body.linearVelocity = Qt.point(moveX * spd, moveY * spd)
@@ -228,7 +277,9 @@ PhysicsItem {
         charge: player.chargeProgress
         chargeFull: player.chargeFull
         downed: player.fallen
-        upgrade: player.upgrade
+        reviveProgress: player.reviveRing
+        swordLevel: player.swordLevel
+        shieldLevel: player.shieldLevel
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -488,8 +539,11 @@ PhysicsItem {
     // a perfect block and a crushing blow look and sound like their own.
     // The attacker is the corner (attackerX, attackerY) of a thing
     // attackerSize Wu in size (isShieldFacing); crush is true for a
-    // crushing blow (Balance.enemy.crush...).
-    function takeDamage(amount, attackerX, attackerY, attackerSize, crush) {
+    // crushing blow (Balance.enemy.crush...). (alongX, alongY) is the way
+    // the blow travelled, y up - a lunge's or a shot's - which a hit
+    // throws the knight back along; without it, from the attacker's centre
+    // through the knight's.
+    function takeDamage(amount, attackerX, attackerY, attackerSize, crush, alongX, alongY) {
         if (fallen) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
@@ -497,13 +551,14 @@ PhysicsItem {
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
         if (blocked && perfectGuard) return _perfectBlock(attackerX, attackerY, attackerSize)
         if (blocked && crush === true)
-            return _crushed(finalDamage, attackerX, attackerY, attackerSize)
+            return _crushed(finalDamage, attackerX, attackerY, attackerSize, alongX, alongY)
         if (blocked) {
             finalDamage = Math.floor(finalDamage * blockedShare)
             // The shield's own sound, the only one a blocked blow plays
             if (gameWorld) gameWorld.playBlock()
             view.block()
             acted("block")
+            payBlock()
         }
         hp = Math.max(0, hp - finalDamage)
         if (gameWorld) {
@@ -513,6 +568,7 @@ PhysicsItem {
         if (!blocked) {
             _cancelCharge()
             graceLeft = Balance.knight.hurtGrace
+            _knockBack(attackerX, attackerY, attackerSize, alongX, alongY)
             view.hurt()
             acted("hurt")
             // The knight's own hurt sound, the only one a hit plays
@@ -528,6 +584,28 @@ PhysicsItem {
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, blocked ? "#4A90A4" : "#FF4444")
         }
         return blocked ? "blocked" : "hit"
+    }
+
+    // Thrown back along the blow (takeDamage), knockback wu: a knockback
+    // fades out step by step, so it covers its start speed
+    // times the sum of its steps' shares of it
+    function _knockBack(attackerX, attackerY, attackerSize, alongX, alongY) {
+        let k = Balance.knight
+        if (knockback <= 0 || fallen) return
+        let dx = alongX, dy = alongY
+        if (dx === undefined || dy === undefined || dx * dx + dy * dy < 1e-6) {
+            let a = _centreOf(attackerX, attackerY, attackerSize)
+            dx = xWu + widthWu / 2 - a.x
+            dy = yWu - heightWu / 2 - a.y
+        }
+        let len = Math.sqrt(dx * dx + dy * dy)
+        if (len < 0.001) return
+        let dt = player.world.timeStep, per = 0
+        for (let t = k.knockbackDuration; t > 1e-9; t -= dt) per += t / k.knockbackDuration * dt
+        let speed = knockback / per
+        _knockVx = dx / len * speed
+        _knockVy = dy / len * speed
+        _knockT = k.knockbackDuration
     }
 
     // The shield rose just before the blow: it takes all of it and gives
@@ -555,15 +633,16 @@ PhysicsItem {
     // A crushing blow met the held shield: it breaks - crushMana mana gone,
     // down for crushLockout seconds - and crushShare of the damage lands,
     // a hurt with its grace
-    function _crushed(damage, attackerX, attackerY, attackerSize) {
+    function _crushed(damage, attackerX, attackerY, attackerSize, alongX, alongY) {
         let e = Balance.enemy
         let finalDamage = Math.max(Balance.minDamage, Math.floor(damage * e.crushShare))
-        mana = Math.max(0, mana - e.crushMana)
+        _spend(e.crushMana)
         shieldLock = e.crushLockout
         isBlocking = false
         hp = Math.max(0, hp - finalDamage)
         _cancelCharge()
         graceLeft = Balance.knight.hurtGrace
+        _knockBack(attackerX, attackerY, attackerSize, alongX, alongY)
         _shieldBreak()
         view.hurt()
         acted("hurt")
@@ -580,6 +659,36 @@ PhysicsItem {
             gameWorld.spawnDamageNumber(xWu, yWu, finalDamage, "#FF4444")
         }
         return "crushed"
+    }
+
+    // Mana spent: the rest before it comes back starts over
+    function _spend(amount) {
+        mana = Math.max(0, mana - amount)
+        _spentAt = _steps
+    }
+    // Whether the knight has amount mana; without it, it says so - the
+    // word over it, the empty click and the mana bar's flash - so a
+    // refused move is never a dead input
+    function _afford(amount) {
+        if (mana >= amount) return true
+        _noMana()
+        return false
+    }
+    function _noMana() {
+        if (!gameWorld) return
+        gameWorld.playShieldEmpty()
+        gameWorld.flashManaBar()
+        if (gameWorld.spawnWord)
+            gameWorld.spawnWord(xWu, yWu + 0.4, Balance.knight.noManaWord, Balance.knight.noManaColor)
+    }
+    // A blow the raised shield stopped, a lunge or a shot: it costs
+    // blockMana, and the shield breaks if that empties it
+    function payBlock() {
+        _spend(blockMana)
+        if (mana <= 0 && isBlocking) {
+            isBlocking = false
+            _shieldBreak()
+        }
     }
 
     // The shield ran dry while raised: it breaks, with a crack, and the
@@ -601,10 +710,7 @@ PhysicsItem {
         // Broken by a crushing blow: it rises when the lockout is over
         if (shieldLock > 0) return
         if (mana <= 0) {
-            if (gameWorld) {
-                gameWorld.playShieldEmpty()
-                gameWorld.flashManaBar()
-            }
+            _noMana()
             return
         }
         isBlocking = true
@@ -625,6 +731,17 @@ PhysicsItem {
         return healed
     }
 
+    // A draught gives mana back up to max mana; none is wasted on a knight
+    // whose mana is full or that has fallen. Returns the mana it gave,
+    // 0 when none was drunk
+    function drinkDraught() {
+        if (draughts <= 0 || fallen || mana >= maxMana) return 0
+        let gained = Math.min(Balance.shop.draughtMana, maxMana - mana)
+        draughts--
+        mana += gained
+        return gained
+    }
+
     function dash() {
         if (fallen || dashCooldown > 0 || isDashing) return
         // Use movement direction, or facing direction if stationary
@@ -642,10 +759,19 @@ PhysicsItem {
         // A heavy swing just let go of turns into a whirlwind; a full
         // charge still held waits whirlWindow steps for its release
         let whirl = isAttacking && isHeavy && _steps - _fullLetGoAt <= Balance.knight.whirlWindow
+        // A dash costs dashMana, a whirlwind whirlMana with its dash;
+        // without the whirlwind's, the dash goes on as one
+        if (!_afford(dashMana)) return
+        if (whirl && mana < whirlMana) {
+            whirl = false
+            _noMana()
+        }
+        _spend(whirl ? whirlMana : dashMana)
         let kept = whirl ? new Set(_hitThisSwing) : null
         if (_charge === "full" && !whirl) _dashedFullAt = _steps
         else _cancelCharge()
         isDashing = true
+        _knockT = 0
         _hitThisSwing = new Set()
         _dashTimer = dashDuration
         dashCooldown = dashCooldownTime
@@ -777,9 +903,15 @@ PhysicsItem {
 
     function _onSwingReleased() {
         // Let go of within the window after the dash started: a whirlwind
-        if (_charge === "full" && isDashing && !isWhirling
-                && _steps - _dashedFullAt <= Balance.knight.whirlWindow) _whirl()
-        else if (_charge === "full") heavyAttack()
+        // its dash paid dashMana already, the whirlwind the rest of
+        // whirlMana; without it, the charge swings heavy
+        let whirlRest = Math.max(0, whirlMana - dashMana)
+        let inWindow = _charge === "full" && isDashing && !isWhirling
+            && _steps - _dashedFullAt <= Balance.knight.whirlWindow
+        if (inWindow && _afford(whirlRest)) {
+            _spend(whirlRest)
+            _whirl()
+        } else if (_charge === "full") heavyAttack()
         else if (_charge === "" || _charge === "charging" || _charge === "normal") attack()
         _charge = ""
     }

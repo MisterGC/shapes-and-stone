@@ -169,8 +169,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, M
-mute and Esc menu.
+LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, 2
+draught, M mute and Esc menu.
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -211,16 +211,56 @@ In a session a knight at 0 HP is down, drawn slumped and dark on every
 screen, and the run goes on while another knight stands: the downed
 player's screen says "You are down" and offers only Esc, which leaves the
 session. When every knight is down the host ends the run: every screen
-leaves the session and shows how far the party got, as the fall screen does
-for one knight, and Enter or Esc goes to the title. The downed bench starts
+shows how far the party got, as the fall screen does for one knight, and
+the session stays. The host's screen says "Enter to go again": its Enter
+starts the next run for every knight of the session, at depth 0 on a new
+seed, with fresh HP, mana, gold and potions and the same colours; nobody
+hosts or joins again. A joiner's screen says "Waiting for the host to go
+again", and its Enter does nothing. Esc leaves the session for the title.
+The downed bench starts
 a host and a joiner in one process, joins them over LAN, brings down first
-one knight and then the other, twice in turn, and exits with the number of
-failed checks. Between the two falls the host goes down two levels, and the
-other screen must make the downed knight downed in each, not standing until
-its next state:
+one knight and then the other, twice in turn, leaves with Esc, and exits
+with the number of failed checks. Between the two falls the host goes down two levels: at the
+village's camp the downed knight rises on both screens and is struck down
+again, and in the next dungeon the other screen must make it downed, not
+standing until its next state:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/downed/downed.qml
+```
+
+A downed knight is not out for good. An ally that stands within
+`party.reviveRange` of it for `party.reviveTime` seconds lifts it up: a
+ring fills around the fallen knight on every screen, a hit on the ally
+starts it over, and the knight rises with `party.reviveHp` of its max HP.
+A knight still down when the party reaches the village rises at its camp
+with the same share. The fight record counts the allies each knight lifted
+(`lifts`) and the times it was lifted (`lifted`). Alone nobody is lifted;
+in the dojo `eval fakeDownedAlly()` puts a fallen ally beside the knight,
+without a session, to try the lift and the table's `party` group on. The
+revive bench checks it over the network: two processes of Clayground's
+live loader, a host and a joiner. The joiner's knight falls, the host's
+stands beside it and is hit half way, and the joiner's knight must rise
+`reviveTime` after the hit with `reviveHp` on both screens; down again, it
+must rise at the camp. It needs the live loader
+(`-DCLAYGROUND_WITH_TOOLS=ON`) and exits with the number of failed checks:
+
+```
+python3 tests/revive/run_revive.py --mode local
+```
+
+The go-again bench checks the next run over the network: two processes of
+Clayground's live loader, a host and a joiner, connected over Local (LAN) or
+Cloud signaling. Three times in one session it takes the party to depth 1,
+lets both knights fall, presses Enter on the joiner's screen - nothing
+starts - and then on the host's, and checks that both games are at depth 0
+on the same new seed with the same enemies, each knight at full HP with no
+gold, and that nothing of the run before is left: no enemy, no shot, no
+downed knight. It needs the live loader (`-DCLAYGROUND_WITH_TOOLS=ON`) and
+exits with the number of failed checks:
+
+```
+python3 tests/goagain/run_goagain.py --mode local
 ```
 
 A session takes players in and lets them go while a run is under way. The
@@ -246,23 +286,36 @@ spawns each as a Clayground replicated object (type `"gold"`), a node
 claims the drops its own knight reaches, and the host gives each to the
 first claim it gets and despawns it, so a drop is picked up once, by one
 knight; each knight's gold is its own node's. In the village the
-innkeeper sells a health potion and the smith one upgrade for the run,
-the sword or the shield, through the dialogue panel: E talks, 1 and 2
-buy what the panel offers, each ware named with its effect. A sharpened
-sword adds `shop.swordAtk` to the knight's attack and shows a brighter,
-wider blade edge; a reinforced shield lets `shop.shieldBlockedShare` of a
-blow through a held block instead of `knight.blockedShare`, drains
-`shop.shieldBlockDrain` mana per second instead of `knight.blockDrain`,
-and shows a lighter rim. The perfect block's window is the same with
-either. The smith sells one of the two per run and refuses a second. The
-knight reads its `upgrade` live, so in the dojo's fight scenario
-`eval player.upgrade = "sword"` (or `"shield"`, or `""`) applies it at
-once. Outside the panel, 1 drinks a potion. The
-campfire stays the healer. Gold, potions and the upgrade go with the
-knight to the next level; a new run starts without them. Prices and
-effects are the table's `shop` group. The gold bench brings one knight to
+innkeeper sells a health potion and a mana draught, and the smith
+upgrades that last the run, through the dialogue panel: E talks, 1 to 4
+buy what the panel offers, each ware named with its effect. Outside the
+panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
+mana back, up to the knight's max - at today's 40 it refills the bar; a
+knight with full mana drinks none. The campfire stays the healer.
+
+The smith's upgrades have levels, I to III: the sharpened sword adds
+`shop.swordAtk` to the knight's attack and shows a brighter, wider blade
+edge; the reinforced shield lets `shop.shieldBlockedShare` of a blow
+through a held block instead of `knight.blockedShare`, a blow it stops
+costs `shop.shieldBlockMana` mana instead of `knight.blockMana`, and shows
+a lighter rim; the lighter harness makes a dash cost `shop.harnessDashMana`
+instead of `knight.dashMana`, the whirlwind's dash too; the balanced blade
+makes a whirlwind cost `shop.bladeWhirlMana`, its dash included, instead
+of `knight.whirlMana`. Each of these is a list with one entry per level.
+The perfect block's window is the same at every level. At each camp the
+smith sells one level, the next above the knight's in one of the four,
+for `shop.upgradePrice` of that level, and then nothing more there; the
+camp after depth d sells level L only once d reaches `shop.levelDepth`
+of L - level I from the first camp, II from the camp after depth 2, III
+from the one after depth 4. The knight reads its levels live, so in the
+dojo's fight scenario `eval player.swordLevel = 2` (or `shieldLevel`,
+`harnessLevel`, `bladeLevel`; 0 for none) applies one at once. Gold,
+potions, draughts and the levels go with the knight to the next level; a
+new run starts without them. In a session they are each knight's own,
+bought with its own gold. Prices and effects are the table's `shop`
+group. The gold bench brings one knight to
 a drop, to the innkeeper and the smith - it buys the sword, is refused the
-shield, and in the next run buys the shield, blocks a 20-attack blow and
+shield at that camp, and in the next run buys the shield, blocks a 20-attack blow and
 measures the drain - then a host and a joiner joined
 over LAN to three drops, one with both knights on it, and exits with the
 number of failed checks:
@@ -283,19 +336,89 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 ```
 
-The HUD shows "Depth N" under the bars; a village counts as the depth of
-the dungeon before it. The fallen screen adds the run's kills and its time
-(simulated, so a pause holds it) and the best depth any run got. The best
-depth is kept with `Clayground.Storage` (`KeyValueStore` "ShapesAndStone",
-key `bestDepth`) as soon as a run gets deeper, not only when it falls. In
-the browser it survives a page reload: Clayground's `KeyValueStore` keeps it
-in the browser's IndexedDB (clayground#341). The depth bench runs twice, as
-two processes, so the best depth crosses a restart; each run exits with the
-number of failed checks:
+At the camp the witch reads the next dungeon: where it sits in its depth's
+range - high, in the middle or low - and what lives there, how many
+enemies, how many of them tough and weak, how many guardians and
+spitters. She reads it off the run's seed, the next dungeon's position
+and the knights the party has, the way the dungeon is built
+(`Game.foretell`), so the dungeon the knights walk down into holds what
+she said; one more press of E per line. In a session every knight hears
+the same reading: the seed, the position and the knights are the host's.
+The camp bench, on the dojo's seed, takes one knight out of a dungeon
+three times - little, half and most of its HP lost - and checks the
+witch's reading against the dungeon it then walks into; buys a draught
+and drinks it in the next dungeon; buys the harness I at the first camp,
+is offered no harness II at the next, dashes with it two dungeons later
+and buys the harness II at the camp after depth 2; then a host and a
+joiner joined over LAN hear the same reading, buy on their own gold and
+find what she read on both screens. It exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camp/camp.qml
+```
+
+A descent gauge under the minimap shows how deep the knight is: a shaft of
+rock layers, one per depth, darker and hotter the deeper, with the
+knight's marker in its layer and "Depth N" beside it; a village counts as
+the depth of the dungeon before it. At the camp the gauge is large and the
+marker sinks into the next layer, the next dungeon's. It shows the depth
+only, never the danger's spot in the depth's range; its colours, sizes and
+timing are the table's `gauge` group. In a session every screen shows the
+party's depth. The gauge bench saves the dungeon at depth 0, 5 and 15 and
+the camp after depth 5 as PNGs (`depth0.png`, `depth5.png`, `depth15.png`,
+`camp.png`) and checks the marker and the layers' colours; the gauge is
+HUD, so offscreen it is saved too, the dungeon behind it only with a
+window and the copied shaders:
+
+```
+qml -I build/bin/qml tests/gauge/gauge.qml -- <out dir>
+```
+
+The fallen screen shows the run's depth, the run's kills and its time
+(simulated, so a pause holds it), the record and this session's runs.
+
+The score of an evening is depth. The record is the deepest descent: its
+depth, the knights' lobby names and the date, "Record 12 • Ana, Bo •
+2026-10-10". It shows on the title, in the lobby, under the depth on the HUD
+("record 12") and on the fallen screen. Alone it is this machine's record,
+under the name the lobby keeps for this knight ("Knight" until it is
+edited). In a session the host's record is the party's: the host sets it
+as a session property and every screen shows it; each node sends its
+knight's name to the host, which sets them all as one. When a run goes
+deeper than the record it started with, the banner "New record" goes up
+over the dungeon on the step the depth passes it, once per run, with a
+chime - on every screen of a session, at the host's word - and the fallen
+screen says "New record". The record is kept with `Clayground.Storage`
+(`KeyValueStore` "ShapesAndStone", key `record`, its depth alone under
+`bestDepth`, the name under `playerName`) as soon as a run gets deeper, not
+only when it falls; a joiner keeps the party's descent in its own record
+too, without a banner of its own. In the browser it survives a page reload:
+Clayground's `KeyValueStore` keeps it in the browser's IndexedDB
+(clayground#341). The fallen screen lists every run of the session with its
+depth and time, newest first: alone the runs since the game started, in a
+session the host's since it was hosted. The banner's timing and the chime
+are the table's `record` group.
+
+The depth bench runs twice, as two processes, so the record crosses a
+restart; each run exits with the number of failed checks. The record bench
+puts a record in its store, plays a run that reaches it and one that passes
+it - the banner goes up once, on the step depth 3 passes depth 2, and the
+new depth is stored with the knight's name - and one that falls short, and
+checks the title, the HUD and the runs on the fallen screen; with an out
+dir and a window it saves `title.png`, `hud.png` and `fallen.png`. The
+record party bench plays it in a session of two processes, each with a
+record of its own: both lobbies and HUDs show the host's record, both
+screens raise the banner once, both fallen screens list the same runs, and
+the joiner's own record stays as it was. It needs the live loader
+(`-DCLAYGROUND_WITH_TOOLS=ON`):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- first
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- second
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/record/record.qml
+qml -I build/bin/qml tests/record/record.qml -- <out dir>
+python3 tests/recordparty/run_recordparty.py --mode local
 ```
 
 Every fight number - HP, damage, timings, cooldowns, spawn counts, the heal
@@ -320,6 +443,60 @@ every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
 in the dungeon at depth 4 (the village and the fight room take a depth the
 same way), and the balance bench checks depth 0, 2 and 4 against the table.
 
+Each depth is a range of difficulty, and how the last dungeon went picks
+the spot in it. A dungeon's danger is its depth plus a position in [0, 1),
+and the `depth` group adds per step of the danger, a share of a step
+between two. Leaving a dungeon moves the position half way (`danger.pull`)
+toward what it earned: 1 less the share of max HP lost in it - a potion's
+heal does not take the loss back - or 0 after a fall. Little lost puts the
+next dungeon high in its depth's range, much lost low, a fall lower still;
+a descent is always harder, since the next depth's range starts where this
+one's ends. The position goes on into the next run, not past a restart: a
+fresh game starts at `danger.start`, 0.5. In a session the host settles it
+from every knight's record: the losses averaged, and one knight's fall is
+the party's. `applyScenario("dungeon", 4.8)` lands high in depth 4's range.
+
+More knights meet more resistance. The host builds each dungeon for the
+knights in the session: each knight beyond the first adds
+`party.enemiesPerKnight` enemies to the spawn table, on top of what the
+danger adds and within `depth.enemiesCap`, and `party.hpPerKnight` of every
+enemy's HP - two more enemies and a quarter more HP per knight. Alone a
+dungeon is as it was. A knight joining or leaving mid-dungeon changes the
+next dungeon, not the one the party is in; the village's fight room stays
+the same for any party. In the dojo, `eval knightsOverride = 4` and then
+`eval applyScenario("dungeon", 2.5)` build that dungeon for four knights,
+and so the next dungeons, until `eval knightsOverride = 0` counts the
+session's knights again; `eval partyKnights` says whom the dungeon is built
+for. The party size bench builds the same seed and
+danger for 1, 2 and 4 knights and checks the enemies against the table,
+and the 1-knight dungeon against the one recorded before:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/partysize/partysize.qml
+```
+
+The dungeon shows its danger (`danger.looks`): low danger has warm torches,
+clean stones and dust in the air; middle fewer, cooler torches, cracks,
+moss and old stains; high ember-red torches, cracked stones, bones and
+glowing embers, embers in the air too. The exit stairs glow in the next
+dungeon's torch colour: in a dungeon where it would stand were the party to
+leave now, in the village where it stands. The danger bench feeds made-up
+records and plays a descent, and builds the same seed at the same danger
+twice; the looks bench saves the same dungeon at low, middle and high
+danger and the stairs at a high and a low next one as PNGs, and needs a
+window and the copied shaders, like the knight bench; the danger party
+bench plays four dungeons in a session of two processes, the host
+settling each next one from both knights' records and building it for two,
+and checks that both screens' gauges show the same depth, at each camp and
+in each dungeon (`--shots` saves both screens of the first three camps
+too):
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
+qml -I build/bin/qml tests/looks/looks.qml -- <out dir>
+python3 tests/dangerparty/run_dangerparty.py --mode local [--shots <out dir>]
+```
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
@@ -342,17 +519,28 @@ white for the window; a spitter's shot gets the same ring, closing as the
 shot leaves, without the white. The ring runs on the physics steps, so a
 pause or a hit stop holds it; the `parryRing` group of the table holds
 its size, thickness and colour. On the other screens of a session it
-follows the host's telegraph and parry window. A hit the shield does not
+follows the host's telegraph and parry window. A grunt or a guardian
+winding up its lunge screams like a goblin, fading with the distance from
+the knight as the crushing blow's growl does, pitched by its tier
+(`scream.tierPitch`, weak to tough) on every screen; a spitter keeps its
+spit. A hit the shield does not
 stop gives the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
 white for as long, and a lunge or a shot in it plays no hit. A hit that
 lands reads as a hurt: the knight flashes red (`hurt.color`) for
 `hurt.flash` seconds before the white flicker, plays its own hurt sound (a
 low thud, never the sword's punch), and the HP it lost stays on the HP bar
-as a pale chunk that drains away over `hurt.chunkDrain` seconds. A blow the
+as a pale chunk that drains away over `hurt.chunkDrain` seconds. It also
+throws the knight `knight.knockback` wu back along the blow - a lunge's or
+a shot's own direction - fading out over `knight.knockbackDuration`
+seconds, so the attacker no longer covers it; a crushing blow through the
+held shield throws it too, a blocked, perfectly blocked or dodged blow
+does not. A wall stops it, a dash cancels it, and as it runs on the
+physics steps a pause or a hit stop holds it. A blow the
 shield stops reads as a success, not a smaller hit: the shield flashes
 white and bumps out, the knight's screen freezes for a moment with a kick,
-the shield sounds its own block - the impact sample pitched up, once - and
-the attacker recoils off it; the `block` group of the table holds each of
+the shield sounds its own block - a metal clang, once, `block.pitch`
+semitones up - and the attacker recoils off it; the shield is drawn as
+riveted steel, edged in the knight's own colour; the `block` group of the table holds each of
 these values. A shield raised at most `knight.perfectBlockFrames` steps
 before a blow from inside its arc blocks it perfectly: no damage, no
 chip, `knight.perfectBlockMana` mana back, and a lunging attacker
@@ -362,17 +550,25 @@ so mashing the right button does not keep the window open; the held
 shield still blocks with the chip. A perfect block flashes the shield
 longer and the knight pale blue, sparks fly around a ring on every
 screen, and the knight's own screen freezes, flashes and pulses; the
-`perfectBlock` group of the table holds these values. In co-op the
-knight's screen judges the blow and staggers the host's enemy. The shield is
-not free: raised, it drains `knight.blockDrain` mana per second (less
-with the smith's reinforced shield), drops at
-0 and cannot be raised again until a parry gives `knight.parryMana` back
-or the campfire refills it at `campfire.manaPerSecond`; mana does not come
-back on its own. Below `shieldBreak.lowShare` of the mana the raised
+`perfectBlock` group of the table holds these values, its clang
+`perfectBlock.pitch` semitones up. In co-op the
+knight's screen judges the blow and staggers the host's enemy. Mana pays
+for what the knight does: the raised shield drains `knight.blockDrain`
+per second, a blow it stops - a lunge or a shot - costs `knight.blockMana`
+(less with the smith's reinforced shield), a dash `knight.dashMana` and a
+whirlwind `knight.whirlMana` with its dash. At 0 the shield drops and
+cannot be raised until a parry gives `knight.parryMana` back, the
+campfire refills it at `campfire.manaPerSecond`, or the knight rests:
+with the shield down and nothing spent for `knight.manaRegenDelay`
+seconds, mana comes back at `knight.manaRegen` per second, on the physics
+clock. Without the mana a dash does not start and a full charge swings
+heavy instead of whirling; every move refused for lack of mana - the
+shield, the dash, the whirlwind - shows `knight.noManaWord` over the
+knight, clicks empty and flashes the mana bar. Below `shieldBreak.lowShare` of the mana the raised
 shield thins and blinks `shieldBreak.blink` times a second; at 0 it breaks
 into grey shards with a crack, on every screen (`acted("shieldBreak")`),
-and the mana bar flashes red. A right-click with no mana answers with a
-dull click and the same flash. The hurt flash, the HP chunk, the blink,
+and the mana bar flashes red. A right-click with no mana answers with
+the refusal above. The hurt flash, the HP chunk, the blink,
 the shards and the mana bar's flash count physics steps like the grace: a
 pause, a single step or the hit stop holds them. The words PARRY and
 PERFECT show over the
@@ -400,7 +596,8 @@ A full charge let go right around a dash's start - at most
 `knight.whirlWindow` physics steps before or after it - spins the knight
 forward as a whirlwind instead: the dash goes on for `knight.whirlDuration`
 seconds at `knight.whirlSpeed`, no damage taken, the glowing blade turning
-round the knight, and every standing enemy within `knight.whirlReach` of
+round the knight, the knight shouting (`whirl.shoutPitch`,
+`whirl.shoutVolume`), and every standing enemy within `knight.whirlReach` of
 it is hit once, `knight.whirlSwing` times atk, through a guardian's
 shield. A heavy swing just let go of turns into the whirlwind, and an
 enemy it hit already is not hit again. Outside the window a full charge
@@ -455,7 +652,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -471,8 +668,10 @@ just before and just after the dash's start (the report counts the
 whirlwinds that landed as `whirlwinds`, their hits as `whirlHits` and the
 ones begun as `whirlsStarted`). A crushing blow is met by the same plan, so a parry finds
 no window; the report counts the crushing wind-ups as `crushBlows`.
-`--depth` puts the fight room at a
-depth: the lineup stays the table's, the enemies hit as hard as there. It
+`--danger` puts the fight room at a
+danger, a depth plus a position in its range (`2.5`), and `--depth d` at
+the bottom of depth d's: the lineup stays the table's, the enemies hit as
+hard as there, and the same seed and danger give the same numbers. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
 about a minute of wall clock.
 
@@ -539,7 +738,7 @@ python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10
 `.github/workflows/pages.yml` does the same with the runtime of a Clayground
 release and, when the check passes, puts `build/web/` on GitHub Pages. It
 runs by hand (*Run workflow*, with the Clayground release to take the
-runtime from, `v2026.8` by default) and when a release of the game is
+runtime from, `v2026.9` by default) and when a release of the game is
 published, never on a push. Pages must be set to deploy from GitHub Actions
 (*Settings > Pages > Source*).
 

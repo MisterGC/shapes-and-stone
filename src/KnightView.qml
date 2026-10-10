@@ -36,6 +36,10 @@ Item {
     // At 0 HP: the knight slumps to the floor, dark, its lantern low and
     // no aim shown - the same on every screen that draws it
     property bool downed: false
+    // How far an ally has lifted the downed knight up, 0..1: the ring
+    // around it (Balance.party)
+    property real reviveProgress: 0
+    readonly property color _ringColor: Balance.party.ringColor
     // The left button is held for a heavy swing: the blade, drawn back,
     // glows brighter with charge (0..1); when chargeFull a ring flashes out
     property bool charging: false
@@ -43,16 +47,15 @@ Item {
     property bool chargeFull: false
     readonly property color _glow: Balance.heavy.glow
     onChargeFullChanged: if (chargeFull) chargeRingFlash.restart()
-    // The smith's upgrade of the run, "sword", "shield" or "": a sharpened
-    // sword's blade has a brighter, wider edge, a reinforced shield a
-    // lighter rim along its outside
-    property string upgrade: ""
+    // The smith's sword and shield levels of the run, 0 for none: a
+    // sharpened sword's blade has a brighter, wider edge, a reinforced
+    // shield a lighter rim along its outside
+    property int swordLevel: 0
+    property int shieldLevel: 0
     readonly property color _edgeColor: Qt.lighter(accentColor, 1.6)
     readonly property color _rimColor: Qt.lighter(accentColor, 1.8)
-    onUpgradeChanged: {
-        shieldArc.requestPaint()
-        chargeBlade.requestPaint()
-    }
+    onSwordLevelChanged: chargeBlade.requestPaint()
+    onShieldLevelChanged: shieldArc.requestPaint()
 
     // Seconds, from the balance table: wind up plus follow through, and
     // the fade of the arc after it
@@ -409,12 +412,51 @@ Item {
             var ctx = getContext("2d")
             ctx.reset()
             var w = width, h = height
-            ctx.beginPath()
-            ctx.arc(w / 2, h / 2, w * 0.4, -Math.PI * 0.4, Math.PI * 0.4)
-            ctx.strokeStyle = view.accentColor
-            ctx.lineWidth = w * thickness
+            var cx = w / 2, cy = h / 2, r = w * 0.4, half = w * thickness / 2
+            var a0 = -Math.PI * 0.4, a1 = Math.PI * 0.4
+            var band = function() {
+                ctx.beginPath()
+                ctx.arc(cx, cy, r + half, a0, a1)
+                ctx.arc(cx, cy, r - half, a1, a0, true)
+                ctx.closePath()
+            }
+            // Steel: bevelled across the band, darker at both edges
+            var steel = ctx.createRadialGradient(cx, cy, r - half, cx, cy, r + half)
+            steel.addColorStop(0, "#5E6870")
+            steel.addColorStop(0.35, "#C9D2D9")
+            steel.addColorStop(0.55, "#9AA6AF")
+            steel.addColorStop(1, "#4A535A")
+            band()
+            ctx.fillStyle = steel
+            ctx.fill()
+            // A sheen from the top, fading down the arc
+            var sheen = ctx.createLinearGradient(0, cy - r - half, 0, cy + r + half)
+            sheen.addColorStop(0, "rgba(255,255,255,0.45)")
+            sheen.addColorStop(0.45, "rgba(255,255,255,0)")
+            sheen.addColorStop(1, "rgba(0,0,0,0.25)")
+            band()
+            ctx.fillStyle = sheen
+            ctx.fill()
+            // Its edge in the knight's own colour, so knights stay apart
+            band()
+            ctx.strokeStyle = Qt.darker(view.accentColor, 1.6)
+            ctx.lineWidth = Math.max(1, w * 0.025)
             ctx.stroke()
-            if (view.upgrade === "shield") {
+            // Rivets along the middle of the band
+            for (var i = -1; i <= 1; i++) {
+                var ra = i * Math.PI * 0.26
+                var rx = cx + Math.cos(ra) * r, ry = cy + Math.sin(ra) * r
+                var rr = Math.max(1, w * thickness * 0.14)
+                ctx.beginPath()
+                ctx.arc(rx, ry, rr, 0, Math.PI * 2)
+                ctx.fillStyle = "#3A4248"
+                ctx.fill()
+                ctx.beginPath()
+                ctx.arc(rx - rr * 0.3, ry - rr * 0.3, rr * 0.45, 0, Math.PI * 2)
+                ctx.fillStyle = "#E8EEF2"
+                ctx.fill()
+            }
+            if (view.shieldLevel > 0) {
                 ctx.beginPath()
                 ctx.arc(w / 2, h / 2, w * (0.4 + thickness / 2), -Math.PI * 0.4, Math.PI * 0.4)
                 ctx.strokeStyle = view._rimColor
@@ -648,7 +690,7 @@ Item {
             ctx.fillStyle = "rgba(" + Math.round(r * 255) + ", " + Math.round(g * 255) + ", "
                     + Math.round(b * 255) + ", 1)"
             ctx.fill()
-            var sharp = view.upgrade === "sword"
+            var sharp = view.swordLevel > 0
             ctx.strokeStyle = view.chargeFull ? "#FFFFFF"
                                               : view._rgba(sharp ? view._edgeColor : view.accentColor, 0.9)
             ctx.lineWidth = view.chargeFull || sharp ? 2 : 1
@@ -683,6 +725,37 @@ Item {
                 from: 0.9; to: 0
                 duration: Balance.heavy.ring * 1000
             }
+        }
+    }
+
+    // A downed knight an ally lifts up: a ring fills clockwise around it
+    // from the top, full when the knight rises. Reparented like the swing
+    Canvas {
+        id: reviveRing
+        objectName: "reviveRing"
+        parent: view.host.parent
+        width: view.host.width * Balance.party.ringRadius * 2 + Balance.party.ringWidth * 2
+        height: width
+        x: view.host.x + view.host.width / 2 - width / 2
+        y: view.host.y + view.host.height / 2 - height / 2
+        visible: view.downed && view.reviveProgress > 0
+        readonly property real progress: view.reviveProgress
+        onProgressChanged: requestPaint()
+        onVisibleChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var r = view.host.width * Balance.party.ringRadius
+            var start = -Math.PI / 2
+            ctx.lineWidth = Balance.party.ringWidth
+            ctx.strokeStyle = view._rgba(view._ringColor, 0.2)
+            ctx.beginPath()
+            ctx.arc(width / 2, height / 2, r, 0, 2 * Math.PI)
+            ctx.stroke()
+            ctx.strokeStyle = view._rgba(view._ringColor, 1)
+            ctx.beginPath()
+            ctx.arc(width / 2, height / 2, r, start, start + 2 * Math.PI * Math.min(1, progress))
+            ctx.stroke()
         }
     }
 
@@ -789,7 +862,7 @@ Item {
             ctx.closePath()
             ctx.fillStyle = view._rgba(heavy ? view._glow : view.bladeColor, swingOpacity)
             ctx.fill()
-            var sharp = view.upgrade === "sword"
+            var sharp = view.swordLevel > 0
             ctx.strokeStyle = view._rgba(sharp ? view._edgeColor : view.accentColor, swingOpacity)
             ctx.lineWidth = sharp ? 2.5 : 1.5
             ctx.stroke()

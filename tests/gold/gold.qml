@@ -6,10 +6,10 @@
 // the enemy's tier, the knight picks it up and the HUD shows it, and the
 // village keeps it. There, with E at the innkeeper and 1 in the dialogue
 // panel, it buys a potion: the gold drops by its price, and 1 outside the
-// panel heals. The smith sells one upgrade for the run, the sharpened sword
-// (more atk) or the reinforced shield (a held block lets less through and
-// drains less mana), and refuses a second; the next level keeps gold,
-// potions and upgrade. Then a host and a joiner in one process, joined over
+// panel heals. The smith sells one level per camp, among them the
+// sharpened sword (more atk) and the reinforced shield (a held block lets
+// less through and costs less mana), and refuses a second there; the next
+// level keeps gold, potions and the level. Then a host and a joiner in one process, joined over
 // LAN: a drop the joiner's knight killed goes to the host's knight that
 // picks it up, one the host killed to the joiner's, one both knights stand
 // on to exactly one of them, and a late claim for a drop already taken
@@ -145,7 +145,7 @@ Window {
             check(solo.player.gold === soloAmount && hudGold(solo).text === "Gold " + soloAmount,
                   "the village keeps the knight's gold (" + hudGold(solo).text + ")")
             // More gold for the shopping, as if from more kills
-            solo.player.gold = Balance.shop.potionPrice + Balance.shop.upgradePrice + 2
+            solo.player.gold = Balance.shop.potionPrice + Balance.shop.upgradePrice[0] + 2
             let inn = npc(solo, "Innkeeper")
             standAt(solo.player, inn.xWu, inn.yWu - 1)
         }],
@@ -155,10 +155,10 @@ Window {
         }],
         [() => panel(solo).visible, () => {
             let p = panel(solo)
-            check(p.speakerName === "Innkeeper" && p.wares.length === 1 && p.wares[0].id === "potion"
-                  && p.wares[0].price === Balance.shop.potionPrice,
+            check(p.speakerName === "Innkeeper" && p.wares.length === 2 && p.wares[0].id === "potion"
+                  && p.wares[0].price === Balance.shop.potionPrice && p.wares[1].id === "draught",
                   "E at the innkeeper opens the dialogue panel, which offers a potion for "
-                  + Balance.shop.potionPrice + " gold")
+                  + Balance.shop.potionPrice + " gold, and a mana draught")
             gold0 = solo.player.gold
             press(Qt.Key_1)
             check(solo.player.gold === gold0 - Balance.shop.potionPrice && solo.player.potions === 1,
@@ -194,47 +194,47 @@ Window {
         [() => npc(solo, "Blacksmith").nearbyPlayer !== null, () => press(Qt.Key_E)],
         [() => panel(solo).visible, () => {
             let p = panel(solo)
-            check(p.speakerName === "Blacksmith" && p.wares.length === 2
+            check(p.speakerName === "Blacksmith" && p.wares.length === 4
                   && p.wares[0].id === "sword" && p.wares[1].id === "shield"
-                  && p.wares[0].label.indexOf("+" + Balance.shop.swordAtk + " damage") >= 0
-                  && p.wares[1].label.indexOf(Math.round(Balance.shop.shieldBlockedShare * 100) + " %") >= 0
-                  && p.wares[1].label.indexOf(Balance.shop.shieldBlockDrain + " mana/s") >= 0,
+                  && p.wares[0].label.indexOf("+" + Balance.shop.swordAtk[0] + " damage") >= 0
+                  && p.wares[1].label.indexOf(Math.round(Balance.shop.shieldBlockedShare[0] * 100) + " %") >= 0
+                  && p.wares[1].label.indexOf("costs " + Balance.shop.shieldBlockMana[0] + " mana") >= 0,
                   "the smith offers the sword and the shield, each with its effect (\""
                   + p.wares.map(w => w.label).join("\", \"") + "\")")
             gold0 = solo.player.gold
             press(Qt.Key_1)
             let k = solo.player
-            check(k.upgrade === "sword" && k.atk === 20 && k.atk === Balance.knight.atk + Balance.shop.swordAtk
-                  && k.maxHp === Balance.knight.hp && k.gold === gold0 - Balance.shop.upgradePrice,
-                  "1 buys the sharpened sword (upgrade \"" + k.upgrade + "\", atk " + k.atk
+            check(k.swordLevel === 1 && k.atk === 20 && k.atk === Balance.knight.atk + Balance.shop.swordAtk[0]
+                  && k.maxHp === Balance.knight.hp && k.gold === gold0 - Balance.shop.upgradePrice[0],
+                  "1 buys the sharpened sword (level " + k.swordLevel + ", atk " + k.atk
                   + ", gold " + gold0 + " -> " + k.gold + ")")
-            check(p.wares.length === 0, "after one upgrade the smith offers none for the run")
+            check(p.wares.length === 0, "after one level the smith offers none more at this camp")
             gold0 = k.gold
             press(Qt.Key_2)
-            let again = solo.buyWare({ id: "shield", price: Balance.shop.upgradePrice })
-            check(!again && k.upgrade === "sword" && k.gold === gold0,
-                  "a second purchase is refused (upgrade \"" + k.upgrade + "\", gold " + k.gold
-                  + ", \"" + panelText(solo) + "\")")
+            let again = solo.buyWare({ id: "shield", price: Balance.shop.upgradePrice[0] })
+            check(!again && k.swordLevel === 1 && k.shieldLevel === 0 && k.gold === gold0,
+                  "a second purchase is refused (sword " + k.swordLevel + ", shield " + k.shieldLevel
+                  + ", gold " + k.gold + ", \"" + panelText(solo) + "\")")
             for (let i = 0; i < 6 && p.visible; i++) press(Qt.Key_E)
             k.potions = 2
             solo._enterLevel(solo.levelIndex + 1)
         }],
         [() => solo.player && solo.levelType === "dungeon", () => {
             let k = solo.player
-            check(k.gold === gold0 && k.potions === 2 && k.upgrade === "sword" && k.atk === 20,
-                  "the next level keeps gold, potions and upgrade (" + k.gold + " gold, " + k.potions
+            check(k.gold === gold0 && k.potions === 2 && k.swordLevel === 1 && k.atk === 20,
+                  "the next level keeps gold, potions and the sword (" + k.gold + " gold, " + k.potions
                   + " potions, atk " + k.atk + ")")
             solo.newRun()
         }],
         [() => solo.player && solo.levelIndex === 0, () => {
             let k = solo.player
-            check(k.gold === 0 && k.potions === 0 && k.upgrade === "" && k.atk === Balance.knight.atk
-                  && k.blockedShare === Balance.knight.blockedShare && k.blockDrain === Balance.knight.blockDrain,
-                  "a new run starts without gold, potions or upgrade")
+            check(k.gold === 0 && k.potions === 0 && k.swordLevel === 0 && k.atk === Balance.knight.atk
+                  && k.blockedShare === Balance.knight.blockedShare && k.blockMana === Balance.knight.blockMana,
+                  "a new run starts without gold, potions or the smith's levels")
             solo._enterLevel(1)
         }],
         [() => solo.player && solo.levelType === "village", () => {
-            solo.player.gold = Balance.shop.upgradePrice
+            solo.player.gold = Balance.shop.upgradePrice[0]
             let smith = npc(solo, "Blacksmith")
             standAt(solo.player, smith.xWu, smith.yWu - 1)
         }],
@@ -243,11 +243,11 @@ Window {
             let p = panel(solo)
             press(Qt.Key_2)
             let k = solo.player
-            check(k.upgrade === "shield" && k.atk === Balance.knight.atk && k.gold === 0,
-                  "2 buys the reinforced shield (upgrade \"" + k.upgrade + "\", atk " + k.atk + ")")
-            k.gold = Balance.shop.upgradePrice
+            check(k.shieldLevel === 1 && k.atk === Balance.knight.atk && k.gold === 0,
+                  "2 buys the reinforced shield (level " + k.shieldLevel + ", atk " + k.atk + ")")
+            k.gold = Balance.shop.upgradePrice[0]
             press(Qt.Key_1)
-            check(k.upgrade === "shield" && k.gold === Balance.shop.upgradePrice,
+            check(k.shieldLevel === 1 && k.swordLevel === 0 && k.gold === Balance.shop.upgradePrice[0],
                   "1 at the smith then buys no sword")
             for (let i = 0; i < 6 && p.visible; i++) press(Qt.Key_E)
             // A 20-atk blow on the held shield, from the front, past the
@@ -257,12 +257,16 @@ Window {
             k.raiseShield()
             k._raisedAt = k._steps - Balance.knight.perfectBlockFrames - 1
             let hp = k.hp
+            let manaBefore = k.mana
             let res = k.takeDamage(20, k.xWu + 1, k.yWu)
             let share = Math.floor((20 - k.def) * 0.15)
             check(res === "blocked" && hp - k.hp === share
-                  && share === Math.floor((20 - k.def) * Balance.shop.shieldBlockedShare),
+                  && share === Math.floor((20 - k.def) * Balance.shop.shieldBlockedShare[0]),
                   "a held block of a 20-atk blow lets " + (hp - k.hp) + " of " + (20 - k.def)
                   + " through (15 %: " + share + ")")
+            check(Math.abs(manaBefore - k.mana - 4) < 1e-6
+                  && Math.abs(manaBefore - k.mana - Balance.shop.shieldBlockMana[0]) < 1e-6,
+                  "the blocked blow costs the reinforced shield " + (manaBefore - k.mana).toFixed(2) + " mana")
             steps0 = k._steps
         }],
         // The drain, measured once the blow's hit stop is over
@@ -279,18 +283,20 @@ Window {
             measuring = false
             let secs = drainSecs
             let drain = (mana0 - k.mana) / secs
-            check(k.isBlocking && Math.abs(drain - 6) < 0.05
-                  && Math.abs(drain - Balance.shop.shieldBlockDrain) < 0.05,
-                  "the held shield drains " + drain.toFixed(2) + " mana/s over " + secs.toFixed(2) + " s")
+            check(k.isBlocking && Math.abs(drain - Balance.knight.blockDrain) < 0.05,
+                  "the held reinforced shield drains " + drain.toFixed(2) + " mana/s over " + secs.toFixed(2)
+                  + " s, as any shield does")
             k.lowerShield()
-            // The upgrade is read live: set it, and its effects follow at once
-            k.upgrade = "sword"
+            // The levels are read live: set one, and its effects follow at once
+            k.shieldLevel = 0
+            k.swordLevel = 1
             let sword = k.atk === 20 && k.blockedShare === Balance.knight.blockedShare
-                && k.blockDrain === Balance.knight.blockDrain
-            k.upgrade = "shield"
-            let shield = k.atk === Balance.knight.atk && k.blockedShare === Balance.shop.shieldBlockedShare
-                && k.blockDrain === Balance.shop.shieldBlockDrain
-            check(sword && shield, "setting upgrade applies the sword or the shield at once")
+                && k.blockMana === Balance.knight.blockMana
+            k.swordLevel = 0
+            k.shieldLevel = 1
+            let shield = k.atk === Balance.knight.atk && k.blockedShare === Balance.shop.shieldBlockedShare[0]
+                && k.blockMana === Balance.shop.shieldBlockMana[0]
+            check(sword && shield, "setting swordLevel or shieldLevel applies the sword or the shield at once")
         }],
         [100, () => solo.destroy()]
     ]
