@@ -341,17 +341,49 @@ qml -I build/bin/qml tests/gauge/gauge.qml -- <out dir>
 ```
 
 The fallen screen shows the run's depth, the run's kills and its time
-(simulated, so a pause holds it) and the best depth any run got. The best
-depth is kept with `Clayground.Storage` (`KeyValueStore` "ShapesAndStone",
-key `bestDepth`) as soon as a run gets deeper, not only when it falls. In
-the browser it survives a page reload: Clayground's `KeyValueStore` keeps it
-in the browser's IndexedDB (clayground#341). The depth bench runs twice, as
-two processes, so the best depth crosses a restart; each run exits with the
-number of failed checks:
+(simulated, so a pause holds it), the record and this session's runs.
+
+The score of an evening is depth. The record is the deepest descent: its
+depth, the knights' lobby names and the date, "Record 12 • Ana, Bo •
+2026-10-10". It shows on the title, in the lobby, under the depth on the HUD
+("record 12") and on the fallen screen. Alone it is this machine's record,
+under the name the lobby keeps for this knight ("Knight" until it is
+edited). In a session the host's record is the party's: the host sets it
+as a session property and every screen shows it; each node sends its
+knight's name to the host, which sets them all as one. When a run goes
+deeper than the record it started with, the banner "New record" goes up
+over the dungeon on the step the depth passes it, once per run, with a
+chime - on every screen of a session, at the host's word - and the fallen
+screen says "New record". The record is kept with `Clayground.Storage`
+(`KeyValueStore` "ShapesAndStone", key `record`, its depth alone under
+`bestDepth`, the name under `playerName`) as soon as a run gets deeper, not
+only when it falls; a joiner keeps the party's descent in its own record
+too, without a banner of its own. In the browser it survives a page reload:
+Clayground's `KeyValueStore` keeps it in the browser's IndexedDB
+(clayground#341). The fallen screen lists every run of the session with its
+depth and time, newest first: alone the runs since the game started, in a
+session the host's since it was hosted. The banner's timing and the chime
+are the table's `record` group.
+
+The depth bench runs twice, as two processes, so the record crosses a
+restart; each run exits with the number of failed checks. The record bench
+puts a record in its store, plays a run that reaches it and one that passes
+it - the banner goes up once, on the step depth 3 passes depth 2, and the
+new depth is stored with the knight's name - and one that falls short, and
+checks the title, the HUD and the runs on the fallen screen; with an out
+dir and a window it saves `title.png`, `hud.png` and `fallen.png`. The
+record party bench plays it in a session of two processes, each with a
+record of its own: both lobbies and HUDs show the host's record, both
+screens raise the banner once, both fallen screens list the same runs, and
+the joiner's own record stays as it was. It needs the live loader
+(`-DCLAYGROUND_WITH_TOOLS=ON`):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- first
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/depth/depth.qml -- second
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/record/record.qml
+qml -I build/bin/qml tests/record/record.qml -- <out dir>
+python3 tests/recordparty/run_recordparty.py --mode local
 ```
 
 Every fight number - HP, damage, timings, cooldowns, spawn counts, the heal
