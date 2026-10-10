@@ -2394,24 +2394,8 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        if (rooms.length > 1) {
-            let spawnRooms = rooms.slice(1)
-            let sb = spawnRolls(danger, partyKnights)
-            let numEnemies = sb.enemiesMin + Math.floor(rng() * (sb.enemiesMax - sb.enemiesMin + 1))
-            let tiers = dealTiers(numEnemies, sb, rng)
-            for (let i = 0; i < numEnemies; i++) {
-                let room = spawnRooms[i % spawnRooms.length]
-                let ex = (room.x + 1 + rng() * (room.w - 2)) * cellSize
-                let ey = (room.y + 1 + rng() * (room.h - 2)) * cellSize
-                let tier = tiers[i]
-                // Enemy type: guardian, spitter, else grunt
-                let typeRoll = rng()
-                let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
-                let type = typeRoll < guardianChance ? "guardian"
-                    : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
-                spawnEnemy(ex, ey, tier, type, partyKnights)
-            }
-        }
+        for (let e of rollEnemies(rooms, spawnRolls(danger, partyKnights), rng))
+            spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
 
         // Bind player controls
         if (player) {
@@ -2479,25 +2463,39 @@ ClayWorld2d {
     }
 
     function placeRooms(minRooms, maxRooms, minSize, maxSize) {
-        rooms = []
-        let numRooms = minRooms + Math.floor(rng() * (maxRooms - minRooms + 1))
+        rooms = planRooms(minRooms, maxRooms, minSize, maxSize, rng)
+        // Carve the rooms into the grid
+        for (let room of rooms)
+            for (let y = room.y; y < room.y + room.h; y++)
+                for (let x = room.x; x < room.x + room.w; x++)
+                    grid[y][x] = cellRoom
+        console.log("[Game] Placed", rooms.length, "rooms")
+    }
+
+    // The rooms of a dungeon, drawn from rand without touching the grid,
+    // sorted by Y position (bottom to top) for the spanning tree. Only
+    // they and rollEnemies draw from the level's rng, so the witch can
+    // read the next dungeon's enemies off its seed (foretell)
+    function planRooms(minRooms, maxRooms, minSize, maxSize, rand) {
+        let out = []
+        let numRooms = minRooms + Math.floor(rand() * (maxRooms - minRooms + 1))
         let attempts = 0
         let maxAttempts = 100
 
-        while (rooms.length < numRooms && attempts < maxAttempts) {
+        while (out.length < numRooms && attempts < maxAttempts) {
             attempts++
 
             // Random room size (in cells)
-            let rw = minSize + Math.floor(rng() * (maxSize - minSize + 1))
-            let rh = minSize + Math.floor(rng() * (maxSize - minSize + 1))
+            let rw = minSize + Math.floor(rand() * (maxSize - minSize + 1))
+            let rh = minSize + Math.floor(rand() * (maxSize - minSize + 1))
 
             // Random position (leave 1 cell border for walls)
-            let rx = 1 + Math.floor(rng() * (gridWidth - rw - 2))
-            let ry = 1 + Math.floor(rng() * (gridHeight - rh - 2))
+            let rx = 1 + Math.floor(rand() * (gridWidth - rw - 2))
+            let ry = 1 + Math.floor(rand() * (gridHeight - rh - 2))
 
             // Check if room overlaps with existing rooms (with 1 cell padding)
             let overlaps = false
-            for (let room of rooms) {
+            for (let room of out) {
                 if (rx < room.x + room.w + 1 &&
                     rx + rw + 1 > room.x &&
                     ry < room.y + room.h + 1 &&
@@ -2506,22 +2504,35 @@ ClayWorld2d {
                     break
                 }
             }
-
-            if (!overlaps) {
-                rooms.push({x: rx, y: ry, w: rw, h: rh})
-                // Carve room into grid
-                for (let y = ry; y < ry + rh; y++) {
-                    for (let x = rx; x < rx + rw; x++) {
-                        grid[y][x] = cellRoom
-                    }
-                }
-                console.log("[Game] Placed room", rooms.length, "at", rx, ry, "size", rw, "x", rh)
-            }
+            if (!overlaps) out.push({x: rx, y: ry, w: rw, h: rh})
         }
 
-        // Sort rooms by Y position (bottom to top) for spanning tree
-        rooms.sort((a, b) => a.y - b.y)
-        console.log("[Game] Placed", rooms.length, "rooms")
+        out.sort((a, b) => a.y - b.y)
+        return out
+    }
+
+    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls),
+    // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
+    // first, the knights' start, with the table's tier mix
+    function rollEnemies(rms, sb, rand) {
+        let out = []
+        if (rms.length < 2) return out
+        let spawnRooms = rms.slice(1)
+        let numEnemies = sb.enemiesMin + Math.floor(rand() * (sb.enemiesMax - sb.enemiesMin + 1))
+        let tiers = dealTiers(numEnemies, sb, rand)
+        for (let i = 0; i < numEnemies; i++) {
+            let room = spawnRooms[i % spawnRooms.length]
+            let ex = (room.x + 1 + rand() * (room.w - 2)) * cellSize
+            let ey = (room.y + 1 + rand() * (room.h - 2)) * cellSize
+            let tier = tiers[i]
+            // Enemy type: guardian, spitter, else grunt
+            let typeRoll = rand()
+            let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
+            let type = typeRoll < guardianChance ? "guardian"
+                : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
+            out.push({x: ex, y: ey, tier: tier, type: type})
+        }
+        return out
     }
 
     function connectRooms() {
