@@ -517,7 +517,7 @@ stands on both screens and meets nothing, and both knights fall; Enter on
 the joiner's screen must start nothing, Enter on the host's must bring
 both to depth 0 on the same new seed, with the same enemies by id, type,
 tier and place (within 1.5 Wu), each knight at full HP and mana with no
-gold, potion or upgrade, the other knight standing at full HP in its
+gold, potion, draught or smith's level, the other knight standing at full HP in its
 colour, and no enemy, shot or gold drop of the run before.
 
 On clayground `dee7c25` (the submodule) it exited 0 with 85 checks passed.
@@ -725,9 +725,12 @@ own knight stands on a drop and claims it (`goldClaim`, sent to the host;
 the host's own claim is answered at once). The host takes the first claim
 it gets for a drop, despawns the drop on every node and tells the
 claimer's node the amount (`goldGrant`); a later claim finds no drop and
-gets nothing. The gold, the potions and the smith's upgrade are each
-knight's own and live on its own node, as its HP does; the others never
-see them. A drop the host leaves behind at a level change is despawned
+gets nothing. The gold, the potions, the draughts and the smith's levels
+are each knight's own and live on its own node, as its HP does; the
+others never see them. The witch's reading is not sent: each node reads
+the next dungeon off the run's seed, the next position and the knights,
+all three the host's, so every knight hears the same (the camp bench
+checks it with a host and a joiner over LAN). A drop the host leaves behind at a level change is despawned
 with the level, as its enemies are.
 
 The gold bench joins a host and a joiner over LAN and puts both knights on

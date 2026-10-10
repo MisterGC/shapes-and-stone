@@ -169,8 +169,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, M
-mute and Esc menu.
+LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, 2
+draught, M mute and Esc menu.
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -286,23 +286,36 @@ spawns each as a Clayground replicated object (type `"gold"`), a node
 claims the drops its own knight reaches, and the host gives each to the
 first claim it gets and despawns it, so a drop is picked up once, by one
 knight; each knight's gold is its own node's. In the village the
-innkeeper sells a health potion and the smith one upgrade for the run,
-the sword or the shield, through the dialogue panel: E talks, 1 and 2
-buy what the panel offers, each ware named with its effect. A sharpened
-sword adds `shop.swordAtk` to the knight's attack and shows a brighter,
-wider blade edge; a reinforced shield lets `shop.shieldBlockedShare` of a
-blow through a held block instead of `knight.blockedShare`, a blow it
-stops costs `shop.shieldBlockMana` mana instead of `knight.blockMana`,
-and shows a lighter rim. The perfect block's window is the same with
-either. The smith sells one of the two per run and refuses a second. The
-knight reads its `upgrade` live, so in the dojo's fight scenario
-`eval player.upgrade = "sword"` (or `"shield"`, or `""`) applies it at
-once. Outside the panel, 1 drinks a potion. The
-campfire stays the healer. Gold, potions and the upgrade go with the
-knight to the next level; a new run starts without them. Prices and
-effects are the table's `shop` group. The gold bench brings one knight to
+innkeeper sells a health potion and a mana draught, and the smith
+upgrades that last the run, through the dialogue panel: E talks, 1 to 4
+buy what the panel offers, each ware named with its effect. Outside the
+panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
+mana back, up to the knight's max - at today's 40 it refills the bar; a
+knight with full mana drinks none. The campfire stays the healer.
+
+The smith's upgrades have levels, I to III: the sharpened sword adds
+`shop.swordAtk` to the knight's attack and shows a brighter, wider blade
+edge; the reinforced shield lets `shop.shieldBlockedShare` of a blow
+through a held block instead of `knight.blockedShare`, a blow it stops
+costs `shop.shieldBlockMana` mana instead of `knight.blockMana`, and shows
+a lighter rim; the lighter harness makes a dash cost `shop.harnessDashMana`
+instead of `knight.dashMana`, the whirlwind's dash too; the balanced blade
+makes a whirlwind cost `shop.bladeWhirlMana`, its dash included, instead
+of `knight.whirlMana`. Each of these is a list with one entry per level.
+The perfect block's window is the same at every level. At each camp the
+smith sells one level, the next above the knight's in one of the four,
+for `shop.upgradePrice` of that level, and then nothing more there; the
+camp after depth d sells level L only once d reaches `shop.levelDepth`
+of L - level I from the first camp, II from the camp after depth 2, III
+from the one after depth 4. The knight reads its levels live, so in the
+dojo's fight scenario `eval player.swordLevel = 2` (or `shieldLevel`,
+`harnessLevel`, `bladeLevel`; 0 for none) applies one at once. Gold,
+potions, draughts and the levels go with the knight to the next level; a
+new run starts without them. In a session they are each knight's own,
+bought with its own gold. Prices and effects are the table's `shop`
+group. The gold bench brings one knight to
 a drop, to the innkeeper and the smith - it buys the sword, is refused the
-shield, and in the next run buys the shield, blocks a 20-attack blow and
+shield at that camp, and in the next run buys the shield, blocks a 20-attack blow and
 measures the drain - then a host and a joiner joined
 over LAN to three drops, one with both knights on it, and exits with the
 number of failed checks:
@@ -321,6 +334,28 @@ checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
+```
+
+At the camp the witch reads the next dungeon: where it sits in its depth's
+range - high, in the middle or low - and what lives there, how many
+enemies, how many of them tough and weak, how many guardians and
+spitters. She reads it off the run's seed, the next dungeon's position
+and the knights the party has, the way the dungeon is built
+(`Game.foretell`), so the dungeon the knights walk down into holds what
+she said; one more press of E per line. In a session every knight hears
+the same reading: the seed, the position and the knights are the host's.
+The camp bench, on the dojo's seed, takes one knight out of a dungeon
+three times - little, half and most of its HP lost - and checks the
+witch's reading against the dungeon it then walks into; buys a draught
+and drinks it in the next dungeon; buys the harness I at the first camp,
+is offered no harness II at the next, dashes with it two dungeons later
+and buys the harness II at the camp after depth 2; then a host and a
+joiner joined over LAN hear the same reading, buy on their own gold and
+find what she read on both screens. It exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camp/camp.qml
 ```
 
 A descent gauge under the minimap shows how deep the knight is: a shaft of
