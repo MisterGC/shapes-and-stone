@@ -7,7 +7,7 @@
 // enemiesPerKnight more enemies, within depth.enemiesCap, each with
 // hpPerKnight more of its HP. The rooms and everything laid on the floor
 // stay the same. For 1 knight the dungeon is today's: its fingerprint is
-// the one recorded below from the game before issue #102. A knight
+// the one recorded below, from the game with 9 to 12 rooms. A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -47,16 +47,16 @@ Window {
 
     function f3(v) { return Number(v).toFixed(3) }
 
-    // The dungeons the bench builds: dangers on the scenario seed, one
-    // with room for every knight's enemies and one where four knights
-    // reach the cap
+    // The dungeons the bench builds: dangers on the scenario seed; with
+    // the cap at 22 neither reaches it, four knights at 1.5 come to 21
     readonly property var dangers: [0.5, 1.5]
     readonly property var parties: [1, 2, 4]
-    // Today's dungeon for one knight, before issue #102: the fingerprint
-    // hash and enemy count at each danger, on the scenario seed
+    // Today's dungeon for one knight (9 to 12 rooms, 8 to 12 enemies at
+    // depth 0): the fingerprint hash and enemy count at each danger, on
+    // the scenario seed
     readonly property var today: ({
-        "0.5": { hash: "e480e841", enemies: 9 },
-        "1.5": { hash: "603ab0e5", enemies: 11 }
+        "0.5": { hash: "80de3f3c", enemies: 13 },
+        "1.5": { hash: "55091890", enemies: 15 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its

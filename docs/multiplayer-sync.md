@@ -227,7 +227,7 @@ joiner that the host had not had in the 300 ms before.
 processes of Clayground's live loader (`clayliveloader --instance host`
 and `--instance joiner`), each with the whole game, connected over Local
 or Cloud signaling and driven through the inspector protocol. The host
-starts the game on seed 424242. The host's knight goes to one enemy and
+starts the game on seed 2026. The host's knight goes to one enemy and
 the joiner's in sight of the enemy farthest from it. The joiner's knight
 answers that enemy (issue #17, below), and the bench checks that the host
 takes each answer and that the joiner then shows the host's HP. After

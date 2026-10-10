@@ -51,7 +51,7 @@ records are stamped with.
 
 Usage:
   run_sameworld.py [--loader <clayliveloader>] [--mode local|cloud]
-                   [--seed 424242] [--seconds 8] [--lag 300] [--slack 20]
+                   [--seed 2026] [--seconds 8] [--lag 300] [--slack 20]
                    [--tolerance 0.25] [--fault stale] [--json out.json]
                    [--dump records.json]
   run_sameworld.py --judge records.json [--late-ms 200]
@@ -789,7 +789,8 @@ def main():
     ap.add_argument("--loader", help="path to clayliveloader")
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
-    ap.add_argument("--seed", type=int, default=424242, help="the game's seed")
+    ap.add_argument("--seed", type=int, default=2026,
+                    help="the game's seed; its first dungeon has the lineup the script needs"))
     ap.add_argument("--seconds", type=float, default=8.0, help="how long the knights fight")
     ap.add_argument("--lag", type=int, default=300,
                     help="ms the joiner may show an id, HP or AI state after the host")
