@@ -507,8 +507,8 @@ doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
 from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
 cell. How many of a kind each room but the start room holds is the
 table's `dungeon.kinds`, per danger band as the looks have it. The kinds
-are `test`, a violet diamond that lies in no dungeon played, and the
-breakables below. In
+are `test`, a violet diamond that lies in no dungeon played, the
+breakables and the spike plates below. In
 the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
@@ -565,6 +565,49 @@ checks:
 
 ```
 python3 tests/breakparty/run_breakparty.py --mode local
+```
+
+A spike plate is a floor stone with small holes in it on its feature's
+cell (`src/SpikePlate.qml`), always the same, coloured by the dungeon's
+look; it does not block. A knight whose centre steps on it makes it
+click, and `dungeon.spikeDelay` seconds later its spikes rise: a knight
+still on it, and not dashing, takes `dungeon.spikeDamage` and
+`spikeDamagePerDepth` more a depth, never more than `spikeCap` of its
+max HP (`Game.spikeDamageAt`); no defence, shield or grace takes any of
+it. Then the plate stays sprung, bent spikes over a stain, and never
+fires again. The enemies walk over it. Alone the delay runs on the
+physics clock, so the dojo's pause holds it. In a session the knight's
+game that sets a plate off reports it and the moment its spikes rise on
+the session clock to the host, which keeps the plates set off in the
+level as the session property `sprung`; every other screen clicks and
+raises that plate at that moment, a player who joins later sees it
+sprung, and each game judges the spikes on its own knight alone. The
+spikes bench lands in the features scenario, checks its plates and that
+laying them out moved no other feature, stands an enemy on a plate,
+which stays armed, and the knight on another: it clicks, the spikes rise
+`spikeDelay` later and take what `spikeDamageAt` says, and the plate
+fires once. A knight that dashes at the click takes nothing; the damage
+stays under the cap from depth 0 to 60, and at depth 0, 3, 8 and 20 the
+spikes take that much. With an out dir and a window it saves
+`plates.png`, a plate armed beside one sprung, and `rising.png`, the
+spikes rising under the knight:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/spikes/spikes.qml
+qml -I build/bin/qml tests/spikes/spikes.qml -- <out dir>
+```
+
+The spike party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both lay
+the same plates; the joiner's knight stands on one, its own game takes
+the damage and the host's screen shows the plate sprung and the joiner's
+HP as the joiner's game has it; the same the other way round; a knight
+that dashes at the click takes nothing; two knights on one plate each
+take the damage once, and a plate stepped on again does nothing. It
+needs the live loader and exits with the number of failed checks:
+
+```
+python3 tests/spikeparty/run_spikeparty.py --mode local
 ```
 
 Enemy AI, knockback and the knight's dash and cooldowns count the time the

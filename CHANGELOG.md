@@ -10,6 +10,7 @@ uses [Semantic Versioning](https://semver.org/).
 
 - **Dungeon features:** after its rooms and corridors are carved, a dungeon lays out its features, each kind from its own stream of the seed, as many per room as its danger asks (`Balance.dungeon`), never in the start room, on a doorway or in a corridor, and clear of the entrance and the exit. No kind lies in a dungeon played yet; the dojo's `features` scenario shows a test kind.
 - **Breakables:** clay urns, wooden crates and barrels, and crystal clusters, glowing and rarer the shallower, stand in a dungeon's rooms and block the way like a small wall. A swing breaks the nearest in its arc, a charged swing and the whirlwind every one they reach; only a charged swing breaks a crystal. Each may hold gold by its kind (`Balance.dungeon.loot`), a crystal more often and more, the deeper the more; it drops where the thing stood. In a session the host rolls it, and a thing broken on one screen is broken on every screen.
+- **Spike plates:** a floor stone with small holes stands in some rooms, more often the higher the danger. Stepped on, it clicks, and 0.25 s later spikes rise (`Balance.dungeon.spikeDelay`): a knight still on it takes `spikeDamage`, more the deeper, never more than a quarter of its max HP; a dash at the click saves it. A plate fires once and stays sprung, bent spikes over a stain. Only knights set it off and take its damage; in a session it is sprung on every screen and each knight's own game judges the spikes on it.
 
 ## [0.2.2] - 2026-10-11
 
