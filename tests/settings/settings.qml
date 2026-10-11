@@ -15,7 +15,9 @@
 // whirlwind every heap within its reach. A right-click right after a swing
 // bashes: the enemy in front is shoved back for Balance.bash.mana, once a
 // swing, and not after the window. Q short of momentum whirls not, with all
-// of it it whirls and spends it; a fall loses it. Prints one PASS or FAIL
+// of it it whirls and spends it; a fall loses it. A grunt does not notice
+// the knight beyond Balance.enemy.sightRange, does within it, and gives up
+// a chase after giveUpAfter seconds out of sight. Prints one PASS or FAIL
 // line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/settings/settings.qml
@@ -309,6 +311,43 @@ Window {
             p.raiseShield()
             p.lowerShield()
             check(p.mana > p.maxMana - Balance.bash.mana, "a right-click after the window only raises the shield")
+            // Sight: a patrolling grunt does not notice the knight across a
+            // room beyond Balance.enemy.sightRange, does within it; chasing,
+            // it keeps on 3.5 s out of sight and gives up at giveUpAfter.
+            // The AI is stepped by hand, nothing else runs in between
+            let room = game.rooms.slice().sort((a, b) => b.w * b.h - a.w * a.h)[0]
+            let cs = game.cellSize
+            let g = game.enemies.find(x => !x.destroyed && x.enemyType === "grunt")
+            g.halted = false
+            g._knockT = 0
+            g.target = p
+            g.aiState = "patrol"
+            p.xWu = (room.x + room.w - 1.5) * cs
+            p.yWu = (room.y + room.h - 1.5) * cs
+            g.xWu = (room.x + 1.5) * cs
+            g.yWu = (room.y + 1.5) * cs
+            let d = Math.hypot(p.xWu - g.xWu, p.yWu - g.yWu)
+            let los = game.hasLineOfSight(g.xWu, g.yWu, p.xWu, p.yWu)
+            g.updateAI(0.1)
+            check(los && d > Balance.enemy.sightRange && g.aiState === "patrol",
+                  "a grunt " + d.toFixed(1) + " wu off, in sight, does not notice the knight (" + g.aiState + ")")
+            g.xWu = p.xWu - 3
+            g.yWu = p.yWu
+            g.updateAI(0.1)
+            check(g.aiState === "chase", "3 wu off it notices it and chases (" + g.aiState + ")")
+            // The knight out of sight: in the first room, far off
+            let r0 = game.rooms[0]
+            p.xWu = (r0.x + r0.w / 2) * cs
+            p.yWu = (r0.y + r0.h / 2) * cs
+            let hidden = !game.hasLineOfSight(g.xWu, g.yWu, p.xWu, p.yWu)
+            for (let t = 0; t < 3.5; t += 0.5) g.updateAI(0.5)
+            let still = g.aiState
+            g.updateAI(0.5)
+            check(hidden && still === "chase" && g.aiState === "patrol",
+                  "out of sight it chases on for 3.5 s (" + still + ") and gives up at "
+                  + Balance.enemy.giveUpAfter + " s (" + g.aiState + ")")
+            g.halted = true
+
             // Q through the game's keys: short of momentum nothing, with all
             // of it the whirlwind
             p.momentum = Balance.momentum.max - 1

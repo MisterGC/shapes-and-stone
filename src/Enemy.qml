@@ -161,6 +161,8 @@ PhysicsItem {
     property real _spawnXWu: 0
     property real _spawnYWu: 0
     property var _lastKnownTargetPos: null
+    // Seconds the chased knight has been out of sight (Balance.enemy.giveUpAfter)
+    property real _unseenT: 0
     property real _pathRecalcTimer: 0
 
     // Contact shadow: grounds the shape on the floor
@@ -597,9 +599,7 @@ PhysicsItem {
                     _recalcChasePath()
                     followPath.running = true
                 } else {
-                    console.log("[Enemy] Lost target, returning to patrol")
-                    aiState = "patrol"
-                    _setupPatrol()
+                    _giveUp()
                 }
             }
         }
@@ -793,10 +793,16 @@ PhysicsItem {
         let dy = target.yWu - yWu
         let dist = Math.sqrt(dx * dx + dy * dy)
         let canSee = gameWorld.hasLineOfSight(xWu, yWu, target.xWu, target.yWu)
+        if (canSee) {
+            _unseenT = 0
+            _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
+        } else {
+            _unseenT += dt
+        }
 
         switch (aiState) {
         case "patrol":
-            if (canSee) {
+            if (canSee && dist <= Balance.enemy.sightRange) {
                 console.log("[Enemy] Spotted player!")
                 aiState = "chase"
                 _recalcChasePath()
@@ -808,6 +814,10 @@ PhysicsItem {
             break
 
         case "chase":
+            if (_unseenT >= Balance.enemy.giveUpAfter) {
+                _giveUp()
+                break
+            }
             if (enemyType === "spitter") {
                 // Spitter transitions to kite when in range with LOS
                 if (canSee && dist < shootRange) {
@@ -825,7 +835,6 @@ PhysicsItem {
                     _dirToTargetY = dy / len
                     windUp(windUpDuration)
                 } else if (_pathRecalcTimer <= 0) {
-                    _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
                     _recalcChasePath()
                     _pathRecalcTimer = Balance.enemy.repathInterval
                 }
@@ -919,9 +928,21 @@ PhysicsItem {
         facingAngle += Math.max(-maxRot, Math.min(maxRot, diff))
     }
 
+    // The knight out of sight, the hunt is over: back to the patrol
+    function _giveUp() {
+        console.log("[Enemy] Lost target, returning to patrol")
+        aiState = "patrol"
+        _unseenT = 0
+        _setupPatrol()
+    }
+
+    // The chase heads for the knight while it is seen, else for where it
+    // was seen last
     function _recalcChasePath() {
         if (!target || !gameWorld) return
-        let path = gameWorld.findPath(xWu, yWu, target.xWu, target.yWu)
+        let goal = _unseenT > 0 && _lastKnownTargetPos ? _lastKnownTargetPos
+                                                       : Qt.point(target.xWu, target.yWu)
+        let path = gameWorld.findPath(xWu, yWu, goal.x, goal.y)
         if (path.length > 1) {
             // Skip first waypoint (our current cell)
             followPath.wpsWu = path.slice(1)
@@ -1119,6 +1140,8 @@ PhysicsItem {
         // Getting hit while patrolling triggers chase
         if (aiState === "patrol" && target) {
             console.log("[Enemy] Hit while patrolling — chasing attacker!")
+            _unseenT = 0
+            _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
             aiState = "chase"
             _recalcChasePath()
         }

@@ -313,6 +313,12 @@ QtObject {
         repathInterval: 1.0,
         // Patrol waypoints lie this far from the spawn point
         patrolRadius: 2,
+        // A patrolling enemy notices a knight it sees within sightRange wu.
+        // Chasing, one it cannot see it hunts where it saw it last, and
+        // gives up after giveUpAfter seconds unseen or there, back to its
+        // patrol: a room does not follow the knight through the dungeon
+        sightRange: 7.0,
+        giveUpAfter: 4.0,
         // Lunge: wind up backwards, then dash at the knight
         lungeRange: 2.0,
         windUpSpeed: 4.0,
