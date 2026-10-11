@@ -508,7 +508,8 @@ from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
 cell. How many of a kind each room but the start room holds is the
 table's `dungeon.kinds`, per danger band as the looks have it. The kinds
 are `test`, a violet diamond that lies in no dungeon played, the
-breakables and the spike plates below. In
+breakables, the spike plates and the arrow slits below; a slit stands
+only on a cell on the room's edge with a wall beside it. In
 the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
@@ -608,6 +609,65 @@ needs the live loader and exits with the number of failed checks:
 
 ```
 python3 tests/spikeparty/run_spikeparty.py --mode local
+```
+
+An arrow slit is a narrow dark opening in a stone frame, set into the
+wall beside its feature's cell on a room's edge (`src/ArrowSlit.qml`), and
+fires across the room along the cell's row or column to the wall facing
+it; its line never ends in a doorway. It fires on the beats of its rhythm,
+`dungeon.slitBeat` seconds each, from the table's `slitRhythms` - a
+single shot and a rest, "1 - 1 - pause", a volley of three, a stream and
+a hail of one a beat, the faster ones only at a higher danger. A room's
+second slit takes the first's rhythm half a turn later, so the two take
+turns. Before each shot a ring in the telegraph colour closes on the slit
+over `slitWarn` seconds and its opening glows, as an enemy's parry ring
+closes on it, and the ring flashes white as the arrow leaves. Every slit
+leaves a safe way past, and the generator checks it: a lane, the room's
+doorways joined by cells on no slit's line and under no breakable, or a
+gap, a rest in its rhythm longer than `slitGapMargin` times what a knight
+takes to walk over the line (`Game.slitGap`, `slitCrossTime`); a room
+with neither takes the band's first rhythm with a gap. An arrow
+(`src/Arrow.qml`) flies at `arrowSpeed` and hurts only knights: one in its
+line takes `arrowDamage`, `arrowDamagePerDepth` more a depth, never more
+than `arrowCap` of its max HP, less its defence (`Game.arrowDamageAt`), a
+blow with its knockback and grace. A held shield facing it stops it whole
+for the shield's mana, as it does a spitter's shot; a perfect block sends
+it back along its line to break on its slit; a dash passes through it, a
+volley too. The beats run on the trap clock: the session clock in a
+session (`Network.sessionTime`), so every screen fires the same arrow at
+the same moment, alone the physics clock, held by the dojo's pause. An
+arrow's flight is worked out from that clock, the same on every screen.
+Each game judges the arrows on its own knight and tells the others what
+became of one that hit, was blocked or sent back, which goes on their
+screens too. The slits bench lands in the features scenario, two slits a
+room: it checks each slit in its wall, on its line across its room, with
+a rhythm of its band, that laying them out moved no other feature and
+that a room's two take turns. A knight in a line, its back to the slit,
+sees it glow and is hit by the arrow of its beat for what
+`arrowDamageAt` says; facing it with the shield held it blocks the next;
+raised just before one, a perfect block sends it back to its slit; a
+dash across the line as an arrow passes takes nothing and the arrow flies
+on to the wall. Then it walks the slits of 50 seeds across the danger
+bands for a lane or a gap. With an out dir and a window it saves
+`glowing.png`, a slit winding up, and `firing.png`, its arrow just out:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/slits/slits.qml
+qml -I build/bin/qml tests/slits/slits.qml -- <out dir>
+```
+
+The slit party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both lay
+the same slits with the same rhythms, and for three seconds fire the same
+arrows, each due at the same session time and leaving within a frame or
+two of it on both screens; the joiner's knight stands in a line, its own
+game takes the arrow and the host's screen shows its HP and the arrow
+gone; its perfect block sends the next arrow back to the slit on both
+screens.
+It needs the live loader and exits with the number of failed checks:
+
+```
+python3 tests/slitparty/run_slitparty.py --mode local
 ```
 
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
