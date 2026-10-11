@@ -6,9 +6,11 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Turn the music and the sound down on their own, see what your knight carries at a glance, and fight by lantern light again. Built on Clayground v2026.9.
+## [0.2.2] - 2026-10-11
 
-**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser; it is deployed from main on every push.
+Fight for your whirlwind: blows that land earn the momentum Q spends, a shield bash follows a swing, and dungeons are darker, fuller and harder, their enemies staying in their rooms. Music and sound have their own volume, and the knight panel shows what you carry. Built on Clayground v2026.9.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser.
 
 ### Added
 
@@ -138,7 +140,8 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.2
 [0.2.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.1
 [0.2.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.0
 [0.1.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.1.0
