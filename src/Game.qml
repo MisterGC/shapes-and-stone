@@ -4969,7 +4969,7 @@ ClayWorld2d {
     }
     // The cells from (sx, sy) to (ex, ey) with a closed door as
     // doorPathCost cells more. GridPathfinder knows walkable or not, no
-    // cost (clayground#TBD): the way through the closed doors is taken
+    // cost (clayground#423): the way through the closed doors is taken
     // unless the way around them is no longer than it and their cost
     function _costPath(sx, sy, ex, ey) {
         let path = _cellPath(sx, sy, ex, ey, false)
