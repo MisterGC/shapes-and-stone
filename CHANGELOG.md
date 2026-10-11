@@ -30,6 +30,7 @@ Turn the music and the sound down on their own, see what your knight carries at 
 ### Fixed
 
 - In the browser the music of the camp, the dungeon and the title loops instead of falling silent after one pass. (3d67868)
+- In the browser the music plays at the remembered Music volume from the start, not at full until the volume is changed once. (0e20fcc)
 
 ## [0.2.1] - 2026-10-10
 
