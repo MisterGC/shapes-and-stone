@@ -11,7 +11,8 @@
 // door chases it; the door shut, the grunt stops at it, winds up with its
 // ring for Balance.dungeon.doorBash seconds and bursts it open, and the
 // bashed door stays open: E does nothing, it blocks no one, and the grunt
-// goes on through. Then it lays out the doors of 50 seeds across the
+// goes on through. A door shut behind a grunt that came through it is no
+// door it bashes. Then it lays out the doors of 50 seeds across the
 // danger bands: each on a doorway, never in the entrance's or the exit's
 // shaft, about doorShare of the doorways at its band, and the same twice
 // on the same seed and danger. With an out dir and a window it saves
@@ -76,6 +77,11 @@ Window {
     function along(d, k) { let u = into(d); return { x: d.cxWu + u.x * k, y: d.cyWu + u.y * k } }
     // How far the knight's centre is past door d's leaf, into the room
     function past(d) { let c = centre(), u = into(d); return (c.x - d.cxWu) * u.x + (c.y - d.cyWu) * u.y }
+    // The same for an enemy's centre
+    function pastOf(d, e) {
+        let u = into(d), x = e.xWu + e.widthWu / 2, y = e.yWu - e.heightWu / 2
+        return (x - d.cxWu) * u.x + (y - d.cyWu) * u.y
+    }
     function walkInto(d, sign) {
         let u = into(d)
         p().moveX = u.x * sign
@@ -89,8 +95,9 @@ Window {
     }
     // A door with two floor cells on each side along its axis, and a path
     // through it from its room's side when it is closed
-    function pickDoor() {
+    function pickDoor(not) {
         for (let d of game.doors) {
+            if (d === not) continue
             let ok = [-4, -2, 2, 4, 5].every(k => { let q = along(d, k); return walkable(q.x, q.y) })
             if (!ok) continue
             let a = along(d, 4), b = along(d, -4)
@@ -113,6 +120,10 @@ Window {
 
     property var door: null
     property var grunt: null
+    // A door shut behind a grunt that came through it, and what the grunt
+    // did after
+    property var behind: null
+    property var after: ({ states: [], bashed: false })
     // The grunt's bash: the physics steps it began and the door broke on,
     // the simulated seconds between and its ring each step of it
     property var bash: ({ started: -1, ended: -1, seconds: 0, ring: 0, samples: 0 })
@@ -226,6 +237,27 @@ Window {
             let a = along(door, 3), b = along(door, -3)
             check(game.hasLineOfSight(a.x, a.y, b.x, b.y), "the knight is seen through it")
             check(grunt.aiState !== "bash", "the grunt winds up at it no more (" + grunt.aiState + ")")
+            // A grunt chases the knight into a room through an open door
+            behind = pickDoor(door)
+            check(behind !== null, "another door with floor on both sides: " + (behind ? behind.cell : "none"))
+            game.useDoor(behind)
+            let k = along(behind, 4), g = along(behind, -2)
+            standAt(k.x, k.y)
+            game.spawnEnemy(g.x - 0.4, g.y + 0.4, 1, "grunt")
+            grunt = game.enemies[game.enemies.length - 1]
+        }],
+        // Through the doorway, past the leaf, the door shut behind it
+        [() => grunt.aiState === "chase" && pastOf(behind, grunt) > 0.7, () => {
+            check(game.useDoor(behind) && behind.shut, "the knight shuts the door behind the grunt, "
+                  + pastOf(behind, grunt).toFixed(2) + " wu past it")
+            followAfter.start()
+        }],
+        [2000, () => {
+            followAfter.enabled = false
+            check(after.states.indexOf("bash") < 0 && behind.doorState === "closed",
+                  "the grunt does not bash the door behind it: the door stays closed, the grunt "
+                  + after.states.join(" -> "))
+            grunt.halt()
         }],
     ].concat(seedSteps()).concat([
         [100, () => {
@@ -267,6 +299,18 @@ Window {
                 b.shot = true
                 bench.grab("bashing.png")
             }
+        }
+    }
+
+    // The grunt's states once the door is shut behind it, each step
+    Connections {
+        id: followAfter
+        target: bench.game ? bench.game.physics : null
+        enabled: false
+        function start() { enabled = true }
+        function onStepped() {
+            let st = bench.after.states, s = bench.grunt ? bench.grunt.aiState : ""
+            if (st[st.length - 1] !== s) st.push(s)
         }
     }
 

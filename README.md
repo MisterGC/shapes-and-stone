@@ -727,7 +727,9 @@ beside it; a closed door hides the knight from an enemy beyond it and an
 open one does not; a grunt that spots the knight through the open door
 chases it, and with the door shut stops at it, winds up with its ring for
 `doorBash` seconds and bursts it open, and E leaves the bashed door
-open. Then it lays out the doors of 50 seeds across the bands: each on a
+open; a grunt that comes through another door and has it shut behind it
+does not bash it, since a door closing has the enemies on the chase plan
+their paths anew. Then it lays out the doors of 50 seeds across the bands: each on a
 doorway and never in the entrance's or the exit's shaft, about
 `doorShare` of the doorways, the same twice on a seed and danger. With an
 out dir and a window it saves `closed.png`, `open.png`, `bashing.png`
