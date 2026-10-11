@@ -506,8 +506,9 @@ Every feature stands on a room's cell, never in the start room, on a
 doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
 from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
 cell. How many of a kind each room but the start room holds is the
-table's `dungeon.kinds`, per danger band as the looks have it. The only
-kind so far is `test`, a violet diamond that lies in no dungeon played. In
+table's `dungeon.kinds`, per danger band as the looks have it. The kinds
+are `test`, a violet diamond that lies in no dungeon played, and the
+breakables below. In
 the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
@@ -520,6 +521,50 @@ grid of 50 seeds for the rules; with an out dir and a window it saves
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/features/features.qml
 qml -I build/bin/qml tests/features/features.qml -- <out dir>
+```
+
+Clay urns, wooden crates and barrels and crystal clusters stand on their
+features' cells (`src/Breakable.qml`), coloured by the dungeon's look, the
+crystals glowing; a crystal is rarer the shallower. Each blocks the
+knights and the enemies like a small wall, a square of
+`dungeon.breakableSize` wu, not the shots, and casts no shadow; the
+enemies' paths go around it. A swing breaks the nearest one in its arc, a
+charged swing and the whirlwind every one they reach. Only a charged swing
+breaks a crystal: a swing glances off it with sparks, the whirlwind passes
+it. A broken thing may hold gold, by its kind's row in `dungeon.loot`: a
+chance, an amount from `gold[0]` to `gold[1]` and `perDepth` more a depth,
+a crystal more often and more than an urn or a crate. The roll comes from
+the level's seed and the thing's cell, whoever breaks it, and the gold
+drops where it stood, a drop as an enemy's. In a session a blow breaks the
+thing at once on the screen that dealt it; the host rolls its gold, spawns
+the drop and keeps the cells broken in the level as the session property
+`broken`, so every screen breaks it too, a player who joins later as well,
+and the drop is picked up once. The heaps of bones still break on the
+breaker's screen only, with no gold. The breakables bench walks the knight
+into a crate, breaks each kind with its swing, a swing's nearest of three
+urns and a charged swing's other two, three crates with the whirlwind,
+then every thing of the features scenario, and checks each drop against
+the table on the scenario seed and the gold of 40 seeds against the
+chances and ranges; with an out dir and a window it saves
+`breakables.png`, an urn, a crate, a barrel and a crystal whole, and
+`breaking.png`, a charged swing breaking them:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/breakables/breakables.qml
+qml -I build/bin/qml tests/breakables/breakables.qml -- <out dir>
+```
+
+The break party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both stand
+the same breakables; the joiner's knight breaks one that holds gold, and
+it must be gone on both screens with the same drop where it stood; both
+knights step onto the drop and one of them gets it; the host's knight
+breaks a crystal, gone on the joiner's screen too. It needs the live
+loader (`-DCLAYGROUND_WITH_TOOLS=ON`) and exits with the number of failed
+checks:
+
+```
+python3 tests/breakparty/run_breakparty.py --mode local
 ```
 
 Enemy AI, knockback and the knight's dash and cooldowns count the time the

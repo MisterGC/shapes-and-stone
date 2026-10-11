@@ -9,6 +9,7 @@ uses [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Dungeon features:** after its rooms and corridors are carved, a dungeon lays out its features, each kind from its own stream of the seed, as many per room as its danger asks (`Balance.dungeon`), never in the start room, on a doorway or in a corridor, and clear of the entrance and the exit. No kind lies in a dungeon played yet; the dojo's `features` scenario shows a test kind.
+- **Breakables:** clay urns, wooden crates and barrels, and crystal clusters, glowing and rarer the shallower, stand in a dungeon's rooms and block the way like a small wall. A swing breaks the nearest in its arc, a charged swing and the whirlwind every one they reach; only a charged swing breaks a crystal. Each may hold gold by its kind (`Balance.dungeon.loot`), a crystal more often and more, the deeper the more; it drops where the thing stood. In a session the host rolls it, and a thing broken on one screen is broken on every screen.
 
 ## [0.2.2] - 2026-10-11
 
