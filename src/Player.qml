@@ -708,6 +708,33 @@ PhysicsItem {
         return "hit"
     }
 
+    // An arrow from a slit met the knight (Game._stepSlits), coming from
+    // (fromX, fromY) along (alongX, alongY), y up. "dodged" by a dash under
+    // way, "ignored" when fallen or in the grace after a hit; a shield
+    // facing it takes it whole, as a spitter's shot: "perfect" when raised
+    // just before it (perfectGuard), which sends it back, else "blocked"
+    // at the shield's mana cost; otherwise amount lands as a blow
+    // (takeDamage): "hit"
+    function meetArrow(amount, fromX, fromY, alongX, alongY) {
+        if (fallen) return "ignored"
+        if (isDashing) return "dodged"
+        if (graceLeft > 0) return "ignored"
+        if (isBlocking && isShieldFacing(fromX, fromY, 0)) {
+            if (perfectGuard) return _perfectBlock(fromX, fromY, 0)
+            view.block()
+            acted("block")
+            if (gameWorld) {
+                let s = getShieldWorldPos()
+                gameWorld.playBlock()
+                gameWorld.impact("projectileDeflected", s.x, s.y, alongX, alongY)
+                gameWorld.countFight("block")
+            }
+            payBlock()
+            return "blocked"
+        }
+        return takeDamage(amount, fromX, fromY, 0, false, alongX, alongY)
+    }
+
     // Thrown back along the blow (takeDamage), knockback wu: a knockback
     // fades out step by step, so it covers its start speed
     // times the sum of its steps' shares of it

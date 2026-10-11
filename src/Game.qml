@@ -688,6 +688,7 @@ ClayWorld2d {
         }
         onStruckReported: (fromId, report) => {
             if (report.source === "shot") _endShot(report.id, report.result)
+            else if (report.source === "arrow") _arrowReported(report)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
     }
@@ -2132,6 +2133,7 @@ ClayWorld2d {
             world._pickUpGold()
             world._stepRevive()
             world._stepPlates()
+            world._stepSlits()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -3091,9 +3093,10 @@ ClayWorld2d {
     // or at the showcase counts, without touching the world. Each kind
     // draws from its own stream, the level's seed and the kind's name, and
     // ranks a room's cells by it whatever the other kinds took: it takes
-    // the first of them still free. So a kind added or retuned moves
-    // another only off a cell it takes first. kinds is Balance.dungeon's
-    // when left out
+    // the first of them still free (a slit one on the room's edge,
+    // _slitAim). So a kind added or retuned moves another only off a cell
+    // it takes first. kinds is Balance.dungeon's when left out. The slits
+    // get their rhythms last (_rhythmSlits)
     function planFeatures(levelSeed, band, showcase, kinds) {
         kinds = kinds || Balance.dungeon.kinds
         let out = []
@@ -3116,17 +3119,22 @@ ClayWorld2d {
                     let j = Math.floor(rand() * (i + 1))
                     let c = cells[i]; cells[i] = cells[j]; cells[j] = c
                 }
+                let picked = []
                 for (let c of cells) {
                     if (n <= 0) break
                     if (taken[c[1] * gridWidth + c[0]]) continue
+                    let aim = kind === "slit" ? _slitAim(c[0], c[1], room, picked) : {}
+                    if (!aim) continue
                     taken[c[1] * gridWidth + c[0]] = true
-                    out.push({ kind: kind, gx: c[0], gy: c[1],
-                               xWu: (c[0] + 0.5) * cellSize, yWu: (c[1] + 0.5) * cellSize })
+                    let f = Object.assign({ kind: kind, gx: c[0], gy: c[1],
+                                            xWu: (c[0] + 0.5) * cellSize, yWu: (c[1] + 0.5) * cellSize }, aim)
+                    out.push(f)
+                    picked.push(f)
                     n--
                 }
             }
         }
-        return out
+        return _rhythmSlits(out, levelSeed, band)
     }
     function _nameHash(name) {
         let h = 5381
@@ -3161,6 +3169,8 @@ ClayWorld2d {
         _brokenCells = []
         plates = []
         _sprungCells = ({})
+        slits = []
+        _clearArrows()
         let band = dangerBand(dangerPosition)
         for (let f of list) {
             let o = null
@@ -3172,6 +3182,8 @@ ClayWorld2d {
                 o = _placeBreakable(f, band)
             else if (f.kind === "spike")
                 o = _placePlate(f, band)
+            else if (f.kind === "slit")
+                o = _placeSlit(f, band)
             if (o) dungeonObjects.push(o)
         }
     }
@@ -3425,6 +3437,306 @@ ClayWorld2d {
     }
     readonly property var _sessionSprung: session.sprung
     on_SessionSprungChanged: _applySprung(_sessionSprung)
+
+    // --- Arrow slits (issue #125) ---
+    // A slit sits in the wall beside its feature's cell, on a room's edge,
+    // and fires across the room on the beats of its rhythm
+    // (Balance.dungeon.slit...). The beats are counted on the trap clock:
+    // the session clock in a session, so every screen fires the same arrow
+    // at the same moment, alone the physics clock, held by a pause. An
+    // arrow's flight is a function of that clock, the same on every screen
+    // too. Each game judges the arrows on its own knight alone
+    // (Player.meetArrow) and tells the others what became of one that hit,
+    // was blocked or sent back, which then goes on their screens as well
+    Component { id: slitComponent; ArrowSlit {} }
+    Component { id: arrowComponent; Arrow {} }
+    property var slits: []
+    property var arrows: []
+    // The knight's square and an arrow's thickness, wu, for the hits and
+    // the gaps
+    readonly property real knightSizeWu: 1.0
+    readonly property real arrowWidthWu: 0.2
+    // Seconds on the physics clock, the trap clock alone
+    property real _trapClock: 0
+    // The last beat the slits fired on, -1 before the first step
+    property int _slitBeat: -1
+    // What another node's knight did to an arrow not fired here yet, by id
+    property var _arrowFates: ({})
+    // An arrow left its slit on this screen, at the trap clock's moment at
+    // (s); this node's knight met one: result as Player.meetArrow's; one
+    // went: on the wall facing its slit ("wall"), on its slit, sent back
+    // ("slit"), or on a knight or a shield ("knight")
+    signal arrowFired(string id, string cell, real at)
+    signal arrowMet(string id, string result)
+    signal arrowEnded(string id, string where)
+
+    // Where a slit on cell (gx, gy) of room fires from, or null. The cell
+    // lies on the room's edge with a wall beside it - north, south, west
+    // or east, the first that fits - and the slit's line runs from it
+    // across the room to a wall, not a doorway, on no line of a slit
+    // picked in the room before. {dx, dy, cells}: the way it fires, y up,
+    // and the cells its line crosses
+    function _slitAim(gx, gy, room, picked) {
+        for (let n of [[0, 1], [0, -1], [-1, 0], [1, 0]]) {
+            if (!grid[gy + n[1]] || grid[gy + n[1]][gx + n[0]] !== cellWall) continue
+            let dx = -n[0], dy = -n[1], x = gx, y = gy, cells = 0
+            while (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) {
+                cells++
+                x += dx
+                y += dy
+            }
+            if (!grid[y] || grid[y][x] !== cellWall) continue
+            if (picked.some(p => dy === 0 ? p.dy === 0 && p.gy === gy : p.dx === 0 && p.gx === gx))
+                continue
+            return { dx: dx, dy: dy, cells: cells }
+        }
+        return null
+    }
+    // The cells of a slit's line, "gx,gy"
+    function slitLine(f) {
+        let out = []
+        for (let i = 0, x = f.gx, y = f.gy; i < f.cells; i++, x += f.dx, y += f.dy) out.push(x + "," + y)
+        return out
+    }
+    // The longest rest of a rhythm's beats a knight has to walk over a
+    // slit's line, s: the time between two arrows less the time one takes
+    // to pass a knight
+    function slitGap(beats) {
+        let t = Balance.dungeon, shots = []
+        beats.forEach((b, i) => { if (b === 1) shots.push(i) })
+        if (shots.length === 0) return Infinity
+        let longest = 0
+        for (let i = 0; i < shots.length; i++) {
+            let next = i + 1 < shots.length ? shots[i + 1] : shots[0] + beats.length
+            longest = Math.max(longest, next - shots[i])
+        }
+        return longest * t.slitBeat - (t.arrowLength + knightSizeWu) / t.arrowSpeed
+    }
+    // What a knight takes to walk over a line at its pace, s, and the gap
+    // a rhythm must leave for it
+    function slitCrossTime() { return (knightSizeWu + arrowWidthWu) / Balance.knight.moveSpeed }
+    function slitGapNeed() { return Balance.dungeon.slitGapMargin * slitCrossTime() }
+    // Whether room leaves a lane past its slits (group): its doorways - its
+    // cells beside a corridor - on none of their lines and under no
+    // breakable of list, and all of them joined by such cells
+    function slitLane(room, group, list) {
+        let blocked = {}
+        for (let f of group) for (let c of slitLine(f)) blocked[c] = true
+        for (let f of list) if (Balance.dungeon.loot[f.kind]) blocked[f.gx + "," + f.gy] = true
+        let inRoom = (x, y) => x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h
+        let doors = []
+        for (let gy = room.y; gy < room.y + room.h; gy++)
+            for (let gx = room.x; gx < room.x + room.w; gx++)
+                for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+                    if (grid[gy + n[1]] && grid[gy + n[1]][gx + n[0]] === cellHallway) {
+                        doors.push(gx + "," + gy)
+                        break
+                    }
+        if (doors.some(d => blocked[d])) return false
+        if (doors.length < 2) return true
+        let seen = {}, todo = [doors[0]]
+        seen[doors[0]] = true
+        while (todo.length > 0) {
+            let c = todo.pop().split(",").map(Number)
+            for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                let x = c[0] + n[0], y = c[1] + n[1], k = x + "," + y
+                if (!inRoom(x, y) || seen[k] || blocked[k]) continue
+                seen[k] = true
+                todo.push(k)
+            }
+        }
+        return doors.every(d => seen[d])
+    }
+    // The rhythms of the planned slits: a room's slits share one, drawn
+    // from the band's rhythms by the level's seed and the room's first
+    // slit, each started its share of a turn after the one before, so two
+    // take turns. A room that leaves no lane takes the band's first
+    // rhythm with a gap if the one drawn has none. Each slit gets rhythm,
+    // beats, offset and safe ("lane" or "gap")
+    function _rhythmSlits(list, levelSeed, band) {
+        let rhythms = Balance.dungeon.slitRhythms.filter(r => r.bands.indexOf(band) >= 0)
+        let byRoom = {}
+        for (let f of list) {
+            if (f.kind !== "slit") continue
+            let r = rooms.findIndex(m => f.gx >= m.x && f.gx < m.x + m.w && f.gy >= m.y && f.gy < m.y + m.h)
+            byRoom[r] = (byRoom[r] || []).concat([f])
+        }
+        for (let r in byRoom) {
+            let group = byRoom[r]
+            let rand = createRng(levelSeed ^ 0x1f83d9ab ^ (group[0].gy * gridWidth + group[0].gx))
+            let rhythm = rhythms[Math.floor(rand() * rhythms.length)]
+            let lane = slitLane(rooms[r], group, list)
+            if (!lane && slitGap(rhythm.beats) < slitGapNeed())
+                rhythm = rhythms.find(x => slitGap(x.beats) >= slitGapNeed()) || rhythm
+            let start = Math.floor(rand() * rhythm.beats.length)
+            group.forEach((f, i) => Object.assign(f, {
+                rhythm: rhythm.name, beats: rhythm.beats, safe: lane ? "lane" : "gap",
+                offset: start + Math.round(i * rhythm.beats.length / group.length) }))
+        }
+        return list
+    }
+
+    function _placeSlit(f, band) {
+        let s = slitComponent.createObject(world.room, {
+            cell: f.gx + "," + f.gy,
+            xWu: f.xWu - f.dx * cellSize / 2, yWu: f.yWu - f.dy * cellSize / 2,
+            dirX: f.dx, dirY: f.dy, lineWu: f.cells * cellSize,
+            rhythm: f.rhythm, beats: f.beats, offset: f.offset, band: band,
+            ringParent: glowParent(),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (s) slits.push(s)
+        return s
+    }
+    function slitAt(cell) {
+        return slits.find(s => s.cell === cell) || null
+    }
+    // The trap clock, s
+    function trapTime() { return session.connected ? session.now() / 1000 : _trapClock }
+    // Whether slit s fires on beat k of the trap clock
+    function slitFiresOn(s, k) {
+        let n = s.beats.length
+        return s.beats[((k + s.offset) % n + n) % n] === 1
+    }
+    // What an arrow deals at depth d to a knight of maxHp, before its
+    // defence: never more than arrowCap of its max HP
+    function arrowDamageAt(d, maxHp) {
+        let t = Balance.dungeon
+        return Math.min(Math.round(t.arrowDamage + t.arrowDamagePerDepth * Math.max(0, d)),
+                        Math.floor(t.arrowCap * maxHp))
+    }
+    // The shot's twang, fading with the distance from this knight
+    function _playArrow(xWu, yWu) {
+        let gain = remoteGain(xWu, yWu) / remoteMaxGain
+        if (gain > 0)
+            swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.slitShotPitch, 0.6 * gain)
+    }
+
+    // Each physics step: the slits fire on the beats passed since the step
+    // before, wind up for the next, and the arrows fly
+    function _stepSlits() {
+        if (levelType !== "dungeon" || slits.length === 0) return
+        _trapClock += world.physics.timeStep
+        let t = trapTime(), beat = Balance.dungeon.slitBeat
+        let k = Math.floor(t / beat)
+        // The first step, or the clock set back or far ahead (a session's
+        // clock syncing): no beats caught up
+        if (_slitBeat < 0 || k < _slitBeat || k - _slitBeat > 4) _slitBeat = k
+        for (let b = _slitBeat + 1; b <= k; b++)
+            for (let s of slits) if (slitFiresOn(s, b)) _fireArrow(s, b, b * beat)
+        _slitBeat = k
+        let warn = Balance.dungeon.slitWarn
+        for (let s of slits) {
+            let next = k + 1
+            while (!slitFiresOn(s, next) && next <= k + s.beats.length) next++
+            let left = next * beat - t
+            s.warn = left <= warn ? 1 - left / warn : 0
+            s.flash = t - s.shotAt >= 0 && t - s.shotAt < 0.08
+        }
+        for (let a of arrows.slice()) _flyArrow(a, t)
+    }
+    // Slit s fires: the arrow of beat b, leaving at the clock's moment at
+    function _fireArrow(s, b, at) {
+        let id = s.cell + "#" + b
+        let a = arrowComponent.createObject(glowParent(), {
+            arrowId: id, slit: s, dirX: s.dirX, dirY: s.dirY,
+            lengthWu: Balance.dungeon.arrowLength,
+            fromX: s.xWu, fromY: s.yWu, fromT: at, flightWu: s.lineWu,
+            xWu: s.xWu, yWu: s.yWu, lastX: s.xWu, lastY: s.yWu,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!a) return
+        arrows.push(a)
+        s.shotAt = at
+        _playArrow(s.xWu, s.yWu)
+        arrowFired(id, s.cell, at)
+        let fate = _arrowFates[id]
+        if (fate) {
+            delete _arrowFates[id]
+            _arrowFate(a, fate)
+        }
+    }
+    // Arrow a at the clock's moment t: on its way from its start, until it
+    // reaches the wall facing its slit, or its slit when sent back
+    function _flyArrow(a, t) {
+        let d = Math.max(0, Math.min(a.flightWu, Balance.dungeon.arrowSpeed * (t - a.fromT)))
+        a.lastX = a.xWu
+        a.lastY = a.yWu
+        a.xWu = a.fromX + a.dirX * d
+        a.yWu = a.fromY + a.dirY * d
+        let back = a.back
+        if (!a.judged) _judgeArrow(a, t)
+        if (a.back !== back) return
+        if (arrows.indexOf(a) >= 0 && d >= a.flightWu - 1e-6) _endArrow(a, a.back ? "slit" : "wall")
+    }
+    // Whether arrow a's shaft, swept since the step before, meets this
+    // node's knight; if so the knight's game judges it
+    function _judgeArrow(a, t) {
+        if (!player) return
+        let cx = player.xWu + player.widthWu / 2, cy = player.yWu - player.heightWu / 2
+        let hw = player.widthWu / 2 + arrowWidthWu / 2, hh = player.heightWu / 2 + arrowWidthWu / 2
+        let tx = a.lastX - a.dirX * a.lengthWu, ty = a.lastY - a.dirY * a.lengthWu
+        if (Math.max(tx, a.xWu) < cx - hw || Math.min(tx, a.xWu) > cx + hw
+                || Math.max(ty, a.yWu) < cy - hh || Math.min(ty, a.yWu) > cy + hh)
+            return
+        a.judged = true
+        // Where it comes from: on its line, two wu towards its slit
+        let fx = a.dirX !== 0 ? cx - a.dirX * 2 : a.xWu
+        let fy = a.dirY !== 0 ? cy - a.dirY * 2 : a.yWu
+        let result = player.meetArrow(arrowDamageAt(depth, player.maxHp), fx, fy, a.dirX, a.dirY)
+        console.log("[Game] Arrow", a.arrowId, "met the knight -", result)
+        arrowMet(a.arrowId, result)
+        if (result !== "hit" && result !== "blocked" && result !== "perfect") return
+        if (session.connected)
+            session.reportStruck({source: "arrow", id: a.arrowId, result: result,
+                                  x: a.xWu, y: a.yWu, at: t * 1000})
+        if (result === "perfect") _sendBack(a, a.xWu, a.yWu, t)
+        else _endArrow(a, "")
+    }
+    // A perfect block sends arrow a back to its slit from (x, y) at the
+    // clock's moment t; it hurts nobody on its way
+    function _sendBack(a, x, y, t) {
+        if (a.back) return
+        a.back = true
+        a.judged = true
+        a.fromX = x
+        a.fromY = y
+        a.fromT = t
+        a.flightWu = Math.abs(x - a.slit.xWu) + Math.abs(y - a.slit.yWu)
+        a.dirX = -a.dirX
+        a.dirY = -a.dirY
+    }
+    // Arrow a is gone: it broke on the wall facing its slit ("wall"), on
+    // its slit ("slit"), or on a knight or a shield ("")
+    function _endArrow(a, where) {
+        let i = arrows.indexOf(a)
+        if (i < 0) return
+        arrows.splice(i, 1)
+        if (where === "wall") spawnSparks(a.xWu, a.yWu, -a.dirX, -a.dirY, 3, "#C8B898")
+        else if (where === "slit") spawnSparks(a.xWu, a.yWu, -a.dirX, -a.dirY, 8, "#FFFFFF")
+        arrowEnded(a.arrowId, where === "" ? "knight" : where)
+        a.destroy()
+    }
+    // Another node's knight met an arrow: hit or blocked it is gone here
+    // too, sent back it flies back here too
+    function _arrowReported(r) {
+        if (levelType !== "dungeon") return
+        let a = arrows.find(x => x.arrowId === r.id)
+        if (a) _arrowFate(a, r)
+        else _arrowFates[r.id] = r
+    }
+    function _arrowFate(a, r) {
+        if (r.result === "perfect") _sendBack(a, r.x, r.y, r.at / 1000)
+        else _endArrow(a, "")
+    }
+    function _clearArrows() {
+        for (let a of arrows) {
+            try { a.destroy() } catch (err) {}
+        }
+        arrows = []
+        _arrowFates = {}
+        _slitBeat = -1
+    }
 
     function placeTorch(wx, wy, color) {
         let t = torchComponent.createObject(glowParent(), {
@@ -3881,6 +4193,8 @@ ClayWorld2d {
         _brokenCells = []
         plates = []
         _sprungCells = ({})
+        slits = []
+        _clearArrows()
         bonePiles = []
         torches = []
         stains = []

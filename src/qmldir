@@ -14,6 +14,8 @@ Stain 1.0 Stain.qml
 Debris 1.0 Debris.qml
 Breakable 1.0 Breakable.qml
 SpikePlate 1.0 SpikePlate.qml
+ArrowSlit 1.0 ArrowSlit.qml
+Arrow 1.0 Arrow.qml
 GoldDrop 1.0 GoldDrop.qml
 BodyShade 1.0 BodyShade.qml
 ExitStairs 1.0 ExitStairs.qml

@@ -55,6 +55,8 @@ clay_app(shapes_and_stone
         src/Debris.qml
         src/Breakable.qml
         src/SpikePlate.qml
+        src/ArrowSlit.qml
+        src/Arrow.qml
         src/GoldDrop.qml
         src/BodyShade.qml
         src/ExitStairs.qml

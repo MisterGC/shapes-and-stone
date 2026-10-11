@@ -473,7 +473,8 @@ QtObject {
     // stands in for the kinds to come and lies in no dungeon played. The
     // breakables: a clay "urn", a wooden "crate" (or barrel) and a
     // "crystal" cluster, rarer the shallower; then the traps: a "spike"
-    // plate, more often the higher the danger
+    // plate, more often the higher the danger, and an arrow "slit" in a
+    // room's wall, the more and the faster the higher the danger
     readonly property var dungeon: ({
         clearOfEntrance: 8,
         clearOfExit: 8,
@@ -482,7 +483,8 @@ QtObject {
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
             crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
-            spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 }
+            spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 },
+            slit: { perRoom: [0.25, 0.5, 0.9], showcase: 2 }
         },
         // A breakable blocks like a small wall: a square of sizeWu on its
         // cell's centre. A swing breaks the nearest one in its arc, a
@@ -513,7 +515,46 @@ QtObject {
         spikeDamagePerDepth: 3,
         spikeCap: 0.25,
         spikeClickPitch: -9,
-        spikeRisePitch: 9
+        spikeRisePitch: 9,
+        // An arrow slit sits in the wall beside its feature's cell, a room
+        // cell on the room's edge, and fires across the room along its
+        // row or column to the wall facing it. It fires on the beats of
+        // its rhythm, slitBeat seconds each, counted on the session clock
+        // (alone on the physics clock), so every screen fires the same
+        // arrow at the same moment. Before each shot it glows: a ring in
+        // slitGlowColor closes on it over slitWarn seconds, as an enemy's
+        // parry ring does, and flashes as the arrow leaves.
+        // slitRhythms: beats, 1 a shot and 0 a rest, and the danger bands
+        // a rhythm is drawn at. A room's second slit takes the first's
+        // rhythm half a turn later: the two take turns. Every slit leaves
+        // a safe way past: a lane, the room's doorways joined by cells no
+        // arrow crosses, or a gap, a rest in its rhythm long enough for a
+        // knight to walk over its line, slitGapMargin times what that
+        // takes (Game.slitCrossTime); a room with neither takes the band's
+        // first rhythm with one. An arrow is arrowLength wu long and flies
+        // at arrowSpeed; it hurts only knights: arrowDamage and
+        // arrowDamagePerDepth more a depth, never more than arrowCap of
+        // the knight's max HP, less its defence. A held shield facing it
+        // stops it whole, at the shield's mana cost; a perfect block sends
+        // it back to its slit; a dash passes through it. slitShotPitch is
+        // the shot's note, in semitones off the swing's sample
+        slitBeat: 0.3,
+        slitWarn: 0.45,
+        slitGlowColor: "#FF8C00",
+        slitRhythms: [
+            { name: "single", beats: [1, 0, 0, 0, 0], bands: [0, 1, 2] },
+            { name: "double", beats: [1, 0, 1, 0, 0, 0, 0], bands: [0, 1, 2] },
+            { name: "volley", beats: [1, 1, 1, 0, 0, 0, 0, 0], bands: [1, 2] },
+            { name: "stream", beats: [1, 0], bands: [2] },
+            { name: "hail", beats: [1], bands: [2] }
+        ],
+        slitGapMargin: 1.5,
+        arrowLength: 0.8,
+        arrowSpeed: 12,
+        arrowDamage: 12,
+        arrowDamagePerDepth: 2,
+        arrowCap: 0.2,
+        slitShotPitch: 7
     })
 
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
