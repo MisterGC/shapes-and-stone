@@ -500,7 +500,8 @@ python3 tests/dangerparty/run_dangerparty.py --mode local [--shots <out dir>]
 A dungeon's features - what the knights read, use, find or break - are
 laid out once its rooms and corridors are carved (`Game.planFeatures`),
 each kind from its own stream of the level's seed and its name, so the
-rooms, the enemies, the torches and the debris stay as the seed has them.
+rooms, the enemies, the torches and the debris stay as the seed has them,
+and a kind added or retuned moves another only off a cell it takes first.
 Every feature stands on a room's cell, never in the start room, on a
 doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
 from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
@@ -511,7 +512,8 @@ the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
 checks that the scenario shows the test kind, that a seed and danger place
-the same features twice and the scenario seed's as recorded, and walks the
+the same features twice and the scenario seed's as recorded, that a kind
+laid out before the test kind moves it only off the cells it takes, and walks the
 grid of 50 seeds for the rules; with an out dir and a window it saves
 `features.png`:
 
