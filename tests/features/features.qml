@@ -57,7 +57,7 @@ Window {
 
     // The features scenario on the scenario seed at danger 0: the
     // fingerprint of its features, recorded from this build
-    readonly property string recorded: "2082daac"
+    readonly property string recorded: "95c2cf41"
     readonly property int seeds: 50
 
     function kinds() { return Object.keys(Balance.dungeon.kinds) }
@@ -100,13 +100,16 @@ Window {
     }
     // The free cells of room r a slit may stand on: on the room's edge,
     // a wall beside it, and a room's row or column from it to a wall
-    // across the room
-    function slitCells(r) {
+    // across the room, not the row or column of one of slits already
+    // firing along it
+    function slitCells(r, slits) {
         let room = game.rooms[r], g = game.grid
         return freeCells(r).filter(c => {
             let p = c.split(",").map(Number)
             return [[0, 1], [0, -1], [-1, 0], [1, 0]].some(n => {
                 if (!g[p[1] + n[1]] || g[p[1] + n[1]][p[0] + n[0]] !== game.cellWall) return false
+                if ((slits || []).some(s => n[1] === 0 ? s.dy === 0 && s.gy === p[1] : s.dx === 0 && s.gx === p[0]))
+                    return false
                 let x = p[0], y = p[1]
                 while (roomOf(x, y) === r) { x -= n[0]; y -= n[1] }
                 return g[y] !== undefined && g[y][x] === game.cellWall
@@ -130,7 +133,8 @@ Window {
         }
         // Each room asks showcase of each kind (whole numbers), or every
         // cell it has free if fewer; a slit only where a free cell on the
-        // room's edge is left that fires across it (slitCells)
+        // room's edge is left that fires across it, off the room's other
+        // slits' lines (slitCells)
         let asked = 0
         for (let k of kinds()) asked += Balance.dungeon.kinds[k].showcase
         for (let r = 1; r < game.rooms.length; r++) {
@@ -138,7 +142,7 @@ Window {
             let here = game.features.filter(f => roomOf(f.gx, f.gy) === r)
             let got = here.length
             let slitsShort = Balance.dungeon.kinds.slit.showcase - here.filter(f => f.kind === "slit").length
-            let edgeLeft = slitCells(r).filter(c => !here.some(f => f.gx + "," + f.gy === c)).length
+            let edgeLeft = slitCells(r, here.filter(f => f.kind === "slit")).filter(c => !here.some(f => f.gx + "," + f.gy === c)).length
             if (got !== want && !(slitsShort > 0 && got + slitsShort === want && edgeLeft < slitsShort))
                 short.push("seed " + seed + " room " + r + " holds " + got + ", asked " + want)
         }

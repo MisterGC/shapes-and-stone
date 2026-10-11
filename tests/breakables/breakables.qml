@@ -60,7 +60,7 @@ Window {
 
     // The gold every breakable of the features scenario on its seed drops,
     // in the order of its features, recorded from this build
-    readonly property string recorded: "de0818ab"
+    readonly property string recorded: "daa64aac"
     readonly property int seeds: 40
     readonly property var kinds: ["urn", "crate", "crystal"]
 

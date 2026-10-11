@@ -2679,6 +2679,9 @@ ClayWorld2d {
         // Step 4: Add entrance (south) and exit (north)
         addEntranceAndExit()
 
+        // Step 4b: Close loops with corridors off the chain
+        addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[dangerBand(dangerPosition)])
+
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
         placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
@@ -2864,6 +2867,99 @@ ClayWorld2d {
             // Carve L-shaped hallway
             carveHallway(ax, ay, bx, by)
         }
+    }
+
+    // The corridors off the chain (addLoops): [{a, b, cells}], a and b the
+    // rooms' indices, cells the [gx, gy] it carved out of the rock
+    property var loopCorridors: []
+
+    // count more corridors, each between two rooms close but not
+    // neighbours in the chain, so the dungeon has loops. rand is their own
+    // stream of the level's seed, so the rooms, the enemies and the
+    // witch's reading stay as the seed has them. Each pick is one of the
+    // dungeon.loopChoice closest pairs left (the gap between the rooms, in
+    // cells), carved L-shaped centre to centre as the chain's are, the
+    // stream choosing which leg comes first. A corridor is taken only if
+    // each of its cells outside its two rooms lies in no third room nor
+    // beside one, beside its own two only where it steps into them, not on
+    // or beside the entrance's or the exit's shaft, and it carves at least
+    // one new cell; else its other leg is tried, then the next pair. Fewer
+    // than count only when no pair is left
+    function addLoops(rand, count) {
+        loopCorridors = []
+        let n = rooms.length
+        let inRoom = (r, gx, gy) => gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h
+        let centre = r => [Math.floor(r.x + r.w / 2), Math.floor(r.y + r.h / 2)]
+        let start = rooms[0], end = rooms[n - 1]
+        let shaft = (gx, gy) => (Math.abs(gx - entranceGridX) <= 1 && gy < start.y)
+                                || (Math.abs(gx - exitGridX) <= 1 && gy >= end.y + end.h)
+        let pairs = []
+        for (let i = 0; i < n; i++)
+            for (let j = i + 2; j < n; j++) {
+                let a = rooms[i], b = rooms[j]
+                let gap = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w))
+                        + Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h))
+                pairs.push({ a: i, b: j, gap: gap })
+            }
+        pairs.sort((p, q) => p.gap - q.gap || p.a - q.a || p.b - q.b)
+
+        let beside = (r, c) => {
+            let inX = c[0] >= r.x && c[0] < r.x + r.w, inY = c[1] >= r.y && c[1] < r.y + r.h
+            let nearX = c[0] >= r.x - 1 && c[0] <= r.x + r.w, nearY = c[1] >= r.y - 1 && c[1] <= r.y + r.h
+            return nearX && nearY && (inX || inY)
+        }
+        let clear = (path, p) => {
+            let fresh = 0
+            for (let i = 0; i < path.length; i++) {
+                let c = path[i]
+                if (inRoom(rooms[p.a], c[0], c[1]) || inRoom(rooms[p.b], c[0], c[1])) continue
+                if (shaft(c[0], c[1])) return -1
+                for (let k = 0; k < n; k++) {
+                    if (!beside(rooms[k], c)) continue
+                    // Its own two rooms only where it steps in or out,
+                    // never along their walls
+                    let step = (k === p.a || k === p.b)
+                        && [path[i - 1], path[i + 1]].some(q => q && inRoom(rooms[k], q[0], q[1]))
+                    if (!step) return -1
+                }
+                if (grid[c[1]][c[0]] === cellWall) fresh++
+            }
+            return fresh
+        }
+
+        while (loopCorridors.length < count && pairs.length > 0) {
+            let pick = Math.floor(rand() * Math.min(Balance.dungeon.loopChoice, pairs.length))
+            let p = pairs.splice(pick, 1)[0]
+            let ca = centre(rooms[p.a]), cb = centre(rooms[p.b])
+            let flip = rand() < 0.5
+            for (let first of [flip, !flip]) {
+                let path = lPath(ca[0], ca[1], cb[0], cb[1], first)
+                if (clear(path, p) <= 0) continue
+                let cells = path.filter(c => grid[c[1]][c[0]] === cellWall)
+                for (let c of cells) grid[c[1]][c[0]] = cellHallway
+                loopCorridors.push({ a: p.a, b: p.b, cells: cells })
+                break
+            }
+        }
+        console.log("[Game] Closed", loopCorridors.length, "loops of", count)
+    }
+
+    // The cells of an L from (x1, y1) to (x2, y2), both ends in: along x
+    // first when acrossFirst, else along y first
+    function lPath(x1, y1, x2, y2, acrossFirst) {
+        let out = []
+        let mx = acrossFirst ? x2 : x1, my = acrossFirst ? y1 : y2
+        let walk = (fx, fy, tx, ty) => {
+            let dx = Math.sign(tx - fx), dy = Math.sign(ty - fy)
+            for (let x = fx, y = fy; ; x += dx, y += dy) {
+                out.push([x, y])
+                if (x === tx && y === ty) break
+            }
+        }
+        walk(x1, y1, mx, my)
+        out.pop()
+        walk(mx, my, x2, y2)
+        return out
     }
 
     function carveHallway(x1, y1, x2, y2) {

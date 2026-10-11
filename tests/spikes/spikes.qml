@@ -5,9 +5,10 @@
 // Lands in the dojo's features scenario, where every room but the first
 // holds a plate, and stills the enemies. Checks that the scenario shows
 // its plates, armed, each on a spike feature's cell, and that laying them
-// out moved none of the other features. With an out dir and a window it
-// saves plates.png, a plate armed and one sprung beside the knight. Then
-// an enemy stands on a plate, which stays armed; the knight stands on
+// out moved another feature only off a cell a plate took. With an out
+// dir and a window it saves plates.png, a plate armed and one sprung
+// beside the knight. Then an enemy stands on a plate, which stays
+// armed; the knight stands on
 // another: it clicks, the knight's HP stays until spikeDelay later, when
 // the spikes rise and take spikeDamageAt(depth) - rising.png is saved
 // then - and the plate stays sprung through a second's standing, a step
@@ -153,14 +154,20 @@ Window {
             check(plates.every(q => spikes.some(f => f.xWu === q.xWu && f.yWu === q.yWu
                                                 && game.featureCellOk(f.gx, f.gy))),
                   "each stands on its feature's cell, a room's, off any doorway and corridor")
-            // Laid out last, the plates moved no other feature
+            // The plates moved another feature only off a cell a plate took
             let ls = game.deriveSeed(game.masterSeed, game.levelIndex)
             let kinds = Object.assign({}, Balance.dungeon.kinds)
             delete kinds.spike
             let without = lines(game.planFeatures(ls, 0, true, kinds))
             let others = lines(game.features.filter(f => f.kind !== "spike"))
-            check(JSON.stringify(without) === JSON.stringify(others),
-                  "laying out the plates moved none of the " + others.length + " other features")
+            let plateCells = spikes.map(f => f.gx + ":" + f.gy)
+            let moved = without.filter(l => others.indexOf(l) < 0)
+            let pushed = moved.filter(l => plateCells.indexOf(l.split(":").slice(1).join(":")) >= 0)
+            check(others.length === without.length && moved.length === pushed.length,
+                  "laying out the plates moved " + moved.length + " of the " + others.length
+                  + " other features, each off a cell a plate took"
+                  + (moved.length !== pushed.length ? "; " + (moved.length - pushed.length)
+                                                      + " moved off a cell left free" : ""))
             if (outDir === "") return
             // In the start room: an armed plate left of the knight, a
             // sprung one right of it

@@ -476,6 +476,14 @@ QtObject {
     // plate, more often the higher the danger, and an arrow "slit" in a
     // room's wall, the more and the faster the higher the danger
     readonly property var dungeon: ({
+        // Loops: the rooms are joined in a chain, and extraCorridors more
+        // corridors at low, middle and high danger (as danger.looks) join
+        // two rooms close but not neighbours in it, so a dungeon has ways
+        // around. Each is drawn from the loopChoice closest pairs left; one
+        // that would cut through or open into a third room, or run into
+        // the entrance's or the exit's shaft, is passed over
+        extraCorridors: [1, 2, 3],
+        loopChoice: 3,
         clearOfEntrance: 8,
         clearOfExit: 8,
         kinds: {
