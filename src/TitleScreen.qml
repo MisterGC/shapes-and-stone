@@ -33,7 +33,7 @@ Item {
     LoopMusic {
         id: titleMusic
         source: "assets/title_music.mp3"
-        volume: muted ? 0 : 0.4 * musicVolume
+        level: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
     // A browser refuses to play before the first key press or click, and the

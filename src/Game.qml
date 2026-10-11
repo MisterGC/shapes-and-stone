@@ -65,28 +65,28 @@ ClayWorld2d {
     LoopMusic {
         id: dungeonAmbience
         source: "assets/dungeon_ambience.mp3"
-        volume: muted ? 0 : 0.4 * musicVolume
+        level: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
 
     LoopMusic {
         id: dungeonMusic
         source: "assets/dungeon_music.mp3"
-        volume: muted ? 0 : 0.3 * musicVolume
+        level: muted ? 0 : 0.3 * musicVolume
         loop: true
     }
 
     LoopMusic {
         id: villageAmbience
         source: "assets/village_ambience.mp3"
-        volume: muted ? 0 : 0.4 * musicVolume
+        level: muted ? 0 : 0.4 * musicVolume
         loop: true
     }
 
     LoopMusic {
         id: villageMusic
         source: "assets/village_music.mp3"
-        volume: muted ? 0 : 0.35 * musicVolume
+        level: muted ? 0 : 0.35 * musicVolume
         loop: true
     }
 
