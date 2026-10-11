@@ -765,6 +765,18 @@ with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
 ```
 
+A full hit stop steps the world by 0 s, and a blow can land inside it: a
+knockback sums its steps to find its start speed, and on a zero step it
+sums them on a normal step of 1/60 s instead, so it is as far as ever and
+the game goes on. The hit stop bench throws the knight back and an enemy
+off the shield on a normal single step, then again inside a full hit
+stop, checks the speeds match, the stop holds both knockbacks and they
+run out after it, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/hitstop/hitstop.qml
+```
+
 Every enemy attack can be read and answered. An attack runs on the physics
 steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`

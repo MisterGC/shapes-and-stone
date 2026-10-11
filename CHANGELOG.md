@@ -19,6 +19,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 - **Enemy paths** come from Clayground's `GridPathfinder` instead of the game's own A*, the same paths as before; a closed door counts as a few cells more, so an enemy takes a short way around one when there is one.
 
+### Fixed
+
+- **A blow during a hit stop froze the game:** a knight hit or an enemy thrown off the shield while a hit stop held the physics hung the game at full CPU, since v0.2.0. The knockback now lands as far as on any other step and the game goes on.
+
 ## [0.2.2] - 2026-10-11
 
 Fight for your whirlwind: blows that land earn the momentum Q spends, a shield bash follows a swing, and dungeons are darker, fuller and harder, their enemies staying in their rooms. Music and sound have their own volume, and the knight panel shows what you carry. Built on Clayground v2026.9.
