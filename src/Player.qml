@@ -749,7 +749,9 @@ PhysicsItem {
         }
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
-        let dt = player.world.timeStep, per = 0
+        // A hit stop steps the world by 0 s (issue #138): the sum runs on
+        // a normal step then, or it never ends
+        let dt = player.world.timeStep > 0 ? player.world.timeStep : 1 / 60, per = 0
         for (let t = k.knockbackDuration; t > 1e-9; t -= dt) per += t / k.knockbackDuration * dt
         let speed = knockback / per
         _knockVx = dx / len * speed

@@ -1049,7 +1049,9 @@ PhysicsItem {
     // covers speed times the sum of its steps' shares of the speed
     function recoil(knight) {
         if (Balance.block.recoil <= 0) return
-        let dt = world.timeStep, per = 0
+        // A hit stop steps the world by 0 s (issue #138): the sum runs on
+        // a normal step then, or it never ends
+        let dt = world.timeStep > 0 ? world.timeStep : 1 / 60, per = 0
         for (let t = knockDuration; t > 1e-9; t -= dt) per += t / knockDuration * dt
         shove(xWu - knight.xWu, yWu - knight.yWu, Balance.block.recoil / per)
     }
