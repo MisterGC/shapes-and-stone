@@ -135,11 +135,12 @@ PhysicsItem {
     property real _ringStep: 1 / 60
     readonly property bool ringShows: aiState === "telegraph" || aiState === "crush"
                                       || aiState === "shoot" || aiState === "lunge"
+                                      || aiState === "bash"
     readonly property color ringColor: parryWindow ? Balance.parryRing.flashColor
         : crushing ? Balance.crush.ringColor
         : enemyType === "spitter" ? "#F2D13A" : "#FF8C00"
     // Seconds of a lunge after its first step until the parry window opens
-    readonly property real _ringLunge: aiState === "shoot" ? 0
+    readonly property real _ringLunge: aiState === "shoot" || aiState === "bash" ? 0
         : Math.max(0, lungeStepCount(_ringStep) - 1 - Balance.enemy.parryFrames) * _ringStep
     readonly property real ringProgress: {
         if (!ringShows) return 0
@@ -321,7 +322,7 @@ PhysicsItem {
 
     // Squash on a hit, crouch while winding up, stretch into the lunge
     property real _poseScale: !_fx ? 1
-        : aiState === "telegraph" || aiState === "crush" || aiState === "shoot" ? 0.8
+        : aiState === "telegraph" || aiState === "crush" || aiState === "shoot" || aiState === "bash" ? 0.8
         : aiState === "lunge" ? 1.15 : 1
     Behavior on _poseScale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
     property real _squash: 1
@@ -563,7 +564,7 @@ PhysicsItem {
         }
         // A wind-up starts the parry ring: its length where the AI runs, a
         // count of steps where it is shown
-        if (aiState === "telegraph" || aiState === "crush" || aiState === "shoot") {
+        if (aiState === "telegraph" || aiState === "crush" || aiState === "shoot" || aiState === "bash") {
             if (world && world.timeStep > 0) _ringStep = world.timeStep
             if (remote) _ringT = 0
             else windUpLength = _attackTimer
@@ -694,8 +695,36 @@ PhysicsItem {
         case "lunge":
             _stepLunge()
             break
+        case "bash":
+            // Opened meanwhile, or wound up: through it, on the chase
+            if (!gameWorld.doorShut(_bashCell)) _endBash()
+            else if (_attackTimer <= 0) {
+                gameWorld.bashDoor(_bashCell)
+                _endBash()
+            }
+            break
         }
     }
+
+    // A closed door on its way (issue #127): it stands, winds up
+    // Balance.dungeon.doorBash seconds with the ring and bursts it open
+    property string _bashCell: ""
+    function _startBash(cell) {
+        _bashCell = cell
+        _attackTimer = Balance.dungeon.doorBash
+        body.linearVelocity = Qt.point(0, 0)
+        aiState = "bash"
+    }
+    // The chase goes on through the door, with time again to find the
+    // knight behind it
+    function _endBash() {
+        _bashCell = ""
+        _unseenT = 0
+        _recalcChasePath()
+        aiState = "chase"
+    }
+    // The waypoints it walks to, for the game to find a door on them
+    function pathAhead() { return followPath.wpsWu }
 
     function _startLunge() {
         if (!target) {
@@ -761,7 +790,7 @@ PhysicsItem {
         targetId = ""
         parryWindow = false
         _attackTimer = 0
-        if (["telegraph", "crush", "lunge", "shoot", "chase", "kite"].indexOf(aiState) >= 0) {
+        if (["telegraph", "crush", "lunge", "shoot", "chase", "kite", "bash"].indexOf(aiState) >= 0) {
             aiState = "patrol"
             followPath.running = false
             followPath.wpsWu = []
@@ -776,7 +805,7 @@ PhysicsItem {
         // attack under way stays on the knight it wound up against
         if (gameWorld && gameWorld.enemiesChooseTarget
             && aiState !== "telegraph" && aiState !== "crush" && aiState !== "lunge"
-            && aiState !== "shoot") {
+            && aiState !== "shoot" && aiState !== "bash") {
             target = gameWorld.nearestKnight(xWu, yWu)
             targetId = gameWorld.knightIdOf(target)
         }
@@ -817,6 +846,13 @@ PhysicsItem {
             if (_unseenT >= Balance.enemy.giveUpAfter) {
                 _giveUp()
                 break
+            }
+            {
+                let door = gameWorld.closedDoorAhead ? gameWorld.closedDoorAhead(enemy) : ""
+                if (door !== "") {
+                    _startBash(door)
+                    break
+                }
             }
             if (enemyType === "spitter") {
                 // Spitter transitions to kite when in range with LOS
@@ -878,7 +914,9 @@ PhysicsItem {
             break
 
         case "shoot":
-            // Holds still while the shot winds up; _stepAttack fires it
+        case "bash":
+            // Holds still while the shot or the bash winds up; _stepAttack
+            // fires it
             body.linearVelocity = Qt.point(0, 0)
             break
 

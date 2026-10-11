@@ -682,6 +682,7 @@ ClayWorld2d {
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
         onBreakReported: (level, cell) => _hostBreak(level, cell)
         onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
+        onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -1345,15 +1346,20 @@ ClayWorld2d {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
             } else if (player) {
-                // Find nearby NPC to interact with
+                // Find nearby NPC to interact with, else a door
                 let items = world.room.children
+                let talked = false
                 for (let i = 0; i < items.length; i++) {
                     let npc = items[i]
                     if (npc.objectName === "npc" && npc.nearbyPlayer) {
                         npc.interact()
+                        talked = true
                         break
                     }
                 }
+                if (!talked && !fallen)
+                    useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
+                                        Balance.dungeon.doorReach))
             }
             event.accepted = true
             return
@@ -2135,6 +2141,7 @@ ClayWorld2d {
             world._stepRevive()
             world._stepPlates()
             world._stepSlits()
+            world._stepDoors()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -2689,6 +2696,7 @@ ClayWorld2d {
         placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
         placeFeatures(planFeatures(levelSeed, dangerBand(dangerPosition), featureShowcase))
+        placeDoors(planDoors(levelSeed, dangerBand(dangerPosition), featureShowcase))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -2726,6 +2734,7 @@ ClayWorld2d {
         // it set off, for a node that joins late
         _applyBroken(_sessionBroken)
         _applySprung(_sessionSprung)
+        _applyDoors(_sessionDoors)
 
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
@@ -3838,6 +3847,215 @@ ClayWorld2d {
         _slitBeat = -1
     }
 
+    // --- Doors (issue #127) ---
+    // Some room entrances get a door (Balance.dungeon.doorShare): a
+    // doorway, a corridor's cell beside a room with rock on its two other
+    // sides, narrowed by two jambs to a leaf one knight wide. The doors
+    // come from their own stream of the level's seed, so nothing else of
+    // the dungeon moves, and start closed. A closed door blocks the
+    // knights, the enemies, their shots and their sight; E beside it opens
+    // or closes it (useDoor). An enemy chasing through a closed one winds
+    // up doorBash seconds and bursts it open (Enemy "bash", bashDoor), and
+    // a bashed door stays open. Alone the game owns the doors; in a
+    // session the host does: a node's E asks it, and it publishes the
+    // doors not closed in the level (session property "doors") for every
+    // screen, a node that joins later too
+    Component { id: doorComponent; Door {} }
+    property var doors: []
+    // Host, and alone: the doors not closed in this level, "gx,gy" to
+    // "open" or "bashed"
+    property var _doorStates: ({})
+
+    // Whether cell (gx, gy) of the carved grid is a doorway: a corridor's
+    // cell beside a room, rock on its two other sides, not in the
+    // entrance's or the exit's shaft. Its axis then: across when the
+    // corridor runs along x, and the side of the room along it
+    function doorway(gx, gy) {
+        if (grid[gy][gx] !== cellHallway || rooms.length < 2) return null
+        let start = rooms[0], end = rooms[rooms.length - 1]
+        if ((gx === entranceGridX && gy < start.y) || (gx === exitGridX && gy >= end.y + end.h))
+            return null
+        let at = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight ? grid[y][x] : cellWall
+        for (let d of [[1, 0], [0, 1]]) {
+            if (at(gx + d[1], gy + d[0]) !== cellWall || at(gx - d[1], gy - d[0]) !== cellWall) continue
+            let a = at(gx + d[0], gy + d[1]), b = at(gx - d[0], gy - d[1])
+            if (a === cellWall || b === cellWall) continue
+            if (a !== cellRoom && b !== cellRoom) continue
+            return { across: d[0] === 1, roomSide: a === cellRoom ? 1 : -1 }
+        }
+        return null
+    }
+    // The doors of the carved dungeon, without touching the world:
+    // [{gx, gy, xWu, yWu, across, roomSide}], each doorway in grid order
+    // with doorShare's chance at the band, every one in the showcase
+    function planDoors(levelSeed, band, showcase) {
+        let out = []
+        let rand = createRng(levelSeed ^ 0x446f6f72)
+        let share = showcase ? 1 : Balance.dungeon.doorShare[band]
+        for (let gy = 0; gy < gridHeight; gy++)
+            for (let gx = 0; gx < gridWidth; gx++) {
+                let d = doorway(gx, gy)
+                if (!d || rand() >= share) continue
+                out.push(Object.assign({ gx: gx, gy: gy, xWu: (gx + 0.5) * cellSize,
+                                         yWu: (gy + 0.5) * cellSize }, d))
+            }
+        return out
+    }
+    function placeDoors(list) {
+        doors = []
+        _doorStates = ({})
+        let t = Balance.dungeon, band = dangerBand(dangerPosition)
+        let jamb = (cellSize - t.doorWidth) / 2
+        for (let f of list) {
+            // The jambs, walls at both ends of the leaf
+            let x0 = f.gx * cellSize, y0 = f.gy * cellSize
+            if (f.across) {
+                createWallAt(f.xWu - t.doorJamb / 2, y0 + jamb, t.doorJamb, jamb)
+                createWallAt(f.xWu - t.doorJamb / 2, y0 + cellSize, t.doorJamb, jamb)
+            } else {
+                createWallAt(x0, f.yWu + t.doorJamb / 2, jamb, t.doorJamb)
+                createWallAt(x0 + cellSize - jamb, f.yWu + t.doorJamb / 2, jamb, t.doorJamb)
+            }
+            let d = doorComponent.createObject(world.room, {
+                cell: f.gx + "," + f.gy, cxWu: f.xWu, cyWu: f.yWu,
+                across: f.across, roomSide: f.roomSide,
+                leafWu: t.doorWidth, thickWu: t.doorThickness, band: band,
+                seed: createRng(f.gx * 7349 + f.gy * 3571)(),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                world: world.physics,
+                categories: catWall,
+                collidesWith: catPlayer | catEnemy | catProjectile
+            })
+            if (!d) continue
+            doors.push(d)
+            dungeonObjects.push(d)
+        }
+    }
+    function doorAt(cell) {
+        return doors.find(d => d.cell === cell) || null
+    }
+    function doorShut(cell) {
+        let d = doorAt(cell)
+        return d !== null && d.shut
+    }
+    // The door nearest (x, y) within reach wu of its centre, bashed ones
+    // left out; null for none
+    function nearestDoor(x, y, reach) {
+        let best = null, bestD = reach
+        for (let d of doors) {
+            if (d.doorState === "bashed") continue
+            let dist = Math.hypot(d.cxWu - x, d.cyWu - y)
+            if (dist <= bestD) { best = d; bestD = dist }
+        }
+        return best
+    }
+    // Whether a knight or an enemy stands where door d's leaf closes
+    function _doorTaken(d) {
+        let bodies = enemies.filter(e => e && !e.destroyed)
+        if (player) bodies.push(player)
+        for (let id in session.remotePlayers) bodies.push(session.remotePlayers[id])
+        let half = Balance.dungeon.doorWidth / 2
+        for (let b of bodies) {
+            let bx = b.xWu + b.widthWu / 2 - d.cxWu, by = b.yWu - b.heightWu / 2 - d.cyWu
+            let along = d.across ? bx : by, side = d.across ? by : bx
+            if (Math.abs(along) < d.thickWu / 2 + b.widthWu / 2 && Math.abs(side) < half + b.widthWu / 2)
+                return true
+        }
+        return false
+    }
+    // This node's knight pressed E at door d: it opens a closed door and
+    // closes an open one, unless someone stands in it; alone at once, in a
+    // session by the host. False when it does nothing
+    function useDoor(d) {
+        if (!d || d.doorState === "bashed") return false
+        let open = d.shut
+        if (!open && _doorTaken(d)) return false
+        if (session.connected && !session.isHost) session.reportDoor(levelIndex, d.cell, open)
+        else _setDoor(d.cell, open ? "open" : "closed")
+        return true
+    }
+    // Host: a node's knight opened or closed the door on that cell
+    function _hostDoor(level, cell, open) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        let d = doorAt(cell)
+        if (!d || d.doorState === "bashed") return
+        if (!open && _doorTaken(d)) return
+        _setDoor(cell, open ? "open" : "closed")
+    }
+    // Alone, or the host: an enemy here burst the door on cell open
+    function bashDoor(cell) { _setDoor(cell, "bashed") }
+    // Alone, or the host: the door on cell is now state, and in a session
+    // every screen is told. A bashed door stays as it is
+    function _setDoor(cell, state) {
+        let d = doorAt(cell)
+        if (!d || d.doorState === state || d.doorState === "bashed") return
+        _showDoor(d, state)
+        let v = Object.assign({}, _doorStates)
+        if (state === "closed") delete v[cell]
+        else v[cell] = state
+        _doorStates = v
+        if (session.connected)
+            session.publishDoors({ seed: session.runSeed, level: levelIndex, doors: v })
+    }
+    function _showDoor(d, state) {
+        if (d.doorState === state) return
+        d.doorState = state
+        if (state === "bashed") {
+            let nx = d.across ? -d.roomSide : 0, ny = d.across ? 0 : -d.roomSide
+            spawnShards(d.cxWu, d.cyWu, nx, ny, 10, d._wood, 0.26)
+            spawnShards(d.cxWu, d.cyWu, nx, ny, 6, Qt.lighter(d._wood, 1.35), 0.16)
+            impactSound.triggerOneShot(0.8)
+        } else {
+            impactSound.triggerOneShot(0.2)
+        }
+    }
+    // The host's doors not closed in the level: every door here as they say
+    function _applyDoors(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let d of doors) {
+            if (d.doorState === "bashed") continue
+            _showDoor(d, v.doors[d.cell] || "closed")
+        }
+    }
+    readonly property var _sessionDoors: session.doors
+    on_SessionDoorsChanged: _applyDoors(_sessionDoors)
+    // Each physics step: the E over the door this node's knight may use
+    function _stepDoors() {
+        if (doors.length === 0) return
+        let near = player && !fallen ? nearestDoor(player.xWu + player.widthWu / 2,
+                                                   player.yWu - player.heightWu / 2,
+                                                   Balance.dungeon.doorReach) : null
+        for (let d of doors) d.prompt = d === near
+    }
+    // Whether the line from (x1, y1) to (x2, y2) runs through a closed
+    // door's doorway
+    function _shutBetween(x1, y1, x2, y2) {
+        for (let d of doors) {
+            if (!d.shut) continue
+            let a1 = d.across ? x1 : y1, a2 = d.across ? x2 : y2
+            let s1 = d.across ? y1 : x1, s2 = d.across ? y2 : x2
+            let at = d.across ? d.cxWu : d.cyWu, side = d.across ? d.cyWu : d.cxWu
+            if ((a1 - at) * (a2 - at) > 0 || a1 === a2) continue
+            let s = s1 + (s2 - s1) * (at - a1) / (a2 - a1)
+            if (Math.abs(s - side) <= cellSize / 2) return true
+        }
+        return false
+    }
+    // The closed door on enemy e's path within doorBashReach wu of it, its
+    // cell; "" for none
+    function closedDoorAhead(e) {
+        let wps = e.pathAhead()
+        if (doors.length === 0 || wps.length === 0) return ""
+        let x = e.xWu + e.widthWu / 2, y = e.yWu - e.heightWu / 2
+        for (let d of doors) {
+            if (!d.shut || Math.hypot(d.cxWu - x, d.cyWu - y) > Balance.dungeon.doorBashReach) continue
+            if (wps.some(w => Math.abs(w.x - d.cxWu) < 0.01 && Math.abs(w.y - d.cyWu) < 0.01))
+                return d.cell
+        }
+        return ""
+    }
+
     function placeTorch(wx, wy, color) {
         let t = torchComponent.createObject(glowParent(), {
             xWu: wx, yWu: wy,
@@ -4295,6 +4513,8 @@ ClayWorld2d {
         _sprungCells = ({})
         slits = []
         _clearArrows()
+        doors = []
+        _doorStates = ({})
         bonePiles = []
         torches = []
         stains = []
@@ -4672,6 +4892,7 @@ ClayWorld2d {
 
     // --- Line-of-sight (Bresenham on grid) ---
     function hasLineOfSight(x1Wu, y1Wu, x2Wu, y2Wu) {
+        if (doors.length > 0 && _shutBetween(x1Wu, y1Wu, x2Wu, y2Wu)) return false
         let gx0 = Math.floor(x1Wu / cellSize)
         let gy0 = Math.floor(y1Wu / cellSize)
         let gx1 = Math.floor(x2Wu / cellSize)
@@ -4731,15 +4952,32 @@ ClayWorld2d {
         return grid[gy][gx] === cellWall || _propCells[gy * gridWidth + gx] === true
     }
     // The cells from (sx, sy) to (ex, ey), [{x, y}] in grid cells; a
-    // breakable on either end is no obstacle
-    function _cellPath(sx, sy, ex, ey) {
+    // breakable on either end is no obstacle. shut: the closed doors
+    // between are, as rock
+    function _cellPath(sx, sy, ex, ey, shut) {
         _syncPathfinder()
         let ends = [[sx, sy], [ex, ey]].filter(c => _blockedCell(c[0], c[1]))
         for (let c of ends) _setPathCell(c[0], c[1], true)
+        let closed = (shut ? doors.filter(d => d.shut) : []).map(d => d.cell.split(",").map(Number))
+                         .filter(c => !(c[0] === sx && c[1] === sy) && !(c[0] === ex && c[1] === ey))
+        for (let c of closed) _setPathCell(c[0], c[1], false)
         let a = _pathCell(sx, sy), b = _pathCell(ex, ey)
         let path = pathfinder.findPath(a.x, a.y, b.x, b.y)
         for (let c of ends) _setPathCell(c[0], c[1], false)
+        for (let c of closed) _setPathCell(c[0], c[1], true)
         return path.map(c => ({ x: gridWidth - 1 - c.x, y: gridHeight - 1 - c.y }))
+    }
+    // The cells from (sx, sy) to (ex, ey) with a closed door as
+    // doorPathCost cells more. GridPathfinder knows walkable or not, no
+    // cost (clayground#TBD): the way through the closed doors is taken
+    // unless the way around them is no longer than it and their cost
+    function _costPath(sx, sy, ex, ey) {
+        let path = _cellPath(sx, sy, ex, ey, false)
+        let shut = path.filter(c => doorShut(c.x + "," + c.y)).length
+        if (shut === 0) return path
+        let around = _cellPath(sx, sy, ex, ey, true)
+        return around.length > 0 && around.length <= path.length + shut * Balance.dungeon.doorPathCost
+            ? around : path
     }
     // The way from one point to another in wu, cell centres as waypoints;
     // [] when there is none
@@ -4770,7 +5008,7 @@ ClayWorld2d {
         let s = snapToWalkable(sx, sy)
         let e = snapToWalkable(ex, ey)
         if (!s || !e) return []
-        return _cellPath(s.x, s.y, e.x, e.y).map(c => Qt.point(c.x * cellSize + cellSize / 2,
+        return _costPath(s.x, s.y, e.x, e.y).map(c => Qt.point(c.x * cellSize + cellSize / 2,
                                                              c.y * cellSize + cellSize / 2))
     }
 

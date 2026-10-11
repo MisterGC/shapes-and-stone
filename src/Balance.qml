@@ -484,6 +484,26 @@ QtObject {
         // the entrance's or the exit's shaft, is passed over
         extraCorridors: [1, 2, 3],
         loopChoice: 3,
+        // Doors: a room entrance - a corridor's cell beside a room, with
+        // rock on its two other sides - gets one with doorShare's chance at
+        // low, middle and high danger, every one in the features scenario.
+        // Two jambs doorJamb wu thick narrow the doorway to a leaf
+        // doorWidth wu wide, one knight, and doorThickness thick. A door
+        // starts closed. Closed it blocks the knights, the enemies, their
+        // shots and their sight; E within doorReach wu of its centre opens
+        // or closes it, unless someone stands in it. An enemy chasing
+        // through a closed door stops within doorBashReach wu of it, winds
+        // up doorBash seconds (the wind-up ring) and bursts it open; a
+        // bashed door stays open. The enemies' paths take a closed door
+        // as doorPathCost cells more than an open one
+        doorShare: [0.3, 0.4, 0.5],
+        doorWidth: 1.2,
+        doorThickness: 0.3,
+        doorJamb: 0.5,
+        doorReach: 1.8,
+        doorBash: 1.5,
+        doorBashReach: 1.6,
+        doorPathCost: 6,
         clearOfEntrance: 8,
         clearOfExit: 8,
         kinds: {

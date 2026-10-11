@@ -57,6 +57,7 @@ clay_app(shapes_and_stone
         src/SpikePlate.qml
         src/ArrowSlit.qml
         src/Arrow.qml
+        src/Door.qml
         src/GoldDrop.qml
         src/BodyShade.qml
         src/ExitStairs.qml
