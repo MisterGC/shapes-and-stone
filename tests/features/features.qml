@@ -176,6 +176,25 @@ Window {
                       "seed " + game.scenarioSeed + " at danger " + dg + " places the same "
                       + a.length + " features twice")
             }
+            // A kind laid out before test, at one count and another, moves
+            // a test feature only off a cell it takes
+            game.applyScenario("features")
+            let ls = game.deriveSeed(game.masterSeed, game.levelIndex)
+            let test = Balance.dungeon.kinds.test
+            let at = (list, k) => list.filter(f => f.kind === k).map(f => f.gx + "," + f.gy)
+            let alone = at(game.planFeatures(ls, 0, true, { test: test }), "test")
+            for (let count of [1, 3]) {
+                let both = game.planFeatures(ls, 0, true, { early: { perRoom: [0, 0, 0], showcase: count },
+                                                            test: test })
+                let early = at(both, "early"), now = at(both, "test")
+                let moved = alone.filter(c => now.indexOf(c) < 0)
+                let pushed = moved.filter(c => early.indexOf(c) >= 0)
+                check(early.length > 0 && moved.length === pushed.length,
+                      "a kind laid out before test, " + count + " a room (" + early.length + " cells), moves "
+                      + moved.length + " of " + alone.length + " test features, each off a cell it took"
+                      + (moved.length !== pushed.length ? "; " + (moved.length - pushed.length)
+                                                          + " moved off a cell it left free" : ""))
+            }
             // The dungeon played: as many as the table asks at its danger
             for (let dg of [0.2, 1.5, 2.9]) {
                 game.applyScenario("dungeon", dg)
