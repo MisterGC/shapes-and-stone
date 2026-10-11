@@ -27,6 +27,7 @@ Turn the music and the sound down on their own, see what your knight carries at 
 - **Dark beyond the light again:** outside the lantern and the torches the dungeon is near black and an enemy is not seen until the light reaches it, its eyes no longer glow; a wall torch lights a smaller stretch. (4069bfd, 3d67868)
 - **The whirlwind** is let loose with Q and needs full momentum, which it spends; a full charge held into a dash no longer whirls. A fall loses the momentum, a new level keeps it. (dd2ff23)
 - **Harder from the start:** a dungeon at depth 0 holds 10 to 15 enemies (was 8 to 12), up to 26 deeper down; enemies have about a fifth more HP and hit 2 harder. Each depth still adds as much as before. (dcc864f)
+- **Enemies stay in their rooms:** they notice a knight only within 7 wu, hunt where they last saw one, and go back to their patrol after 4 s out of sight, so a room no longer follows the knight through the dungeon. (a246a0e)
 - **The minimap** shows no enemies; in a session it always shows the other knights in their colours, also in parts no one has explored. (8e698f9)
 
 ### Fixed
