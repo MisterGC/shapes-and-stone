@@ -52,11 +52,11 @@ Window {
     readonly property var dangers: [0.5, 1.5]
     readonly property var parties: [1, 2, 4]
     // Today's dungeon for one knight (9 to 12 rooms, 10 to 15 enemies at
-    // depth 0, its breakables): the fingerprint hash and enemy count at
-    // each danger, on the scenario seed
+    // depth 0, its breakables and spike plates): the fingerprint hash and
+    // enemy count at each danger, on the scenario seed
     readonly property var today: ({
-        "0.5": { hash: "503161f9", enemies: 15 },
-        "1.5": { hash: "fe1dc1c", enemies: 18 }
+        "0.5": { hash: "c84887", enemies: 15 },
+        "1.5": { hash: "7a4def11", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its

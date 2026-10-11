@@ -472,7 +472,8 @@ QtObject {
     // showcase how many per room in the dojo's features scenario. "test"
     // stands in for the kinds to come and lies in no dungeon played. The
     // breakables: a clay "urn", a wooden "crate" (or barrel) and a
-    // "crystal" cluster, rarer the shallower
+    // "crystal" cluster, rarer the shallower; then the traps: a "spike"
+    // plate, more often the higher the danger
     readonly property var dungeon: ({
         clearOfEntrance: 8,
         clearOfExit: 8,
@@ -480,7 +481,8 @@ QtObject {
             test: { perRoom: [0, 0, 0], showcase: 2 },
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
-            crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 }
+            crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
+            spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 }
         },
         // A breakable blocks like a small wall: a square of sizeWu on its
         // cell's centre. A swing breaks the nearest one in its arc, a
@@ -495,7 +497,23 @@ QtObject {
             urn: { chance: 0.35, gold: [1, 3], perDepth: 0 },
             crate: { chance: 0.3, gold: [2, 4], perDepth: 0 },
             crystal: { chance: 0.85, gold: [6, 10], perDepth: 2 }
-        }
+        },
+        // A spike plate: a square of spikePlateSize wu on its cell's
+        // centre with small holes in it. A knight whose centre steps on it
+        // makes it click, and spikeDelay seconds later its spikes rise: a
+        // knight still on it then, and not dashing, takes spikeDamage and
+        // spikeDamagePerDepth more a depth, never more than spikeCap of
+        // its max HP; no defence, shield or grace takes any of it. A plate
+        // fires once and stays sprung. Only knights trigger it.
+        // spikeClickPitch and spikeRisePitch are the click's and the
+        // spikes' notes, in semitones off their samples
+        spikePlateSize: 1.6,
+        spikeDelay: 0.25,
+        spikeDamage: 14,
+        spikeDamagePerDepth: 3,
+        spikeCap: 0.25,
+        spikeClickPitch: -9,
+        spikeRisePitch: 9
     })
 
     // Gold: what a killed enemy drops where it fell, for a knight to pick up

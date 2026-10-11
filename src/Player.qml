@@ -688,6 +688,26 @@ PhysicsItem {
         return blocked ? "blocked" : "hit"
     }
 
+    // A trap's spikes rose under the knight (Game._risePlate): amount
+    // lands whole, no defence, shield or grace takes any of it, and a
+    // dash under way avoids it all. "hit", "dodged" or "ignored"
+    function takeTrapDamage(amount) {
+        if (fallen) return "ignored"
+        if (isDashing) return "dodged"
+        hp = Math.max(0, hp - amount)
+        _cancelCharge()
+        graceLeft = Balance.knight.hurtGrace
+        view.hurt()
+        acted("hurt")
+        if (gameWorld) {
+            gameWorld.playHurt()
+            gameWorld.countFight("taken", amount)
+            gameWorld.shake(3)
+            gameWorld.spawnHurtNumber(xWu, yWu, amount, "#FF4444")
+        }
+        return "hit"
+    }
+
     // Thrown back along the blow (takeDamage), knockback wu: a knockback
     // fades out step by step, so it covers its start speed
     // times the sum of its steps' shares of it

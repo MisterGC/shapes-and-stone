@@ -236,6 +236,14 @@ ClayWorld2d {
     function playShieldEmpty() {
         shieldEmptySound.triggerOneShot(1)
     }
+    // A spike plate: its click is the menu's tick pitched down, its
+    // spikes the swing pitched up (Balance.dungeon.spike...Pitch)
+    function playPlateClick() {
+        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.dungeon.spikeClickPitch, 1)
+    }
+    function playSpikesRise() {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
+    }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
     // knight, and fading to silence about a screen away from you
@@ -672,6 +680,7 @@ ClayWorld2d {
         onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
         onBreakReported: (level, cell) => _hostBreak(level, cell)
+        onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -2122,6 +2131,7 @@ ClayWorld2d {
             world._physicsSteps++
             world._pickUpGold()
             world._stepRevive()
+            world._stepPlates()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -2705,9 +2715,10 @@ ClayWorld2d {
             revealAroundPlayer()  // Initial reveal
         }
 
-        // The things the host's party broke here already, for a node that
-        // joins late
+        // The things the host's party broke here already, and the plates
+        // it set off, for a node that joins late
         _applyBroken(_sessionBroken)
+        _applySprung(_sessionSprung)
 
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
@@ -3148,6 +3159,8 @@ ClayWorld2d {
         breakables = []
         _propCells = ({})
         _brokenCells = []
+        plates = []
+        _sprungCells = ({})
         let band = dangerBand(dangerPosition)
         for (let f of list) {
             let o = null
@@ -3157,6 +3170,8 @@ ClayWorld2d {
                         pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
             else if (Balance.dungeon.loot[f.kind])
                 o = _placeBreakable(f, band)
+            else if (f.kind === "spike")
+                o = _placePlate(f, band)
             if (o) dungeonObjects.push(o)
         }
     }
@@ -3295,6 +3310,121 @@ ClayWorld2d {
         b.destroy()
         return true
     }
+
+    // --- Spike plates (issue #124) ---
+    // A plate stands on its feature's cell, the same on every screen. This
+    // node's knight stepping on it, its centre on the plate, makes it
+    // click; spikeDelay later its spikes rise and judge this node's knight
+    // alone: on the plate and not dashing, it takes the spikes' damage
+    // (spikeDamageAt). Then it stays sprung. Alone the delay runs on the
+    // physics clock, held by a pause. In a session the rise is a moment on
+    // the session clock: the node that set it off reports it to the host,
+    // which publishes the plates set off in the level (session property
+    // "sprung"), and every other screen clicks and raises the plate at that
+    // moment, judging its own knight, a node that joins later too
+    Component { id: plateComponent; SpikePlate {} }
+    property var plates: []
+    // Host: the plates set off in this level, "gx,gy" to their riseAt
+    property var _sprungCells: ({})
+    // A plate clicked or rose on this screen; result is what its spikes
+    // did to this node's knight (SpikePlate.result)
+    signal plateClicked(string cell)
+    signal plateRose(string cell, string result)
+    function _placePlate(f, band) {
+        let p = plateComponent.createObject(world.room, {
+            cell: f.gx + "," + f.gy, xWu: f.xWu, yWu: f.yWu, band: band,
+            sizeWu: Balance.dungeon.spikePlateSize,
+            seed: createRng(f.gx * 7349 + f.gy * 3571)(),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (p) plates.push(p)
+        return p
+    }
+    function plateAt(cell) {
+        return plates.find(p => p.cell === cell) || null
+    }
+    // What a plate's spikes deal at depth d to a knight of maxHp: never
+    // more than spikeCap of its max HP
+    function spikeDamageAt(d, maxHp) {
+        let t = Balance.dungeon
+        return Math.min(Math.round(t.spikeDamage + t.spikeDamagePerDepth * Math.max(0, d)),
+                        Math.floor(t.spikeCap * maxHp))
+    }
+    // Whether this node's knight stands on plate p: its centre on the slab
+    function onPlate(p) {
+        if (!player) return false
+        let h = p.sizeWu / 2
+        return Math.abs(player.xWu + player.widthWu / 2 - p.xWu) <= h
+            && Math.abs(player.yWu - player.heightWu / 2 - p.yWu) <= h
+    }
+    // Each physics step: a plate this knight steps on clicks, a clicked
+    // one whose moment came rises
+    function _stepPlates() {
+        if (plates.length === 0 || levelType !== "dungeon") return
+        let dt = world.physics.timeStep
+        for (let p of plates.slice()) {
+            if (p.phase === "armed") {
+                if (player && !player.fallen && onPlate(p)) _clickPlate(p, -1)
+            } else if (p.phase === "clicked") {
+                let due = p.riseAt >= 0 ? session.now() >= p.riseAt
+                                        : (p.riseIn = p.riseIn - dt) <= 1e-6
+                if (due) _risePlate(p)
+            }
+        }
+    }
+    // p clicks: set off by this node's knight (riseAt -1), or by another's,
+    // its spikes due at riseAt on the session clock
+    function _clickPlate(p, riseAt) {
+        p.phase = "clicked"
+        playPlateClick()
+        if (riseAt >= 0) {
+            p.riseAt = riseAt
+        } else if (session.connected) {
+            p.riseAt = session.now() + Balance.dungeon.spikeDelay * 1000
+            session.reportSpring(levelIndex, p.cell, p.riseAt)
+        } else {
+            p.riseIn = Balance.dungeon.spikeDelay
+        }
+        plateClicked(p.cell)
+    }
+    // p's spikes rise: this node's knight on it is hit, unless it dashes
+    function _risePlate(p) {
+        p.phase = "sprung"
+        playSpikesRise()
+        spawnSparks(p.xWu, p.yWu, 0, 1, 6, "#E6E2D6")
+        let result = "clear"
+        if (player && onPlate(p)) {
+            result = player.takeTrapDamage(spikeDamageAt(depth, player.maxHp))
+            console.log("[Game] Spikes rose under the knight at", p.cell, "-", result)
+        }
+        p.result = result
+        plateRose(p.cell, result)
+    }
+    // Host: a node set off the plate on that cell of that level, its
+    // spikes due at riseAt; the first word on a plate holds
+    function _hostSpring(level, cell, riseAt) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        if (_sprungCells[cell] !== undefined || !plateAt(cell)) return
+        _sprungCells[cell] = riseAt
+        let p = plateAt(cell)
+        if (p.phase === "armed") _clickPlate(p, riseAt)
+        session.publishSprung({ seed: session.runSeed, level: levelIndex,
+                                plates: Object.assign({}, _sprungCells) })
+    }
+    // The host's plates set off in the level: those still armed here click
+    // and rise at their moment; long past, they are simply sprung
+    function _applySprung(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let cell in v.plates) {
+            let p = plateAt(cell)
+            if (!p || p.phase !== "armed") continue
+            if (session.now() - v.plates[cell] > 1000) p.phase = "sprung"
+            else _clickPlate(p, v.plates[cell])
+        }
+    }
+    readonly property var _sessionSprung: session.sprung
+    on_SessionSprungChanged: _applySprung(_sessionSprung)
 
     function placeTorch(wx, wy, color) {
         let t = torchComponent.createObject(glowParent(), {
@@ -3749,6 +3879,8 @@ ClayWorld2d {
         breakables = []
         _propCells = ({})
         _brokenCells = []
+        plates = []
+        _sprungCells = ({})
         bonePiles = []
         torches = []
         stains = []

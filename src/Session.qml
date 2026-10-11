@@ -71,6 +71,9 @@ Item {
     // Host: a node's knight broke the breakable on cell ("gx,gy") of
     // that level (issue #123)
     signal breakReported(int level, string cell)
+    // Host: a node's knight set off the spike plate on cell ("gx,gy") of
+    // that level, its spikes due at session time riseAt (issue #124)
+    signal springReported(int level, string cell, real riseAt)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -119,6 +122,11 @@ Item {
     // session property "broken" ({seed, level, cells}); null before any
     readonly property var broken: net.connected && net.sessionProperties.broken
                                   ? net.sessionProperties.broken : null
+    // The spike plates set off in the level the host plays, the session
+    // property "sprung" ({seed, level, plates: {cell: riseAt}}); null
+    // before any
+    readonly property var sprung: net.connected && net.sessionProperties.sprung
+                                  ? net.sessionProperties.sprung : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -177,6 +185,8 @@ Item {
                 if (net.isHost) session.goldClaimed(fromId, data.id)
             } else if (data.type === "break") {
                 if (net.isHost) session.breakReported(data.level, data.cell)
+            } else if (data.type === "spring") {
+                if (net.isHost) session.springReported(data.level, data.cell, data.at)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -434,6 +444,20 @@ Item {
     // Host: the breakables broken in its level, for every node
     function publishBroken(broken) {
         if (net.isHost) net.setSessionProperty("broken", broken)
+    }
+    // The session clock (Network.sessionTime), ms, the same on every
+    // node; -1 outside a session
+    function now() { return net.connected ? net.sessionTime : -1 }
+    // This node's knight set off a spike plate, its spikes due at riseAt
+    // on the session clock: the host tells every node. The host's own is
+    // taken at once
+    function reportSpring(level, cell, riseAt) {
+        if (net.isHost) springReported(level, cell, riseAt)
+        else net.sendTo(net.hostId, {type: "spring", level: level, cell: cell, at: riseAt})
+    }
+    // Host: the spike plates set off in its level, for every node
+    function publishSprung(sprung) {
+        if (net.isHost) net.setSessionProperty("sprung", sprung)
     }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {
