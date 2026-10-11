@@ -497,6 +497,31 @@ qml -I build/bin/qml tests/looks/looks.qml -- <out dir>
 python3 tests/dangerparty/run_dangerparty.py --mode local [--shots <out dir>]
 ```
 
+A dungeon's rooms are joined in a chain, the start room to the exit's,
+and some get a second entrance: `dungeon.extraCorridors` more corridors,
+one at low danger, two at middle and three at high, each between two
+rooms close but not neighbours in the chain, so a dungeon has loops to
+flank and to escape (`Game.addLoops`). They come from their own stream of
+the level's seed, so the rooms, the enemies and the witch's reading stay
+as the seed has them, and every screen of a session carves the same. Each
+is drawn from the `dungeon.loopChoice` closest pairs left and carved
+L-shaped, centre to centre, as the chain's corridors are; one that would
+cut through or open into a third room, run along one of its own rooms'
+walls, or run into the entrance's or the exit's shaft is passed over. The
+exit stays reachable and the entrance blocked. The loops bench checks the
+table, that a seed and danger carve the same corridors twice, and walks
+50 seeds for the rules: every room and the exit reachable, as many
+corridors as the table asks, none through or into a third room, along a
+wall or into a shaft, each closing a loop. With an out dir and a window it
+saves `loops.png`, the game's minimap of a dungeon with three loops, all
+of it explored, beside the same grid with its corridors off the chain in
+amber:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/loops/loops.qml
+qml -I build/bin/qml tests/loops/loops.qml -- <out dir>
+```
+
 A dungeon's features - what the knights read, use, find or break - are
 laid out once its rooms and corridors are carved (`Game.planFeatures`),
 each kind from its own stream of the level's seed and its name, so the
@@ -584,12 +609,13 @@ level as the session property `sprung`; every other screen clicks and
 raises that plate at that moment, a player who joins later sees it
 sprung, and each game judges the spikes on its own knight alone. The
 spikes bench lands in the features scenario, checks its plates and that
-laying them out moved no other feature, stands an enemy on a plate,
-which stays armed, and the knight on another: it clicks, the spikes rise
-`spikeDelay` later and take what `spikeDamageAt` says, and the plate
-fires once. A knight that dashes at the click takes nothing; the damage
-stays under the cap from depth 0 to 60, and at depth 0, 3, 8 and 20 the
-spikes take that much. With an out dir and a window it saves
+laying them out moved another feature only off a cell a plate took,
+stands an enemy on a plate, which stays armed, and the knight on
+another: it clicks, the spikes rise `spikeDelay` later and take what
+`spikeDamageAt` says, and the plate fires once. A knight that dashes
+at the click takes nothing; the damage stays under the cap from depth 0
+to 60, and at depth 0, 3, 8 and 20 the spikes take that much. With an
+out dir and a window it saves
 `plates.png`, a plate armed beside one sprung, and `rising.png`, the
 spikes rising under the knight:
 
