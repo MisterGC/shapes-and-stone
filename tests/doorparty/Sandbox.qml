@@ -1,0 +1,102 @@
+// Door party bench - one of two game instances, a host or a joiner, that
+// run_doorparty.py starts as two processes (clayliveloader --instance),
+// connects over Local or Cloud signaling and drives through the inspector
+// protocol (issue #127).
+//
+// The instance runs the real game. The driver stands a knight beside one
+// of the dungeon's doors, has it press E there and reads the doors each
+// screen shows.
+
+import QtQuick
+import Clayground.Network
+import "../../src"
+
+Item {
+    id: bench
+    anchors.fill: parent
+
+    Game {
+        id: game
+        anchors.fill: parent
+        muted: true
+        // A record of its own: the bench keeps no best depth of the player's
+        recordStoreName: "ShapesAndStoneDoorPartyBench"
+    }
+
+    // ---- the game's Session and its Network, found by what they offer ----
+    readonly property var session: {
+        for (let i = 0; i < game.data.length; i++)
+            if (typeof game.data[i].sendImpact === "function") return game.data[i]
+        return null
+    }
+    readonly property var net: session ? session.network : null
+
+    // ---- driver API ----
+    property bool useLocalSignaling: true
+    readonly property string netId: net ? net.networkId : ""
+    readonly property string nodeId: net ? net.nodeId : ""
+    readonly property bool connected: net ? net.connected : false
+    readonly property int nodeCount: net ? net.nodeCount : 0
+
+    function configure(local) {
+        useLocalSignaling = local
+        return net !== null
+    }
+    function _mode() {
+        return useLocalSignaling ? Network.SignalingMode.Local : Network.SignalingMode.Cloud
+    }
+    function hostUp() { net.signalingMode = _mode(); net.host() }
+    function joinNet(code) { net.signalingMode = _mode(); net.join(code) }
+    // Host: start the session's game on this seed
+    function startGame(s) {
+        game.masterSeed = s
+        game._startMultiplayerGame()
+    }
+    function leave() { if (net) net.leave() }
+
+    // In a dungeon with the other player's knight and the host's enemies
+    function inRun() {
+        return game.screen === "game" && game.player !== null
+               && session !== null && Object.keys(session.remotePlayers).length > 0
+               && game.enemies.length > 0
+    }
+    // Host: every enemy stands where it is
+    function halt() {
+        for (let e of game.enemies) if (e && e.halt) e.halt()
+        return game.enemies.length
+    }
+    // The knight out of reach of a stray blow
+    function standUp() { game.player.hp = 100000 }
+
+    // The doors on this screen, by cell, and how each stands
+    function doors() {
+        if (!game.doors) return []
+        return game.doors.map(d => ({ cell: d.cell, state: d.doorState, x: d.cxWu, y: d.cyWu,
+                                      across: d.across, side: d.roomSide }))
+    }
+    function stateOf(cell) {
+        let d = game.doorAt ? game.doorAt(cell) : null
+        return d ? d.doorState : ""
+    }
+    // This knight's centre k wu from the door on cell along its axis,
+    // into its room for k > 0
+    function standBy(cell, k) {
+        let d = game.doorAt(cell)
+        if (!d) return false
+        let p = game.player
+        let x = d.cxWu + (d.across ? d.roomSide * k : 0), y = d.cyWu + (d.across ? 0 : d.roomSide * k)
+        p.xWu = x - p.widthWu / 2
+        p.yWu = y + p.heightWu / 2
+        return true
+    }
+    // What E does here with no one to talk to: the nearest door in reach
+    function pressE() {
+        let p = game.player
+        return game.useDoor(game.nearestDoor(p.xWu + p.widthWu / 2, p.yWu - p.heightWu / 2,
+                                             Balance.dungeon.doorReach))
+    }
+    // Host: an enemy of its bursts the door on cell open, as Enemy's
+    // bash does once wound up
+    function bash(cell) { game.bashDoor(cell); return stateOf(cell) }
+    function level() { return game.levelIndex }
+}
