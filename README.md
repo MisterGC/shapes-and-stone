@@ -497,6 +497,29 @@ qml -I build/bin/qml tests/looks/looks.qml -- <out dir>
 python3 tests/dangerparty/run_dangerparty.py --mode local [--shots <out dir>]
 ```
 
+A dungeon's features - what the knights read, use, find or break - are
+laid out once its rooms and corridors are carved (`Game.planFeatures`),
+each kind from its own stream of the level's seed and its name, so the
+rooms, the enemies, the torches and the debris stay as the seed has them.
+Every feature stands on a room's cell, never in the start room, on a
+doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
+from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
+cell. How many of a kind each room but the start room holds is the
+table's `dungeon.kinds`, per danger band as the looks have it. The only
+kind so far is `test`, a violet diamond that lies in no dungeon played. In
+the dojo `applyScenario("features")` lands in a dungeon with every kind at
+its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
+and on a seed; the next level is built without it. The features bench
+checks that the scenario shows the test kind, that a seed and danger place
+the same features twice and the scenario seed's as recorded, and walks the
+grid of 50 seeds for the rules; with an out dir and a window it saves
+`features.png`:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/features/features.qml
+qml -I build/bin/qml tests/features/features.qml -- <out dir>
+```
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.

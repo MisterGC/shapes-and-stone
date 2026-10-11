@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Dungeon features:** after its rooms and corridors are carved, a dungeon lays out its features, each kind from its own stream of the seed, as many per room as its danger asks (`Balance.dungeon`), never in the start room, on a doorway or in a corridor, and clear of the entrance and the exit. No kind lies in a dungeon played yet; the dojo's `features` scenario shows a test kind.
+
 ## [0.2.2] - 2026-10-11
 
 Fight for your whirlwind: blows that land earn the momentum Q spends, a shield bash follows a swing, and dungeons are darker, fuller and harder, their enemies staying in their rooms. Music and sound have their own volume, and the knight panel shows what you carry. Built on Clayground v2026.9.
