@@ -18,10 +18,9 @@ Usage:
 always parries, "perfect" raises the shield 4 physics steps before each
 lunge lands, a perfect block, "heavy" meets attacks as "mix" does but
 charges a heavy swing at a guardian instead of shield-dashing it,
-"whirlwind" meets attacks as "mix" does but goes for every enemy with a
-full charge and lets go right around a dash at it: a whirlwind. The report
-counts the whirlwinds that landed (hit an enemy), their hits and the ones
-begun. --danger is the danger the fight room is at, its depth plus a
+"whirlwind" fights as "mix" does and, once its momentum is full, whirls
+(Q) at the nearest enemy within reach. The report counts the whirlwinds
+that landed (hit an enemy), their hits and the ones begun. --danger is the danger the fight room is at, its depth plus a
 position in the depth's range (2.5: half way through depth 2's): the lineup
 stays, the enemies hit as hard as at that danger. --depth d is --danger d,
 the bottom of the depth's range. The same seed and danger give the same

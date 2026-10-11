@@ -1292,6 +1292,12 @@ ClayWorld2d {
             event.accepted = true
             return
         }
+        // Q: the whirlwind, with full momentum
+        if (event.key === Qt.Key_Q) {
+            if (!event.isAutoRepeat && screen === "game" && player && !fallen && !talking) player.unleash()
+            event.accepted = true
+            return
+        }
         if (event.key === Qt.Key_C) {
             if (screen === "game" && player && !fallen) knightPanelOpen = !knightPanelOpen
             event.accepted = true
@@ -1531,6 +1537,64 @@ ClayWorld2d {
         }
     }
 
+    // Momentum (Balance.momentum): a pip for each one earned, right of the
+    // mana bar; full, they glow and Q is named. Q short of them flashes
+    // them for momentum.flash seconds
+    Row {
+        id: momentumHud
+        objectName: "momentumHud"
+        anchors.left: manaHud.right
+        anchors.leftMargin: 8
+        anchors.verticalCenter: manaHud.verticalCenter
+        spacing: 4
+        z: 1000
+        visible: player !== null
+        readonly property int have: player ? player.momentum : 0
+        readonly property bool full: have >= Balance.momentum.max
+        property bool flashing: false
+        Timer {
+            id: momentumFlash
+            interval: Balance.momentum.flash * 1000
+            onTriggered: momentumHud.flashing = false
+        }
+        Connections {
+            target: player
+            function onMomentumShort() {
+                momentumHud.flashing = true
+                momentumFlash.restart()
+            }
+        }
+        Repeater {
+            model: Balance.momentum.max
+            Rectangle {
+                required property int index
+                width: 10; height: 10
+                rotation: 45
+                color: index >= momentumHud.have ? "#2A2A2A"
+                    : momentumHud.full ? Qt.lighter(Balance.momentum.color, 1.15 + 0.15 * Math.sin(world._momentumT * 8))
+                    : Balance.momentum.color
+                border.color: momentumHud.flashing ? Balance.shieldBreak.barColor
+                    : index < momentumHud.have ? "#FFF2C0" : "#666666"
+                border.width: momentumHud.flashing ? 2 : 1
+            }
+        }
+        Text {
+            visible: momentumHud.full
+            text: "Q"
+            color: Balance.momentum.color
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 12
+            font.bold: true
+        }
+    }
+    property real _momentumT: 0
+    NumberAnimation on _momentumT {
+        running: momentumHud.full
+        from: 0; to: 1000; duration: 1000000
+        loops: Animation.Infinite
+    }
+
     // The mana bar's red flash, on this screen only
     function flashManaBar() { manaFlash.age = 0 }
     readonly property bool manaBarFlashing: manaFlash.running
@@ -1604,7 +1668,7 @@ ClayWorld2d {
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
         text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
-              + "E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
+              + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -2331,9 +2395,9 @@ ClayWorld2d {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
                                  potions: player.potions, draughts: player.draughts,
-                                 levels: smithLevels(player) }
+                                 momentum: player.momentum, levels: smithLevels(player) }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
-                                 potions: 0, draughts: 0, levels: smithLevels(null) }
+                                 potions: 0, draughts: 0, momentum: 0, levels: smithLevels(null) }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
                     "gold:", carried.gold, "potions:", carried.potions, "draughts:", carried.draughts,
                     "smith:", JSON.stringify(carried.levels))
@@ -2353,6 +2417,7 @@ ClayWorld2d {
             player.gold = carried.gold
             player.potions = carried.potions
             player.draughts = carried.draughts
+            player.momentum = carried.momentum
         }
         // A knight still down when the party reaches the camp rises there
         if (session.connected && levelType === "village") _rise("camp")

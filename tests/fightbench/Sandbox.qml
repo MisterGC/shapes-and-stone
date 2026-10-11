@@ -57,7 +57,6 @@ Item {
         crushBlows = 0
         _crushing = new Set()
         whirlsStarted = 0
-        _whirlPending = false
         game.applyScenario("fight", danger)
         // The bench tries the moves, not the mana they cost: plenty of it
         if (game.player) {
@@ -187,11 +186,9 @@ Item {
     // meets attacks as "mix" does; it answers a guardian's shield with a
     // charged heavy swing instead of a shield dash: it holds the left
     // button on its way in and lets go once the charge is full and the
-    // guardian in the heavy swing's reach. "whirlwind" meets attacks as
-    // "mix" does; it charges a step back from the nearest enemy, goes for
-    // it with the charge full, and within whirlFrom of it lets go and
-    // dashes at it, by turns on the same
-    // step (just before the dash) and on the step after (just after).
+    // guardian in the heavy swing's reach. "whirlwind" fights as "mix"
+    // does and earns momentum by it; with all of it (Balance.momentum) and
+    // an enemy within whirlFrom it whirls at that enemy (Q, unleash).
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
     // Steps before a lunge lands that the "perfect" plan raises the shield
@@ -223,11 +220,9 @@ Item {
         }
     }
     function heavyReach(p) { return p.attackRange * Balance.knight.heavyRange * 0.9 }
-    // Whirlwinds begun, how close the knight whirls at an enemy, and a
-    // dash with a full charge held whose release comes on the next step
+    // Whirlwinds begun, and how close the knight whirls at an enemy
     property int whirlsStarted: 0
     readonly property real whirlFrom: 3.5
-    property bool _whirlPending: false
     function letGo(p) {
         if (_held) p.dropSwing()
         _held = false
@@ -274,14 +269,6 @@ Item {
         }
         let foes = game.enemies.filter(alive)
         if (foes.length === 0) { stand(p); letGo(p); p.isBlocking = false; return }
-
-        // Dashed with a full charge held: let go of it now, a step after
-        if (_whirlPending) {
-            _whirlPending = false
-            p.releaseSwing()
-            _held = false
-            return
-        }
 
         // Forget plans of attacks that are over
         for (let e of Array.from(_plans.keys()))
@@ -367,29 +354,13 @@ Item {
             else stand(p)
             return
         }
-        // Every enemy is met with a whirlwind: charged on the way in, let
-        // go of around the dash at it
-        if (answer === "whirlwind") {
-            if (p.isDashing) return
-            // Held past the charge's hold, the knight let it go: press anew
-            if (_held && !p.isCharging && p.chargeHeld > Balance.knight.chargeStart) letGo(p)
-            if (!_held) _held = p.pressSwing()
-            // Charging, it keeps out of the enemy's lunge; full, it goes in
-            if (!p.chargeFull && targetDist < whirlFrom - 0.5)
-                moveTowards(p, 2 * p.xWu - target.xWu, 2 * p.yWu - target.yWu, 1)
-            else if (!p.chargeFull && targetDist <= whirlFrom) stand(p)
-            else moveTowards(p, target.xWu, target.yWu, 1)
-            if (p.chargeFull && targetDist <= whirlFrom && p.dashCooldown <= 0) {
-                if (whirlsStarted % 2 === 0) {
-                    p.releaseSwing()
-                    _held = false
-                    p.dash()
-                } else {
-                    p.dash()
-                    _whirlPending = true
-                }
-                return
-            }
+        // With all the momentum and an enemy close, a whirlwind at it;
+        // otherwise it fights as "mix" does
+        if (answer === "whirlwind" && !p.isDashing && p.momentum >= Balance.momentum.max
+                && targetDist <= whirlFrom) {
+            letGo(p)
+            moveTowards(p, target.xWu, target.yWu, 1)
+            p.unleash()
             return
         }
         letGo(p)

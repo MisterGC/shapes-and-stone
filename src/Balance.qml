@@ -78,14 +78,11 @@ QtObject {
         heavyArc: 90,
         heavyRange: 1.25,
         heavyKnockback: 2,
-        // Whirlwind: a full charge let go at most whirlWindow physics steps
-        // before or after a dash starts spins the knight forward instead,
-        // whirlSpeed for whirlDuration seconds along the dash, no damage
-        // taken, and hits every standing enemy within whirlReach of it,
-        // centre to centre, once, for whirlSwing times atk, through a
-        // guardian's shield. Outside the window a full charge swings heavy
-        // and a dash cancels the charge
-        whirlWindow: 6,
+        // Whirlwind: Q with full momentum (Balance.momentum) spins the
+        // knight forward, whirlSpeed for whirlDuration seconds along its
+        // way or facing, no damage taken, and hits every standing enemy
+        // within whirlReach of it, centre to centre, once, for whirlSwing
+        // times atk, through a guardian's shield. A dash cancels a charge
         whirlDuration: 0.35,
         whirlSpeed: 22.0,
         whirlReach: 1.6,
@@ -222,6 +219,23 @@ QtObject {
         thickness: 0.06,
         opacity: 0.9,
         flashColor: "#FFFFFF"
+    })
+
+    // Momentum, the whirlwind's price: max pips, earned by blows that land
+    // - a swing or a heavy blow that hits swing or heavy (once a swing,
+    // however many it hits), a parry parry, a bash that shoves bash, a
+    // perfect block perfectBlock. Q with all of them whirls and spends
+    // them; short of max it flashes the pips for flash seconds. A fall
+    // loses them, a new level keeps them
+    readonly property var momentum: ({
+        max: 4,
+        swing: 1,
+        heavy: 1,
+        parry: 2,
+        bash: 1,
+        perfectBlock: 2,
+        flash: 0.4,
+        color: "#FFC85A"
     })
 
     // The sword-and-shield combo: the right button within window seconds of

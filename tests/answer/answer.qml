@@ -39,15 +39,15 @@
 // shield it takes enemy.crushMana mana and enemy.crushShare of the damage
 // and drops the shield for enemy.crushLockout, after which a held button
 // raises it again; a perfect block takes it whole and staggers the
-// guardian for enemy.stagger; a dash makes it miss. A full charge let go
-// knight.whirlWindow steps before or after a dash starts whirls, a step
-// more does not, nor does a charge that is not full; the whirlwind hits
-// each enemy along its path once, knight.whirlSwing times atk, through a
-// guardian's shield, and not one the heavy swing it turned hit already;
-// the dash swing and the shield dash work as before, and a pause holds
-// the window. A dash costs knight.dashMana and a whirlwind knight.whirlMana;
-// short of it no dash starts and a full charge swings heavy, each showing
-// knight.noManaWord and the mana bar's flash. A lunge or a shot that lands
+// guardian for enemy.stagger; a dash makes it miss. A swing into the air
+// earns no momentum, one that hits two enemies momentum.swing once. Q short
+// of full momentum whirls not and flashes the pips; with it but short of
+// knight.whirlMana it shows knight.noManaWord and keeps the momentum; with
+// both it whirls, costs whirlMana and spends the momentum. The whirlwind hits each enemy along its path once,
+// knight.whirlSwing times atk, through a guardian's shield; a full charge
+// held into a dash whirls no more; the dash swing and the shield dash work
+// as before. A dash costs knight.dashMana; short of it no dash starts,
+// showing knight.noManaWord and the mana bar's flash. A lunge or a shot that lands
 // throws the knight knight.knockback wu along it, off the grunt; a crushing
 // blow through the shield too, a blocked, perfect or dodged blow not; a
 // wall stops it, a pause and a hit stop hold it. A blow or a shot the shield
@@ -885,17 +885,18 @@ Window {
             Clayground.paused = false
             console.log("[Answer] charge done,", failures, "failed")
         }],
-        // The whirlwind: a full charge let go right around a dash's start
+        // The whirlwind: Q with full momentum, earned by blows that land
         [() => true, () => {
             Clayground.paused = true
             let p = game.player
             let k = Balance.knight
+            let mo = Balance.momentum
             let cx = game.width / 2, cy = game.height / 2
-            let win = k.whirlWindow
             let fullSteps = Math.round(k.chargeTime / stepS)
             let foes = game.enemies.filter(e => !e.destroyed)
             for (let o of foes) { o.halt(); o.parryWindow = false; o.hp = 100 }
             let gr = foes.filter(e => e.enemyType === "grunt")[0]
+            let gr2 = foes.filter(e => e.enemyType === "grunt")[1]
             let gd = foes.find(e => e.enemyType === "guardian")
             let sp = foes.find(e => e.enemyType === "spitter")
             let x0 = p.xWu, y0 = p.yWu
@@ -925,83 +926,72 @@ Window {
                 away()
                 Clayground.physicsStep(1)
             }
-            // Held until the charge is full
-            let charge = () => {
-                ready()
-                mouse.mousePress(game, cx, cy, Qt.LeftButton)
-                Clayground.physicsStep(fullSteps)
-                return p.chargeFull
-            }
             let actions = []
             let record = (a) => actions.push(a)
             p.acted.connect(record)
+            let shorts = 0
+            let short = () => shorts++
+            p.momentumShort.connect(short)
             let whirls0 = game.fightRecord.whirlwinds
 
-            // Let go of n steps before the dash starts
-            let before = (n) => {
-                let full = charge()
-                mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-                if (n > 0) Clayground.physicsStep(n)
-                actions = []
-                p.dash()
-                return {full: full, whirl: p.isWhirling && actions.indexOf("whirlwind") >= 0,
-                        acts: actions.join(", ")}
-            }
-            let b = before(win)
-            check(b.full && b.whirl, "a full charge let go " + win + " steps before the dash starts"
-                  + " whirls (full " + b.full + ", acted " + b.acts + ")")
-            b = before(win + 1)
-            check(b.full && !b.whirl && p.isDashing && p.isHeavy,
-                  "let go " + (win + 1) + " steps before, it swings heavy and the dash stays a dash"
-                  + " (acted " + b.acts + ", heavy " + p.isHeavy + ")")
-
-            // Let go of n steps after the dash started
-            let after = (n) => {
-                let full = charge()
-                p.dash()
-                if (n > 0) Clayground.physicsStep(n)
-                actions = []
-                mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-                return {full: full, whirl: p.isWhirling && actions.indexOf("whirlwind") >= 0,
-                        acts: actions.join(", ") || "nothing"}
-            }
-            let a = after(win)
-            check(a.full && a.whirl, "a full charge let go " + win + " steps after the dash started"
-                  + " whirls (full " + a.full + ", acted " + a.acts + ")")
-            a = after(win + 1)
-            check(a.full && !a.whirl && !p.isAttacking && a.acts === "nothing",
-                  "let go " + (win + 1) + " steps after, the dash has cancelled the charge: the"
-                  + " release swings nothing (acted " + a.acts + ")")
-
-            // A charge that is not full: the dash cancels it, and one let go
-            // just before the dash swings normally
+            // Momentum: a swing into the air earns none, one that hits two
+            // enemies earns momentum.swing once
             ready()
-            mouse.mousePress(game, cx, cy, Qt.LeftButton)
-            Clayground.physicsStep(fullSteps - 1)
-            let charging = p.isCharging && !p.chargeFull
-            p.dash()
-            actions = []
-            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-            check(charging && !p.isWhirling && actions.length === 0,
-                  "a charge not yet full, dashed with, whirls not and swings nothing (acted "
-                  + (actions.join(", ") || "nothing") + ")")
+            p.momentum = 0
+            p.attack()
+            Clayground.physicsStep(Math.ceil(k.swingFade / stepS) + 4)
+            check(p.momentum === 0, "a swing into the air earns no momentum (" + p.momentum + ")")
             ready()
-            mouse.mousePress(game, cx, cy, Qt.LeftButton)
-            Clayground.physicsStep(fullSteps - 1)
-            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-            let normal = p.isAttacking && !p.isHeavy
+            gr.xWu = x0 + 1.0; gr.yWu = y0 + 0.3
+            gr2.xWu = x0 + 1.0; gr2.yWu = y0 - 0.3
+            let hp1 = gr.hp, hp2 = gr2.hp
+            p.momentum = 0
+            p.attack()
+            Clayground.physicsStep(Math.ceil(k.swingFade / stepS) + 4)
+            check(gr.hp < hp1 && gr2.hp < hp2 && p.momentum === mo.swing,
+                  "a swing that hits two enemies earns " + p.momentum + " momentum, the table's "
+                  + mo.swing + " once")
+
+            // Short of full momentum Q whirls not: the pips flash, no mana
+            // is spent, nothing is acted
+            ready()
+            p.momentum = mo.max - 1
             actions = []
-            p.dash()
-            check(normal && !p.isWhirling && actions.indexOf("whirlwind") < 0,
-                  "one let go just before a dash swings normally and whirls not (acted "
+            let m0 = p.mana
+            let did = p.unleash()
+            check(!did && !p.isWhirling && !p.isDashing && shorts === 1 && p.mana === m0
+                  && actions.length === 0 && p.momentum === mo.max - 1,
+                  "with " + (mo.max - 1) + " of " + mo.max + " momentum Q whirls not, the pips flash ("
+                  + shorts + ") and no mana is spent (acted " + (actions.join(", ") || "nothing") + ")")
+
+            // Full momentum, short of the whirlwind's mana: no whirlwind,
+            // the word and the mana bar's flash, the momentum kept
+            ready()
+            p.momentum = mo.max
+            p.mana = k.whirlMana - 1
+            let words = spawned("fightWord", k.noManaWord)
+            actions = []
+            did = p.unleash()
+            check(!did && !p.isWhirling && p.momentum === mo.max
+                  && spawned("fightWord", k.noManaWord) === words + 1 && game.manaBarFlashing,
+                  "with " + (k.whirlMana - 1) + " mana Q whirls not, " + k.noManaWord
+                  + " shows, the mana bar flashes and the momentum is kept")
+
+            // Full momentum and mana: it whirls, costs whirlMana and spends
+            // the momentum (the Q key itself: tests/settings)
+            ready()
+            p.momentum = mo.max
+            actions = []
+            p.unleash()
+            check(p.isWhirling && actions.indexOf("whirlwind") >= 0 && p.momentum === 0
+                  && Math.abs(p.maxMana - p.mana - k.whirlMana) < 1e-6,
+                  "with full momentum it whirls, costs " + (p.maxMana - p.mana).toFixed(2)
+                  + " mana (the table's " + k.whirlMana + ") and spends the momentum (acted "
                   + actions.join(", ") + ")")
 
-            // Along its path: a grunt the heavy swing hit just before, a
-            // guardian facing the knight and the other grunt; the spitter
-            // stands off the path
-            let gr2 = foes.filter(e => e.enemyType === "grunt")[1]
-            charge()
-            gr.xWu = x0 + 1.5; gr.yWu = y0
+            // Along its path: a guardian facing the knight and a grunt
+            // behind it; the spitter stands off the path
+            ready()
             gd.xWu = x0 + 3.5; gd.yWu = y0 + 0.3; gd.facingAngle = 180
             gr2.xWu = x0 + 5.5; gr2.yWu = y0 - 0.3
             sp.xWu = x0 + 3.5; sp.yWu = y0 + 4
@@ -1009,11 +999,9 @@ Window {
             let front = gd._isShieldFacing(p.xWu, p.yWu)
             let hits0 = game.fightRecord.whirlHits
             let dealt0 = game.fightRecord.damageDealt
-            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-            Clayground.physicsStep(2)
-            let heavyHit = 100 - gr.hp
+            p.momentum = mo.max
             actions = []
-            p.dash()
+            p.unleash()
             let n = 0
             while (p.isDashing && n < 120) {
                 Clayground.physicsStep(1)
@@ -1023,10 +1011,6 @@ Window {
             let lost = foes.map((e, i) => lost0[i] - e.hp)
             let whirlDmg = Math.floor(p.atk * k.whirlSwing)
             let lostOf = (e) => lost[foes.indexOf(e)]
-            check(actions.indexOf("whirlwind") >= 0 && heavyHit === Math.floor(p.atk * k.heavySwing) - gr.def
-                  && lostOf(gr) === heavyHit,
-                  "the grunt the heavy swing hit just before is not hit again by its whirlwind (lost "
-                  + lostOf(gr) + ", the heavy hit " + heavyHit + ")")
             check(front && lostOf(gd) === whirlDmg - gd.def && lostOf(gr2) === whirlDmg - gr2.def,
                   "the whirlwind hits the guardian through its shield and the grunt behind it once each, "
                   + whirlDmg + " (" + k.whirlSwing + "x atk " + p.atk + ") less def: they lost "
@@ -1036,11 +1020,26 @@ Window {
                   && game.fightRecord.whirlwinds - whirls0 === 1,
                   "the fight record counts " + (game.fightRecord.whirlHits - hits0)
                   + " whirlwind hits and " + (game.fightRecord.whirlwinds - whirls0)
-                  + " whirlwind that landed; the earlier ones hit nothing")
-            check(game.fightRecord.damageDealt - dealt0 === heavyHit + lostOf(gd) + lostOf(gr2),
+                  + " whirlwind that landed; the one before hit nothing")
+            check(game.fightRecord.damageDealt - dealt0 === lostOf(gd) + lostOf(gr2),
                   "its hits count " + (game.fightRecord.damageDealt - dealt0) + " dealt")
             check(n <= Math.ceil((k.whirlDuration) / stepS) + 1 && !p.isWhirling,
                   "the whirlwind lasts " + n + " steps (" + k.whirlDuration + " s)")
+
+            // A full charge held into a dash whirls no more: the dash
+            // cancels the charge and its release swings nothing
+            ready()
+            p.momentum = mo.max
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(fullSteps)
+            let full = p.chargeFull
+            p.dash()
+            Clayground.physicsStep(2)
+            actions = []
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            check(full && !p.isWhirling && !p.isAttacking && actions.length === 0 && p.momentum === mo.max,
+                  "a full charge held into a dash whirls not and its release swings nothing (acted "
+                  + (actions.join(", ") || "nothing") + ")")
 
             // The dash swing and the shield dash work as before
             ready()
@@ -1067,66 +1066,25 @@ Window {
                   + actions.join(", ") + ")")
             p.isBlocking = false
 
-            // Mana pays for a dash and a whirlwind; without it a dash does
-            // not start and a full charge swings heavy, each refusal with
+            // Mana pays for a dash; without it a dash does not start, with
             // the word over the knight and the mana bar's flash
             ready()
-            let m0 = p.mana
+            m0 = p.mana
             p.dash()
             check(p.isDashing && Math.abs(m0 - p.mana - k.dashMana) < 1e-6,
                   "a dash costs " + (m0 - p.mana).toFixed(2) + " mana, the table says " + k.dashMana)
-            let w = before(0)
-            check(w.whirl && Math.abs(p.maxMana - p.mana - k.whirlMana) < 1e-6,
-                  "a whirlwind costs " + (p.maxMana - p.mana).toFixed(2) + " mana with its dash, the table says "
-                  + k.whirlMana)
             ready()
             p.mana = k.dashMana - 1
-            let words = spawned("fightWord", k.noManaWord)
+            words = spawned("fightWord", k.noManaWord)
             actions = []
             p.dash()
             check(!p.isDashing && actions.indexOf("dash") < 0 && p.mana === k.dashMana - 1
                   && spawned("fightWord", k.noManaWord) === words + 1 && game.manaBarFlashing,
                   "with " + (k.dashMana - 1) + " mana no dash starts, " + k.noManaWord
                   + " shows and the mana bar flashes (acted " + (actions.join(", ") || "nothing") + ")")
-            ready()
-            charge()
-            p.mana = k.whirlMana - 1
-            words = spawned("fightWord", k.noManaWord)
-            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-            actions = []
-            p.dash()
-            check(p.isDashing && !p.isWhirling && p.isHeavy && actions.indexOf("whirlwind") < 0
-                  && spawned("fightWord", k.noManaWord) === words + 1,
-                  "with " + (k.whirlMana - 1) + " mana a full charge let go into a dash swings heavy and"
-                  + " dashes, " + k.noManaWord + " shows (acted " + actions.join(", ") + ")")
-            ready()
-            charge()
-            p.dash()
-            p.mana = k.whirlMana - k.dashMana - 1
-            words = spawned("fightWord", k.noManaWord)
-            actions = []
-            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
-            check(!p.isWhirling && actions.indexOf("heavy") >= 0
-                  && spawned("fightWord", k.noManaWord) === words + 1,
-                  "a full charge held into a dash and let go short of the whirlwind's mana swings heavy, "
-                  + k.noManaWord + " shows (acted " + actions.join(", ") + ")")
 
-            // A full charge held into a dash, the game paused: the window
-            // counts physics steps, not the wall clock
-            charge()
-            p.dash()
-            kept = p
-        }],
-        [300, () => {
-            let p = kept
-            let actions = []
-            let record = (a) => actions.push(a)
-            p.acted.connect(record)
-            mouse.mouseRelease(game, game.width / 2, game.height / 2, Qt.LeftButton)
-            check(p.isWhirling && actions.indexOf("whirlwind") >= 0,
-                  "paused 300 ms after a dash with a full charge, its release still whirls (acted "
-                  + (actions.join(", ") || "nothing") + ")")
             p.acted.disconnect(record)
+            p.momentumShort.disconnect(short)
             for (let o of game.enemies) if (!o.destroyed) { o.halted = false; o.aiState = "patrol" }
             Clayground.physicsStep(Math.ceil(Balance.knight.whirlDuration / stepS) + 2)
             Clayground.paused = false

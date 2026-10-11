@@ -14,7 +14,8 @@
 // body, under the darkness. A swing breaks a heap of bones in its arc, a
 // whirlwind every heap within its reach. A right-click right after a swing
 // bashes: the enemy in front is shoved back for Balance.bash.mana, once a
-// swing, and not after the window. Prints one PASS or FAIL
+// swing, and not after the window. Q short of momentum whirls not, with all
+// of it it whirls and spends it; a fall loses it. Prints one PASS or FAIL
 // line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/settings/settings.qml
@@ -308,6 +309,29 @@ Window {
             p.raiseShield()
             p.lowerShield()
             check(p.mana > p.maxMana - Balance.bash.mana, "a right-click after the window only raises the shield")
+            // Q through the game's keys: short of momentum nothing, with all
+            // of it the whirlwind
+            p.momentum = Balance.momentum.max - 1
+            p.mana = p.maxMana
+            p.dashCooldown = 0
+            game.forceActiveFocus()
+        }],
+        [100, () => {
+            press(Qt.Key_Q)
+        }],
+        [100, () => {
+            let p = game.player
+            check(!p.isWhirling && p.momentum === Balance.momentum.max - 1, "Q short of momentum whirls not")
+            p.momentum = Balance.momentum.max
+            press(Qt.Key_Q)
+        }],
+        [() => !game.player.isDashing, () => {
+            let p = game.player
+            check(p.momentum === 0 && p.mana < p.maxMana, "Q with full momentum whirls and spends it")
+            // A fall loses the momentum
+            p.momentum = Balance.momentum.max
+            p.hp = 0
+            check(p.fallen && p.momentum === 0, "a fall loses the momentum (" + p.momentum + ")")
             console.log("[Settings] done,", failures, "failed")
         }],
         [300, () => game.destroy()],
