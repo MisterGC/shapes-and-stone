@@ -3898,19 +3898,23 @@ ClayWorld2d {
     // A fixed seed keeps the layout identical across reloads, so before/after
     // captures compare the same room.
     readonly property int scenarioSeed: 424242
-    function scenarios() { return ["dungeon", "village", "fight"] }
+    // "features" is the dungeon with every feature kind at its showcase
+    // count (Balance.dungeon), to try a kind right after a reload
+    function scenarios() { return ["dungeon", "village", "fight", "features"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
-    // for a dungeon high in depth 4's range. A whole number is the bottom
-    function applyScenario(name, atDanger) {
+    // for a dungeon high in depth 4's range. A whole number is the bottom.
+    // seed (scenarioSeed when left out) is the run's seed it is built on
+    function applyScenario(name, atDanger, seed) {
         let dg = Math.max(0, Number(atDanger) || 0)
         let d = Math.floor(dg)
         _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
         _setKnights(knightsNow())
         muted = true
-        masterSeed = scenarioSeed
+        masterSeed = seed === undefined ? scenarioSeed : seed
         if (player) clearDungeon()
+        featureShowcase = name === "features"
         fallen = false
         fightRoomActive = false
         // Generate before leaving the title: with a player in place,
