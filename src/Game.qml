@@ -2303,6 +2303,7 @@ ClayWorld2d {
     // Minimap with fog of war
     Canvas {
         id: minimap
+        objectName: "minimap"
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 10
