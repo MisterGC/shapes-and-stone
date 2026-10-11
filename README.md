@@ -696,6 +696,61 @@ It needs the live loader and exits with the number of failed checks:
 python3 tests/slitparty/run_slitparty.py --mode local
 ```
 
+Some room entrances get a door (`src/Door.qml`): a doorway, a corridor's
+cell beside a room with rock on its two other sides, gets one with
+`dungeon.doorShare`'s chance at the danger's band, every doorway in the
+features scenario (`Game.planDoors`). The doors come from their own
+stream of the level's seed, so the rooms, the enemies and the features
+stay as the seed has them. Two jambs narrow the doorway to a wooden leaf
+`dungeon.doorWidth` wu wide, one knight, and every door starts closed.
+Closed it blocks the knights, the enemies and their shots like a wall,
+and the enemies' sight: an enemy does not see a knight behind it. E
+within `doorReach` wu of a door's centre, with no one to talk to, opens
+or closes the nearest - an E shows over it - unless a knight or an enemy
+stands where its leaf closes; open it swings into the room. An enemy
+chasing through a closed door stops within `doorBashReach` wu of it,
+winds up with its ring for `doorBash` seconds and bursts it open
+(`Game.bashDoor`); a bashed door lies in splinters and stays open, and E
+does nothing at it. The enemies' paths come from Clayground's
+`GridPathfinder`, fed the grid turned half a turn so they are the paths
+of the game's own A* before it; a closed door counts as `doorPathCost`
+cells more. The pathfinder takes no cost per cell (clayground#423), so
+the game searches twice, through the closed doors and around them, and
+takes the way around when it is no longer than the way through and the
+doors' cost. Alone the game owns the doors; in a session the host does:
+a node's E asks it, and it keeps the doors open or bashed in the level as
+the session property `doors`, so every screen shows them so, a player
+who joins later too. The doors bench lands in the features scenario: the
+knight walks into a closed door, which stops it, opens it with E and
+walks through, cannot close it standing in the doorway and closes it from
+beside it; a closed door hides the knight from an enemy beyond it and an
+open one does not; a grunt that spots the knight through the open door
+chases it, and with the door shut stops at it, winds up with its ring for
+`doorBash` seconds and bursts it open, and E leaves the bashed door
+open. Then it lays out the doors of 50 seeds across the bands: each on a
+doorway and never in the entrance's or the exit's shaft, about
+`doorShare` of the doorways, the same twice on a seed and danger. With an
+out dir and a window it saves `closed.png`, `open.png`, `bashing.png`
+(the ring half closed) and `bashed.png`:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/doors/doors.qml
+qml -I build/bin/qml tests/doors/doors.qml -- <out dir>
+```
+
+The door party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both lay
+the same doors, all closed; the joiner's knight opens one with E and it
+is open on both screens; the host's closes it and it is closed on both;
+the joiner's E in the doorway of a door the host opened leaves it open;
+a door the host's enemy bashes is bashed on both screens, and the
+joiner's E leaves it so. It needs the live loader and exits with the
+number of failed checks:
+
+```
+python3 tests/doorparty/run_doorparty.py --mode local
+```
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.

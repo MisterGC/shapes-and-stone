@@ -13,6 +13,11 @@ uses [Semantic Versioning](https://semver.org/).
 - **Spike plates:** a floor stone with small holes stands in some rooms, more often the higher the danger. Stepped on, it clicks, and 0.25 s later spikes rise (`Balance.dungeon.spikeDelay`): a knight still on it takes `spikeDamage`, more the deeper, never more than a quarter of its max HP; a dash at the click saves it. A plate fires once and stays sprung, bent spikes over a stain. Only knights set it off and take its damage; in a session it is sprung on every screen and each knight's own game judges the spikes on it.
 - **Arrow slits:** a narrow opening in a room's wall fires across the room in a rhythm you can learn (`Balance.dungeon.slitRhythms`) - a single shot, "1 - 1 - pause", a volley, and at a higher danger a stream or a hail - and two in a room take turns. Before each shot a ring closes on it and it glows, as an enemy's wind-up does. Every slit leaves a lane or a gap in its rhythm long enough to walk past. An arrow hurts only knights; a held shield stops it, a perfect block sends it back to its slit and a dash passes through it. In a session every screen fires the same arrow at the same session time, and each knight's own game judges the arrows on it.
 - **Loops:** some rooms get a second entrance - one corridor off the chain of rooms at low danger, two at middle, three at high (`Balance.dungeon.extraCorridors`) - between rooms close but not next in the chain, so a dungeon has ways around to flank and to escape. A seed and danger carve the same on every screen; no such corridor cuts through or opens into another room.
+- **Doors:** some room entrances get a door, more often the higher the danger (`Balance.dungeon.doorShare`), one knight wide, so a doorway becomes a chokepoint. E beside it opens or closes it; closed it blocks knights, enemies, their shots and their sight. An enemy chasing through a closed door stops, winds up with its ring for 1.5 s (`doorBash`) and bursts it open, and a bashed door stays open. In a session the host owns the doors, and a door opened on one screen is open on every screen.
+
+### Changed
+
+- **Enemy paths** come from Clayground's `GridPathfinder` instead of the game's own A*, the same paths as before; a closed door counts as a few cells more, so an enemy takes a short way around one when there is one.
 
 ## [0.2.2] - 2026-10-11
 
