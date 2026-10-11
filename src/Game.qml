@@ -1,6 +1,7 @@
 import QtQuick
 import Box2D
 import Clayground.Common
+import Clayground.Algorithm
 import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
@@ -3337,6 +3338,7 @@ ClayWorld2d {
         }
         breakables.push(b)
         _propCells[f.gy * gridWidth + f.gx] = true
+        _setPathCell(f.gx, f.gy, false)
         return b
     }
     function breakableAt(cell) {
@@ -3401,6 +3403,7 @@ ClayWorld2d {
         breakables.splice(i, 1)
         let c = b.cell.split(",").map(Number)
         delete _propCells[c[1] * gridWidth + c[0]]
+        _setPathCell(c[0], c[1], true)
         let x = b.cxWu, y = b.cyWu
         if (b.kind === "urn") {
             spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
@@ -4693,7 +4696,53 @@ ClayWorld2d {
         }
     }
 
-    // --- A* pathfinder on grid ---
+    // --- Paths on the grid: Clayground's GridPathfinder (issue #127) ---
+    // The pathfinder holds the grid's walls and the breakables still
+    // standing as blocked. It is fed the grid turned half a turn: its
+    // neighbour order is then the one of the game's own A* it replaced, so
+    // a seed takes the same paths and the fight bench the same numbers
+    GridPathfinder { id: pathfinder }
+    // The grid the pathfinder was filled from; another one fills it anew
+    property var _pathGrid: null
+    function _pathCell(gx, gy) {
+        return { x: gridWidth - 1 - gx, y: gridHeight - 1 - gy }
+    }
+    function _syncPathfinder() {
+        if (_pathGrid === grid) return
+        let data = new Array(gridWidth * gridHeight)
+        for (let gy = 0; gy < gridHeight; gy++)
+            for (let gx = 0; gx < gridWidth; gx++) {
+                let c = _pathCell(gx, gy)
+                data[c.y * gridWidth + c.x] = grid[gy][gx] === cellWall
+                    || _propCells[gy * gridWidth + gx] ? 1 : 0
+            }
+        pathfinder.columns = gridWidth
+        pathfinder.rows = gridHeight
+        pathfinder.walkableData = data
+        _pathGrid = grid
+    }
+    // Whether the pathfinder takes cell (gx, gy) as walkable, once filled
+    function _setPathCell(gx, gy, walkable) {
+        if (_pathGrid !== grid) return
+        let c = _pathCell(gx, gy)
+        pathfinder.setWalkable(c.x, c.y, walkable)
+    }
+    function _blockedCell(gx, gy) {
+        return grid[gy][gx] === cellWall || _propCells[gy * gridWidth + gx] === true
+    }
+    // The cells from (sx, sy) to (ex, ey), [{x, y}] in grid cells; a
+    // breakable on either end is no obstacle
+    function _cellPath(sx, sy, ex, ey) {
+        _syncPathfinder()
+        let ends = [[sx, sy], [ex, ey]].filter(c => _blockedCell(c[0], c[1]))
+        for (let c of ends) _setPathCell(c[0], c[1], true)
+        let a = _pathCell(sx, sy), b = _pathCell(ex, ey)
+        let path = pathfinder.findPath(a.x, a.y, b.x, b.y)
+        for (let c of ends) _setPathCell(c[0], c[1], false)
+        return path.map(c => ({ x: gridWidth - 1 - c.x, y: gridHeight - 1 - c.y }))
+    }
+    // The way from one point to another in wu, cell centres as waypoints;
+    // [] when there is none
     function findPath(x1Wu, y1Wu, x2Wu, y2Wu) {
         let sx = Math.floor(x1Wu / cellSize)
         let sy = Math.floor(y1Wu / cellSize)
@@ -4721,93 +4770,8 @@ ClayWorld2d {
         let s = snapToWalkable(sx, sy)
         let e = snapToWalkable(ex, ey)
         if (!s || !e) return []
-        sx = s.x; sy = s.y; ex = e.x; ey = e.y
-
-        // Binary heap (min-heap by f score)
-        let open = []
-        let closed = new Set()
-        let cameFrom = {}
-        let gScore = {}
-
-        function key(x, y) { return y * gridWidth + x }
-        function heuristic(x, y) { return Math.abs(x - ex) + Math.abs(y - ey) }
-
-        function heapPush(node) {
-            open.push(node)
-            let i = open.length - 1
-            while (i > 0) {
-                let p = (i - 1) >> 1
-                if (open[p].f <= open[i].f) break
-                let tmp = open[p]; open[p] = open[i]; open[i] = tmp
-                i = p
-            }
-        }
-
-        function heapPop() {
-            let top = open[0]
-            let last = open.pop()
-            if (open.length > 0) {
-                open[0] = last
-                let i = 0
-                while (true) {
-                    let best = i
-                    let l = 2 * i + 1, r = 2 * i + 2
-                    if (l < open.length && open[l].f < open[best].f) best = l
-                    if (r < open.length && open[r].f < open[best].f) best = r
-                    if (best === i) break
-                    let tmp = open[best]; open[best] = open[i]; open[i] = tmp
-                    i = best
-                }
-            }
-            return top
-        }
-
-        let startKey = key(sx, sy)
-        gScore[startKey] = 0
-        heapPush({x: sx, y: sy, f: heuristic(sx, sy)})
-
-        let dirs = [[1,0],[-1,0],[0,1],[0,-1]]
-
-        while (open.length > 0) {
-            let cur = heapPop()
-            let ck = key(cur.x, cur.y)
-
-            if (cur.x === ex && cur.y === ey) {
-                // Reconstruct path as world-unit waypoints
-                let path = []
-                let k = ck
-                while (k !== undefined) {
-                    let py = Math.floor(k / gridWidth)
-                    let px = k % gridWidth
-                    path.unshift(Qt.point(px * cellSize + cellSize / 2,
-                                          py * cellSize + cellSize / 2))
-                    k = cameFrom[k]
-                }
-                return path
-            }
-
-            if (closed.has(ck)) continue
-            closed.add(ck)
-
-            for (let d of dirs) {
-                let nx = cur.x + d[0]
-                let ny = cur.y + d[1]
-                if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) continue
-                if (grid[ny][nx] === cellWall) continue
-                let nk = key(nx, ny)
-                // Around a breakable still standing, unless it is the goal
-                if (_propCells[nk] && !(nx === ex && ny === ey)) continue
-                if (closed.has(nk)) continue
-                let ng = gScore[ck] + 1
-                if (gScore[nk] === undefined || ng < gScore[nk]) {
-                    gScore[nk] = ng
-                    cameFrom[nk] = ck
-                    heapPush({x: nx, y: ny, f: ng + heuristic(nx, ny)})
-                }
-            }
-        }
-
-        return [] // No path found
+        return _cellPath(s.x, s.y, e.x, e.y).map(c => Qt.point(c.x * cellSize + cellSize / 2,
+                                                             c.y * cellSize + cellSize / 2))
     }
 
     // --- Screen Overlays ---
