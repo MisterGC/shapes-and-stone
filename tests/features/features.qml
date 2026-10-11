@@ -147,9 +147,15 @@ Window {
             console.log("[Features] scenario fingerprint:", h, game.features.length, "features")
             check(h === recorded, "seed " + game.scenarioSeed + " places the features recorded ("
                   + h + ", recorded " + recorded + ")")
+            // Beside the first feature, the enemies still, the camera
+            // snapped to the knight as the looks bench does
             if (outDir !== "") {
+                game.fx = true
+                for (let e of game.enemies) if (e && e.halt) e.halt()
                 game.player.xWu = game.features[0].xWu
                 game.player.yWu = game.features[0].yWu - 1.5
+                game.camera.target = null
+                game.camera.target = game.player
             }
         }],
         [500, () => {
