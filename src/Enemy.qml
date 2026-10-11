@@ -723,7 +723,9 @@ PhysicsItem {
         _recalcChasePath()
         aiState = "chase"
     }
-    // The waypoints it walks to, for the game to find a door on them
+    // Its path's waypoints, for the game to find a door on them. FollowPath
+    // keeps those already passed too; the game has it plan anew when a
+    // door closes
     function pathAhead() { return followPath.wpsWu }
 
     function _startLunge() {

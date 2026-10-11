@@ -3994,6 +3994,12 @@ ClayWorld2d {
         if (state === "closed") delete v[cell]
         else v[cell] = state
         _doorStates = v
+        // A path holds the waypoints already passed: the enemies on the
+        // chase plan anew from where they stand, so a door shut behind
+        // one is no door ahead of it (closedDoorAhead)
+        if (state === "closed")
+            for (let e of enemies)
+                if (e && !e.destroyed && !e.remote && e.aiState === "chase") e._recalcChasePath()
         if (session.connected)
             session.publishDoors({ seed: session.runSeed, level: levelIndex, doors: v })
     }
