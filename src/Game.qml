@@ -3068,30 +3068,40 @@ ClayWorld2d {
 
     // The features of the carved dungeon, at the look's band (dangerBand)
     // or at the showcase counts, without touching the world. Each kind
-    // draws from its own stream, the level's seed and the kind's name, so a
-    // kind added or retuned leaves where the others fall as it was, but
-    // for a cell one of them takes first
-    function planFeatures(levelSeed, band, showcase) {
+    // draws from its own stream, the level's seed and the kind's name, and
+    // ranks a room's cells by it whatever the other kinds took: it takes
+    // the first of them still free. So a kind added or retuned moves
+    // another only off a cell it takes first. kinds is Balance.dungeon's
+    // when left out
+    function planFeatures(levelSeed, band, showcase, kinds) {
+        kinds = kinds || Balance.dungeon.kinds
         let out = []
         if (rooms.length < 2) return out
         let taken = {}
-        for (let kind in Balance.dungeon.kinds) {
-            let table = Balance.dungeon.kinds[kind]
+        for (let kind in kinds) {
+            let table = kinds[kind]
             let rand = createRng(levelSeed ^ 0x7a3d9e21 ^ _nameHash(kind))
             let perRoom = showcase ? table.showcase : table.perRoom[band]
             for (let room of rooms.slice(1)) {
                 // A whole number per room, its fraction a chance of one more
                 let n = Math.floor(perRoom + rand())
                 if (n <= 0) continue
-                let free = []
+                let cells = []
                 for (let gy = room.y; gy < room.y + room.h; gy++)
                     for (let gx = room.x; gx < room.x + room.w; gx++)
-                        if (!taken[gy * gridWidth + gx] && featureCellOk(gx, gy)) free.push([gx, gy])
-                for (let i = 0; i < n && free.length > 0; i++) {
-                    let c = free.splice(Math.floor(rand() * free.length), 1)[0]
+                        if (featureCellOk(gx, gy)) cells.push([gx, gy])
+                // Shuffled (Fisher-Yates) by this kind's stream alone
+                for (let i = cells.length - 1; i > 0; i--) {
+                    let j = Math.floor(rand() * (i + 1))
+                    let c = cells[i]; cells[i] = cells[j]; cells[j] = c
+                }
+                for (let c of cells) {
+                    if (n <= 0) break
+                    if (taken[c[1] * gridWidth + c[0]]) continue
                     taken[c[1] * gridWidth + c[0]] = true
                     out.push({ kind: kind, gx: c[0], gy: c[1],
                                xWu: (c[0] + 0.5) * cellSize, yWu: (c[1] + 0.5) * cellSize })
+                    n--
                 }
             }
         }
