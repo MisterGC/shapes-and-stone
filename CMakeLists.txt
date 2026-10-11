@@ -53,6 +53,7 @@ clay_app(shapes_and_stone
         src/FxParticle.qml
         src/Stain.qml
         src/Debris.qml
+        src/Breakable.qml
         src/GoldDrop.qml
         src/BodyShade.qml
         src/ExitStairs.qml

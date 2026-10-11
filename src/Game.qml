@@ -671,6 +671,7 @@ ClayWorld2d {
         onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
         onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
+        onBreakReported: (level, cell) => _hostBreak(level, cell)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -839,7 +840,10 @@ ClayWorld2d {
     // Where an enemy died: gold for its tier, none in the fight room
     function dropGold(x, y, tier) {
         if (fightRoomActive) return
-        let amount = Balance.loot.goldByTier[tier] || 0
+        _spawnGold(x, y, Balance.loot.goldByTier[tier] || 0)
+    }
+    // amount gold at (x, y): this node's own alone, the host's in a session
+    function _spawnGold(x, y, amount) {
         if (amount <= 0) return
         let props = {xWu: x, yWu: y, amount: amount}
         if (!session.connected)
@@ -1206,6 +1210,8 @@ ClayWorld2d {
     readonly property int catPlayer: Box.Category2
     readonly property int catEnemy: Box.Category3
     readonly property int catProjectile: Box.Category4
+    // The breakables: they stop the knights and the enemies, not the shots
+    readonly property int catProp: Box.Category5
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
@@ -2699,6 +2705,10 @@ ClayWorld2d {
             revealAroundPlayer()  // Initial reveal
         }
 
+        // The things the host's party broke here already, for a node that
+        // joins late
+        _applyBroken(_sessionBroken)
+
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
             let startRoom = rooms[0]
@@ -3135,14 +3145,155 @@ ClayWorld2d {
     }
     function placeFeatures(list) {
         features = list
+        breakables = []
+        _propCells = ({})
+        _brokenCells = []
+        let band = dangerBand(dangerPosition)
         for (let f of list) {
-            let o = f.kind === "test"
-                ? testFeatureComponent.createObject(glowParent(), {
-                      xWu: f.xWu, yWu: f.yWu, kind: f.kind,
-                      pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
-                : null
+            let o = null
+            if (f.kind === "test")
+                o = testFeatureComponent.createObject(glowParent(), {
+                        xWu: f.xWu, yWu: f.yWu, kind: f.kind,
+                        pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+            else if (Balance.dungeon.loot[f.kind])
+                o = _placeBreakable(f, band)
             if (o) dungeonObjects.push(o)
         }
+    }
+
+    // --- Breakables (issue #123) ---
+    // Urns, crates and crystals stand on their features' cells, the same
+    // on every screen, as the seed lays them out. A blow on this screen
+    // breaks one at once (Player._breakThings); alone the game rolls its
+    // gold, in a session the host does, publishes the cells broken in the
+    // level (session property "broken") and every screen breaks them too,
+    // a node that joins later as well. The gold is a drop as an enemy's
+    Component { id: breakableComponent; Breakable {} }
+    Component {
+        id: crystalGlowComponent
+        Rectangle {
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            x: xWu * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit - height / 2
+            width: 1.6 * pixelPerUnit
+            height: width
+            radius: width / 2
+            color: "#307FE6FF"
+            SequentialAnimation on opacity {
+                loops: Animation.Infinite
+                NumberAnimation { from: 0.6; to: 1; duration: 1100; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 1; to: 0.6; duration: 1100; easing.type: Easing.InOutSine }
+            }
+        }
+    }
+    // The whole ones still standing, and their cells by grid key, which
+    // the enemies' paths go around
+    property var breakables: []
+    property var _propCells: ({})
+    // Host, and alone: the cells broken in this level, "gx,gy"
+    property var _brokenCells: []
+    function _placeBreakable(f, band) {
+        let cell = f.gx + "," + f.gy
+        let b = breakableComponent.createObject(world.room, {
+            kind: f.kind, cell: cell, cxWu: f.xWu, cyWu: f.yWu, band: band,
+            sizeWu: Balance.dungeon.breakableSize,
+            seed: createRng(f.gx * 7349 + f.gy * 3571)(),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catProp,
+            collidesWith: catPlayer | catEnemy
+        })
+        if (!b) return null
+        if (f.kind === "crystal") {
+            b.glow = crystalGlowComponent.createObject(glowParent(), {
+                xWu: f.xWu, yWu: f.yWu, pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+            if (b.glow) dungeonObjects.push(b.glow)
+        }
+        breakables.push(b)
+        _propCells[f.gy * gridWidth + f.gx] = true
+        return b
+    }
+    function breakableAt(cell) {
+        return breakables.find(b => b.cell === cell) || null
+    }
+    // The gold a breakable holds, from the level's seed and its cell
+    // alone, whoever breaks it and when: 0 for none
+    function breakableGold(kind, cell) {
+        let t = Balance.dungeon.loot[kind]
+        if (!t) return 0
+        let c = cell.split(",").map(Number)
+        let rand = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
+        if (rand() >= t.chance) return 0
+        let lo = t.gold[0] + t.perDepth * depth, hi = t.gold[1] + t.perDepth * depth
+        return lo + Math.floor(rand() * (hi - lo + 1))
+    }
+    // This node's knight broke b with a blow along (nx, ny)
+    function breakThing(b, nx, ny) {
+        if (!_wreck(b, nx, ny)) return
+        if (session.connected) session.reportBreak(levelIndex, b.cell)
+        else _broken(b.kind, b.cell, b.cxWu, b.cyWu)
+    }
+    // A blow too weak for it: a crystal glances a swing off with sparks
+    function glanceThing(b, nx, ny) {
+        spawnSparks(b.cxWu, b.cyWu, -nx, -ny, 6, "#BFF4FF")
+        impactSound.triggerOneShot(0.25)
+    }
+    // Alone, or the host: b broke for good, its gold drops where it stood
+    // and, in a session, every screen is told
+    function _broken(kind, cell, x, y) {
+        if (_brokenCells.indexOf(cell) >= 0) return
+        _brokenCells.push(cell)
+        _spawnGold(x, y, breakableGold(kind, cell))
+        if (session.connected)
+            session.publishBroken({ seed: session.runSeed, level: levelIndex, cells: _brokenCells.slice() })
+    }
+    // Host: a node broke the thing on that cell of that level
+    function _hostBreak(level, cell) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        let f = features.find(f => f.gx + "," + f.gy === cell && Balance.dungeon.loot[f.kind])
+        if (!f) return
+        let b = breakableAt(cell)
+        if (b) _wreck(b, 0, -1)
+        _broken(f.kind, cell, f.xWu, f.yWu)
+    }
+    // The host's cells broken in the level: those still whole here break
+    function _applyBroken(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let cell of v.cells) {
+            let b = breakableAt(cell)
+            if (b) _wreck(b, 0, -1)
+        }
+    }
+    readonly property var _sessionBroken: session.broken
+    on_SessionBrokenChanged: _applyBroken(_sessionBroken)
+    // Off the floor with its look's pieces thrown along (nx, ny) and a
+    // crack; false when it was broken already
+    function _wreck(b, nx, ny) {
+        let i = breakables.indexOf(b)
+        if (i < 0) return false
+        breakables.splice(i, 1)
+        let c = b.cell.split(",").map(Number)
+        delete _propCells[c[1] * gridWidth + c[0]]
+        let x = b.cxWu, y = b.cyWu
+        if (b.kind === "urn") {
+            spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
+            spawnShards(x, y, nx, ny, 4, Qt.lighter(b._clay, 1.3), 0.28)
+            impactSound.triggerOneShot(0.5)
+        } else if (b.kind === "crate") {
+            spawnShards(x, y, nx, ny, 9, b._wood, 0.24)
+            spawnShards(x, y, nx, ny, 5, Qt.lighter(b._wood, 1.3), 0.14)
+            impactSound.triggerOneShot(0.6)
+        } else {
+            spawnShards(x, y, nx, ny, 12, "#7FE6FF", 0.18)
+            spawnSparks(x, y, nx, ny, 10, "#E8FBFF")
+            impactSound.triggerOneShot(0.7)
+        }
+        if (b.glow) b.glow.destroy()
+        b.destroy()
+        return true
     }
 
     function placeTorch(wx, wy, color) {
@@ -3229,7 +3380,7 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catPlayer,
-            collidesWith: catWall | catProjectile,
+            collidesWith: catWall | catProjectile | catProp,
             // Attack sensor detects enemies
             attackSensorCategories: catPlayer,
             attackSensorCollidesWith: catEnemy
@@ -3326,7 +3477,7 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catEnemy,
-            collidesWith: catWall | catPlayer
+            collidesWith: catWall | catPlayer | catProp
         }))
         if (enemy) {
             console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp,
@@ -3595,6 +3746,9 @@ ClayWorld2d {
         dungeonObjects = []
         features = []
         featureShowcase = false
+        breakables = []
+        _propCells = ({})
+        _brokenCells = []
         bonePiles = []
         torches = []
         stains = []
@@ -4098,6 +4252,8 @@ ClayWorld2d {
                 if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) continue
                 if (grid[ny][nx] === cellWall) continue
                 let nk = key(nx, ny)
+                // Around a breakable still standing, unless it is the goal
+                if (_propCells[nk] && !(nx === ex && ny === ey)) continue
                 if (closed.has(nk)) continue
                 let ng = gScore[ck] + 1
                 if (gScore[nk] === undefined || ng < gScore[nk]) {

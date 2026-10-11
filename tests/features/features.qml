@@ -57,7 +57,7 @@ Window {
 
     // The features scenario on the scenario seed at danger 0: the
     // fingerprint of its features, recorded from this build
-    readonly property string recorded: "87b91999"
+    readonly property string recorded: "d9f38ae2"
     readonly property int seeds: 50
 
     function kinds() { return Object.keys(Balance.dungeon.kinds) }
@@ -203,8 +203,10 @@ Window {
                     let per = Balance.dungeon.kinds[k].perRoom[band]
                     let n = game.features.filter(f => f.kind === k).length
                     let rooms = game.rooms.length - 1
-                    // Each room its whole number and a chance of one more
-                    let ok = per === 0 ? n === 0 : n > 0 && n <= Math.ceil(per) * rooms
+                    // Each room its whole number and a chance of one more:
+                    // none at all only where fewer than 3 are to be expected
+                    let ok = per === 0 ? n === 0
+                                       : (n > 0 || per * rooms < 3) && n <= Math.ceil(per) * rooms
                     check(ok, "danger " + dg + " (band " + band + "): " + n + " " + k
                           + ", the table asks " + per + " a room in " + rooms + " rooms")
                 }

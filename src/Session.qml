@@ -68,6 +68,9 @@ Item {
     signal goldClaimed(string fromId, string objectId)
     // The host gave this node's knight a drop (id, amount)
     signal goldGranted(var grant)
+    // Host: a node's knight broke the breakable on cell ("gx,gy") of
+    // that level (issue #123)
+    signal breakReported(int level, string cell)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -112,6 +115,10 @@ Item {
     // the session property "runs"
     readonly property var hostRuns: net.connected && net.sessionProperties.runs
                                     ? net.sessionProperties.runs : []
+    // The breakables the host's party broke in the level it plays, the
+    // session property "broken" ({seed, level, cells}); null before any
+    readonly property var broken: net.connected && net.sessionProperties.broken
+                                  ? net.sessionProperties.broken : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -168,6 +175,8 @@ Item {
                 session.enemyKillReceived(data)
             } else if (data.type === "goldClaim") {
                 if (net.isHost) session.goldClaimed(fromId, data.id)
+            } else if (data.type === "break") {
+                if (net.isHost) session.breakReported(data.level, data.cell)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -415,6 +424,16 @@ Item {
     function claimGold(objectId) {
         if (net.isHost) goldClaimed(net.nodeId, objectId)
         else net.sendTo(net.hostId, {type: "goldClaim", id: objectId})
+    }
+    // This node's knight broke a breakable: the host breaks it for every
+    // node and rolls its gold. The host's own is taken at once
+    function reportBreak(level, cell) {
+        if (net.isHost) breakReported(level, cell)
+        else net.sendTo(net.hostId, {type: "break", level: level, cell: cell})
+    }
+    // Host: the breakables broken in its level, for every node
+    function publishBroken(broken) {
+        if (net.isHost) net.setSessionProperty("broken", broken)
     }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {

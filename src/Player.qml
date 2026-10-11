@@ -287,6 +287,7 @@ PhysicsItem {
             if (isAttacking) {
                 hitEnemiesInArc()
                 _breakBones(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
+                _breakThings(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
             }
         }
     }
@@ -534,6 +535,44 @@ PhysicsItem {
         }
     }
 
+    // The breakables a blow reaches (Game.breakThing): within reach of the
+    // knight's centre to their edge, and in the swing's arc when inArc. A
+    // swing breaks the nearest of them and no more, a charged swing and
+    // the whirlwind every one. A crystal only a charged swing breaks: a
+    // swing glances off it, once a swing, and the whirlwind passes it
+    property bool _brokeThisSwing: false
+    property var _glancedThisSwing: new Set()
+    function _breakThings(reach, inArc) {
+        if (!gameWorld || !gameWorld.breakables || gameWorld.breakables.length === 0) return
+        let heavy = inArc && isHeavy
+        if (inArc && !heavy && _brokeThisSwing) return
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let near = []
+        for (let b of gameWorld.breakables) {
+            let dx = b.cxWu - cx, dy = b.cyWu - cy
+            let d = Math.sqrt(dx * dx + dy * dy)
+            if (d > reach + b.sizeWu / 2) continue
+            // The arc test reads a top-left corner like the knight's own
+            if (inArc && !isInAttackArc({xWu: b.cxWu - widthWu / 2, yWu: b.cyWu + heightWu / 2})) continue
+            near.push({b: b, d: d, nx: d > 0 ? dx / d : 1, ny: d > 0 ? dy / d : 0})
+        }
+        near.sort((p, q) => p.d - q.d)
+        for (let n of near) {
+            if (n.b.kind === "crystal" && !heavy) {
+                if (inArc && !_glancedThisSwing.has(n.b)) {
+                    _glancedThisSwing.add(n.b)
+                    gameWorld.glanceThing(n.b, n.nx, n.ny)
+                }
+                continue
+            }
+            gameWorld.breakThing(n.b, n.nx, n.ny)
+            if (inArc && !heavy) {
+                _brokeThisSwing = true
+                return
+            }
+        }
+    }
+
     // The whirlwind hits every standing enemy within whirlReach of the
     // knight, centre to centre, once: a heavy blow, through a guardian's
     // shield. Returns how many it hit this step
@@ -541,6 +580,7 @@ PhysicsItem {
         if (!gameWorld || !gameWorld.enemies) return 0
         let k = Balance.knight
         _breakBones(k.whirlReach, false)
+        _breakThings(k.whirlReach, false)
         let hitCount = 0
         for (let e of gameWorld.enemies) {
             if (!e || e.destroyed !== false || _hitThisWhirl.has(e)) continue
@@ -935,6 +975,8 @@ PhysicsItem {
             isHeavy = false
             _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
+            _brokeThisSwing = false
+            _glancedThisSwing = new Set()
             _swingEarned = 0
             attackCooldown = attackCooldownTime
             _swungAt = _steps
@@ -954,6 +996,8 @@ PhysicsItem {
         isHeavy = true
         _swingTimer = attackDuration + Balance.knight.swingFade
         _hitThisSwing = new Set()
+        _brokeThisSwing = false
+        _glancedThisSwing = new Set()
         _swingEarned = 0
         attackCooldown = attackCooldownTime
         view.swing(true)

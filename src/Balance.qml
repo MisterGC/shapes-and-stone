@@ -470,12 +470,31 @@ QtObject {
     // the start room holds at low, middle and high danger (as
     // danger.looks), a whole number, its fraction a chance of one more;
     // showcase how many per room in the dojo's features scenario. "test"
-    // stands in for the kinds to come and lies in no dungeon played
+    // stands in for the kinds to come and lies in no dungeon played. The
+    // breakables: a clay "urn", a wooden "crate" (or barrel) and a
+    // "crystal" cluster, rarer the shallower
     readonly property var dungeon: ({
         clearOfEntrance: 8,
         clearOfExit: 8,
         kinds: {
-            test: { perRoom: [0, 0, 0], showcase: 2 }
+            test: { perRoom: [0, 0, 0], showcase: 2 },
+            urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
+            crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
+            crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 }
+        },
+        // A breakable blocks like a small wall: a square of sizeWu on its
+        // cell's centre. A swing breaks the nearest one in its arc, a
+        // charged swing and the whirlwind every one they reach; a crystal
+        // only a charged swing breaks
+        breakableSize: 1.2,
+        // What a breakable holds: gold with chance, an amount from
+        // gold[0] to gold[1], and perDepth more of both ends a depth.
+        // Rolled by the host from the level's seed and the thing's cell,
+        // dropped where it stood
+        loot: {
+            urn: { chance: 0.35, gold: [1, 3], perDepth: 0 },
+            crate: { chance: 0.3, gold: [2, 4], perDepth: 0 },
+            crystal: { chance: 0.85, gold: [6, 10], perDepth: 2 }
         }
     })
 
