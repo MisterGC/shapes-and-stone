@@ -2665,6 +2665,7 @@ ClayWorld2d {
         buildDungeonFromGrid()
         placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
+        placeFeatures(planFeatures(levelSeed, dangerBand(dangerPosition), featureShowcase))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -3038,6 +3039,100 @@ ClayWorld2d {
         spawnShards(pile.xWu, pile.yWu, nx, ny, 3, "#DDD5C2", 0.22)
         impactSound.triggerOneShot(0.35)
         pile.destroy()
+    }
+
+    // The dungeon's features (Balance.dungeon): [{kind, gx, gy, xWu, yWu}],
+    // a cell and its centre in wu. The dojo's features scenario sets
+    // featureShowcase, and each kind is laid out at its showcase count
+    // instead of its danger's; a new level is built without it
+    property var features: []
+    property bool featureShowcase: false
+
+    // Whether a feature may stand on cell (gx, gy) of the carved grid: a
+    // room's cell, not in the start room, not beside a corridor, and the
+    // table's distance clear of the entrance and the exit
+    function featureCellOk(gx, gy) {
+        if (grid[gy][gx] !== cellRoom) return false
+        let start = rooms[0]
+        if (gx >= start.x && gx < start.x + start.w && gy >= start.y && gy < start.y + start.h)
+            return false
+        for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            let nx = gx + n[0], ny = gy + n[1]
+            if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && grid[ny][nx] === cellHallway)
+                return false
+        }
+        let far = (ex, ey, d) => Math.hypot((gx - ex) * cellSize, (gy - ey) * cellSize) >= d
+        return far(entranceGridX, 0, Balance.dungeon.clearOfEntrance)
+            && far(exitGridX, gridHeight - 1, Balance.dungeon.clearOfExit)
+    }
+
+    // The features of the carved dungeon, at the look's band (dangerBand)
+    // or at the showcase counts, without touching the world. Each kind
+    // draws from its own stream, the level's seed and the kind's name, so a
+    // kind added or retuned leaves where the others fall as it was, but
+    // for a cell one of them takes first
+    function planFeatures(levelSeed, band, showcase) {
+        let out = []
+        if (rooms.length < 2) return out
+        let taken = {}
+        for (let kind in Balance.dungeon.kinds) {
+            let table = Balance.dungeon.kinds[kind]
+            let rand = createRng(levelSeed ^ 0x7a3d9e21 ^ _nameHash(kind))
+            let perRoom = showcase ? table.showcase : table.perRoom[band]
+            for (let room of rooms.slice(1)) {
+                // A whole number per room, its fraction a chance of one more
+                let n = Math.floor(perRoom + rand())
+                if (n <= 0) continue
+                let free = []
+                for (let gy = room.y; gy < room.y + room.h; gy++)
+                    for (let gx = room.x; gx < room.x + room.w; gx++)
+                        if (!taken[gy * gridWidth + gx] && featureCellOk(gx, gy)) free.push([gx, gy])
+                for (let i = 0; i < n && free.length > 0; i++) {
+                    let c = free.splice(Math.floor(rand() * free.length), 1)[0]
+                    taken[c[1] * gridWidth + c[0]] = true
+                    out.push({ kind: kind, gx: c[0], gy: c[1],
+                               xWu: (c[0] + 0.5) * cellSize, yWu: (c[1] + 0.5) * cellSize })
+                }
+            }
+        }
+        return out
+    }
+    function _nameHash(name) {
+        let h = 5381
+        for (let i = 0; i < name.length; i++) h = (Math.imul(h, 33) ^ name.charCodeAt(i)) | 0
+        return h
+    }
+
+    // The test kind stands for the kinds to come: a violet diamond on its
+    // cell, glowing on its own so it shows in the dark
+    Component {
+        id: testFeatureComponent
+        Rectangle {
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property string kind: "test"
+            z: -1
+            x: xWu * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit - height / 2
+            width: 0.9 * pixelPerUnit
+            height: width
+            rotation: 45
+            color: "#40B07CFF"
+            border.color: "#B07CFF"
+            border.width: Math.max(1, width * 0.12)
+        }
+    }
+    function placeFeatures(list) {
+        features = list
+        for (let f of list) {
+            let o = f.kind === "test"
+                ? testFeatureComponent.createObject(glowParent(), {
+                      xWu: f.xWu, yWu: f.yWu, kind: f.kind,
+                      pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+                : null
+            if (o) dungeonObjects.push(o)
+        }
     }
 
     function placeTorch(wx, wy, color) {
@@ -3488,6 +3583,8 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        features = []
+        featureShowcase = false
         bonePiles = []
         torches = []
         stains = []

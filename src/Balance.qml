@@ -459,6 +459,26 @@ QtObject {
         ]
     })
 
+    // A dungeon's features - what the knights read, use, find or break -
+    // laid out once its rooms and corridors are carved, each kind from its
+    // own stream of the level's seed. Every feature keeps the same rules:
+    // it stands on a room's cell, never in the start room, never on a
+    // doorway (a room cell beside a corridor) nor on a corridor's cell, at
+    // least clearOfEntrance wu from the entrance and clearOfExit wu from
+    // the exit, centre to centre, one feature to a cell. kinds, in the
+    // order they are laid out: perRoom how many of the kind each room but
+    // the start room holds at low, middle and high danger (as
+    // danger.looks), a whole number, its fraction a chance of one more;
+    // showcase how many per room in the dojo's features scenario. "test"
+    // stands in for the kinds to come and lies in no dungeon played
+    readonly property var dungeon: ({
+        clearOfEntrance: 8,
+        clearOfExit: 8,
+        kinds: {
+            test: { perRoom: [0, 0, 0], showcase: 2 }
+        }
+    })
+
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
     readonly property var loot: ({
         // By tier: weak, normal, tough. The fight room drops none
