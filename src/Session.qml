@@ -31,11 +31,13 @@ Item {
     // way (also emitted on the host itself). levelIndex is the level the
     // host plays, 0 at the start; position and next are the danger's
     // positions it plays it at (Game.dangerPosition, Game.nextPosition),
-    // knights the knights the host built the level for (Game.partyKnights)
-    signal started(int seed, int levelIndex, real position, real next, int knights)
+    // knights the knights the host built the level for (Game.partyKnights),
+    // dm the overrides the host's dungeon master built a dungeon with
+    // (Game.master), null for the game's own
+    signal started(int seed, int levelIndex, real position, real next, int knights, var dm)
     // Every client applies this level at the host's danger, built for the
-    // host's knights; the host is the level authority
-    signal levelChanged(int levelIndex, real position, real next, int knights)
+    // host's knights with its overrides; the host is the level authority
+    signal levelChanged(int levelIndex, real position, real next, int knights, var dm)
     // Host only: a player reached the exit, the host decides to advance
     signal advanceRequested()
     // The host pressed start in the lobby; the game picks the seed and
@@ -68,6 +70,18 @@ Item {
     signal goldClaimed(string fromId, string objectId)
     // The host gave this node's knight a drop (id, amount)
     signal goldGranted(var grant)
+    // Host: a node's knight broke the breakable on cell ("gx,gy") of
+    // that level (issue #123)
+    signal breakReported(int level, string cell)
+    // Host: a node's knight set off the spike plate on cell ("gx,gy") of
+    // that level, its spikes due at session time riseAt (issue #124)
+    signal springReported(int level, string cell, real riseAt)
+    // Host: a node's knight opened (open) or closed the door on that cell
+    // of that level
+    signal doorReported(int level, string cell, bool open)
+    // Host: a node's knight opened the secret door on that cell of that
+    // level (issue #128)
+    signal secretReported(int level, string cell)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -89,8 +103,8 @@ Item {
     signal runEnded()
     // The host started the next run after the party had fallen: this
     // joiner goes again from depth 0 on this seed, at this position in
-    // its range, its first dungeon built for knights
-    signal wentAgain(int seed, real position, int knights)
+    // its range, its first dungeon built for knights with the overrides dm
+    signal wentAgain(int seed, real position, int knights, var dm)
     // Another node's knight stood beside this node's fallen knight long
     // enough: it rises (Balance.party)
     signal liftReceived(string fromId)
@@ -112,6 +126,24 @@ Item {
     // the session property "runs"
     readonly property var hostRuns: net.connected && net.sessionProperties.runs
                                     ? net.sessionProperties.runs : []
+    // The breakables the host's party broke in the level it plays, the
+    // session property "broken" ({seed, level, cells}); null before any
+    readonly property var broken: net.connected && net.sessionProperties.broken
+                                  ? net.sessionProperties.broken : null
+    // The spike plates set off in the level the host plays, the session
+    // property "sprung" ({seed, level, plates: {cell: riseAt}}); null
+    // before any
+    readonly property var sprung: net.connected && net.sessionProperties.sprung
+                                  ? net.sessionProperties.sprung : null
+    // The doors not closed in the level the host plays, the session
+    // property "doors" ({seed, level, doors: {cell: "open" or "bashed"}});
+    // null before any
+    readonly property var doors: net.connected && net.sessionProperties.doors
+                                 ? net.sessionProperties.doors : null
+    // The secret doors opened in the level the host plays, the session
+    // property "secrets" ({seed, level, cells}); null before any
+    readonly property var secrets: net.connected && net.sessionProperties.secrets
+                                   ? net.sessionProperties.secrets : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -122,6 +154,13 @@ Item {
     property var lastStates: ({})
     // This node is leaving on its own: its session ending is no lost host
     property bool _leaving: false
+    // The host's dungeon master panel is up (the session property
+    // "mastering"): the joiners wait for the next dungeon and are told so
+    readonly property bool mastering: net.connected && net.sessionProperties.mastering === true
+    function setMastering(on) {
+        if (net.connected && net.isHost) net.setSessionProperty("mastering", on)
+    }
+
     // The knights in the session, this node's among them: what the host
     // builds the next level for
     readonly property int knights: net.connected ? net.nodeCount : 1
@@ -137,21 +176,23 @@ Item {
         autoRelay: true
 
         // The run is the session property "run", its seed, the level
-        // played, the danger's positions (pos, next) and the knights it
-        // was built for (knights): the host sets it
+        // played, the danger's positions (pos, next), the knights it
+        // was built for (knights) and a dungeon's overrides (dm, null for
+        // the game's own): the host sets it
         // when the run starts and at each level, and a node that joins
         // late gets it with its welcome (clayground#306)
         onSessionPropertyChanged: (name, value) => {
             if (net.isHost || name !== "run") return
             let again = session.inGame && value.seed !== session.runSeed
             let knights = value.knights || 1
+            let dm = value.dm || null
             session.runSeed = value.seed
-            if (!session.inGame) session.started(value.seed, value.level, value.pos, value.next, knights)
+            if (!session.inGame) session.started(value.seed, value.level, value.pos, value.next, knights, dm)
             else if (again) {
                 session.lastStates = ({})
-                session.wentAgain(value.seed, value.pos, knights)
+                session.wentAgain(value.seed, value.pos, knights, dm)
             }
-            else session.levelChanged(value.level, value.pos, value.next, knights)
+            else session.levelChanged(value.level, value.pos, value.next, knights, dm)
         }
 
         onMessageReceived: (fromId, data) => {
@@ -168,6 +209,14 @@ Item {
                 session.enemyKillReceived(data)
             } else if (data.type === "goldClaim") {
                 if (net.isHost) session.goldClaimed(fromId, data.id)
+            } else if (data.type === "break") {
+                if (net.isHost) session.breakReported(data.level, data.cell)
+            } else if (data.type === "spring") {
+                if (net.isHost) session.springReported(data.level, data.cell, data.at)
+            } else if (data.type === "door") {
+                if (net.isHost) session.doorReported(data.level, data.cell, data.open === true)
+            } else if (data.type === "secret") {
+                if (net.isHost) session.secretReported(data.level, data.cell)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -297,24 +346,25 @@ Item {
     }
 
     // Host: start the game for everyone with this seed, its first dungeon
-    // at this position in its range, built for knights
-    function start(seed, position, knights) {
+    // at this position in its range, built for knights with the overrides
+    // dm (null or left out for the game's own)
+    function start(seed, position, knights, dm) {
         runSeed = seed
         net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
-                                       knights: knights})
-        started(seed, 0, position, position, knights)
+                                       knights: knights, dm: dm || null})
+        started(seed, 0, position, position, knights, dm || null)
     }
 
     // Host: the party has fallen, the next run starts for everyone on this
     // seed. The last states are of the run before, whose knights were down:
     // each knight of the next run is drawn from its first state in it (on
     // a joiner too, when wentAgain comes)
-    function goAgain(seed, position, knights) {
+    function goAgain(seed, position, knights, dm) {
         if (!net.isHost) return
         runSeed = seed
         lastStates = ({})
         net.setSessionProperty("run", {seed: seed, level: 0, pos: position, next: position,
-                                       knights: knights})
+                                       knights: knights, dm: dm || null})
     }
 
     // The name goes to the host, which sets it for every node; the host's
@@ -416,6 +466,50 @@ Item {
         if (net.isHost) goldClaimed(net.nodeId, objectId)
         else net.sendTo(net.hostId, {type: "goldClaim", id: objectId})
     }
+    // This node's knight broke a breakable: the host breaks it for every
+    // node and rolls its gold. The host's own is taken at once
+    function reportBreak(level, cell) {
+        if (net.isHost) breakReported(level, cell)
+        else net.sendTo(net.hostId, {type: "break", level: level, cell: cell})
+    }
+    // Host: the breakables broken in its level, for every node
+    function publishBroken(broken) {
+        if (net.isHost) net.setSessionProperty("broken", broken)
+    }
+    // The session clock (Network.sessionTime), ms, the same on every
+    // node; -1 outside a session
+    function now() { return net.connected ? net.sessionTime : -1 }
+    // This node's knight set off a spike plate, its spikes due at riseAt
+    // on the session clock: the host tells every node. The host's own is
+    // taken at once
+    function reportSpring(level, cell, riseAt) {
+        if (net.isHost) springReported(level, cell, riseAt)
+        else net.sendTo(net.hostId, {type: "spring", level: level, cell: cell, at: riseAt})
+    }
+    // Host: the spike plates set off in its level, for every node
+    function publishSprung(sprung) {
+        if (net.isHost) net.setSessionProperty("sprung", sprung)
+    }
+    // This node's knight opened or closed a door: the host does it for
+    // every node. The host's own is taken at once
+    function reportDoor(level, cell, open) {
+        if (net.isHost) doorReported(level, cell, open)
+        else net.sendTo(net.hostId, {type: "door", level: level, cell: cell, open: open})
+    }
+    // Host: the doors not closed in its level, for every node
+    function publishDoors(doors) {
+        if (net.isHost) net.setSessionProperty("doors", doors)
+    }
+    // This node's knight opened a secret door: the host opens it for
+    // every node. The host's own is taken at once
+    function reportSecret(level, cell) {
+        if (net.isHost) secretReported(level, cell)
+        else net.sendTo(net.hostId, {type: "secret", level: level, cell: cell})
+    }
+    // Host: the secret doors opened in its level, for every node
+    function publishSecrets(secrets) {
+        if (net.isHost) net.setSessionProperty("secrets", secrets)
+    }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {
         net.sendTo(nodeId, Object.assign({type: "goldGrant"}, grant))
@@ -458,13 +552,13 @@ Item {
         runEnded()
     }
 
-    // Host: tell the joiners which level comes next, at which danger and
-    // for how many knights, and every node that joins later which one is
-    // played
-    function announceLevel(levelIndex, position, next, knights) {
+    // Host: tell the joiners which level comes next, at which danger, for
+    // how many knights and with which overrides (dm), and every node that
+    // joins later which one is played
+    function announceLevel(levelIndex, position, next, knights, dm) {
         net.setSessionProperty("run", {seed: net.sessionProperties.run.seed,
                                        level: levelIndex, pos: position, next: next,
-                                       knights: knights})
+                                       knights: knights, dm: dm || null})
     }
 
     Component { id: remotePlayerComponent; RemotePlayer {} }

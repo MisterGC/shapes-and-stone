@@ -459,6 +459,165 @@ QtObject {
         ]
     })
 
+    // A dungeon's features - what the knights read, use, find or break -
+    // laid out once its rooms and corridors are carved, each kind from its
+    // own stream of the level's seed. Every feature keeps the same rules:
+    // it stands on a room's cell, never in the start room, never on a
+    // doorway (a room cell beside a corridor) nor on a corridor's cell, at
+    // least clearOfEntrance wu from the entrance and clearOfExit wu from
+    // the exit, centre to centre, one feature to a cell. kinds, in the
+    // order they are laid out: perRoom how many of the kind each room but
+    // the start room holds at low, middle and high danger (as
+    // danger.looks), a whole number, its fraction a chance of one more;
+    // showcase how many per room in the dojo's features scenario. The
+    // breakables: a clay "urn", a wooden "crate" (or barrel) and a
+    // "crystal" cluster, rarer the shallower; then the traps: a "spike"
+    // plate, more often the higher the danger, and an arrow "slit" in a
+    // room's wall, the more and the faster the higher the danger
+    readonly property var dungeon: ({
+        // Loops: the rooms are joined in a chain, and extraCorridors more
+        // corridors at low, middle and high danger (as danger.looks) join
+        // two rooms close but not neighbours in it, so a dungeon has ways
+        // around. Each is drawn from the loopChoice closest pairs left; one
+        // that would cut through or open into a third room, or run into
+        // the entrance's or the exit's shaft, is passed over
+        extraCorridors: [1, 2, 3],
+        loopChoice: 3,
+        // Doors: a room entrance - a corridor's cell beside a room, with
+        // rock on its two other sides - gets one with doorShare's chance at
+        // low, middle and high danger, every one in the features scenario.
+        // Two jambs doorJamb wu thick narrow the doorway to a leaf
+        // doorWidth wu wide, one knight, and doorThickness thick. A door
+        // starts closed. Closed it blocks the knights, the enemies, their
+        // shots and their sight; E within doorReach wu of its centre opens
+        // or closes it, unless someone stands in it. An enemy chasing
+        // through a closed door stops within doorBashReach wu of it, winds
+        // up doorBash seconds (the wind-up ring) and bursts it open; a
+        // bashed door stays open. The enemies' paths take a closed door
+        // as doorPathCost cells more than an open one
+        doorShare: [0.3, 0.4, 0.5],
+        doorWidth: 1.2,
+        doorThickness: 0.3,
+        doorJamb: 0.5,
+        doorReach: 1.8,
+        doorBash: 1.5,
+        doorBashReach: 1.6,
+        doorPathCost: 6,
+        clearOfEntrance: 8,
+        clearOfExit: 8,
+        kinds: {
+            urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
+            crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
+            crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
+            spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 },
+            slit: { perRoom: [0.25, 0.5, 0.6], showcase: 1 }
+        },
+        // A breakable blocks like a small wall: a square of sizeWu on its
+        // cell's centre. A swing breaks the nearest one in its arc, a
+        // charged swing and the whirlwind every one they reach; a crystal
+        // only a charged swing breaks
+        breakableSize: 1.2,
+        // An urn and a barrel stand upright and are drawn from the side:
+        // they block a square of foot wu instead (a knight is 1 wu, a
+        // flagstone 0.5) and rise tall wu from its near edge
+        standing: {
+            urn: { foot: 0.6, tall: 0.85 },
+            barrel: { foot: 0.75, tall: 1.0 }
+        },
+        // What a breakable holds: gold with chance, an amount from
+        // gold[0] to gold[1], and perDepth more of both ends a depth.
+        // Rolled by the host from the level's seed and the thing's cell,
+        // dropped where it stood
+        loot: {
+            urn: { chance: 0.35, gold: [1, 3], perDepth: 0 },
+            crate: { chance: 0.3, gold: [2, 4], perDepth: 0 },
+            crystal: { chance: 0.85, gold: [6, 10], perDepth: 2 }
+        },
+        // A spike plate: a square of spikePlateSize wu on its cell's
+        // centre with small holes in it. A knight whose centre steps on it
+        // makes it click, and spikeDelay seconds later its spikes rise: a
+        // knight still on it then, and not dashing, takes spikeDamage and
+        // spikeDamagePerDepth more a depth, never more than spikeCap of
+        // its max HP; no defence, shield or grace takes any of it. A plate
+        // fires once and stays sprung. Only knights trigger it.
+        // spikeClickPitch and spikeRisePitch are the click's and the
+        // spikes' notes, in semitones off their samples
+        spikePlateSize: 1.6,
+        spikeDelay: 0.25,
+        spikeDamage: 14,
+        spikeDamagePerDepth: 3,
+        spikeCap: 0.25,
+        spikeClickPitch: -9,
+        spikeRisePitch: 9,
+        // An arrow slit sits in the wall beside its feature's cell, a room
+        // cell on the room's edge, and fires across the room along its
+        // row or column to the wall facing it. It fires on the beats of
+        // its rhythm, slitBeat seconds each, counted on the session clock
+        // (alone on the physics clock), so every screen fires the same
+        // arrow at the same moment. Before each shot it glows: a ring in
+        // slitGlowColor closes on it over slitWarn seconds, as an enemy's
+        // parry ring does, and flashes as the arrow leaves.
+        // slitRhythms: beats, 1 a shot and 0 a rest, and the danger bands
+        // a rhythm is drawn at. A room's second slit takes the first's
+        // rhythm half a turn later: the two take turns. Every slit leaves
+        // a safe way past: a lane, the room's doorways joined by cells no
+        // arrow crosses, or a gap, a rest in its rhythm long enough for a
+        // knight to walk over its line, slitGapMargin times what that
+        // takes (Game.slitCrossTime); a room with neither takes the band's
+        // first rhythm with one. An arrow is arrowLength wu long and flies
+        // at arrowSpeed; it hurts only knights: arrowDamage and
+        // arrowDamagePerDepth more a depth, never more than arrowCap of
+        // the knight's max HP, less its defence. A held shield facing it
+        // stops it whole, at the shield's mana cost; a perfect block sends
+        // it back to its slit; a dash passes through it. slitShotPitch is
+        // the shot's note, in semitones off the swing's sample
+        slitBeat: 0.3,
+        slitWarn: 0.45,
+        slitGlowColor: "#FF8C00",
+        slitRhythms: [
+            { name: "single", beats: [1, 0, 0, 0, 0], bands: [0, 1, 2] },
+            { name: "double", beats: [1, 0, 1, 0, 0, 0, 0], bands: [0, 1, 2] },
+            { name: "volley", beats: [1, 1, 1, 0, 0, 0, 0, 0], bands: [1, 2] },
+            { name: "stream", beats: [1, 0], bands: [2] },
+            { name: "hail", beats: [1], bands: [2] }
+        ],
+        slitGapMargin: 1.5,
+        arrowLength: 0.8,
+        arrowSpeed: 12,
+        arrowDamage: 12,
+        arrowDamagePerDepth: 2,
+        arrowCap: 0.2,
+        slitShotPitch: 7,
+        // Secret rooms: secrets how many a dungeon hides at low, middle and
+        // high danger, a whole number, its fraction a chance of one more;
+        // secretShowcase in the features scenario. Each is a chamber of
+        // secretSize by secretSize cells off a room but the start room,
+        // behind one cell of its wall, with rock all round. The wall cell
+        // shows a hairline crack with dust breathing out of it. A dash
+        // that reaches its face - the knight's body within secretDashReach
+        // wu of it, its centre in front of the cell - bursts it open when
+        // it heads into the wall no more than secretDashAngle degrees off
+        // straight; at a flatter angle it glances off with a puff of dust
+        // and a knock. E does nothing at it. It lies on no way to the
+        // exit, and stays rock on the minimap until it is open. It holds a
+        // cache: cacheThings urns
+        // and crates and, with cacheCrystal's chance at the band, a
+        // crystal cluster, each with the gold of its cacheLoot row (as
+        // loot), always more than the same thing elsewhere
+        secrets: [0.3, 0.6, 1.3],
+        secretShowcase: 1,
+        secretSize: 3,
+        secretDashReach: 0.25,
+        secretDashAngle: 45,
+        cacheThings: 3,
+        cacheCrystal: [0.25, 0.4, 0.6],
+        cacheLoot: {
+            urn: { chance: 1, gold: [4, 7], perDepth: 1 },
+            crate: { chance: 1, gold: [5, 8], perDepth: 1 },
+            crystal: { chance: 1, gold: [14, 20], perDepth: 3 }
+        }
+    })
+
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
     readonly property var loot: ({
         // By tier: weak, normal, tough. The fight room drops none
@@ -498,6 +657,29 @@ QtObject {
         // Balanced blade: a whirlwind costs this much mana, its dash
         // included, instead of knight.whirlMana
         bladeWhirlMana: [15, 12, 9]
+    })
+
+    // The dungeon master's panel (issue #142): with Dungeon Master ticked
+    // on the title, the host or a solo player sees these settings before
+    // each dungeon, with the values the game would use, and sets any of
+    // them for that dungeon and the ones after. A row: its key, its
+    // label, the step its arrows turn it by, its range and the decimals
+    // shown; kinds the feature kinds (dungeon.kinds) it sets per room
+    // together, its whole number split between them as the dungeon's
+    // band shares them out. A feature knob more is a row more
+    readonly property var dungeonMaster: ({
+        settings: [
+            { key: "enemies", label: "Enemies per room", step: 0.1, min: 0, max: 8, decimals: 2 },
+            { key: "spikes", label: "Spike plates per room", step: 0.1, min: 0, max: 4, decimals: 2,
+              kinds: ["spike"] },
+            { key: "slits", label: "Arrow slits per room", step: 0.1, min: 0, max: 4, decimals: 2,
+              kinds: ["slit"] },
+            { key: "rooms", label: "Rooms", step: 1, min: 3, max: 16, decimals: 0 },
+            { key: "depth", label: "Base depth", step: 1, min: 0, max: 30, decimals: 0 },
+            { key: "position", label: "Relative difficulty", step: 0.05, min: 0, max: 0.999, decimals: 2 },
+            { key: "breakables", label: "Breakables per room", step: 0.1, min: 0, max: 6, decimals: 2,
+              kinds: ["urn", "crate", "crystal"] }
+        ]
     })
 
     // A session's party: an ally lifts a fallen knight up, and a knight

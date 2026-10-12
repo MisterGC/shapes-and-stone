@@ -1,6 +1,7 @@
 import QtQuick
 
-// Shown when the knight falls: how deep the run got, its kills and time,
+// Shown when the knight falls: how deep the run got, its kills, the
+// secret rooms found and its time,
 // the record of the deepest descent, this session's runs with the depth
 // and time of each, newest first, Enter to go again, Esc back to the
 // title. In a session whose other knights still fight it says the knight
@@ -17,6 +18,8 @@ Item {
 
     property int depth: 0
     property int kills: 0
+    // The secret rooms the party opened this run
+    property int secrets: 0
     // Simulated seconds the run lasted
     property real seconds: 0
     // The record (Game.recordLine)
@@ -91,6 +94,7 @@ Item {
             objectName: "fallenStats"
             anchors.horizontalCenter: parent.horizontalCenter
             text: fallenScreen.kills + (fallenScreen.kills === 1 ? " kill" : " kills")
+                  + "  •  " + fallenScreen.secrets + (fallenScreen.secrets === 1 ? " secret" : " secrets")
                   + "  •  " + fallenScreen.clock(fallenScreen.seconds)
             color: "#AAAAAA"
             font.pixelSize: 14

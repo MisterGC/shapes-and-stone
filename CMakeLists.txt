@@ -32,7 +32,7 @@ file(GLOB SNS_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS src/
 
 clay_app(shapes_and_stone
 
-    VERSION 0.2.2
+    VERSION 0.3.0
 
     LINK_LIBS
         Qt::Core
@@ -53,6 +53,12 @@ clay_app(shapes_and_stone
         src/FxParticle.qml
         src/Stain.qml
         src/Debris.qml
+        src/Breakable.qml
+        src/SpikePlate.qml
+        src/ArrowSlit.qml
+        src/Arrow.qml
+        src/Door.qml
+        src/SecretWall.qml
         src/GoldDrop.qml
         src/BodyShade.qml
         src/ExitStairs.qml
@@ -70,6 +76,7 @@ clay_app(shapes_and_stone
         src/RemotePlayer.qml
         src/Session.qml
         src/DepthGauge.qml
+        src/DungeonMasterPanel.qml
 
     RES_FILES
         src/qmldir

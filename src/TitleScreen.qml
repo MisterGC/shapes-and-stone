@@ -6,6 +6,10 @@ Item {
 
     signal singlePlayerSelected()
     signal multiplayerSelected()
+    // The third row: the dungeon master's panel before each dungeon, on
+    // or off (Game.dungeonMaster); Enter or a click turns it over
+    signal dungeonMasterToggled()
+    property bool dungeonMaster: false
 
     property bool muted: false
     // The player's Music and Sound settings (Game.musicVolume, soundVolume)
@@ -113,9 +117,10 @@ Item {
         }
 
         Repeater {
-            model: ["Single Player", "Multiplayer"]
+            model: ["Single Player", "Multiplayer", "Dungeon Master"]
             delegate: Rectangle {
                 id: btn
+                objectName: "titleChoice" + index
                 width: 220; height: 44; radius: 6
                 property bool isCurrent: titleScreen._selectedIndex === index
                 color: isCurrent ? "#44FFFFFF" : "#22FFFFFF"
@@ -124,7 +129,7 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: modelData
+                    text: index === 2 ? modelData + ": " + (titleScreen.dungeonMaster ? "On" : "Off") : modelData
                     color: btn.isCurrent ? "#FFFFFF" : "#999999"
                     font.pixelSize: 16
                     font.bold: btn.isCurrent
@@ -169,7 +174,7 @@ Item {
             if (_selectedIndex > 0) { _selectedIndex--; menuHoverSound.play() }
             event.accepted = true
         } else if (event.key === Qt.Key_S || event.key === Qt.Key_Down) {
-            if (_selectedIndex < 1) { _selectedIndex++; menuHoverSound.play() }
+            if (_selectedIndex < 2) { _selectedIndex++; menuHoverSound.play() }
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
                    || event.key === Qt.Key_Space) {
@@ -197,6 +202,11 @@ Item {
 
     function _confirm() {
         if (_pendingSelection >= 0) return  // Already transitioning
+        if (_selectedIndex === 2) {
+            menuHoverSound.play()
+            dungeonMasterToggled()
+            return
+        }
         _pendingSelection = _selectedIndex
         menuConfirmSound.play()
         fadeOutAnim.start()

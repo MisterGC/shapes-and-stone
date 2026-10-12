@@ -1,6 +1,7 @@
 import QtQuick
 import Box2D
 import Clayground.Common
+import Clayground.Algorithm
 import Clayground.World
 import Clayground.Physics
 import Clayground.GameController
@@ -235,6 +236,14 @@ ClayWorld2d {
     }
     function playShieldEmpty() {
         shieldEmptySound.triggerOneShot(1)
+    }
+    // A spike plate: its click is the menu's tick pitched down, its
+    // spikes the swing pitched up (Balance.dungeon.spike...Pitch)
+    function playPlateClick() {
+        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.dungeon.spikeClickPitch, 1)
+    }
+    function playSpikesRise() {
+        swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
     }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
@@ -622,17 +631,18 @@ ClayWorld2d {
         recordLine: world.recordLine
         // The host's run, from its start or, on a node that joins late,
         // at the level the host plays
-        onStarted: (seed, level, position, next, knights) => {
+        onStarted: (seed, level, position, next, knights, dm) => {
             masterSeed = seed
             world.levelIndex = level
             world.levelType = levelTypeOf(level)
+            master = world.levelType === "dungeon" ? dm || null : null
             _setDanger(position, next)
             _setKnights(knights)
             screen = "game"
         }
-        onLevelChanged: (newIndex, position, next, knights) =>
-            _applyLevelChange(newIndex, {pos: position, next: next, knights: knights})
-        onWentAgain: (seed, position, knights) => _startRun(seed, position, knights)
+        onLevelChanged: (newIndex, position, next, knights, dm) =>
+            _applyLevelChange(newIndex, {pos: position, next: next, knights: knights, master: dm || null})
+        onWentAgain: (seed, position, knights, dm) => _startRun(seed, position, knights, dm)
         onLiftReceived: (fromId) => _rise("lift")
         onRecordBroken: (banner) => _hostRecordBroken(banner)
         onNameEdited: (name) => world.playerName = name
@@ -671,6 +681,10 @@ ClayWorld2d {
         onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
         onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
+        onBreakReported: (level, cell) => _hostBreak(level, cell)
+        onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
+        onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
+        onSecretReported: (level, cell) => _hostSecret(level, cell)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -678,6 +692,7 @@ ClayWorld2d {
         }
         onStruckReported: (fromId, report) => {
             if (report.source === "shot") _endShot(report.id, report.result)
+            else if (report.source === "arrow") _arrowReported(report)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
     }
@@ -839,7 +854,10 @@ ClayWorld2d {
     // Where an enemy died: gold for its tier, none in the fight room
     function dropGold(x, y, tier) {
         if (fightRoomActive) return
-        let amount = Balance.loot.goldByTier[tier] || 0
+        _spawnGold(x, y, Balance.loot.goldByTier[tier] || 0)
+    }
+    // amount gold at (x, y): this node's own alone, the host's in a session
+    function _spawnGold(x, y, amount) {
         if (amount <= 0) return
         let props = {xWu: x, yWu: y, amount: amount}
         if (!session.connected)
@@ -939,7 +957,14 @@ ClayWorld2d {
     // has ended in a fall, nextPosition is where the next run starts
     property real dangerPosition: Balance.danger.start
     property real nextPosition: Balance.danger.start
-    readonly property real danger: depth + dangerPosition
+    // The overrides the dungeon played now is built with (issue #142):
+    // {seed, rooms, enemies, depth, and per feature row its key}, each
+    // left out for the game's own, null for a dungeon wholly the game's
+    // and for a village. dangerDepth is the depth its danger counts from:
+    // the base depth set there, else depth
+    property var master: null
+    readonly property int dangerDepth: master && master.depth !== undefined ? master.depth : depth
+    readonly property real danger: dangerDepth + dangerPosition
     // 0 low, 1 middle, 2 high
     function dangerBand(position) {
         return position < Balance.danger.low ? 0 : position < Balance.danger.high ? 1 : 2
@@ -1019,7 +1044,8 @@ ClayWorld2d {
     // --- The witch reads the next dungeon (issue #98) ---
     // What the dungeon at level index holds, read off its seed the way
     // generateDungeon builds it: its depth, its position's band in the
-    // depth's range and its enemies counted by tier and type. Left out,
+    // depth's range, its enemies counted by tier and type and its secret
+    // rooms (secretsOf). Left out,
     // the dungeon is the next one, at nextPosition, for the knights the
     // party has now. In a session every node reads the same: the seed,
     // the position and the knights are the host's
@@ -1032,15 +1058,45 @@ ClayWorld2d {
         let rms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax, rand)
         let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
-                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0 }
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0,
+                    secrets: secretsOf(index, position) }
         for (let e of enemies) {
             out[["weak", "normal", "tough"][e.tier]]++
             out[e.type]++
         }
         return out
     }
+    // How many secret rooms the dungeon at level index and position holds:
+    // carved off its seed by carveDungeon, as generateDungeon carves it,
+    // and the level played now put back as it was
+    function secretsOf(index, position) {
+        let kept = _keepCarved()
+        let levelSeed = deriveSeed(masterSeed, index)
+        let band = dangerBand(position)
+        let n = 0
+        try {
+            n = carveDungeon(levelSeed, band, false, createRng(levelSeed)).secrets.length
+        } finally {
+            _putCarved(kept)
+        }
+        return n
+    }
+    // What carveDungeon carves on the live grid, kept to put back after a
+    // dungeon is carved only to be read
+    function _keepCarved() {
+        return { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
+                 loopCorridors: loopCorridors }
+    }
+    function _putCarved(kept) {
+        grid = kept.grid
+        rooms = kept.rooms
+        entranceGridX = kept.entranceGridX
+        exitGridX = kept.exitGridX
+        loopCorridors = kept.loopCorridors
+    }
     // The witch's reading of the next dungeon, one line per press of E:
-    // where it sits in its depth's range and what lives there
+    // where it sits in its depth's range, what lives there and, when it
+    // hides one, that a chamber lies behind its stones and how to find it
     function witchReading() {
         let f = foretell()
         let lines = ["Depth " + f.depth + " waits below. It sits "
@@ -1057,8 +1113,209 @@ ClayWorld2d {
                                      + " from afar" : ""].filter(t => t !== "")
         lines.push(kinds.length > 0 ? "Among them " + kinds.join(" and ") + "."
                                     : "No shields, nothing that spits - only teeth.")
+        if (f.secrets > 0)
+            lines.push("And a hidden chamber lies below, behind the stones. Where a wall is cracked "
+                       + "and breathes dust, throw yourself at it.")
         lines.push("Return to me... if you survive.")
         return lines
+    }
+
+    // --- Dungeon master (issue #142) ---
+    // Ticked on the title (kept, key "dungeonMaster"): before each
+    // dungeon the host, or a solo player, sees the panel with
+    // Balance.dungeonMaster's settings at the values the game would use.
+    // A setting turned is set (masterPinned, kept as JSON under
+    // "dungeonMasterSettings") for that dungeon and the ones after, until
+    // Backspace gives it back to the game. Generate shows the dungeon Go
+    // enters, again a new one; Go builds it with the settings as its
+    // master. In a session only the host has the panel, and the master
+    // goes with the level, so every knight plays the host's dungeon
+    property bool dungeonMaster: false
+    property var masterPinned: ({})
+    // The dungeon the panel is up for: {index, pos, knights, seed (the
+    // run's), go(m, pos)}; null while it is not up
+    property var masterAsk: null
+    // The level seed Generate rolled for it, -1 for the run's own
+    property int masterSeedRoll: -1
+    // What the panel shows: planDungeon's, null before Generate
+    property var masterPreview: null
+    property string masterNote: ""
+    readonly property bool masterOpen: masterAsk !== null
+
+    function setDungeonMaster(on) {
+        dungeonMaster = on
+        records.set("dungeonMaster", on ? "1" : "0")
+    }
+    function _loadMaster() {
+        dungeonMaster = records.get("dungeonMaster", "0") === "1"
+        let pinned = {}
+        try { pinned = JSON.parse(records.get("dungeonMasterSettings", "{}")) } catch (err) {}
+        masterPinned = _masterRead(pinned) || {}
+    }
+    function _keepMaster() { records.set("dungeonMasterSettings", JSON.stringify(masterPinned)) }
+    // The settings in o that the table has, each in its range; null when
+    // o is no object
+    function _masterRead(o) {
+        if (!o || typeof o !== "object" || Array.isArray(o)) return null
+        let out = {}
+        for (let row of Balance.dungeonMaster.settings) {
+            let v = Number(o[row.key])
+            if (o[row.key] === undefined || o[row.key] === null || isNaN(v)) continue
+            out[row.key] = _masterClamp(row, v)
+        }
+        return out
+    }
+    function _masterClamp(row, v) {
+        let f = Math.pow(10, row.decimals)
+        return Math.max(row.min, Math.min(row.max, Math.round(v * f) / f))
+    }
+    // Whether this node asks the dungeon master before a dungeon
+    function _masterAsks() { return dungeonMaster && (!session.connected || session.isHost) }
+
+    // The panel up for ask; the knight lets go of what it holds, as
+    // under the Esc menu
+    function openMaster(ask) {
+        if (player) {
+            player.lowerShield()
+            player.dropSwing()
+        }
+        masterSeedRoll = -1
+        masterPreview = null
+        masterNote = ""
+        masterAsk = ask
+        session.setMastering(true)
+        console.log("[Game] Dungeon master: the panel is up for level", ask.index)
+    }
+    // The level seed of the panel's dungeon
+    function _masterSeed() {
+        return masterSeedRoll >= 0 ? masterSeedRoll : deriveSeed(masterAsk.seed, masterAsk.index)
+    }
+    // The overrides the panel's dungeon is built with: the settings set,
+    // the seed Generate rolled; null when it is the game's own
+    function masterOverrides() {
+        let m = {}
+        for (let k in masterPinned) if (k !== "position") m[k] = masterPinned[k]
+        if (masterSeedRoll >= 0) m.seed = masterSeedRoll
+        return Object.keys(m).length > 0 ? m : null
+    }
+    function _masterPosition() {
+        return masterPinned.position !== undefined ? masterPinned.position : masterAsk.pos
+    }
+    // What the game would use for each setting of the panel's dungeon,
+    // with its seed and the depth, position and rooms set: {key: value}
+    function masterGameValues() {
+        let a = masterAsk
+        let pos = _masterPosition()
+        let d = masterPinned.depth !== undefined ? masterPinned.depth : depthOf(a.index)
+        let rand = createRng(_masterSeed())
+        let sb = Balance.spawn
+        let rmin = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMin
+        let rmax = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMax
+        let rms = planRooms(rmin, rmax, sb.roomSizeMin, sb.roomSizeMax, rand)
+        let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand)
+        let band = dangerBand(pos)
+        let out = { enemies: rms.length > 1 ? foes.length / (rms.length - 1) : 0,
+                    rooms: rms.length, depth: depthOf(a.index), position: a.pos }
+        for (let row of Balance.dungeonMaster.settings)
+            if (row.kinds)
+                out[row.key] = row.kinds.reduce((t, k) => t + Balance.dungeon.kinds[k].perRoom[band], 0)
+        return out
+    }
+    // The panel's rows: [{key, label, value, set, text}]
+    function masterRows() {
+        if (!masterAsk) return []
+        let game = masterGameValues()
+        return Balance.dungeonMaster.settings.map(row => {
+            let set = masterPinned[row.key] !== undefined
+            let v = set ? masterPinned[row.key] : game[row.key]
+            let text = Number(v).toFixed(row.decimals)
+            if (row.key === "position") text += " " + ["low", "middle", "high"][dangerBand(v)]
+            return { key: row.key, label: row.label, value: v, set: set, text: text }
+        })
+    }
+    // A setting turned by steps of its row: set from what it shows
+    function masterTurn(key, steps) {
+        let row = Balance.dungeonMaster.settings.find(r => r.key === key)
+        if (!row || !masterAsk) return
+        let shown = masterRows().find(r => r.key === key).value
+        let p = Object.assign({}, masterPinned)
+        p[key] = _masterClamp(row, shown + steps * row.step)
+        masterPinned = p
+        _keepMaster()
+        if (masterPreview) _masterShow()
+    }
+    // A setting given back to the game
+    function masterUnset(key) {
+        if (masterPinned[key] === undefined) return
+        let p = Object.assign({}, masterPinned)
+        delete p[key]
+        masterPinned = p
+        _keepMaster()
+        if (masterPreview) _masterShow()
+    }
+    // Generate: the dungeon Go enters; once one is shown, a new one on a
+    // new seed
+    function masterGenerate() {
+        if (!masterAsk) return
+        if (masterPreview) {
+            let seed
+            do { seed = Math.floor(Math.random() * 2147483647) } while (seed === _masterSeed())
+            masterSeedRoll = seed
+        }
+        _masterShow()
+    }
+    function _masterShow() {
+        masterPreview = planDungeon(masterAsk.index, _masterPosition(), masterAsk.knights,
+                                    masterOverrides(), masterAsk.seed)
+    }
+    // Go: the panel's dungeon is entered, built with its overrides
+    function masterGo() {
+        if (!masterAsk) return
+        let a = masterAsk, m = masterOverrides(), pos = _masterPosition()
+        masterAsk = null
+        masterPreview = null
+        session.setMastering(false)
+        console.log("[Game] Dungeon master: go,", JSON.stringify(m), "at position", pos.toFixed(3))
+        a.go(m, pos)
+    }
+    // Copy settings: the settings set, as JSON; Paste settings sets
+    // exactly those of a copied text, false when it holds none
+    function masterSettingsJson() { return JSON.stringify(masterPinned) }
+    function masterPaste(text) {
+        let o = null
+        try { o = _masterRead(JSON.parse(text)) } catch (err) {}
+        if (!o) {
+            masterNote = "The clipboard holds no settings"
+            return false
+        }
+        masterPinned = o
+        _keepMaster()
+        masterNote = "Settings pasted"
+        if (masterPreview) _masterShow()
+        return true
+    }
+    // The dungeon at level index and position, for knights, with the
+    // overrides m (null for the game's own) on the run's seed: carved and
+    // its enemies rolled as generateDungeon does, without touching the
+    // world, the level played now put back as it was. {seed, band, depth,
+    // grid, rooms, features, doors, secrets, enemies, entranceGridX,
+    // exitGridX}
+    function planDungeon(index, position, knights, m, runSeed) {
+        let kept = _keepCarved()
+        try {
+            let levelSeed = m && m.seed !== undefined ? m.seed
+                                                       : deriveSeed(runSeed === undefined ? masterSeed : runSeed, index)
+            let spec = dungeonSpec(position, m)
+            let rand = createRng(levelSeed)
+            let plan = carveDungeon(levelSeed, spec.band, false, rand, spec)
+            let d = m && m.depth !== undefined ? m.depth : depthOf(index)
+            let foes = rollEnemies(rooms, spec.rolls(d + position, knights), rand)
+            return { seed: levelSeed, band: spec.band, depth: d, position: position, grid: grid,
+                     rooms: rooms, features: plan.features, doors: plan.doors, secrets: plan.secrets,
+                     enemies: foes, entranceGridX: entranceGridX, exitGridX: exitGridX }
+        } finally {
+            _putCarved(kept)
+        }
     }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
@@ -1096,6 +1353,8 @@ ClayWorld2d {
     // simulated seconds since it started (a pause holds them)
     property int runKills: 0
     property real runSeconds: 0
+    // The secret rooms the party opened this run
+    property int runSecrets: 0
     // The record of the deepest descent on this machine: the depth (-1
     // before the first), the knights' names and the date, kept with
     // Clayground.Storage as soon as a run gets deeper (key "record", and
@@ -1132,6 +1391,7 @@ ClayWorld2d {
     function _startRunRecord() {
         runKills = 0
         runSeconds = 0
+        runSecrets = 0
         runStartRecord = ownRecord.depth
         recordPassed = false
     }
@@ -1206,11 +1466,14 @@ ClayWorld2d {
     readonly property int catPlayer: Box.Category2
     readonly property int catEnemy: Box.Category3
     readonly property int catProjectile: Box.Category4
+    // The breakables: they stop the knights and the enemies, not the shots
+    readonly property int catProp: Box.Category5
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         _loadRecord()
         _loadVolumes()
+        _loadMaster()
         runStartRecord = ownRecord.depth
         console.log("[Game] Record so far:", recordLine === "" ? "none" : recordLine)
         forceActiveFocus()
@@ -1223,7 +1486,7 @@ ClayWorld2d {
         _tryStartGame()
     }
     function _tryStartGame() {
-        if (screen === "game" && width > 0 && height > 0 && !player) {
+        if (screen === "game" && width > 0 && height > 0 && !player && !masterOpen) {
             console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
             if (!session.connected) _setKnights(knightsNow())
@@ -1232,16 +1495,36 @@ ClayWorld2d {
                 generateVillage()
                 return
             }
-            dungeonAmbience.start()
-            dungeonMusic.start()
-            generateDungeon()
+            let go = () => {
+                dungeonAmbience.start()
+                dungeonMusic.start()
+                generateDungeon()
+            }
+            // Alone the dungeon master sets the first dungeon here, in a
+            // session the host did before the start
+            if (session.connected || !_masterAsks()) {
+                go()
+                return
+            }
+            if (masterSeed < 0)
+                masterSeed = Math.floor(Math.random() * 2147483647)
+            openMaster({ index: levelIndex, pos: dangerPosition, knights: partyKnights, seed: masterSeed,
+                         go: (m, pos) => {
+                             master = m
+                             _setDanger(pos, pos)
+                             go()
+                         } })
         }
     }
 
     function _startMultiplayerGame() {
+        if (masterOpen) return
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        session.start(masterSeed, dangerPosition, knightsNow())
+        let knights = knightsNow()
+        let go = (m, pos) => session.start(masterSeed, pos, knights, m)
+        if (!_masterAsks()) go(null, dangerPosition)
+        else openMaster({ index: 0, pos: dangerPosition, knights: knights, seed: masterSeed, go: go })
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -1328,15 +1611,20 @@ ClayWorld2d {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
             } else if (player) {
-                // Find nearby NPC to interact with
+                // Find nearby NPC to interact with, else a door
                 let items = world.room.children
+                let talked = false
                 for (let i = 0; i < items.length; i++) {
                     let npc = items[i]
                     if (npc.objectName === "npc" && npc.nearbyPlayer) {
                         npc.interact()
+                        talked = true
                         break
                     }
                 }
+                if (!talked && !fallen)
+                    useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
+                                        Balance.dungeon.doorReach))
             }
             event.accepted = true
             return
@@ -2116,6 +2404,10 @@ ClayWorld2d {
             world._physicsSteps++
             world._pickUpGold()
             world._stepRevive()
+            world._stepPlates()
+            world._stepSlits()
+            world._stepDoors()
+            world._stepSecrets()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -2137,23 +2429,29 @@ ClayWorld2d {
     // a session only the host starts it, for every knight
     function newRun() {
         if (session.connected && !session.isHost) return
+        if (masterOpen) return
         let seed
         do {
             seed = Math.floor(Math.random() * 2147483647)
         } while (seed === masterSeed)
-        _startRun(seed, nextPosition, knightsNow())
+        let knights = knightsNow()
+        let go = (m, pos) => _startRun(seed, pos, knights, m)
+        if (!_masterAsks()) go(null, nextPosition)
+        else openMaster({ index: 0, pos: nextPosition, knights: knights, seed: seed, go: go })
     }
     // The next run on seed, from depth 0 with a fresh knight, its first
-    // dungeon at position in its range. The host clears its enemies on
-    // every node before it tells the others the seed and spawns the next
-    // run's; its first dungeon is built for knights
-    function _startRun(seed, position, knights) {
+    // dungeon at position in its range and built with the overrides m
+    // (null for the game's own). The host clears its enemies on every
+    // node before it tells the others the seed and spawns the next run's;
+    // its first dungeon is built for knights
+    function _startRun(seed, position, knights, m) {
         console.log("[Game] New run, seed:", seed)
         clearDungeon()
         masterSeed = seed
+        master = m || null
         _setDanger(position, position)
         _setKnights(knights)
-        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights)
+        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights, master)
         menuOpen = false
         knightPanelOpen = false
         fallen = false
@@ -2184,6 +2482,9 @@ ClayWorld2d {
         resetting = false
         fightRoomActive = false
         masterSeed = -1
+        master = null
+        masterAsk = null
+        masterPreview = null
         levelIndex = 0
         levelType = "dungeon"
         _startRunRecord()
@@ -2285,6 +2586,7 @@ ClayWorld2d {
     // Minimap with fog of war
     Canvas {
         id: minimap
+        objectName: "minimap"
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: 10
@@ -2302,9 +2604,9 @@ ClayWorld2d {
             // Draw explored cells
             for (var gy = 0; gy < gridHeight; gy++) {
                 for (var gx = 0; gx < gridWidth; gx++) {
-                    if (exploredCells[gy] && exploredCells[gy][gx]) {
-                        var cellType = grid[gy][gx]
-                        ctx.fillStyle = (cellType === cellWall) ? "#333" : "#666"
+                    var shown = mapCell(gx, gy)
+                    if (shown !== "") {
+                        ctx.fillStyle = shown === "rock" ? "#333" : "#666"
                         ctx.fillRect(gx * scale, (gridHeight - 1 - gy) * scale, scale, scale)
                     }
                 }
@@ -2368,10 +2670,16 @@ ClayWorld2d {
     // The host settles the next danger from every knight's record and
     // sends it with the level
     function _hostAdvanceLevel() {
-        if (resetting) return
-        let d = _dangerFor(levelIndex + 1)
-        session.announceLevel(levelIndex + 1, d.pos, d.next, d.knights)
-        _applyLevelChange(levelIndex + 1, d)
+        if (resetting || masterOpen) return
+        let next = levelIndex + 1
+        let d = _dangerFor(next)
+        let go = (m, pos) => {
+            let dd = m || pos !== d.pos ? { pos: pos, next: pos, knights: d.knights, master: m } : d
+            session.announceLevel(next, dd.pos, dd.next, dd.knights, m)
+            _applyLevelChange(next, dd)
+        }
+        if (levelTypeOf(next) !== "dungeon" || !_masterAsks()) go(null, d.pos)
+        else openMaster({ index: next, pos: d.pos, knights: d.knights, seed: masterSeed, go: go })
     }
 
     // d: the danger's positions the level is entered at and the knights it
@@ -2390,7 +2698,8 @@ ClayWorld2d {
     // In a session a knight down rises at the village's camp. d is the
     // danger's positions it is entered at and the knights it is built
     // for, the host's in a session; alone they are settled here, before
-    // the knight and its record are gone
+    // the knight and its record are gone. d.master is the dungeon's
+    // overrides, the dungeon master's
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
@@ -2404,6 +2713,7 @@ ClayWorld2d {
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
+        master = levelType === "dungeon" ? d.master || null : null
         _setDanger(d.pos, d.next)
         _setKnights(d.knights)
         if (levelType === "village")
@@ -2640,7 +2950,7 @@ ClayWorld2d {
     function generateDungeon() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        let levelSeed = deriveSeed(masterSeed, levelIndex)
+        let levelSeed = levelSeedNow()
         rng = createRng(levelSeed)
         console.log("[Game] Seed:", masterSeed, "Level:", levelIndex, "LevelSeed:", levelSeed)
         // Nothing lost here yet: were the party to leave at once, the next
@@ -2648,23 +2958,23 @@ ClayWorld2d {
         nextPosition = settleDanger(dangerPosition, [{ lost: 0, fell: false }])
         console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
-        // Step 1: Initialize grid with walls
-        initializeGrid()
+        // Steps 1 to 4c: the grid carved and its features, doors and
+        // secret rooms laid out (carveDungeon); a secret room's cells stay
+        // rock until opened
         initExploredCells()
-
-        // Step 2: Place rooms
-        placeRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax)
-
-        // Step 3: Connect rooms with spanning tree
-        connectRooms()
-
-        // Step 4: Add entrance (south) and exit (north)
-        addEntranceAndExit()
+        let spec = dungeonSpec(dangerPosition, master)
+        let plan = carveDungeon(levelSeed, spec.band, featureShowcase, rng, spec)
+        let featureList = plan.features
+        let doorList = plan.doors
+        _takeSecrets(plan.secrets)
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
         placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
+        placeFeatures(featureList)
+        placeDoors(doorList)
+        placeSecrets()
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -2682,7 +2992,7 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        for (let e of rollEnemies(rooms, spawnRolls(danger, partyKnights), rng))
+        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng))
             spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
 
         // Bind player controls
@@ -2698,6 +3008,14 @@ ClayWorld2d {
             revealAroundPlayer()  // Initial reveal
         }
 
+        // The secret rooms the host's party opened here already, the
+        // things it broke, and the plates it set off, for a node that
+        // joins late
+        _applySecrets(_sessionSecrets)
+        _applyBroken(_sessionBroken)
+        _applySprung(_sessionSprung)
+        _applyDoors(_sessionDoors)
+
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
             let startRoom = rooms[0]
@@ -2706,6 +3024,81 @@ ClayWorld2d {
         }
 
         console.log("[Game] generateDungeon() complete")
+    }
+
+    // The level seed the level played now is built on: the master's when
+    // it set one, else the run's seed's for the level
+    function levelSeedNow() {
+        return master && master.seed !== undefined ? master.seed : deriveSeed(masterSeed, levelIndex)
+    }
+    // What a dungeon at position is built from, with the master's
+    // overrides m (null for the game's own): its band, its rooms' count
+    // range, the feature kinds' table and its spawn rolls at a danger for
+    // knights (spawnRolls, with the enemies per room m sets). position
+    // left out is the middle of the range
+    function dungeonSpec(position, m) {
+        let sb = Balance.spawn
+        let spec = { band: position === undefined ? 1 : dangerBand(position),
+                     roomsMin: sb.roomsMin, roomsMax: sb.roomsMax, kinds: Balance.dungeon.kinds,
+                     enemiesPerRoom: undefined }
+        spec.rolls = (d, knights) => Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+        if (!m) return spec
+        if (m.rooms !== undefined) spec.roomsMin = spec.roomsMax = m.rooms
+        if (m.enemies !== undefined) spec.enemiesPerRoom = m.enemies
+        // A feature row's per room, split between its kinds, at every band
+        let kinds = {}
+        for (let k in Balance.dungeon.kinds) kinds[k] = Object.assign({}, Balance.dungeon.kinds[k])
+        for (let row of Balance.dungeonMaster.settings) {
+            if (!row.kinds || m[row.key] === undefined) continue
+            let shares = splitShare(m[row.key], row.kinds.map(k => kinds[k].perRoom[spec.band]))
+            row.kinds.forEach((k, i) => kinds[k].perRoom = [shares[i], shares[i], shares[i]])
+        }
+        spec.kinds = kinds
+        return spec
+    }
+    // total split by weights: its whole number in whole shares, the
+    // largest remainders first, and its fraction in proportion, so a
+    // whole total gives that many to a room
+    function splitShare(total, weights) {
+        let sum = weights.reduce((a, b) => a + b, 0)
+        let w = weights.map(x => sum > 0 ? x / sum : 1 / weights.length)
+        let whole = Math.floor(total + 1e-9), frac = Math.max(0, total - whole)
+        let out = w.map(x => Math.floor(x * whole))
+        let left = whole - out.reduce((a, b) => a + b, 0)
+        let order = w.map((x, i) => i).sort((a, b) => (w[b] * whole - out[b]) - (w[a] * whole - out[a]) || w[b] - w[a])
+        for (let i = 0; i < left; i++) out[order[i % order.length]]++
+        return out.map((n, i) => n + frac * w[i])
+    }
+
+    // Steps 1 to 4c of a dungeon, the same for the one built
+    // (generateDungeon) and the one the witch reads (secretsOf), on the
+    // live grid: the grid filled with walls, the rooms drawn from rand and
+    // carved, the chain of corridors, the entrance and the exit, the loops;
+    // then its features, doors and secret rooms laid out on it, without
+    // touching the world: {features, doors, secrets}
+    function carveDungeon(levelSeed, band, showcase, rand, spec) {
+        spec = spec || dungeonSpec(undefined, null)
+        // Step 1: Initialize grid with walls
+        initializeGrid()
+
+        // Step 2: Place rooms
+        placeRooms(spec.roomsMin, spec.roomsMax, Balance.spawn.roomSizeMin,
+                   Balance.spawn.roomSizeMax, rand)
+
+        // Step 3: Connect rooms with spanning tree
+        connectRooms()
+
+        // Step 4: Add entrance (south) and exit (north)
+        addEntranceAndExit()
+
+        // Step 4b: Close loops with corridors off the chain
+        addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[band])
+
+        // Step 4c: Lay out the features, the doors and the secret rooms
+        let features = planFeatures(levelSeed, band, showcase, spec.kinds)
+        let doors = planDoors(levelSeed, band, showcase)
+        return { features: features, doors: doors,
+                 secrets: planSecrets(levelSeed, band, showcase, features, doors) }
     }
 
     function initializeGrid() {
@@ -2750,8 +3143,8 @@ ClayWorld2d {
         minimap.requestPaint()
     }
 
-    function placeRooms(minRooms, maxRooms, minSize, maxSize) {
-        rooms = planRooms(minRooms, maxRooms, minSize, maxSize, rng)
+    function placeRooms(minRooms, maxRooms, minSize, maxSize, rand) {
+        rooms = planRooms(minRooms, maxRooms, minSize, maxSize, rand || rng)
         // Carve the rooms into the grid
         for (let room of rooms)
             for (let y = room.y; y < room.y + room.h; y++)
@@ -2799,14 +3192,19 @@ ClayWorld2d {
         return out
     }
 
-    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls),
+    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls,
+    // or a dungeonSpec's rolls),
     // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
     // first, the knights' start, with the table's tier mix
     function rollEnemies(rms, sb, rand) {
         let out = []
         if (rms.length < 2) return out
         let spawnRooms = rms.slice(1)
-        let numEnemies = sb.enemiesMin + Math.floor(rand() * (sb.enemiesMax - sb.enemiesMin + 1))
+        // perRoom, when the rolls have it, sets the count: that many to a
+        // room, rounded over all of them; the roll is drawn all the same
+        let roll = rand()
+        let numEnemies = sb.perRoom !== undefined ? Math.round(sb.perRoom * spawnRooms.length)
+                                                  : sb.enemiesMin + Math.floor(roll * (sb.enemiesMax - sb.enemiesMin + 1))
         let tiers = dealTiers(numEnemies, sb, rand)
         for (let i = 0; i < numEnemies; i++) {
             let room = spawnRooms[i % spawnRooms.length]
@@ -2840,6 +3238,99 @@ ClayWorld2d {
             // Carve L-shaped hallway
             carveHallway(ax, ay, bx, by)
         }
+    }
+
+    // The corridors off the chain (addLoops): [{a, b, cells}], a and b the
+    // rooms' indices, cells the [gx, gy] it carved out of the rock
+    property var loopCorridors: []
+
+    // count more corridors, each between two rooms close but not
+    // neighbours in the chain, so the dungeon has loops. rand is their own
+    // stream of the level's seed, so the rooms, the enemies and the
+    // witch's reading stay as the seed has them. Each pick is one of the
+    // dungeon.loopChoice closest pairs left (the gap between the rooms, in
+    // cells), carved L-shaped centre to centre as the chain's are, the
+    // stream choosing which leg comes first. A corridor is taken only if
+    // each of its cells outside its two rooms lies in no third room nor
+    // beside one, beside its own two only where it steps into them, not on
+    // or beside the entrance's or the exit's shaft, and it carves at least
+    // one new cell; else its other leg is tried, then the next pair. Fewer
+    // than count only when no pair is left
+    function addLoops(rand, count) {
+        loopCorridors = []
+        let n = rooms.length
+        let inRoom = (r, gx, gy) => gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h
+        let centre = r => [Math.floor(r.x + r.w / 2), Math.floor(r.y + r.h / 2)]
+        let start = rooms[0], end = rooms[n - 1]
+        let shaft = (gx, gy) => (Math.abs(gx - entranceGridX) <= 1 && gy < start.y)
+                                || (Math.abs(gx - exitGridX) <= 1 && gy >= end.y + end.h)
+        let pairs = []
+        for (let i = 0; i < n; i++)
+            for (let j = i + 2; j < n; j++) {
+                let a = rooms[i], b = rooms[j]
+                let gap = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w))
+                        + Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h))
+                pairs.push({ a: i, b: j, gap: gap })
+            }
+        pairs.sort((p, q) => p.gap - q.gap || p.a - q.a || p.b - q.b)
+
+        let beside = (r, c) => {
+            let inX = c[0] >= r.x && c[0] < r.x + r.w, inY = c[1] >= r.y && c[1] < r.y + r.h
+            let nearX = c[0] >= r.x - 1 && c[0] <= r.x + r.w, nearY = c[1] >= r.y - 1 && c[1] <= r.y + r.h
+            return nearX && nearY && (inX || inY)
+        }
+        let clear = (path, p) => {
+            let fresh = 0
+            for (let i = 0; i < path.length; i++) {
+                let c = path[i]
+                if (inRoom(rooms[p.a], c[0], c[1]) || inRoom(rooms[p.b], c[0], c[1])) continue
+                if (shaft(c[0], c[1])) return -1
+                for (let k = 0; k < n; k++) {
+                    if (!beside(rooms[k], c)) continue
+                    // Its own two rooms only where it steps in or out,
+                    // never along their walls
+                    let step = (k === p.a || k === p.b)
+                        && [path[i - 1], path[i + 1]].some(q => q && inRoom(rooms[k], q[0], q[1]))
+                    if (!step) return -1
+                }
+                if (grid[c[1]][c[0]] === cellWall) fresh++
+            }
+            return fresh
+        }
+
+        while (loopCorridors.length < count && pairs.length > 0) {
+            let pick = Math.floor(rand() * Math.min(Balance.dungeon.loopChoice, pairs.length))
+            let p = pairs.splice(pick, 1)[0]
+            let ca = centre(rooms[p.a]), cb = centre(rooms[p.b])
+            let flip = rand() < 0.5
+            for (let first of [flip, !flip]) {
+                let path = lPath(ca[0], ca[1], cb[0], cb[1], first)
+                if (clear(path, p) <= 0) continue
+                let cells = path.filter(c => grid[c[1]][c[0]] === cellWall)
+                for (let c of cells) grid[c[1]][c[0]] = cellHallway
+                loopCorridors.push({ a: p.a, b: p.b, cells: cells })
+                break
+            }
+        }
+        console.log("[Game] Closed", loopCorridors.length, "loops of", count)
+    }
+
+    // The cells of an L from (x1, y1) to (x2, y2), both ends in: along x
+    // first when acrossFirst, else along y first
+    function lPath(x1, y1, x2, y2, acrossFirst) {
+        let out = []
+        let mx = acrossFirst ? x2 : x1, my = acrossFirst ? y1 : y2
+        let walk = (fx, fy, tx, ty) => {
+            let dx = Math.sign(tx - fx), dy = Math.sign(ty - fy)
+            for (let x = fx, y = fy; ; x += dx, y += dy) {
+                out.push([x, y])
+                if (x === tx && y === ty) break
+            }
+        }
+        walk(x1, y1, mx, my)
+        out.pop()
+        walk(mx, my, x2, y2)
+        return out
     }
 
     function carveHallway(x1, y1, x2, y2) {
@@ -2924,9 +3415,10 @@ ClayWorld2d {
             let gx = 0
             while (gx < gridWidth) {
                 if (grid[gy][gx] === cellWall) {
-                    // Found start of wall run, find its length
-                    let startX = gx
-                    while (gx < gridWidth && grid[gy][gx] === cellWall) {
+                    // Found start of wall run, find its length; a secret
+                    // room's cells run apart, so opening it takes them away
+                    let startX = gx, secret = _secretOf(gx, gy)
+                    while (gx < gridWidth && grid[gy][gx] === cellWall && _secretOf(gx, gy) === secret) {
                         gx++
                     }
                     let runLength = gx - startX
@@ -2935,7 +3427,7 @@ ClayWorld2d {
                     let wx = startX * cellSize
                     let wy = gy * cellSize
                     let ww = runLength * cellSize
-                    createWallAt(wx, wy + cellSize, ww, cellSize)
+                    _keepSecretBuilt(secret, createWallAt(wx, wy + cellSize, ww, cellSize))
                     wallCount++
                 } else {
                     gx++
@@ -2980,7 +3472,7 @@ ClayWorld2d {
             if (gy >= gridHeight) continue
             let spots = []
             for (let gx = room.x; gx < room.x + room.w; gx++)
-                if (grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                if (grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall && _secretOf(gx, gy) < 0)
                     spots.push(gx)
             if (spots.length === 0) continue
             let count = room.w >= 7 && spots.length >= 4 ? 2 : 1
@@ -3040,6 +3532,1169 @@ ClayWorld2d {
         pile.destroy()
     }
 
+    // The dungeon's features (Balance.dungeon): [{kind, gx, gy, xWu, yWu}],
+    // a cell and its centre in wu. The dojo's features scenario sets
+    // featureShowcase, and each kind is laid out at its showcase count
+    // instead of its danger's; a new level is built without it
+    property var features: []
+    property bool featureShowcase: false
+
+    // Whether a feature may stand on cell (gx, gy) of the carved grid: a
+    // room's cell, not in the start room, not beside a corridor, and the
+    // table's distance clear of the entrance and the exit
+    function featureCellOk(gx, gy) {
+        if (grid[gy][gx] !== cellRoom) return false
+        let start = rooms[0]
+        if (gx >= start.x && gx < start.x + start.w && gy >= start.y && gy < start.y + start.h)
+            return false
+        for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            let nx = gx + n[0], ny = gy + n[1]
+            if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && grid[ny][nx] === cellHallway)
+                return false
+        }
+        let far = (ex, ey, d) => Math.hypot((gx - ex) * cellSize, (gy - ey) * cellSize) >= d
+        return far(entranceGridX, 0, Balance.dungeon.clearOfEntrance)
+            && far(exitGridX, gridHeight - 1, Balance.dungeon.clearOfExit)
+    }
+
+    // The features of the carved dungeon, at the look's band (dangerBand)
+    // or at the showcase counts, without touching the world. Each kind
+    // draws from its own stream, the level's seed and the kind's name, and
+    // ranks a room's cells by it whatever the other kinds took: it takes
+    // the first of them still free (a slit one on the room's edge,
+    // _slitAim). So a kind added or retuned moves another only off a cell
+    // it takes first. kinds is Balance.dungeon's when left out. The slits
+    // get their rhythms last (_rhythmSlits)
+    function planFeatures(levelSeed, band, showcase, kinds) {
+        kinds = kinds || Balance.dungeon.kinds
+        let out = []
+        if (rooms.length < 2) return out
+        let taken = {}
+        for (let kind in kinds) {
+            let table = kinds[kind]
+            let rand = createRng(levelSeed ^ 0x7a3d9e21 ^ _nameHash(kind))
+            let perRoom = showcase ? table.showcase : table.perRoom[band]
+            for (let room of rooms.slice(1)) {
+                // A whole number per room, its fraction a chance of one more
+                let n = Math.floor(perRoom + rand())
+                if (n <= 0) continue
+                let cells = []
+                for (let gy = room.y; gy < room.y + room.h; gy++)
+                    for (let gx = room.x; gx < room.x + room.w; gx++)
+                        if (featureCellOk(gx, gy)) cells.push([gx, gy])
+                // Shuffled (Fisher-Yates) by this kind's stream alone
+                for (let i = cells.length - 1; i > 0; i--) {
+                    let j = Math.floor(rand() * (i + 1))
+                    let c = cells[i]; cells[i] = cells[j]; cells[j] = c
+                }
+                let picked = []
+                for (let c of cells) {
+                    if (n <= 0) break
+                    if (taken[c[1] * gridWidth + c[0]]) continue
+                    let aim = kind === "slit" ? _slitAim(c[0], c[1], room, picked) : {}
+                    if (!aim) continue
+                    taken[c[1] * gridWidth + c[0]] = true
+                    let f = Object.assign({ kind: kind, gx: c[0], gy: c[1],
+                                            xWu: (c[0] + 0.5) * cellSize, yWu: (c[1] + 0.5) * cellSize }, aim)
+                    out.push(f)
+                    picked.push(f)
+                    n--
+                }
+            }
+        }
+        return _rhythmSlits(out, levelSeed, band)
+    }
+    function _nameHash(name) {
+        let h = 5381
+        for (let i = 0; i < name.length; i++) h = (Math.imul(h, 33) ^ name.charCodeAt(i)) | 0
+        return h
+    }
+
+    function placeFeatures(list) {
+        features = list
+        breakables = []
+        _propCells = ({})
+        _brokenCells = []
+        plates = []
+        _sprungCells = ({})
+        slits = []
+        _clearArrows()
+        let band = dangerBand(dangerPosition)
+        for (let f of list) {
+            let o = null
+            if (Balance.dungeon.loot[f.kind])
+                o = _placeBreakable(f, band)
+            else if (f.kind === "spike")
+                o = _placePlate(f, band)
+            else if (f.kind === "slit")
+                o = _placeSlit(f, band)
+            if (o) dungeonObjects.push(o)
+        }
+    }
+
+    // --- Breakables (issue #123) ---
+    // Urns, crates and crystals stand on their features' cells, the same
+    // on every screen, as the seed lays them out. A blow on this screen
+    // breaks one at once (Player._breakThings); alone the game rolls its
+    // gold, in a session the host does, publishes the cells broken in the
+    // level (session property "broken") and every screen breaks them too,
+    // a node that joins later as well. The gold is a drop as an enemy's
+    Component { id: breakableComponent; Breakable {} }
+    Component {
+        id: crystalGlowComponent
+        Rectangle {
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            x: xWu * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - yWu * pixelPerUnit - height / 2
+            width: 1.6 * pixelPerUnit
+            height: width
+            radius: width / 2
+            color: "#307FE6FF"
+            SequentialAnimation on opacity {
+                loops: Animation.Infinite
+                NumberAnimation { from: 0.6; to: 1; duration: 1100; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 1; to: 0.6; duration: 1100; easing.type: Easing.InOutSine }
+            }
+        }
+    }
+    // The whole ones still standing, and their cells by grid key, which
+    // the enemies' paths go around
+    property var breakables: []
+    property var _propCells: ({})
+    // Host, and alone: the cells broken in this level, "gx,gy"
+    property var _brokenCells: []
+    function _placeBreakable(f, band) {
+        let cell = f.gx + "," + f.gy
+        let b = breakableComponent.createObject(world.room, {
+            kind: f.kind, cell: cell, cxWu: f.xWu, cyWu: f.yWu, band: band,
+            seed: createRng(f.gx * 7349 + f.gy * 3571)(),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catProp,
+            collidesWith: catPlayer | catEnemy
+        })
+        if (!b) return null
+        if (f.kind === "crystal") {
+            b.glow = crystalGlowComponent.createObject(glowParent(), {
+                xWu: f.xWu, yWu: f.yWu, pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+            if (b.glow) dungeonObjects.push(b.glow)
+        }
+        breakables.push(b)
+        _propCells[f.gy * gridWidth + f.gx] = true
+        _setPathCell(f.gx, f.gy, false)
+        return b
+    }
+    function breakableAt(cell) {
+        return breakables.find(b => b.cell === cell) || null
+    }
+    // The gold a breakable holds, from the level's seed and its cell
+    // alone, whoever breaks it and when: 0 for none
+    function breakableGold(kind, cell) {
+        let t = (_cacheCells[cell] ? Balance.dungeon.cacheLoot : Balance.dungeon.loot)[kind]
+        if (!t) return 0
+        let c = cell.split(",").map(Number)
+        let rand = createRng(levelSeedNow() ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
+        if (rand() >= t.chance) return 0
+        let lo = t.gold[0] + t.perDepth * dangerDepth, hi = t.gold[1] + t.perDepth * dangerDepth
+        return lo + Math.floor(rand() * (hi - lo + 1))
+    }
+    // This node's knight broke b with a blow along (nx, ny)
+    function breakThing(b, nx, ny) {
+        if (!_wreck(b, nx, ny)) return
+        if (session.connected) session.reportBreak(levelIndex, b.cell)
+        else _broken(b.kind, b.cell, b.cxWu, b.cyWu)
+    }
+    // A blow too weak for it: a crystal glances a swing off with sparks
+    function glanceThing(b, nx, ny) {
+        spawnSparks(b.cxWu, b.cyWu, -nx, -ny, 6, "#BFF4FF")
+        impactSound.triggerOneShot(0.25)
+    }
+    // Alone, or the host: b broke for good, its gold drops where it stood
+    // and, in a session, every screen is told
+    function _broken(kind, cell, x, y) {
+        if (_brokenCells.indexOf(cell) >= 0) return
+        _brokenCells.push(cell)
+        _spawnGold(x, y, breakableGold(kind, cell))
+        if (session.connected)
+            session.publishBroken({ seed: session.runSeed, level: levelIndex, cells: _brokenCells.slice() })
+    }
+    // Host: a node broke the thing on that cell of that level
+    function _hostBreak(level, cell) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        let cache = [].concat(...secretRooms.filter(s => s.open).map(s => s.cache))
+        let f = features.concat(cache).find(f => f.gx + "," + f.gy === cell && Balance.dungeon.loot[f.kind])
+        if (!f) return
+        let b = breakableAt(cell)
+        if (b) _wreck(b, 0, -1)
+        _broken(f.kind, cell, f.xWu, f.yWu)
+    }
+    // The host's cells broken in the level: those still whole here break
+    function _applyBroken(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let cell of v.cells) {
+            let b = breakableAt(cell)
+            if (b) _wreck(b, 0, -1)
+        }
+    }
+    readonly property var _sessionBroken: session.broken
+    on_SessionBrokenChanged: _applyBroken(_sessionBroken)
+    // Off the floor with its look's pieces thrown along (nx, ny) and a
+    // crack; false when it was broken already
+    function _wreck(b, nx, ny) {
+        let i = breakables.indexOf(b)
+        if (i < 0) return false
+        breakables.splice(i, 1)
+        let c = b.cell.split(",").map(Number)
+        delete _propCells[c[1] * gridWidth + c[0]]
+        _setPathCell(c[0], c[1], true)
+        let x = b.cxWu, y = b.cyWu
+        if (b.kind === "urn") {
+            spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
+            spawnShards(x, y, nx, ny, 4, Qt.lighter(b._clay, 1.3), 0.28)
+            impactSound.triggerOneShot(0.5)
+        } else if (b.kind === "crate") {
+            spawnShards(x, y, nx, ny, 9, b._wood, 0.24)
+            spawnShards(x, y, nx, ny, 5, Qt.lighter(b._wood, 1.3), 0.14)
+            impactSound.triggerOneShot(0.6)
+        } else {
+            spawnShards(x, y, nx, ny, 12, "#7FE6FF", 0.18)
+            spawnSparks(x, y, nx, ny, 10, "#E8FBFF")
+            impactSound.triggerOneShot(0.7)
+        }
+        if (b.glow) b.glow.destroy()
+        b.destroy()
+        return true
+    }
+
+    // --- Spike plates (issue #124) ---
+    // A plate stands on its feature's cell, the same on every screen. This
+    // node's knight stepping on it, its centre on the plate, makes it
+    // click; spikeDelay later its spikes rise and judge this node's knight
+    // alone: on the plate and not dashing, it takes the spikes' damage
+    // (spikeDamageAt). Then it stays sprung. Alone the delay runs on the
+    // physics clock, held by a pause. In a session the rise is a moment on
+    // the session clock: the node that set it off reports it to the host,
+    // which publishes the plates set off in the level (session property
+    // "sprung"), and every other screen clicks and raises the plate at that
+    // moment, judging its own knight, a node that joins later too
+    Component { id: plateComponent; SpikePlate {} }
+    property var plates: []
+    // Host: the plates set off in this level, "gx,gy" to their riseAt
+    property var _sprungCells: ({})
+    // A plate clicked or rose on this screen; result is what its spikes
+    // did to this node's knight (SpikePlate.result)
+    signal plateClicked(string cell)
+    signal plateRose(string cell, string result)
+    function _placePlate(f, band) {
+        let p = plateComponent.createObject(world.room, {
+            cell: f.gx + "," + f.gy, xWu: f.xWu, yWu: f.yWu, band: band,
+            sizeWu: Balance.dungeon.spikePlateSize,
+            seed: createRng(f.gx * 7349 + f.gy * 3571)(),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (p) plates.push(p)
+        return p
+    }
+    function plateAt(cell) {
+        return plates.find(p => p.cell === cell) || null
+    }
+    // What a plate's spikes deal at depth d to a knight of maxHp: never
+    // more than spikeCap of its max HP
+    function spikeDamageAt(d, maxHp) {
+        let t = Balance.dungeon
+        return Math.min(Math.round(t.spikeDamage + t.spikeDamagePerDepth * Math.max(0, d)),
+                        Math.floor(t.spikeCap * maxHp))
+    }
+    // Whether this node's knight stands on plate p: its centre on the slab
+    function onPlate(p) {
+        if (!player) return false
+        let h = p.sizeWu / 2
+        return Math.abs(player.xWu + player.widthWu / 2 - p.xWu) <= h
+            && Math.abs(player.yWu - player.heightWu / 2 - p.yWu) <= h
+    }
+    // Each physics step: a plate this knight steps on clicks, a clicked
+    // one whose moment came rises
+    function _stepPlates() {
+        if (plates.length === 0 || levelType !== "dungeon") return
+        let dt = world.physics.timeStep
+        for (let p of plates.slice()) {
+            if (p.phase === "armed") {
+                if (player && !player.fallen && onPlate(p)) _clickPlate(p, -1)
+            } else if (p.phase === "clicked") {
+                let due = p.riseAt >= 0 ? session.now() >= p.riseAt
+                                        : (p.riseIn = p.riseIn - dt) <= 1e-6
+                if (due) _risePlate(p)
+            }
+        }
+    }
+    // p clicks: set off by this node's knight (riseAt -1), or by another's,
+    // its spikes due at riseAt on the session clock
+    function _clickPlate(p, riseAt) {
+        p.phase = "clicked"
+        playPlateClick()
+        if (riseAt >= 0) {
+            p.riseAt = riseAt
+        } else if (session.connected) {
+            p.riseAt = session.now() + Balance.dungeon.spikeDelay * 1000
+            session.reportSpring(levelIndex, p.cell, p.riseAt)
+        } else {
+            p.riseIn = Balance.dungeon.spikeDelay
+        }
+        plateClicked(p.cell)
+    }
+    // p's spikes rise: this node's knight on it is hit, unless it dashes
+    function _risePlate(p) {
+        p.phase = "sprung"
+        playSpikesRise()
+        spawnSparks(p.xWu, p.yWu, 0, 1, 6, "#E6E2D6")
+        let result = "clear"
+        if (player && onPlate(p)) {
+            result = player.takeTrapDamage(spikeDamageAt(dangerDepth, player.maxHp))
+            console.log("[Game] Spikes rose under the knight at", p.cell, "-", result)
+        }
+        p.result = result
+        plateRose(p.cell, result)
+    }
+    // Host: a node set off the plate on that cell of that level, its
+    // spikes due at riseAt; the first word on a plate holds
+    function _hostSpring(level, cell, riseAt) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        if (_sprungCells[cell] !== undefined || !plateAt(cell)) return
+        _sprungCells[cell] = riseAt
+        let p = plateAt(cell)
+        if (p.phase === "armed") _clickPlate(p, riseAt)
+        session.publishSprung({ seed: session.runSeed, level: levelIndex,
+                                plates: Object.assign({}, _sprungCells) })
+    }
+    // The host's plates set off in the level: those still armed here click
+    // and rise at their moment; long past, they are simply sprung
+    function _applySprung(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let cell in v.plates) {
+            let p = plateAt(cell)
+            if (!p || p.phase !== "armed") continue
+            if (session.now() - v.plates[cell] > 1000) p.phase = "sprung"
+            else _clickPlate(p, v.plates[cell])
+        }
+    }
+    readonly property var _sessionSprung: session.sprung
+    on_SessionSprungChanged: _applySprung(_sessionSprung)
+
+    // --- Arrow slits (issue #125) ---
+    // A slit sits in the wall beside its feature's cell, on a room's edge,
+    // and fires across the room on the beats of its rhythm
+    // (Balance.dungeon.slit...). The beats are counted on the trap clock:
+    // the session clock in a session, so every screen fires the same arrow
+    // at the same moment, alone the physics clock, held by a pause. An
+    // arrow's flight is a function of that clock, the same on every screen
+    // too. Each game judges the arrows on its own knight alone
+    // (Player.meetArrow) and tells the others what became of one that hit,
+    // was blocked or sent back, which then goes on their screens as well
+    Component { id: slitComponent; ArrowSlit {} }
+    Component { id: arrowComponent; Arrow {} }
+    property var slits: []
+    property var arrows: []
+    // The knight's square and an arrow's thickness, wu, for the hits and
+    // the gaps
+    readonly property real knightSizeWu: 1.0
+    readonly property real arrowWidthWu: 0.2
+    // Seconds on the physics clock, the trap clock alone
+    property real _trapClock: 0
+    // The last beat the slits fired on, -1 before the first step
+    property int _slitBeat: -1
+    // What another node's knight did to an arrow not fired here yet, by id
+    property var _arrowFates: ({})
+    // An arrow left its slit on this screen, at the trap clock's moment at
+    // (s); this node's knight met one: result as Player.meetArrow's; one
+    // went: on the wall facing its slit ("wall"), on its slit, sent back
+    // ("slit"), or on a knight or a shield ("knight")
+    signal arrowFired(string id, string cell, real at)
+    signal arrowMet(string id, string result)
+    signal arrowEnded(string id, string where)
+
+    // Where a slit on cell (gx, gy) of room fires from, or null. The cell
+    // lies on the room's edge with a wall beside it - north, south, west
+    // or east, the first that fits - and the slit's line runs from it
+    // across the room to a wall, not a doorway, on no line of a slit
+    // picked in the room before. {dx, dy, cells}: the way it fires, y up,
+    // and the cells its line crosses
+    function _slitAim(gx, gy, room, picked) {
+        for (let n of [[0, 1], [0, -1], [-1, 0], [1, 0]]) {
+            if (!grid[gy + n[1]] || grid[gy + n[1]][gx + n[0]] !== cellWall) continue
+            let dx = -n[0], dy = -n[1], x = gx, y = gy, cells = 0
+            while (x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h) {
+                cells++
+                x += dx
+                y += dy
+            }
+            if (!grid[y] || grid[y][x] !== cellWall) continue
+            if (picked.some(p => dy === 0 ? p.dy === 0 && p.gy === gy : p.dx === 0 && p.gx === gx))
+                continue
+            return { dx: dx, dy: dy, cells: cells }
+        }
+        return null
+    }
+    // The cells of a slit's line, "gx,gy"
+    function slitLine(f) {
+        let out = []
+        for (let i = 0, x = f.gx, y = f.gy; i < f.cells; i++, x += f.dx, y += f.dy) out.push(x + "," + y)
+        return out
+    }
+    // The longest rest of a rhythm's beats a knight has to walk over a
+    // slit's line, s: the time between two arrows less the time one takes
+    // to pass a knight
+    function slitGap(beats) {
+        let t = Balance.dungeon, shots = []
+        beats.forEach((b, i) => { if (b === 1) shots.push(i) })
+        if (shots.length === 0) return Infinity
+        let longest = 0
+        for (let i = 0; i < shots.length; i++) {
+            let next = i + 1 < shots.length ? shots[i + 1] : shots[0] + beats.length
+            longest = Math.max(longest, next - shots[i])
+        }
+        return longest * t.slitBeat - (t.arrowLength + knightSizeWu) / t.arrowSpeed
+    }
+    // What a knight takes to walk over a line at its pace, s, and the gap
+    // a rhythm must leave for it
+    function slitCrossTime() { return (knightSizeWu + arrowWidthWu) / Balance.knight.moveSpeed }
+    function slitGapNeed() { return Balance.dungeon.slitGapMargin * slitCrossTime() }
+    // Whether room leaves a lane past its slits (group): its doorways - its
+    // cells beside a corridor - on none of their lines and under no
+    // breakable of list, and all of them joined by such cells
+    function slitLane(room, group, list) {
+        let blocked = {}
+        for (let f of group) for (let c of slitLine(f)) blocked[c] = true
+        for (let f of list) if (Balance.dungeon.loot[f.kind]) blocked[f.gx + "," + f.gy] = true
+        let inRoom = (x, y) => x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h
+        let doors = []
+        for (let gy = room.y; gy < room.y + room.h; gy++)
+            for (let gx = room.x; gx < room.x + room.w; gx++)
+                for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+                    if (grid[gy + n[1]] && grid[gy + n[1]][gx + n[0]] === cellHallway) {
+                        doors.push(gx + "," + gy)
+                        break
+                    }
+        if (doors.some(d => blocked[d])) return false
+        if (doors.length < 2) return true
+        let seen = {}, todo = [doors[0]]
+        seen[doors[0]] = true
+        while (todo.length > 0) {
+            let c = todo.pop().split(",").map(Number)
+            for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                let x = c[0] + n[0], y = c[1] + n[1], k = x + "," + y
+                if (!inRoom(x, y) || seen[k] || blocked[k]) continue
+                seen[k] = true
+                todo.push(k)
+            }
+        }
+        return doors.every(d => seen[d])
+    }
+    // The rhythms of the planned slits: a room's slits share one, drawn
+    // from the band's rhythms by the level's seed and the room's first
+    // slit, each started its share of a turn after the one before, so two
+    // take turns. A room that leaves no lane takes the band's first
+    // rhythm with a gap if the one drawn has none. Each slit gets rhythm,
+    // beats, offset and safe ("lane" or "gap")
+    function _rhythmSlits(list, levelSeed, band) {
+        let rhythms = Balance.dungeon.slitRhythms.filter(r => r.bands.indexOf(band) >= 0)
+        let byRoom = {}
+        for (let f of list) {
+            if (f.kind !== "slit") continue
+            let r = rooms.findIndex(m => f.gx >= m.x && f.gx < m.x + m.w && f.gy >= m.y && f.gy < m.y + m.h)
+            byRoom[r] = (byRoom[r] || []).concat([f])
+        }
+        for (let r in byRoom) {
+            let group = byRoom[r]
+            let rand = createRng(levelSeed ^ 0x1f83d9ab ^ (group[0].gy * gridWidth + group[0].gx))
+            let rhythm = rhythms[Math.floor(rand() * rhythms.length)]
+            let lane = slitLane(rooms[r], group, list)
+            if (!lane && slitGap(rhythm.beats) < slitGapNeed())
+                rhythm = rhythms.find(x => slitGap(x.beats) >= slitGapNeed()) || rhythm
+            let start = Math.floor(rand() * rhythm.beats.length)
+            group.forEach((f, i) => Object.assign(f, {
+                rhythm: rhythm.name, beats: rhythm.beats, safe: lane ? "lane" : "gap",
+                offset: start + Math.round(i * rhythm.beats.length / group.length) }))
+        }
+        return list
+    }
+
+    function _placeSlit(f, band) {
+        let s = slitComponent.createObject(world.room, {
+            cell: f.gx + "," + f.gy,
+            xWu: f.xWu - f.dx * cellSize / 2, yWu: f.yWu - f.dy * cellSize / 2,
+            dirX: f.dx, dirY: f.dy, lineWu: f.cells * cellSize,
+            rhythm: f.rhythm, beats: f.beats, offset: f.offset, band: band,
+            ringParent: glowParent(),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (s) slits.push(s)
+        return s
+    }
+    function slitAt(cell) {
+        return slits.find(s => s.cell === cell) || null
+    }
+    // The trap clock, s
+    function trapTime() { return session.connected ? session.now() / 1000 : _trapClock }
+    // Whether slit s fires on beat k of the trap clock
+    function slitFiresOn(s, k) {
+        let n = s.beats.length
+        return s.beats[((k + s.offset) % n + n) % n] === 1
+    }
+    // What an arrow deals at depth d to a knight of maxHp, before its
+    // defence: never more than arrowCap of its max HP
+    function arrowDamageAt(d, maxHp) {
+        let t = Balance.dungeon
+        return Math.min(Math.round(t.arrowDamage + t.arrowDamagePerDepth * Math.max(0, d)),
+                        Math.floor(t.arrowCap * maxHp))
+    }
+    // The shot's twang, fading with the distance from this knight
+    function _playArrow(xWu, yWu) {
+        let gain = remoteGain(xWu, yWu) / remoteMaxGain
+        if (gain > 0)
+            swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.slitShotPitch, 0.6 * gain)
+    }
+
+    // Each physics step: the slits fire on the beats passed since the step
+    // before, wind up for the next, and the arrows fly
+    function _stepSlits() {
+        if (levelType !== "dungeon" || slits.length === 0) return
+        _trapClock += world.physics.timeStep
+        let t = trapTime(), beat = Balance.dungeon.slitBeat
+        let k = Math.floor(t / beat)
+        // The first step, or the clock set back or far ahead (a session's
+        // clock syncing): no beats caught up
+        if (_slitBeat < 0 || k < _slitBeat || k - _slitBeat > 4) _slitBeat = k
+        for (let b = _slitBeat + 1; b <= k; b++)
+            for (let s of slits) if (slitFiresOn(s, b)) _fireArrow(s, b, b * beat)
+        _slitBeat = k
+        let warn = Balance.dungeon.slitWarn
+        for (let s of slits) {
+            let next = k + 1
+            while (!slitFiresOn(s, next) && next <= k + s.beats.length) next++
+            let left = next * beat - t
+            s.warn = left <= warn ? 1 - left / warn : 0
+            s.flash = t - s.shotAt >= 0 && t - s.shotAt < 0.08
+        }
+        for (let a of arrows.slice()) _flyArrow(a, t)
+    }
+    // Slit s fires: the arrow of beat b, leaving at the clock's moment at
+    function _fireArrow(s, b, at) {
+        let id = s.cell + "#" + b
+        let a = arrowComponent.createObject(glowParent(), {
+            arrowId: id, slit: s, dirX: s.dirX, dirY: s.dirY,
+            lengthWu: Balance.dungeon.arrowLength,
+            fromX: s.xWu, fromY: s.yWu, fromT: at, flightWu: s.lineWu,
+            xWu: s.xWu, yWu: s.yWu, lastX: s.xWu, lastY: s.yWu,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!a) return
+        arrows.push(a)
+        s.shotAt = at
+        _playArrow(s.xWu, s.yWu)
+        arrowFired(id, s.cell, at)
+        let fate = _arrowFates[id]
+        if (fate) {
+            delete _arrowFates[id]
+            _arrowFate(a, fate)
+        }
+    }
+    // Arrow a at the clock's moment t: on its way from its start, until it
+    // reaches the wall facing its slit, or its slit when sent back
+    function _flyArrow(a, t) {
+        let d = Math.max(0, Math.min(a.flightWu, Balance.dungeon.arrowSpeed * (t - a.fromT)))
+        a.lastX = a.xWu
+        a.lastY = a.yWu
+        a.xWu = a.fromX + a.dirX * d
+        a.yWu = a.fromY + a.dirY * d
+        let back = a.back
+        if (!a.judged) _judgeArrow(a, t)
+        if (a.back !== back) return
+        if (arrows.indexOf(a) >= 0 && d >= a.flightWu - 1e-6) _endArrow(a, a.back ? "slit" : "wall")
+    }
+    // Whether arrow a's shaft, swept since the step before, meets this
+    // node's knight; if so the knight's game judges it
+    function _judgeArrow(a, t) {
+        if (!player) return
+        let cx = player.xWu + player.widthWu / 2, cy = player.yWu - player.heightWu / 2
+        let hw = player.widthWu / 2 + arrowWidthWu / 2, hh = player.heightWu / 2 + arrowWidthWu / 2
+        let tx = a.lastX - a.dirX * a.lengthWu, ty = a.lastY - a.dirY * a.lengthWu
+        if (Math.max(tx, a.xWu) < cx - hw || Math.min(tx, a.xWu) > cx + hw
+                || Math.max(ty, a.yWu) < cy - hh || Math.min(ty, a.yWu) > cy + hh)
+            return
+        a.judged = true
+        // Where it comes from: on its line, two wu towards its slit
+        let fx = a.dirX !== 0 ? cx - a.dirX * 2 : a.xWu
+        let fy = a.dirY !== 0 ? cy - a.dirY * 2 : a.yWu
+        let result = player.meetArrow(arrowDamageAt(dangerDepth, player.maxHp), fx, fy, a.dirX, a.dirY)
+        console.log("[Game] Arrow", a.arrowId, "met the knight -", result)
+        arrowMet(a.arrowId, result)
+        if (result !== "hit" && result !== "blocked" && result !== "perfect") return
+        if (session.connected)
+            session.reportStruck({source: "arrow", id: a.arrowId, result: result,
+                                  x: a.xWu, y: a.yWu, at: t * 1000})
+        if (result === "perfect") _sendBack(a, a.xWu, a.yWu, t)
+        else _endArrow(a, "")
+    }
+    // A perfect block sends arrow a back to its slit from (x, y) at the
+    // clock's moment t; it hurts nobody on its way
+    function _sendBack(a, x, y, t) {
+        if (a.back) return
+        a.back = true
+        a.judged = true
+        a.fromX = x
+        a.fromY = y
+        a.fromT = t
+        a.flightWu = Math.abs(x - a.slit.xWu) + Math.abs(y - a.slit.yWu)
+        a.dirX = -a.dirX
+        a.dirY = -a.dirY
+    }
+    // Arrow a is gone: it broke on the wall facing its slit ("wall"), on
+    // its slit ("slit"), or on a knight or a shield ("")
+    function _endArrow(a, where) {
+        let i = arrows.indexOf(a)
+        if (i < 0) return
+        arrows.splice(i, 1)
+        if (where === "wall") spawnSparks(a.xWu, a.yWu, -a.dirX, -a.dirY, 3, "#C8B898")
+        else if (where === "slit") spawnSparks(a.xWu, a.yWu, -a.dirX, -a.dirY, 8, "#FFFFFF")
+        arrowEnded(a.arrowId, where === "" ? "knight" : where)
+        a.destroy()
+    }
+    // Another node's knight met an arrow: hit or blocked it is gone here
+    // too, sent back it flies back here too
+    function _arrowReported(r) {
+        if (levelType !== "dungeon") return
+        let a = arrows.find(x => x.arrowId === r.id)
+        if (a) _arrowFate(a, r)
+        else _arrowFates[r.id] = r
+    }
+    function _arrowFate(a, r) {
+        if (r.result === "perfect") _sendBack(a, r.x, r.y, r.at / 1000)
+        else _endArrow(a, "")
+    }
+    function _clearArrows() {
+        for (let a of arrows) {
+            try { a.destroy() } catch (err) {}
+        }
+        arrows = []
+        _arrowFates = {}
+        _slitBeat = -1
+    }
+
+    // --- Doors (issue #127) ---
+    // Some room entrances get a door (Balance.dungeon.doorShare): a
+    // doorway, a corridor's cell beside a room with rock on its two other
+    // sides, narrowed by two jambs to a leaf one knight wide. The doors
+    // come from their own stream of the level's seed, so nothing else of
+    // the dungeon moves, and start closed. A closed door blocks the
+    // knights, the enemies, their shots and their sight; E beside it opens
+    // or closes it (useDoor). An enemy chasing through a closed one winds
+    // up doorBash seconds and bursts it open (Enemy "bash", bashDoor), and
+    // a bashed door stays open. Alone the game owns the doors; in a
+    // session the host does: a node's E asks it, and it publishes the
+    // doors not closed in the level (session property "doors") for every
+    // screen, a node that joins later too
+    Component { id: doorComponent; Door {} }
+    property var doors: []
+    // Host, and alone: the doors not closed in this level, "gx,gy" to
+    // "open" or "bashed"
+    property var _doorStates: ({})
+
+    // Whether cell (gx, gy) of the carved grid is a doorway: a corridor's
+    // cell beside a room, rock on its two other sides, not in the
+    // entrance's or the exit's shaft. Its axis then: across when the
+    // corridor runs along x, and the side of the room along it
+    function doorway(gx, gy) {
+        if (grid[gy][gx] !== cellHallway || rooms.length < 2) return null
+        let start = rooms[0], end = rooms[rooms.length - 1]
+        if ((gx === entranceGridX && gy < start.y) || (gx === exitGridX && gy >= end.y + end.h))
+            return null
+        let at = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight ? grid[y][x] : cellWall
+        for (let d of [[1, 0], [0, 1]]) {
+            if (at(gx + d[1], gy + d[0]) !== cellWall || at(gx - d[1], gy - d[0]) !== cellWall) continue
+            let a = at(gx + d[0], gy + d[1]), b = at(gx - d[0], gy - d[1])
+            if (a === cellWall || b === cellWall) continue
+            if (a !== cellRoom && b !== cellRoom) continue
+            return { across: d[0] === 1, roomSide: a === cellRoom ? 1 : -1 }
+        }
+        return null
+    }
+    // The doors of the carved dungeon, without touching the world:
+    // [{gx, gy, xWu, yWu, across, roomSide}], each doorway in grid order
+    // with doorShare's chance at the band, every one in the showcase
+    function planDoors(levelSeed, band, showcase) {
+        let out = []
+        let rand = createRng(levelSeed ^ 0x446f6f72)
+        let share = showcase ? 1 : Balance.dungeon.doorShare[band]
+        for (let gy = 0; gy < gridHeight; gy++)
+            for (let gx = 0; gx < gridWidth; gx++) {
+                let d = doorway(gx, gy)
+                if (!d || rand() >= share) continue
+                out.push(Object.assign({ gx: gx, gy: gy, xWu: (gx + 0.5) * cellSize,
+                                         yWu: (gy + 0.5) * cellSize }, d))
+            }
+        return out
+    }
+    function placeDoors(list) {
+        doors = []
+        _doorStates = ({})
+        let t = Balance.dungeon, band = dangerBand(dangerPosition)
+        let jamb = (cellSize - t.doorWidth) / 2
+        for (let f of list) {
+            // The jambs, walls at both ends of the leaf
+            let x0 = f.gx * cellSize, y0 = f.gy * cellSize
+            if (f.across) {
+                createWallAt(f.xWu - t.doorJamb / 2, y0 + jamb, t.doorJamb, jamb)
+                createWallAt(f.xWu - t.doorJamb / 2, y0 + cellSize, t.doorJamb, jamb)
+            } else {
+                createWallAt(x0, f.yWu + t.doorJamb / 2, jamb, t.doorJamb)
+                createWallAt(x0 + cellSize - jamb, f.yWu + t.doorJamb / 2, jamb, t.doorJamb)
+            }
+            let d = doorComponent.createObject(world.room, {
+                cell: f.gx + "," + f.gy, cxWu: f.xWu, cyWu: f.yWu,
+                across: f.across, roomSide: f.roomSide,
+                leafWu: t.doorWidth, thickWu: t.doorThickness, band: band,
+                seed: createRng(f.gx * 7349 + f.gy * 3571)(),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                world: world.physics,
+                categories: catWall,
+                collidesWith: catPlayer | catEnemy | catProjectile
+            })
+            if (!d) continue
+            doors.push(d)
+            dungeonObjects.push(d)
+        }
+    }
+    function doorAt(cell) {
+        return doors.find(d => d.cell === cell) || null
+    }
+    function doorShut(cell) {
+        let d = doorAt(cell)
+        return d !== null && d.shut
+    }
+    // The door nearest (x, y) within reach wu of its centre, bashed ones
+    // left out; null for none
+    function nearestDoor(x, y, reach) {
+        let best = null, bestD = reach
+        for (let d of doors) {
+            if (d.doorState === "bashed") continue
+            let dist = Math.hypot(d.cxWu - x, d.cyWu - y)
+            if (dist <= bestD) { best = d; bestD = dist }
+        }
+        return best
+    }
+    // Whether a knight or an enemy stands where door d's leaf closes
+    function _doorTaken(d) {
+        let bodies = enemies.filter(e => e && !e.destroyed)
+        if (player) bodies.push(player)
+        for (let id in session.remotePlayers) bodies.push(session.remotePlayers[id])
+        let half = Balance.dungeon.doorWidth / 2
+        for (let b of bodies) {
+            let bx = b.xWu + b.widthWu / 2 - d.cxWu, by = b.yWu - b.heightWu / 2 - d.cyWu
+            let along = d.across ? bx : by, side = d.across ? by : bx
+            if (Math.abs(along) < d.thickWu / 2 + b.widthWu / 2 && Math.abs(side) < half + b.widthWu / 2)
+                return true
+        }
+        return false
+    }
+    // This node's knight pressed E at door d: it opens a closed door and
+    // closes an open one, unless someone stands in it; alone at once, in a
+    // session by the host. False when it does nothing
+    function useDoor(d) {
+        if (!d || d.doorState === "bashed") return false
+        let open = d.shut
+        if (!open && _doorTaken(d)) return false
+        if (session.connected && !session.isHost) session.reportDoor(levelIndex, d.cell, open)
+        else _setDoor(d.cell, open ? "open" : "closed")
+        return true
+    }
+    // Host: a node's knight opened or closed the door on that cell
+    function _hostDoor(level, cell, open) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        let d = doorAt(cell)
+        if (!d || d.doorState === "bashed") return
+        if (!open && _doorTaken(d)) return
+        _setDoor(cell, open ? "open" : "closed")
+    }
+    // Alone, or the host: an enemy here burst the door on cell open
+    function bashDoor(cell) { _setDoor(cell, "bashed") }
+    // Alone, or the host: the door on cell is now state, and in a session
+    // every screen is told. A bashed door stays as it is
+    function _setDoor(cell, state) {
+        let d = doorAt(cell)
+        if (!d || d.doorState === state || d.doorState === "bashed") return
+        _showDoor(d, state)
+        let v = Object.assign({}, _doorStates)
+        if (state === "closed") delete v[cell]
+        else v[cell] = state
+        _doorStates = v
+        // A path holds the waypoints already passed: the enemies on the
+        // chase plan anew from where they stand, so a door shut behind
+        // one is no door ahead of it (closedDoorAhead)
+        if (state === "closed")
+            for (let e of enemies)
+                if (e && !e.destroyed && !e.remote && e.aiState === "chase") e._recalcChasePath()
+        if (session.connected)
+            session.publishDoors({ seed: session.runSeed, level: levelIndex, doors: v })
+    }
+    function _showDoor(d, state) {
+        if (d.doorState === state) return
+        d.doorState = state
+        if (state === "bashed") {
+            let nx = d.across ? -d.roomSide : 0, ny = d.across ? 0 : -d.roomSide
+            spawnShards(d.cxWu, d.cyWu, nx, ny, 10, d._wood, 0.26)
+            spawnShards(d.cxWu, d.cyWu, nx, ny, 6, Qt.lighter(d._wood, 1.35), 0.16)
+            impactSound.triggerOneShot(0.8)
+        } else {
+            impactSound.triggerOneShot(0.2)
+        }
+    }
+    // The host's doors not closed in the level: every door here as they say
+    function _applyDoors(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let d of doors) {
+            if (d.doorState === "bashed") continue
+            _showDoor(d, v.doors[d.cell] || "closed")
+        }
+    }
+    readonly property var _sessionDoors: session.doors
+    on_SessionDoorsChanged: _applyDoors(_sessionDoors)
+    // Each physics step: the E over the door this node's knight may use
+    function _stepDoors() {
+        if (doors.length === 0) return
+        let near = player && !fallen ? nearestDoor(player.xWu + player.widthWu / 2,
+                                                   player.yWu - player.heightWu / 2,
+                                                   Balance.dungeon.doorReach) : null
+        for (let d of doors) d.prompt = d === near
+    }
+    // Whether the line from (x1, y1) to (x2, y2) runs through a closed
+    // door's doorway
+    function _shutBetween(x1, y1, x2, y2) {
+        for (let d of doors) {
+            if (!d.shut) continue
+            let a1 = d.across ? x1 : y1, a2 = d.across ? x2 : y2
+            let s1 = d.across ? y1 : x1, s2 = d.across ? y2 : x2
+            let at = d.across ? d.cxWu : d.cyWu, side = d.across ? d.cyWu : d.cxWu
+            if ((a1 - at) * (a2 - at) > 0 || a1 === a2) continue
+            let s = s1 + (s2 - s1) * (at - a1) / (a2 - a1)
+            if (Math.abs(s - side) <= cellSize / 2) return true
+        }
+        return false
+    }
+    // The closed door on enemy e's path within doorBashReach wu of it, its
+    // cell; "" for none
+    function closedDoorAhead(e) {
+        let wps = e.pathAhead()
+        if (doors.length === 0 || wps.length === 0) return ""
+        let x = e.xWu + e.widthWu / 2, y = e.yWu - e.heightWu / 2
+        for (let d of doors) {
+            if (!d.shut || Math.hypot(d.cxWu - x, d.cyWu - y) > Balance.dungeon.doorBashReach) continue
+            if (wps.some(w => Math.abs(w.x - d.cxWu) < 0.01 && Math.abs(w.y - d.cyWu) < 0.01))
+                return d.cell
+        }
+        return ""
+    }
+
+    // --- Secret rooms (issue #128) ---
+    // Some dungeons hide a chamber off a room behind a secret door
+    // (Balance.dungeon.secrets): one cell of the room's wall, with a
+    // hairline crack and dust breathing out of it (SecretWall). The
+    // secrets come from their own stream of the level's seed, laid out
+    // after the features and the doors, so nothing else of the dungeon
+    // moves. Until it is opened a secret room is rock in the grid: the
+    // walls, their faces, the shadows, the enemies' sight and paths and
+    // the minimap take it as stone, and it lies on no way to the exit. A
+    // dash of this node's knight into the cracked face bursts it open
+    // (_stepSecrets, burstSecret), one that glances off it shows a puff of
+    // dust; E does nothing at it. Opened, the walls on its cells go, the grid opens
+    // and the cache inside - urns, crates, maybe a crystal - stands on its
+    // floor, richer than elsewhere (cacheLoot). Alone the game owns the
+    // secrets; in a session the host does: a node's E asks it, and it
+    // keeps the secrets opened in the level as the session property
+    // "secrets", so every screen opens them, a player who joins later too
+    Component { id: secretWallComponent; SecretWall {} }
+    // [{cell, gx, gy, fx, fy, nx, ny, room: {x, y, w, h}, cache: [feature],
+    // open, built: [the walls, faces and rims on its cells], trims: [the
+    // faces and rims its opening bared], clue}]: gx, gy
+    // the cracked wall cell ("gx,gy" its cell), fx, fy the floor cell in
+    // front of it, (nx, ny) the step from the one to the other
+    property var secretRooms: []
+    // The secret rooms' cells by grid key (gy * gridWidth + gx), the
+    // cracked one with them, to their index in secretRooms
+    property var _secretCells: ({})
+    // The cache things' cells, "gx,gy", which roll their gold by cacheLoot
+    property var _cacheCells: ({})
+    // Host, and alone: the cells of the secrets opened in this level
+    property var _openedSecrets: []
+
+    function _secretOf(gx, gy) {
+        let i = _secretCells[gy * gridWidth + gx]
+        return i === undefined ? -1 : i
+    }
+    function _keepSecretBuilt(i, o) {
+        if (i >= 0 && o) secretRooms[i].built.push(o)
+    }
+    // The secret rooms of the carved dungeon with these features and
+    // doors, at the band or the showcase count, without touching the
+    // world or the grid. Each hides behind one cell of a room's wall, not
+    // at its corners and not of the start room: the floor cell in front of
+    // it a feature's cell would be (featureCellOk) with no feature on it,
+    // the cell rock with rock beside it along the wall, and the chamber,
+    // secretSize cells square, beyond it with rock all round, out of every
+    // other room, corridor, shaft and secret. The candidates are taken in
+    // an order drawn from the secrets' own stream, one to a room, and the
+    // same stream lays out each one's cache
+    function planSecrets(levelSeed, band, showcase, featureList, doorList) {
+        let t = Balance.dungeon
+        let rand = createRng(levelSeed ^ 0x53656372)
+        let want = showcase ? t.secretShowcase : Math.floor(t.secrets[band] + rand())
+        let out = []
+        if (want <= 0 || rooms.length < 2) return out
+        let n = t.secretSize
+        let used = {}
+        for (let f of featureList || []) used[f.gx + "," + f.gy] = true
+        for (let d of doorList || []) used[d.gx + "," + d.gy] = true
+        let cands = []
+        for (let ri = 1; ri < rooms.length; ri++) {
+            let r = rooms[ri]
+            for (let d of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                let len = d[0] === 0 ? r.w : r.h
+                for (let i = 1; i < len - 1; i++) {
+                    let fx = d[0] === 0 ? r.x + i : (d[0] > 0 ? r.x + r.w - 1 : r.x)
+                    let fy = d[0] !== 0 ? r.y + i : (d[1] > 0 ? r.y + r.h - 1 : r.y)
+                    let gx = fx + d[0], gy = fy + d[1]
+                    for (let off of [0, -1, 1]) {
+                        let x0 = d[0] === 0 ? gx - Math.floor(n / 2) + off : (d[0] > 0 ? gx + 1 : gx - n)
+                        let y0 = d[1] === 0 ? gy - Math.floor(n / 2) + off : (d[1] > 0 ? gy + 1 : gy - n)
+                        cands.push({ ri: ri, gx: gx, gy: gy, fx: fx, fy: fy, nx: -d[0], ny: -d[1],
+                                     room: { x: x0, y: y0, w: n, h: n } })
+                    }
+                }
+            }
+        }
+        for (let i = cands.length - 1; i > 0; i--) {
+            let j = Math.floor(rand() * (i + 1))
+            let c = cands[i]; cands[i] = cands[j]; cands[j] = c
+        }
+        let rock = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight && grid[y][x] === cellWall
+        let taken = {}, hosts = {}
+        for (let c of cands) {
+            if (out.length >= want) break
+            if (hosts[c.ri] || used[c.fx + "," + c.fy] || !featureCellOk(c.fx, c.fy)) continue
+            if (!rock(c.gx, c.gy) || !rock(c.gx + c.ny, c.gy + c.nx) || !rock(c.gx - c.ny, c.gy - c.nx))
+                continue
+            let m = c.room
+            if (m.x < 1 || m.y < 1 || m.x + m.w > gridWidth - 1 || m.y + m.h > gridHeight - 1) continue
+            let ok = true
+            for (let y = m.y - 1; ok && y <= m.y + m.h; y++)
+                for (let x = m.x - 1; ok && x <= m.x + m.w; x++)
+                    ok = rock(x, y) && !taken[y * gridWidth + x]
+            if (!ok) continue
+            for (let y = m.y - 1; y <= m.y + m.h; y++)
+                for (let x = m.x - 1; x <= m.x + m.w; x++) taken[y * gridWidth + x] = true
+            hosts[c.ri] = true
+            // The cache on the chamber's cells but the one inside the door
+            let inside = [c.gx - c.nx, c.gy - c.ny]
+            let cells = []
+            for (let y = m.y; y < m.y + m.h; y++)
+                for (let x = m.x; x < m.x + m.w; x++)
+                    if (x !== inside[0] || y !== inside[1]) cells.push([x, y])
+            for (let i = cells.length - 1; i > 0; i--) {
+                let j = Math.floor(rand() * (i + 1))
+                let q = cells[i]; cells[i] = cells[j]; cells[j] = q
+            }
+            let kinds = []
+            for (let i = 0; i < t.cacheThings; i++) kinds.push(rand() < 0.5 ? "urn" : "crate")
+            if (showcase || rand() < t.cacheCrystal[band]) kinds.push("crystal")
+            let cache = kinds.slice(0, cells.length).map((k, i) => ({
+                kind: k, gx: cells[i][0], gy: cells[i][1],
+                xWu: (cells[i][0] + 0.5) * cellSize, yWu: (cells[i][1] + 0.5) * cellSize }))
+            out.push({ cell: c.gx + "," + c.gy, gx: c.gx, gy: c.gy, fx: c.fx, fy: c.fy,
+                       nx: c.nx, ny: c.ny, room: m, cache: cache })
+        }
+        return out
+    }
+    // The planned secrets are this level's: their cells known before the
+    // walls are built, so the walls on them run apart
+    function _takeSecrets(list) {
+        secretRooms = list.map(s => Object.assign({ open: false, built: [], trims: [], clue: null }, s))
+        let cells = {}, cache = {}
+        secretRooms.forEach((s, i) => {
+            cells[s.gy * gridWidth + s.gx] = i
+            for (let y = s.room.y; y < s.room.y + s.room.h; y++)
+                for (let x = s.room.x; x < s.room.x + s.room.w; x++) cells[y * gridWidth + x] = i
+            for (let f of s.cache) cache[f.gx + "," + f.gy] = true
+        })
+        _secretCells = cells
+        _cacheCells = cache
+        _openedSecrets = []
+    }
+    // The clue over each cracked cell, and the faces and rims its opening
+    // will bare, hidden till then: built with the level, before the
+    // knights and the enemies, they lie under them
+    function placeSecrets() {
+        for (let s of secretRooms) {
+            s.trims = _secretTrims(s)
+            s.clue = secretWallComponent.createObject(world.room, {
+                cxWu: (s.gx + 0.5) * cellSize, cyWu: (s.gy + 0.5) * cellSize, sizeWu: cellSize,
+                nx: s.nx, ny: s.ny, seed: createRng(s.gx * 7349 + s.gy * 3571)(),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+            if (s.clue) dungeonObjects.push(s.clue)
+        }
+    }
+    // The faces and rims secret s's opening bares, hidden: a face on a
+    // wall cell over one of its cells, a rim under one, each run of them
+    // along a row one piece
+    function _secretTrims(s) {
+        let out = []
+        let opened = (x, y) => (x === s.gx && y === s.gy)
+            || (x >= s.room.x && x < s.room.x + s.room.w && y >= s.room.y && y < s.room.y + s.room.h)
+        let x0 = Math.min(s.gx, s.room.x) - 1, x1 = Math.max(s.gx, s.room.x + s.room.w - 1) + 1
+        let y0 = Math.min(s.gy, s.room.y) - 1, y1 = Math.max(s.gy, s.room.y + s.room.h - 1) + 1
+        for (let gy = y0; gy <= y1; gy++) {
+            for (let which of [-1, 1]) {
+                let trim = x => grid[gy][x] === cellWall && !opened(x, gy) && opened(x, gy + which)
+                let gx = x0
+                while (gx <= x1) {
+                    if (!trim(gx)) { gx++; continue }
+                    let startX = gx
+                    while (gx <= x1 && trim(gx)) gx++
+                    let o = which < 0 ? _createWallFace(startX, gx, gy) : _createWallRim(startX, gx, gy)
+                    if (!o) continue
+                    o.visible = false
+                    out.push(o)
+                }
+            }
+        }
+        return out
+    }
+    function secretAt(cell) {
+        return secretRooms.find(s => s.cell === cell) || null
+    }
+    // The closed secret whose cracked face a knight's body, its centre at
+    // (x, y) and half wu wide, reaches: within secretDashReach wu of the
+    // face, the centre in front of the cracked cell. null for none
+    function secretTouched(x, y, half) {
+        for (let s of secretRooms) {
+            if (s.open) continue
+            let dx = x - (s.gx + 0.5) * cellSize, dy = y - (s.gy + 0.5) * cellSize
+            let off = dx * s.nx + dy * s.ny - cellSize / 2 - half
+            let side = Math.abs(dx * s.ny - dy * s.nx)
+            if (off > -0.05 && off <= Balance.dungeon.secretDashReach && side < cellSize / 2) return s
+        }
+        return null
+    }
+    // How straight a dash along (dirX, dirY), y up, heads into secret s's
+    // wall: the cosine of the angle off straight, 1 head on, 0 along it
+    function secretDashInto(s, dirX, dirY) {
+        return -(dirX * s.nx + dirY * s.ny)
+    }
+    // A dash of this node's knight reached a cracked face and glanced off
+    // it (Balance.dungeon.secretDashAngle), once a dash
+    signal secretGlanced(string cell)
+    // The secret the dash under way glanced off already
+    property var _glancedBy: null
+    // This node's knight's dash burst secret s: alone it opens at once,
+    // in a session by the host. False when it does nothing
+    function burstSecret(s) {
+        if (!s || s.open) return false
+        if (session.connected && !session.isHost) session.reportSecret(levelIndex, s.cell)
+        else _openSecret(s.cell)
+        return true
+    }
+    // Host: a node's knight opened the secret on that cell
+    function _hostSecret(level, cell) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        _openSecret(cell)
+    }
+    // Alone, or the host: the secret on cell opens, and in a session every
+    // screen is told
+    function _openSecret(cell) {
+        let s = secretAt(cell)
+        if (!s || s.open) return
+        _showSecret(s)
+        _openedSecrets = _openedSecrets.concat([cell])
+        if (session.connected)
+            session.publishSecrets({ seed: session.runSeed, level: levelIndex, cells: _openedSecrets.slice() })
+    }
+    // Secret s opens on this screen: the walls on its cells go, the grid,
+    // the shadows and the paths open, the faces and rims its opening bares
+    // show, and its cache stands on its floor
+    function _showSecret(s) {
+        if (s.open) return
+        s.open = true
+        for (let o of s.built) { try { if (o) o.destroy() } catch(err) {} }
+        dungeonObjects = dungeonObjects.filter(o => s.built.indexOf(o) < 0)
+        s.built = []
+        let carve = (x, y, type) => {
+            grid[y][x] = type
+            _setPathCell(x, y, true)
+        }
+        carve(s.gx, s.gy, cellHallway)
+        for (let y = s.room.y; y < s.room.y + s.room.h; y++)
+            for (let x = s.room.x; x < s.room.x + s.room.w; x++) carve(x, y, cellRoom)
+        for (let o of s.trims) o.visible = Qt.binding(() => world.fx)
+        updateOccluders()
+        let band = dangerBand(dangerPosition)
+        for (let f of s.cache) {
+            let o = _placeBreakable(f, band)
+            if (o) dungeonObjects.push(o)
+        }
+        if (s.clue) s.clue.open = true
+        let cx = (s.gx + 0.5) * cellSize, cy = (s.gy + 0.5) * cellSize
+        spawnShards(cx, cy, s.nx, s.ny, 12, "#5A6272", 0.28)
+        spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
+        impactSound.triggerOneShot(0.7)
+        shake(0.4)
+        runSecrets++
+        minimap.requestPaint()
+        // A thing of its cache the host broke before this screen opened it
+        _applyBroken(_sessionBroken)
+    }
+    // The host's secrets opened in the level: every one here opens
+    function _applySecrets(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let cell of v.cells) {
+            let s = secretAt(cell)
+            if (s) _showSecret(s)
+        }
+    }
+    readonly property var _sessionSecrets: session.secrets
+    on_SessionSecretsChanged: _applySecrets(_sessionSecrets)
+    // Each physics step: this node's knight dashing into a cracked face
+    // bursts it open, heading in within secretDashAngle of straight; at a
+    // flatter angle, still into the wall, the dash glances off with a puff
+    // of dust from the crack and a dull knock, once a dash
+    function _stepSecrets() {
+        if (secretRooms.length === 0) return
+        if (!player || fallen || !player.isDashing) { _glancedBy = null; return }
+        let s = secretTouched(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
+                              player.widthWu / 2)
+        if (!s) return
+        let into = secretDashInto(s, player.dashDirX, -player.dashDirY)
+        if (into >= Math.cos(Balance.dungeon.secretDashAngle * Math.PI / 180) - 1e-6) {
+            burstSecret(s)
+        } else if (into > 0 && _glancedBy !== s) {
+            _glancedBy = s
+            let cx = (s.gx + 0.5 + s.nx * 0.5) * cellSize, cy = (s.gy + 0.5 + s.ny * 0.5) * cellSize
+            spawnShards(cx, cy, s.nx, s.ny, 6, "#D8CDB6", 0.1)
+            impactSound.triggerOneShot(0.25)
+            secretGlanced(s.cell)
+        }
+    }
+    // What the minimap shows of cell (gx, gy): "" unexplored, "rock" or
+    // "floor". A secret room is rock until it is opened
+    function mapCell(gx, gy) {
+        if (!exploredCells[gy] || !exploredCells[gy][gx]) return ""
+        return grid[gy][gx] === cellWall ? "rock" : "floor"
+    }
+
     function placeTorch(wx, wy, color) {
         let t = torchComponent.createObject(glowParent(), {
             xWu: wx, yWu: wy,
@@ -3075,18 +4730,23 @@ ClayWorld2d {
             while (gx < gridWidth) {
                 let isRim = grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall
                 if (!isRim) { gx++; continue }
-                let startX = gx
-                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall)
+                let startX = gx, secret = _secretOf(gx, gy)
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall
+                       && _secretOf(gx, gy) === secret)
                     gx++
-                let r = wallRimComponent.createObject(world.room, {
-                    xWu: startX * cellSize, yWu: (gy + 1) * cellSize,
-                    widthWu: (gx - startX) * cellSize,
-                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-                    visible: Qt.binding(() => world.fx)
-                })
-                dungeonObjects.push(r)
+                _keepSecretBuilt(secret, _createWallRim(startX, gx, gy))
             }
         }
+    }
+    function _createWallRim(fromGx, toGx, gy) {
+        let r = wallRimComponent.createObject(world.room, {
+            xWu: fromGx * cellSize, yWu: (gy + 1) * cellSize,
+            widthWu: (toGx - fromGx) * cellSize,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(r)
+        return r
     }
 
     // Brick faces on every wall cell whose southern neighbour is walkable,
@@ -3098,21 +4758,26 @@ ClayWorld2d {
             while (gx < gridWidth) {
                 let isFace = grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
                 if (!isFace) { gx++; continue }
-                let startX = gx
-                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                let startX = gx, secret = _secretOf(gx, gy)
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                       && _secretOf(gx, gy) === secret)
                     gx++
-                let f = wallFaceComponent.createObject(world.room, {
-                    xWu: startX * cellSize,
-                    yWu: gy * cellSize + wallFaceWu,
-                    widthWu: (gx - startX) * cellSize,
-                    heightWu: wallFaceWu,
-                    color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
-                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-                    visible: Qt.binding(() => world.fx)
-                })
-                dungeonObjects.push(f)
+                _keepSecretBuilt(secret, _createWallFace(startX, gx, gy))
             }
         }
+    }
+    function _createWallFace(fromGx, toGx, gy) {
+        let f = wallFaceComponent.createObject(world.room, {
+            xWu: fromGx * cellSize,
+            yWu: gy * cellSize + wallFaceWu,
+            widthWu: (toGx - fromGx) * cellSize,
+            heightWu: wallFaceWu,
+            color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(f)
+        return f
     }
 
     function spawnPlayer(px, py) {
@@ -3124,7 +4789,7 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catPlayer,
-            collidesWith: catWall | catProjectile,
+            collidesWith: catWall | catProjectile | catProp,
             // Attack sensor detects enemies
             attackSensorCategories: catPlayer,
             attackSensorCollidesWith: catEnemy
@@ -3221,7 +4886,7 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catEnemy,
-            collidesWith: catWall | catPlayer
+            collidesWith: catWall | catPlayer | catProp
         }))
         if (enemy) {
             console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp,
@@ -3488,6 +5153,21 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        features = []
+        featureShowcase = false
+        breakables = []
+        _propCells = ({})
+        _brokenCells = []
+        plates = []
+        _sprungCells = ({})
+        slits = []
+        _clearArrows()
+        doors = []
+        _doorStates = ({})
+        secretRooms = []
+        _secretCells = ({})
+        _cacheCells = ({})
+        _openedSecrets = []
         bonePiles = []
         torches = []
         stains = []
@@ -3506,9 +5186,21 @@ ClayWorld2d {
         exploredCells = []
     }
 
+    // Alone out of a level into the next; into a dungeon the dungeon
+    // master sets it first, and the exit stays taken while the panel is up
     function resetDungeon() {
-        _enterLevel(levelIndex + 1)
-        resetting = false
+        let next = levelIndex + 1
+        if (levelTypeOf(next) !== "dungeon" || !_masterAsks()) {
+            _enterLevel(next)
+            resetting = false
+            return
+        }
+        let d = _dangerFor(next)
+        openMaster({ index: next, pos: d.pos, knights: d.knights, seed: masterSeed,
+                     go: (m, pos) => {
+                         _enterLevel(next, { pos: pos, next: pos, knights: d.knights, master: m })
+                         resetting = false
+                     } })
     }
 
     // --- Village/Camp generation ---
@@ -3801,19 +5493,24 @@ ClayWorld2d {
     // A fixed seed keeps the layout identical across reloads, so before/after
     // captures compare the same room.
     readonly property int scenarioSeed: 424242
-    function scenarios() { return ["dungeon", "village", "fight"] }
+    // "features" is the dungeon with every feature kind at its showcase
+    // count (Balance.dungeon), to try a kind right after a reload
+    function scenarios() { return ["dungeon", "village", "fight", "features"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
-    // for a dungeon high in depth 4's range. A whole number is the bottom
-    function applyScenario(name, atDanger) {
+    // for a dungeon high in depth 4's range. A whole number is the bottom.
+    // seed (scenarioSeed when left out) is the run's seed it is built on
+    function applyScenario(name, atDanger, seed) {
         let dg = Math.max(0, Number(atDanger) || 0)
         let d = Math.floor(dg)
         _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
         _setKnights(knightsNow())
         muted = true
-        masterSeed = scenarioSeed
+        masterSeed = seed === undefined ? scenarioSeed : seed
         if (player) clearDungeon()
+        master = null
+        featureShowcase = name === "features"
         fallen = false
         fightRoomActive = false
         // Generate before leaving the title: with a player in place,
@@ -3840,7 +5537,7 @@ ClayWorld2d {
     // fight; only where the AI runs. Seeded anew with each level
     property var _attackRng: null
     function rollAttack() {
-        if (!_attackRng) _attackRng = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x6372)
+        if (!_attackRng) _attackRng = createRng(levelSeedNow() ^ 0x6372)
         return _attackRng()
     }
 
@@ -3861,6 +5558,7 @@ ClayWorld2d {
 
     // --- Line-of-sight (Bresenham on grid) ---
     function hasLineOfSight(x1Wu, y1Wu, x2Wu, y2Wu) {
+        if (doors.length > 0 && _shutBetween(x1Wu, y1Wu, x2Wu, y2Wu)) return false
         let gx0 = Math.floor(x1Wu / cellSize)
         let gy0 = Math.floor(y1Wu / cellSize)
         let gx1 = Math.floor(x2Wu / cellSize)
@@ -3885,7 +5583,70 @@ ClayWorld2d {
         }
     }
 
-    // --- A* pathfinder on grid ---
+    // --- Paths on the grid: Clayground's GridPathfinder (issue #127) ---
+    // The pathfinder holds the grid's walls and the breakables still
+    // standing as blocked. It is fed the grid turned half a turn: its
+    // neighbour order is then the one of the game's own A* it replaced, so
+    // a seed takes the same paths and the fight bench the same numbers
+    GridPathfinder { id: pathfinder }
+    // The grid the pathfinder was filled from; another one fills it anew
+    property var _pathGrid: null
+    function _pathCell(gx, gy) {
+        return { x: gridWidth - 1 - gx, y: gridHeight - 1 - gy }
+    }
+    function _syncPathfinder() {
+        if (_pathGrid === grid) return
+        let data = new Array(gridWidth * gridHeight)
+        for (let gy = 0; gy < gridHeight; gy++)
+            for (let gx = 0; gx < gridWidth; gx++) {
+                let c = _pathCell(gx, gy)
+                data[c.y * gridWidth + c.x] = grid[gy][gx] === cellWall
+                    || _propCells[gy * gridWidth + gx] ? 1 : 0
+            }
+        pathfinder.columns = gridWidth
+        pathfinder.rows = gridHeight
+        pathfinder.walkableData = data
+        _pathGrid = grid
+    }
+    // Whether the pathfinder takes cell (gx, gy) as walkable, once filled
+    function _setPathCell(gx, gy, walkable) {
+        if (_pathGrid !== grid) return
+        let c = _pathCell(gx, gy)
+        pathfinder.setWalkable(c.x, c.y, walkable)
+    }
+    function _blockedCell(gx, gy) {
+        return grid[gy][gx] === cellWall || _propCells[gy * gridWidth + gx] === true
+    }
+    // The cells from (sx, sy) to (ex, ey), [{x, y}] in grid cells; a
+    // breakable on either end is no obstacle. shut: the closed doors
+    // between are, as rock
+    function _cellPath(sx, sy, ex, ey, shut) {
+        _syncPathfinder()
+        let ends = [[sx, sy], [ex, ey]].filter(c => _blockedCell(c[0], c[1]))
+        for (let c of ends) _setPathCell(c[0], c[1], true)
+        let closed = (shut ? doors.filter(d => d.shut) : []).map(d => d.cell.split(",").map(Number))
+                         .filter(c => !(c[0] === sx && c[1] === sy) && !(c[0] === ex && c[1] === ey))
+        for (let c of closed) _setPathCell(c[0], c[1], false)
+        let a = _pathCell(sx, sy), b = _pathCell(ex, ey)
+        let path = pathfinder.findPath(a.x, a.y, b.x, b.y)
+        for (let c of ends) _setPathCell(c[0], c[1], false)
+        for (let c of closed) _setPathCell(c[0], c[1], true)
+        return path.map(c => ({ x: gridWidth - 1 - c.x, y: gridHeight - 1 - c.y }))
+    }
+    // The cells from (sx, sy) to (ex, ey) with a closed door as
+    // doorPathCost cells more. GridPathfinder knows walkable or not, no
+    // cost (clayground#423): the way through the closed doors is taken
+    // unless the way around them is no longer than it and their cost
+    function _costPath(sx, sy, ex, ey) {
+        let path = _cellPath(sx, sy, ex, ey, false)
+        let shut = path.filter(c => doorShut(c.x + "," + c.y)).length
+        if (shut === 0) return path
+        let around = _cellPath(sx, sy, ex, ey, true)
+        return around.length > 0 && around.length <= path.length + shut * Balance.dungeon.doorPathCost
+            ? around : path
+    }
+    // The way from one point to another in wu, cell centres as waypoints;
+    // [] when there is none
     function findPath(x1Wu, y1Wu, x2Wu, y2Wu) {
         let sx = Math.floor(x1Wu / cellSize)
         let sy = Math.floor(y1Wu / cellSize)
@@ -3913,91 +5674,8 @@ ClayWorld2d {
         let s = snapToWalkable(sx, sy)
         let e = snapToWalkable(ex, ey)
         if (!s || !e) return []
-        sx = s.x; sy = s.y; ex = e.x; ey = e.y
-
-        // Binary heap (min-heap by f score)
-        let open = []
-        let closed = new Set()
-        let cameFrom = {}
-        let gScore = {}
-
-        function key(x, y) { return y * gridWidth + x }
-        function heuristic(x, y) { return Math.abs(x - ex) + Math.abs(y - ey) }
-
-        function heapPush(node) {
-            open.push(node)
-            let i = open.length - 1
-            while (i > 0) {
-                let p = (i - 1) >> 1
-                if (open[p].f <= open[i].f) break
-                let tmp = open[p]; open[p] = open[i]; open[i] = tmp
-                i = p
-            }
-        }
-
-        function heapPop() {
-            let top = open[0]
-            let last = open.pop()
-            if (open.length > 0) {
-                open[0] = last
-                let i = 0
-                while (true) {
-                    let best = i
-                    let l = 2 * i + 1, r = 2 * i + 2
-                    if (l < open.length && open[l].f < open[best].f) best = l
-                    if (r < open.length && open[r].f < open[best].f) best = r
-                    if (best === i) break
-                    let tmp = open[best]; open[best] = open[i]; open[i] = tmp
-                    i = best
-                }
-            }
-            return top
-        }
-
-        let startKey = key(sx, sy)
-        gScore[startKey] = 0
-        heapPush({x: sx, y: sy, f: heuristic(sx, sy)})
-
-        let dirs = [[1,0],[-1,0],[0,1],[0,-1]]
-
-        while (open.length > 0) {
-            let cur = heapPop()
-            let ck = key(cur.x, cur.y)
-
-            if (cur.x === ex && cur.y === ey) {
-                // Reconstruct path as world-unit waypoints
-                let path = []
-                let k = ck
-                while (k !== undefined) {
-                    let py = Math.floor(k / gridWidth)
-                    let px = k % gridWidth
-                    path.unshift(Qt.point(px * cellSize + cellSize / 2,
-                                          py * cellSize + cellSize / 2))
-                    k = cameFrom[k]
-                }
-                return path
-            }
-
-            if (closed.has(ck)) continue
-            closed.add(ck)
-
-            for (let d of dirs) {
-                let nx = cur.x + d[0]
-                let ny = cur.y + d[1]
-                if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) continue
-                if (grid[ny][nx] === cellWall) continue
-                let nk = key(nx, ny)
-                if (closed.has(nk)) continue
-                let ng = gScore[ck] + 1
-                if (gScore[nk] === undefined || ng < gScore[nk]) {
-                    gScore[nk] = ng
-                    cameFrom[nk] = ck
-                    heapPush({x: nx, y: ny, f: ng + heuristic(nx, ny)})
-                }
-            }
-        }
-
-        return [] // No path found
+        return _costPath(s.x, s.y, e.x, e.y).map(c => Qt.point(c.x * cellSize + cellSize / 2,
+                                                             c.y * cellSize + cellSize / 2))
     }
 
     // --- Screen Overlays ---
@@ -4028,6 +5706,7 @@ ClayWorld2d {
             FallenScreen {
                 depth: world.depth
                 kills: world.runKills
+                secrets: world.runSecrets
                 seconds: world.runSeconds
                 recordLine: world.recordLine
                 newRecord: world.recordPassed
@@ -4054,8 +5733,59 @@ ClayWorld2d {
                 soundVolume: world.soundVolume
                 message: world.titleMessage
                 recordLine: world.recordLine
+                dungeonMaster: world.dungeonMaster
+                onDungeonMasterToggled: world.setDungeonMaster(!world.dungeonMaster)
                 onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
+            }
+        }
+    }
+
+    // A joiner while the host's dungeon master panel is up, in the lobby,
+    // the village or on the fallen screen: the next dungeon is coming
+    Rectangle {
+        objectName: "masterWaitNote"
+        z: 5650
+        visible: session.mastering && !session.isHost
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 24
+        width: waitText.implicitWidth + 32
+        height: waitText.implicitHeight + 16
+        radius: 6
+        color: "#CC08070C"
+        border.color: "#E0B060"
+        border.width: 1
+        Text {
+            id: waitText
+            anchors.centerIn: parent
+            text: "The dungeon master prepares the next dungeon\u2026"
+            color: "#E0B060"
+            font.pixelSize: 16
+            font.italic: true
+        }
+    }
+
+    // The dungeon master's panel (over the lobby and the fallen screen)
+    Loader {
+        anchors.fill: parent
+        z: 5600
+        active: world.masterOpen
+        sourceComponent: Component {
+            DungeonMasterPanel {
+                depth: world.masterAsk ? world.depthOf(world.masterAsk.index) : 0
+                rows: world.masterAsk ? world.masterRows() : []
+                preview: world.masterPreview
+                note: world.masterNote
+                settingsJson: world.masterSettingsJson()
+                cellWall: world.cellWall
+                cellSize: world.cellSize
+                onTurned: (key, steps) => world.masterTurn(key, steps)
+                onUnset: (key) => world.masterUnset(key)
+                onGenerate: world.masterGenerate()
+                onGo: world.masterGo()
+                onCopied: world.masterNote = "Settings copied"
+                onPasted: (text) => world.masterPaste(text)
             }
         }
     }
