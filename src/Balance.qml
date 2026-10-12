@@ -659,6 +659,29 @@ QtObject {
         bladeWhirlMana: [15, 12, 9]
     })
 
+    // The dungeon master's panel (issue #142): with Dungeon Master ticked
+    // on the title, the host or a solo player sees these settings before
+    // each dungeon, with the values the game would use, and sets any of
+    // them for that dungeon and the ones after. A row: its key, its
+    // label, the step its arrows turn it by, its range and the decimals
+    // shown; kinds the feature kinds (dungeon.kinds) it sets per room
+    // together, its whole number split between them as the dungeon's
+    // band shares them out. A feature knob more is a row more
+    readonly property var dungeonMaster: ({
+        settings: [
+            { key: "enemies", label: "Enemies per room", step: 0.1, min: 0, max: 8, decimals: 2 },
+            { key: "spikes", label: "Spike plates per room", step: 0.1, min: 0, max: 4, decimals: 2,
+              kinds: ["spike"] },
+            { key: "slits", label: "Arrow slits per room", step: 0.1, min: 0, max: 4, decimals: 2,
+              kinds: ["slit"] },
+            { key: "rooms", label: "Rooms", step: 1, min: 3, max: 16, decimals: 0 },
+            { key: "depth", label: "Base depth", step: 1, min: 0, max: 30, decimals: 0 },
+            { key: "position", label: "Relative difficulty", step: 0.05, min: 0, max: 0.999, decimals: 2 },
+            { key: "breakables", label: "Breakables per room", step: 0.1, min: 0, max: 6, decimals: 2,
+              kinds: ["urn", "crate", "crystal"] }
+        ]
+    })
+
     // A session's party: an ally lifts a fallen knight up, and a knight
     // still down when the party reaches the camp rises there. Solo play
     // has neither. A dungeon is built for the knights the party had when

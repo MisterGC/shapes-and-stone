@@ -631,17 +631,18 @@ ClayWorld2d {
         recordLine: world.recordLine
         // The host's run, from its start or, on a node that joins late,
         // at the level the host plays
-        onStarted: (seed, level, position, next, knights) => {
+        onStarted: (seed, level, position, next, knights, dm) => {
             masterSeed = seed
             world.levelIndex = level
             world.levelType = levelTypeOf(level)
+            master = world.levelType === "dungeon" ? dm || null : null
             _setDanger(position, next)
             _setKnights(knights)
             screen = "game"
         }
-        onLevelChanged: (newIndex, position, next, knights) =>
-            _applyLevelChange(newIndex, {pos: position, next: next, knights: knights})
-        onWentAgain: (seed, position, knights) => _startRun(seed, position, knights)
+        onLevelChanged: (newIndex, position, next, knights, dm) =>
+            _applyLevelChange(newIndex, {pos: position, next: next, knights: knights, master: dm || null})
+        onWentAgain: (seed, position, knights, dm) => _startRun(seed, position, knights, dm)
         onLiftReceived: (fromId) => _rise("lift")
         onRecordBroken: (banner) => _hostRecordBroken(banner)
         onNameEdited: (name) => world.playerName = name
@@ -956,7 +957,14 @@ ClayWorld2d {
     // has ended in a fall, nextPosition is where the next run starts
     property real dangerPosition: Balance.danger.start
     property real nextPosition: Balance.danger.start
-    readonly property real danger: depth + dangerPosition
+    // The overrides the dungeon played now is built with (issue #142):
+    // {seed, rooms, enemies, depth, and per feature row its key}, each
+    // left out for the game's own, null for a dungeon wholly the game's
+    // and for a village. dangerDepth is the depth its danger counts from:
+    // the base depth set there, else depth
+    property var master: null
+    readonly property int dangerDepth: master && master.depth !== undefined ? master.depth : depth
+    readonly property real danger: dangerDepth + dangerPosition
     // 0 low, 1 middle, 2 high
     function dangerBand(position) {
         return position < Balance.danger.low ? 0 : position < Balance.danger.high ? 1 : 2
@@ -1062,21 +1070,29 @@ ClayWorld2d {
     // carved off its seed by carveDungeon, as generateDungeon carves it,
     // and the level played now put back as it was
     function secretsOf(index, position) {
-        let kept = { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
-                     loopCorridors: loopCorridors }
+        let kept = _keepCarved()
         let levelSeed = deriveSeed(masterSeed, index)
         let band = dangerBand(position)
         let n = 0
         try {
             n = carveDungeon(levelSeed, band, false, createRng(levelSeed)).secrets.length
         } finally {
-            grid = kept.grid
-            rooms = kept.rooms
-            entranceGridX = kept.entranceGridX
-            exitGridX = kept.exitGridX
-            loopCorridors = kept.loopCorridors
+            _putCarved(kept)
         }
         return n
+    }
+    // What carveDungeon carves on the live grid, kept to put back after a
+    // dungeon is carved only to be read
+    function _keepCarved() {
+        return { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
+                 loopCorridors: loopCorridors }
+    }
+    function _putCarved(kept) {
+        grid = kept.grid
+        rooms = kept.rooms
+        entranceGridX = kept.entranceGridX
+        exitGridX = kept.exitGridX
+        loopCorridors = kept.loopCorridors
     }
     // The witch's reading of the next dungeon, one line per press of E:
     // where it sits in its depth's range, what lives there and, when it
@@ -1102,6 +1118,204 @@ ClayWorld2d {
                        + "and breathes dust, throw yourself at it.")
         lines.push("Return to me... if you survive.")
         return lines
+    }
+
+    // --- Dungeon master (issue #142) ---
+    // Ticked on the title (kept, key "dungeonMaster"): before each
+    // dungeon the host, or a solo player, sees the panel with
+    // Balance.dungeonMaster's settings at the values the game would use.
+    // A setting turned is set (masterPinned, kept as JSON under
+    // "dungeonMasterSettings") for that dungeon and the ones after, until
+    // Backspace gives it back to the game. Generate shows the dungeon Go
+    // enters, again a new one; Go builds it with the settings as its
+    // master. In a session only the host has the panel, and the master
+    // goes with the level, so every knight plays the host's dungeon
+    property bool dungeonMaster: false
+    property var masterPinned: ({})
+    // The dungeon the panel is up for: {index, pos, knights, seed (the
+    // run's), go(m, pos)}; null while it is not up
+    property var masterAsk: null
+    // The level seed Generate rolled for it, -1 for the run's own
+    property int masterSeedRoll: -1
+    // What the panel shows: planDungeon's, null before Generate
+    property var masterPreview: null
+    property string masterNote: ""
+    readonly property bool masterOpen: masterAsk !== null
+
+    function setDungeonMaster(on) {
+        dungeonMaster = on
+        records.set("dungeonMaster", on ? "1" : "0")
+    }
+    function _loadMaster() {
+        dungeonMaster = records.get("dungeonMaster", "0") === "1"
+        let pinned = {}
+        try { pinned = JSON.parse(records.get("dungeonMasterSettings", "{}")) } catch (err) {}
+        masterPinned = _masterRead(pinned) || {}
+    }
+    function _keepMaster() { records.set("dungeonMasterSettings", JSON.stringify(masterPinned)) }
+    // The settings in o that the table has, each in its range; null when
+    // o is no object
+    function _masterRead(o) {
+        if (!o || typeof o !== "object" || Array.isArray(o)) return null
+        let out = {}
+        for (let row of Balance.dungeonMaster.settings) {
+            let v = Number(o[row.key])
+            if (o[row.key] === undefined || o[row.key] === null || isNaN(v)) continue
+            out[row.key] = _masterClamp(row, v)
+        }
+        return out
+    }
+    function _masterClamp(row, v) {
+        let f = Math.pow(10, row.decimals)
+        return Math.max(row.min, Math.min(row.max, Math.round(v * f) / f))
+    }
+    // Whether this node asks the dungeon master before a dungeon
+    function _masterAsks() { return dungeonMaster && (!session.connected || session.isHost) }
+
+    // The panel up for ask; the knight lets go of what it holds, as
+    // under the Esc menu
+    function openMaster(ask) {
+        if (player) {
+            player.lowerShield()
+            player.dropSwing()
+        }
+        masterSeedRoll = -1
+        masterPreview = null
+        masterNote = ""
+        masterAsk = ask
+        session.setMastering(true)
+        console.log("[Game] Dungeon master: the panel is up for level", ask.index)
+    }
+    // The level seed of the panel's dungeon
+    function _masterSeed() {
+        return masterSeedRoll >= 0 ? masterSeedRoll : deriveSeed(masterAsk.seed, masterAsk.index)
+    }
+    // The overrides the panel's dungeon is built with: the settings set,
+    // the seed Generate rolled; null when it is the game's own
+    function masterOverrides() {
+        let m = {}
+        for (let k in masterPinned) if (k !== "position") m[k] = masterPinned[k]
+        if (masterSeedRoll >= 0) m.seed = masterSeedRoll
+        return Object.keys(m).length > 0 ? m : null
+    }
+    function _masterPosition() {
+        return masterPinned.position !== undefined ? masterPinned.position : masterAsk.pos
+    }
+    // What the game would use for each setting of the panel's dungeon,
+    // with its seed and the depth, position and rooms set: {key: value}
+    function masterGameValues() {
+        let a = masterAsk
+        let pos = _masterPosition()
+        let d = masterPinned.depth !== undefined ? masterPinned.depth : depthOf(a.index)
+        let rand = createRng(_masterSeed())
+        let sb = Balance.spawn
+        let rmin = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMin
+        let rmax = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMax
+        let rms = planRooms(rmin, rmax, sb.roomSizeMin, sb.roomSizeMax, rand)
+        let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand)
+        let band = dangerBand(pos)
+        let out = { enemies: rms.length > 1 ? foes.length / (rms.length - 1) : 0,
+                    rooms: rms.length, depth: depthOf(a.index), position: a.pos }
+        for (let row of Balance.dungeonMaster.settings)
+            if (row.kinds)
+                out[row.key] = row.kinds.reduce((t, k) => t + Balance.dungeon.kinds[k].perRoom[band], 0)
+        return out
+    }
+    // The panel's rows: [{key, label, value, set, text}]
+    function masterRows() {
+        if (!masterAsk) return []
+        let game = masterGameValues()
+        return Balance.dungeonMaster.settings.map(row => {
+            let set = masterPinned[row.key] !== undefined
+            let v = set ? masterPinned[row.key] : game[row.key]
+            let text = Number(v).toFixed(row.decimals)
+            if (row.key === "position") text += " " + ["low", "middle", "high"][dangerBand(v)]
+            return { key: row.key, label: row.label, value: v, set: set, text: text }
+        })
+    }
+    // A setting turned by steps of its row: set from what it shows
+    function masterTurn(key, steps) {
+        let row = Balance.dungeonMaster.settings.find(r => r.key === key)
+        if (!row || !masterAsk) return
+        let shown = masterRows().find(r => r.key === key).value
+        let p = Object.assign({}, masterPinned)
+        p[key] = _masterClamp(row, shown + steps * row.step)
+        masterPinned = p
+        _keepMaster()
+        if (masterPreview) _masterShow()
+    }
+    // A setting given back to the game
+    function masterUnset(key) {
+        if (masterPinned[key] === undefined) return
+        let p = Object.assign({}, masterPinned)
+        delete p[key]
+        masterPinned = p
+        _keepMaster()
+        if (masterPreview) _masterShow()
+    }
+    // Generate: the dungeon Go enters; once one is shown, a new one on a
+    // new seed
+    function masterGenerate() {
+        if (!masterAsk) return
+        if (masterPreview) {
+            let seed
+            do { seed = Math.floor(Math.random() * 2147483647) } while (seed === _masterSeed())
+            masterSeedRoll = seed
+        }
+        _masterShow()
+    }
+    function _masterShow() {
+        masterPreview = planDungeon(masterAsk.index, _masterPosition(), masterAsk.knights,
+                                    masterOverrides(), masterAsk.seed)
+    }
+    // Go: the panel's dungeon is entered, built with its overrides
+    function masterGo() {
+        if (!masterAsk) return
+        let a = masterAsk, m = masterOverrides(), pos = _masterPosition()
+        masterAsk = null
+        masterPreview = null
+        session.setMastering(false)
+        console.log("[Game] Dungeon master: go,", JSON.stringify(m), "at position", pos.toFixed(3))
+        a.go(m, pos)
+    }
+    // Copy settings: the settings set, as JSON; Paste settings sets
+    // exactly those of a copied text, false when it holds none
+    function masterSettingsJson() { return JSON.stringify(masterPinned) }
+    function masterPaste(text) {
+        let o = null
+        try { o = _masterRead(JSON.parse(text)) } catch (err) {}
+        if (!o) {
+            masterNote = "The clipboard holds no settings"
+            return false
+        }
+        masterPinned = o
+        _keepMaster()
+        masterNote = "Settings pasted"
+        if (masterPreview) _masterShow()
+        return true
+    }
+    // The dungeon at level index and position, for knights, with the
+    // overrides m (null for the game's own) on the run's seed: carved and
+    // its enemies rolled as generateDungeon does, without touching the
+    // world, the level played now put back as it was. {seed, band, depth,
+    // grid, rooms, features, doors, secrets, enemies, entranceGridX,
+    // exitGridX}
+    function planDungeon(index, position, knights, m, runSeed) {
+        let kept = _keepCarved()
+        try {
+            let levelSeed = m && m.seed !== undefined ? m.seed
+                                                       : deriveSeed(runSeed === undefined ? masterSeed : runSeed, index)
+            let spec = dungeonSpec(position, m)
+            let rand = createRng(levelSeed)
+            let plan = carveDungeon(levelSeed, spec.band, false, rand, spec)
+            let d = m && m.depth !== undefined ? m.depth : depthOf(index)
+            let foes = rollEnemies(rooms, spec.rolls(d + position, knights), rand)
+            return { seed: levelSeed, band: spec.band, depth: d, position: position, grid: grid,
+                     rooms: rooms, features: plan.features, doors: plan.doors, secrets: plan.secrets,
+                     enemies: foes, entranceGridX: entranceGridX, exitGridX: exitGridX }
+        } finally {
+            _putCarved(kept)
+        }
     }
     // The knight is at 0 HP: the enemies stand still and the fallen screen
     // offers a new run or the title
@@ -1259,6 +1473,7 @@ ClayWorld2d {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         _loadRecord()
         _loadVolumes()
+        _loadMaster()
         runStartRecord = ownRecord.depth
         console.log("[Game] Record so far:", recordLine === "" ? "none" : recordLine)
         forceActiveFocus()
@@ -1271,7 +1486,7 @@ ClayWorld2d {
         _tryStartGame()
     }
     function _tryStartGame() {
-        if (screen === "game" && width > 0 && height > 0 && !player) {
+        if (screen === "game" && width > 0 && height > 0 && !player && !masterOpen) {
             console.log("[Game] Starting game - width:", width, "height:", height)
             console.log("[Game] pixelPerUnit:", pixelPerUnit)
             if (!session.connected) _setKnights(knightsNow())
@@ -1280,16 +1495,36 @@ ClayWorld2d {
                 generateVillage()
                 return
             }
-            dungeonAmbience.start()
-            dungeonMusic.start()
-            generateDungeon()
+            let go = () => {
+                dungeonAmbience.start()
+                dungeonMusic.start()
+                generateDungeon()
+            }
+            // Alone the dungeon master sets the first dungeon here, in a
+            // session the host did before the start
+            if (session.connected || !_masterAsks()) {
+                go()
+                return
+            }
+            if (masterSeed < 0)
+                masterSeed = Math.floor(Math.random() * 2147483647)
+            openMaster({ index: levelIndex, pos: dangerPosition, knights: partyKnights, seed: masterSeed,
+                         go: (m, pos) => {
+                             master = m
+                             _setDanger(pos, pos)
+                             go()
+                         } })
         }
     }
 
     function _startMultiplayerGame() {
+        if (masterOpen) return
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        session.start(masterSeed, dangerPosition, knightsNow())
+        let knights = knightsNow()
+        let go = (m, pos) => session.start(masterSeed, pos, knights, m)
+        if (!_masterAsks()) go(null, dangerPosition)
+        else openMaster({ index: 0, pos: dangerPosition, knights: knights, seed: masterSeed, go: go })
     }
 
     // Mouse input: aiming + attack + shield (also handles WASM focus)
@@ -2194,23 +2429,29 @@ ClayWorld2d {
     // a session only the host starts it, for every knight
     function newRun() {
         if (session.connected && !session.isHost) return
+        if (masterOpen) return
         let seed
         do {
             seed = Math.floor(Math.random() * 2147483647)
         } while (seed === masterSeed)
-        _startRun(seed, nextPosition, knightsNow())
+        let knights = knightsNow()
+        let go = (m, pos) => _startRun(seed, pos, knights, m)
+        if (!_masterAsks()) go(null, nextPosition)
+        else openMaster({ index: 0, pos: nextPosition, knights: knights, seed: seed, go: go })
     }
     // The next run on seed, from depth 0 with a fresh knight, its first
-    // dungeon at position in its range. The host clears its enemies on
-    // every node before it tells the others the seed and spawns the next
-    // run's; its first dungeon is built for knights
-    function _startRun(seed, position, knights) {
+    // dungeon at position in its range and built with the overrides m
+    // (null for the game's own). The host clears its enemies on every
+    // node before it tells the others the seed and spawns the next run's;
+    // its first dungeon is built for knights
+    function _startRun(seed, position, knights, m) {
         console.log("[Game] New run, seed:", seed)
         clearDungeon()
         masterSeed = seed
+        master = m || null
         _setDanger(position, position)
         _setKnights(knights)
-        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights)
+        if (session.connected && session.isHost) session.goAgain(seed, dangerPosition, partyKnights, master)
         menuOpen = false
         knightPanelOpen = false
         fallen = false
@@ -2241,6 +2482,9 @@ ClayWorld2d {
         resetting = false
         fightRoomActive = false
         masterSeed = -1
+        master = null
+        masterAsk = null
+        masterPreview = null
         levelIndex = 0
         levelType = "dungeon"
         _startRunRecord()
@@ -2426,10 +2670,16 @@ ClayWorld2d {
     // The host settles the next danger from every knight's record and
     // sends it with the level
     function _hostAdvanceLevel() {
-        if (resetting) return
-        let d = _dangerFor(levelIndex + 1)
-        session.announceLevel(levelIndex + 1, d.pos, d.next, d.knights)
-        _applyLevelChange(levelIndex + 1, d)
+        if (resetting || masterOpen) return
+        let next = levelIndex + 1
+        let d = _dangerFor(next)
+        let go = (m, pos) => {
+            let dd = m || pos !== d.pos ? { pos: pos, next: pos, knights: d.knights, master: m } : d
+            session.announceLevel(next, dd.pos, dd.next, dd.knights, m)
+            _applyLevelChange(next, dd)
+        }
+        if (levelTypeOf(next) !== "dungeon" || !_masterAsks()) go(null, d.pos)
+        else openMaster({ index: next, pos: d.pos, knights: d.knights, seed: masterSeed, go: go })
     }
 
     // d: the danger's positions the level is entered at and the knights it
@@ -2448,7 +2698,8 @@ ClayWorld2d {
     // In a session a knight down rises at the village's camp. d is the
     // danger's positions it is entered at and the knights it is built
     // for, the host's in a session; alone they are settled here, before
-    // the knight and its record are gone
+    // the knight and its record are gone. d.master is the dungeon's
+    // overrides, the dungeon master's
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
@@ -2462,6 +2713,7 @@ ClayWorld2d {
         clearDungeon()
         levelIndex = newIndex
         levelType = levelTypeOf(newIndex)
+        master = levelType === "dungeon" ? d.master || null : null
         _setDanger(d.pos, d.next)
         _setKnights(d.knights)
         if (levelType === "village")
@@ -2698,7 +2950,7 @@ ClayWorld2d {
     function generateDungeon() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        let levelSeed = deriveSeed(masterSeed, levelIndex)
+        let levelSeed = levelSeedNow()
         rng = createRng(levelSeed)
         console.log("[Game] Seed:", masterSeed, "Level:", levelIndex, "LevelSeed:", levelSeed)
         // Nothing lost here yet: were the party to leave at once, the next
@@ -2710,8 +2962,8 @@ ClayWorld2d {
         // secret rooms laid out (carveDungeon); a secret room's cells stay
         // rock until opened
         initExploredCells()
-        let band = dangerBand(dangerPosition)
-        let plan = carveDungeon(levelSeed, band, featureShowcase, rng)
+        let spec = dungeonSpec(dangerPosition, master)
+        let plan = carveDungeon(levelSeed, spec.band, featureShowcase, rng, spec)
         let featureList = plan.features
         let doorList = plan.doors
         _takeSecrets(plan.secrets)
@@ -2740,7 +2992,7 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        for (let e of rollEnemies(rooms, spawnRolls(danger, partyKnights), rng))
+        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng))
             spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
 
         // Bind player controls
@@ -2774,18 +3026,63 @@ ClayWorld2d {
         console.log("[Game] generateDungeon() complete")
     }
 
+    // The level seed the level played now is built on: the master's when
+    // it set one, else the run's seed's for the level
+    function levelSeedNow() {
+        return master && master.seed !== undefined ? master.seed : deriveSeed(masterSeed, levelIndex)
+    }
+    // What a dungeon at position is built from, with the master's
+    // overrides m (null for the game's own): its band, its rooms' count
+    // range, the feature kinds' table and its spawn rolls at a danger for
+    // knights (spawnRolls, with the enemies per room m sets). position
+    // left out is the middle of the range
+    function dungeonSpec(position, m) {
+        let sb = Balance.spawn
+        let spec = { band: position === undefined ? 1 : dangerBand(position),
+                     roomsMin: sb.roomsMin, roomsMax: sb.roomsMax, kinds: Balance.dungeon.kinds,
+                     enemiesPerRoom: undefined }
+        spec.rolls = (d, knights) => Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+        if (!m) return spec
+        if (m.rooms !== undefined) spec.roomsMin = spec.roomsMax = m.rooms
+        if (m.enemies !== undefined) spec.enemiesPerRoom = m.enemies
+        // A feature row's per room, split between its kinds, at every band
+        let kinds = {}
+        for (let k in Balance.dungeon.kinds) kinds[k] = Object.assign({}, Balance.dungeon.kinds[k])
+        for (let row of Balance.dungeonMaster.settings) {
+            if (!row.kinds || m[row.key] === undefined) continue
+            let shares = splitShare(m[row.key], row.kinds.map(k => kinds[k].perRoom[spec.band]))
+            row.kinds.forEach((k, i) => kinds[k].perRoom = [shares[i], shares[i], shares[i]])
+        }
+        spec.kinds = kinds
+        return spec
+    }
+    // total split by weights: its whole number in whole shares, the
+    // largest remainders first, and its fraction in proportion, so a
+    // whole total gives that many to a room
+    function splitShare(total, weights) {
+        let sum = weights.reduce((a, b) => a + b, 0)
+        let w = weights.map(x => sum > 0 ? x / sum : 1 / weights.length)
+        let whole = Math.floor(total + 1e-9), frac = Math.max(0, total - whole)
+        let out = w.map(x => Math.floor(x * whole))
+        let left = whole - out.reduce((a, b) => a + b, 0)
+        let order = w.map((x, i) => i).sort((a, b) => (w[b] * whole - out[b]) - (w[a] * whole - out[a]) || w[b] - w[a])
+        for (let i = 0; i < left; i++) out[order[i % order.length]]++
+        return out.map((n, i) => n + frac * w[i])
+    }
+
     // Steps 1 to 4c of a dungeon, the same for the one built
     // (generateDungeon) and the one the witch reads (secretsOf), on the
     // live grid: the grid filled with walls, the rooms drawn from rand and
     // carved, the chain of corridors, the entrance and the exit, the loops;
     // then its features, doors and secret rooms laid out on it, without
     // touching the world: {features, doors, secrets}
-    function carveDungeon(levelSeed, band, showcase, rand) {
+    function carveDungeon(levelSeed, band, showcase, rand, spec) {
+        spec = spec || dungeonSpec(undefined, null)
         // Step 1: Initialize grid with walls
         initializeGrid()
 
         // Step 2: Place rooms
-        placeRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin,
+        placeRooms(spec.roomsMin, spec.roomsMax, Balance.spawn.roomSizeMin,
                    Balance.spawn.roomSizeMax, rand)
 
         // Step 3: Connect rooms with spanning tree
@@ -2798,7 +3095,7 @@ ClayWorld2d {
         addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[band])
 
         // Step 4c: Lay out the features, the doors and the secret rooms
-        let features = planFeatures(levelSeed, band, showcase)
+        let features = planFeatures(levelSeed, band, showcase, spec.kinds)
         let doors = planDoors(levelSeed, band, showcase)
         return { features: features, doors: doors,
                  secrets: planSecrets(levelSeed, band, showcase, features, doors) }
@@ -2895,14 +3192,19 @@ ClayWorld2d {
         return out
     }
 
-    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls),
+    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls,
+    // or a dungeonSpec's rolls),
     // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
     // first, the knights' start, with the table's tier mix
     function rollEnemies(rms, sb, rand) {
         let out = []
         if (rms.length < 2) return out
         let spawnRooms = rms.slice(1)
-        let numEnemies = sb.enemiesMin + Math.floor(rand() * (sb.enemiesMax - sb.enemiesMin + 1))
+        // perRoom, when the rolls have it, sets the count: that many to a
+        // room, rounded over all of them; the roll is drawn all the same
+        let roll = rand()
+        let numEnemies = sb.perRoom !== undefined ? Math.round(sb.perRoom * spawnRooms.length)
+                                                  : sb.enemiesMin + Math.floor(roll * (sb.enemiesMax - sb.enemiesMin + 1))
         let tiers = dealTiers(numEnemies, sb, rand)
         for (let i = 0; i < numEnemies; i++) {
             let room = spawnRooms[i % spawnRooms.length]
@@ -3393,9 +3695,9 @@ ClayWorld2d {
         let t = (_cacheCells[cell] ? Balance.dungeon.cacheLoot : Balance.dungeon.loot)[kind]
         if (!t) return 0
         let c = cell.split(",").map(Number)
-        let rand = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
+        let rand = createRng(levelSeedNow() ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
         if (rand() >= t.chance) return 0
-        let lo = t.gold[0] + t.perDepth * depth, hi = t.gold[1] + t.perDepth * depth
+        let lo = t.gold[0] + t.perDepth * dangerDepth, hi = t.gold[1] + t.perDepth * dangerDepth
         return lo + Math.floor(rand() * (hi - lo + 1))
     }
     // This node's knight broke b with a blow along (nx, ny)
@@ -3550,7 +3852,7 @@ ClayWorld2d {
         spawnSparks(p.xWu, p.yWu, 0, 1, 6, "#E6E2D6")
         let result = "clear"
         if (player && onPlate(p)) {
-            result = player.takeTrapDamage(spikeDamageAt(depth, player.maxHp))
+            result = player.takeTrapDamage(spikeDamageAt(dangerDepth, player.maxHp))
             console.log("[Game] Spikes rose under the knight at", p.cell, "-", result)
         }
         p.result = result
@@ -3827,7 +4129,7 @@ ClayWorld2d {
         // Where it comes from: on its line, two wu towards its slit
         let fx = a.dirX !== 0 ? cx - a.dirX * 2 : a.xWu
         let fy = a.dirY !== 0 ? cy - a.dirY * 2 : a.yWu
-        let result = player.meetArrow(arrowDamageAt(depth, player.maxHp), fx, fy, a.dirX, a.dirY)
+        let result = player.meetArrow(arrowDamageAt(dangerDepth, player.maxHp), fx, fy, a.dirX, a.dirY)
         console.log("[Game] Arrow", a.arrowId, "met the knight -", result)
         arrowMet(a.arrowId, result)
         if (result !== "hit" && result !== "blocked" && result !== "perfect") return
@@ -4884,9 +5186,21 @@ ClayWorld2d {
         exploredCells = []
     }
 
+    // Alone out of a level into the next; into a dungeon the dungeon
+    // master sets it first, and the exit stays taken while the panel is up
     function resetDungeon() {
-        _enterLevel(levelIndex + 1)
-        resetting = false
+        let next = levelIndex + 1
+        if (levelTypeOf(next) !== "dungeon" || !_masterAsks()) {
+            _enterLevel(next)
+            resetting = false
+            return
+        }
+        let d = _dangerFor(next)
+        openMaster({ index: next, pos: d.pos, knights: d.knights, seed: masterSeed,
+                     go: (m, pos) => {
+                         _enterLevel(next, { pos: pos, next: pos, knights: d.knights, master: m })
+                         resetting = false
+                     } })
     }
 
     // --- Village/Camp generation ---
@@ -5195,6 +5509,7 @@ ClayWorld2d {
         muted = true
         masterSeed = seed === undefined ? scenarioSeed : seed
         if (player) clearDungeon()
+        master = null
         featureShowcase = name === "features"
         fallen = false
         fightRoomActive = false
@@ -5222,7 +5537,7 @@ ClayWorld2d {
     // fight; only where the AI runs. Seeded anew with each level
     property var _attackRng: null
     function rollAttack() {
-        if (!_attackRng) _attackRng = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x6372)
+        if (!_attackRng) _attackRng = createRng(levelSeedNow() ^ 0x6372)
         return _attackRng()
     }
 
@@ -5418,8 +5733,59 @@ ClayWorld2d {
                 soundVolume: world.soundVolume
                 message: world.titleMessage
                 recordLine: world.recordLine
+                dungeonMaster: world.dungeonMaster
+                onDungeonMasterToggled: world.setDungeonMaster(!world.dungeonMaster)
                 onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
+            }
+        }
+    }
+
+    // A joiner while the host's dungeon master panel is up, in the lobby,
+    // the village or on the fallen screen: the next dungeon is coming
+    Rectangle {
+        objectName: "masterWaitNote"
+        z: 5650
+        visible: session.mastering && !session.isHost
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 24
+        width: waitText.implicitWidth + 32
+        height: waitText.implicitHeight + 16
+        radius: 6
+        color: "#CC08070C"
+        border.color: "#E0B060"
+        border.width: 1
+        Text {
+            id: waitText
+            anchors.centerIn: parent
+            text: "The dungeon master prepares the next dungeon\u2026"
+            color: "#E0B060"
+            font.pixelSize: 16
+            font.italic: true
+        }
+    }
+
+    // The dungeon master's panel (over the lobby and the fallen screen)
+    Loader {
+        anchors.fill: parent
+        z: 5600
+        active: world.masterOpen
+        sourceComponent: Component {
+            DungeonMasterPanel {
+                depth: world.masterAsk ? world.depthOf(world.masterAsk.index) : 0
+                rows: world.masterAsk ? world.masterRows() : []
+                preview: world.masterPreview
+                note: world.masterNote
+                settingsJson: world.masterSettingsJson()
+                cellWall: world.cellWall
+                cellSize: world.cellSize
+                onTurned: (key, steps) => world.masterTurn(key, steps)
+                onUnset: (key) => world.masterUnset(key)
+                onGenerate: world.masterGenerate()
+                onGo: world.masterGo()
+                onCopied: world.masterNote = "Settings copied"
+                onPasted: (text) => world.masterPaste(text)
             }
         }
     }
