@@ -380,8 +380,11 @@ Window {
             lastMet = null
             waitFor = "raise"
         }],
-        [() => lastMet === null && Object.keys(fired).some(id => fired[id].clock > game._trapClock - 0.05), () => {
+        // An arrow of a rhythm's run still in flight may meet the knight
+        // before the next leaves: what it met is forgotten here
+        [() => Object.keys(fired).some(id => fired[id].clock > game._trapClock - 0.05), () => {
             // Just as an arrow leaves, long before it comes: no perfect block
+            lastMet = null
             p().raiseShield()
             hpBefore = p().hp
             manaBefore = p().mana
