@@ -71,6 +71,14 @@ Item {
         return game.masterOpen
     }
     function panelUp() { return game.masterOpen }
+    // The line a joiner sees while the host's panel is up, "" when none
+    function waitNote() {
+        for (let i = 0; i < game.data.length; i++) {
+            let o = game.data[i]
+            if (o.objectName === "masterWaitNote") return o.visible ? o.children[0].text : ""
+        }
+        return "missing"
+    }
     function turn(key, steps) { game.masterTurn(key, steps); return game.masterSettingsJson() }
     function generate() { game.masterGenerate(); return game.masterPreview ? game.masterPreview.seed : null }
     function go() { game.masterGo(); return true }

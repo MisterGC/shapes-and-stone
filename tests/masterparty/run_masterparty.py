@@ -8,14 +8,15 @@ signaling. The host ticks Dungeon Master and sets 6 rooms and 2 enemies
 per room, the joiner ticks it too (a joiner never has the panel). Then:
 
 - the host starts the game: the panel is up on the host, the joiner
-  waits outside the dungeon
-- the host generates twice (a new seed) and goes: both screens build the
+  waits outside the dungeon and is told the dungeon master prepares it
+- the host generates twice (a new seed) and goes: the joiner's line is
+  gone, and both screens build the
   dungeon the panel showed, the same grid, rooms and features on the
   rolled seed, the host's enemies where the preview had them and as many
   on the joiner's screen
 - out to the village, no panel; out of it the panel is up on the host and
-  the joiner waits in the village; the host sets 7 rooms, generates and
-  goes: both screens build that dungeon
+  the joiner waits in the village, told so; the host sets 7 rooms,
+  generates and goes: both screens build that dungeon
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -145,6 +146,8 @@ def enter(H, J, check, what):
           f"{what}: the host's G shows a dungeon, G again a new seed ({first} -> {second})")
     shown = H.json("shown()")
     H.eval1("go()")
+    check(wait_for(lambda: J.eval1("waitNote()") == "", 10) and H.eval1("waitNote()") == "",
+          f"{what}: after Go the joiner's waiting line is gone (the host never shows it)")
     if not wait_for(lambda: H.eval1("inRun()") is True and J.eval1("inRun()") is True, 30):
         check(False, f"{what}: both knights in the dungeon after Go "
               f"(host {H.json('where()')}, joiner {J.json('where()')})")
@@ -178,6 +181,8 @@ def first_dungeon(args, H, J, check):
     jw = J.json("where()")
     check(J.eval1("panelUp()") is False and not (jw["screen"] == "game" and jw["knight"]),
           f"the joiner waits outside the dungeon, without a panel ({jw})")
+    note = J.eval1("waitNote()")
+    check(note.startswith("The dungeon master prepares"), f"the joiner is told why it waits ({note!r})")
     if enter(H, J, check, "first dungeon") is None:
         return 100
 
@@ -194,6 +199,9 @@ def first_dungeon(args, H, J, check):
     time.sleep(1.0)
     jw = J.json("where()")
     check(jw["type"] == "village" and jw["level"] == 1, f"the joiner waits in the village ({jw})")
+    note = J.eval1("waitNote()")
+    check(note.startswith("The dungeon master prepares"),
+          f"the joiner in the village is told why it waits ({note!r})")
     turned = json.loads(H.eval1("turn('rooms', 1)") or "null")
     check(turned == dict(SETTINGS, rooms=SETTINGS["rooms"] + 1), f"the host turns the rooms up to 7 ({turned})")
     shown = enter(H, J, check, "second dungeon")
