@@ -152,6 +152,9 @@ PhysicsItem {
     property real _dashTimer: 0
     property real _dashDirX: 0
     property real _dashDirY: 0
+    // The way the dash under way goes, a unit vector, y down as on screen
+    readonly property real dashDirX: _dashDirX
+    readonly property real dashDirY: _dashDirY
     // The dash under way is a whirlwind (Balance.knight.whirl...), let
     // loose with Q (unleash)
     property bool isWhirling: false
@@ -287,6 +290,7 @@ PhysicsItem {
             if (isAttacking) {
                 hitEnemiesInArc()
                 _breakBones(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
+                _breakThings(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
             }
         }
     }
@@ -534,6 +538,44 @@ PhysicsItem {
         }
     }
 
+    // The breakables a blow reaches (Game.breakThing): within reach of the
+    // knight's centre to their edge, and in the swing's arc when inArc. A
+    // swing breaks the nearest of them and no more, a charged swing and
+    // the whirlwind every one. A crystal only a charged swing breaks: a
+    // swing glances off it, once a swing, and the whirlwind passes it
+    property bool _brokeThisSwing: false
+    property var _glancedThisSwing: new Set()
+    function _breakThings(reach, inArc) {
+        if (!gameWorld || !gameWorld.breakables || gameWorld.breakables.length === 0) return
+        let heavy = inArc && isHeavy
+        if (inArc && !heavy && _brokeThisSwing) return
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let near = []
+        for (let b of gameWorld.breakables) {
+            let dx = b.cxWu - cx, dy = b.cyWu - cy
+            let d = Math.sqrt(dx * dx + dy * dy)
+            if (d > reach + b.sizeWu / 2) continue
+            // The arc test reads a top-left corner like the knight's own
+            if (inArc && !isInAttackArc({xWu: b.cxWu - widthWu / 2, yWu: b.cyWu + heightWu / 2})) continue
+            near.push({b: b, d: d, nx: d > 0 ? dx / d : 1, ny: d > 0 ? dy / d : 0})
+        }
+        near.sort((p, q) => p.d - q.d)
+        for (let n of near) {
+            if (n.b.kind === "crystal" && !heavy) {
+                if (inArc && !_glancedThisSwing.has(n.b)) {
+                    _glancedThisSwing.add(n.b)
+                    gameWorld.glanceThing(n.b, n.nx, n.ny)
+                }
+                continue
+            }
+            gameWorld.breakThing(n.b, n.nx, n.ny)
+            if (inArc && !heavy) {
+                _brokeThisSwing = true
+                return
+            }
+        }
+    }
+
     // The whirlwind hits every standing enemy within whirlReach of the
     // knight, centre to centre, once: a heavy blow, through a guardian's
     // shield. Returns how many it hit this step
@@ -541,6 +583,7 @@ PhysicsItem {
         if (!gameWorld || !gameWorld.enemies) return 0
         let k = Balance.knight
         _breakBones(k.whirlReach, false)
+        _breakThings(k.whirlReach, false)
         let hitCount = 0
         for (let e of gameWorld.enemies) {
             if (!e || e.destroyed !== false || _hitThisWhirl.has(e)) continue
@@ -648,6 +691,53 @@ PhysicsItem {
         return blocked ? "blocked" : "hit"
     }
 
+    // A trap's spikes rose under the knight (Game._risePlate): amount
+    // lands whole, no defence, shield or grace takes any of it, and a
+    // dash under way avoids it all. "hit", "dodged" or "ignored"
+    function takeTrapDamage(amount) {
+        if (fallen) return "ignored"
+        if (isDashing) return "dodged"
+        hp = Math.max(0, hp - amount)
+        _cancelCharge()
+        graceLeft = Balance.knight.hurtGrace
+        view.hurt()
+        acted("hurt")
+        if (gameWorld) {
+            gameWorld.playHurt()
+            gameWorld.countFight("taken", amount)
+            gameWorld.shake(3)
+            gameWorld.spawnHurtNumber(xWu, yWu, amount, "#FF4444")
+        }
+        return "hit"
+    }
+
+    // An arrow from a slit met the knight (Game._stepSlits), coming from
+    // (fromX, fromY) along (alongX, alongY), y up. "dodged" by a dash under
+    // way, "ignored" when fallen or in the grace after a hit; a shield
+    // facing it takes it whole, as a spitter's shot: "perfect" when raised
+    // just before it (perfectGuard), which sends it back, else "blocked"
+    // at the shield's mana cost; otherwise amount lands as a blow
+    // (takeDamage): "hit"
+    function meetArrow(amount, fromX, fromY, alongX, alongY) {
+        if (fallen) return "ignored"
+        if (isDashing) return "dodged"
+        if (graceLeft > 0) return "ignored"
+        if (isBlocking && isShieldFacing(fromX, fromY, 0)) {
+            if (perfectGuard) return _perfectBlock(fromX, fromY, 0)
+            view.block()
+            acted("block")
+            if (gameWorld) {
+                let s = getShieldWorldPos()
+                gameWorld.playBlock()
+                gameWorld.impact("projectileDeflected", s.x, s.y, alongX, alongY)
+                gameWorld.countFight("block")
+            }
+            payBlock()
+            return "blocked"
+        }
+        return takeDamage(amount, fromX, fromY, 0, false, alongX, alongY)
+    }
+
     // Thrown back along the blow (takeDamage), knockback wu: a knockback
     // fades out step by step, so it covers its start speed
     // times the sum of its steps' shares of it
@@ -662,7 +752,9 @@ PhysicsItem {
         }
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
-        let dt = player.world.timeStep, per = 0
+        // A hit stop steps the world by 0 s (issue #138): the sum runs on
+        // a normal step then, or it never ends
+        let dt = player.world.timeStep > 0 ? player.world.timeStep : 1 / 60, per = 0
         for (let t = k.knockbackDuration; t > 1e-9; t -= dt) per += t / k.knockbackDuration * dt
         let speed = knockback / per
         _knockVx = dx / len * speed
@@ -935,6 +1027,8 @@ PhysicsItem {
             isHeavy = false
             _swingTimer = attackDuration + Balance.knight.swingFade
             _hitThisSwing = new Set()
+            _brokeThisSwing = false
+            _glancedThisSwing = new Set()
             _swingEarned = 0
             attackCooldown = attackCooldownTime
             _swungAt = _steps
@@ -954,6 +1048,8 @@ PhysicsItem {
         isHeavy = true
         _swingTimer = attackDuration + Balance.knight.swingFade
         _hitThisSwing = new Set()
+        _brokeThisSwing = false
+        _glancedThisSwing = new Set()
         _swingEarned = 0
         attackCooldown = attackCooldownTime
         view.swing(true)

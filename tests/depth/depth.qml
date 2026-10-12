@@ -105,7 +105,7 @@ Window {
         [() => fallenScreen() !== null, () => {
             check(fallenText("fallenDepth") === "Depth 2", "the fallen screen shows depth 2 (" + fallenText("fallenDepth") + ")")
             let stats = fallenText("fallenStats")
-            check(/^1 kill  •  0:\d\d$/.test(stats), "the fallen screen shows 1 kill and the time (" + stats + ")")
+            check(/^1 kill  •  0 secrets  •  0:\d\d$/.test(stats), "the fallen screen shows 1 kill, no secret and the time (" + stats + ")")
             check(game.runSeconds > 0, "the run's time ran (" + game.runSeconds.toFixed(2) + " s)")
             check(fallenText("fallenRecord") === "New record",
                   "a first fall at depth 2 is a new record (" + fallenText("fallenRecord") + ")")
@@ -125,7 +125,7 @@ Window {
         }],
         [() => fallenScreen() !== null, () => {
             check(fallenText("fallenDepth") === "Depth 0", "the fall is at depth 0 (" + fallenText("fallenDepth") + ")")
-            check(/^0 kills  •  0:\d\d$/.test(fallenText("fallenStats")),
+            check(/^0 kills  •  0 secrets  •  0:\d\d$/.test(fallenText("fallenStats")),
                   "no kills this run (" + fallenText("fallenStats") + ")")
             check(fallenText("fallenRecord").startsWith("Record 2  •  "),
                   "the fallen screen shows the previous record, depth 2 (" + fallenText("fallenRecord") + ")")

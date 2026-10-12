@@ -185,7 +185,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
 ```
 
 At 0 HP the knight falls: the enemies stop and a screen shows how deep the
-run got, counted in dungeons from depth 0. Enter starts a new run from depth
+run got, counted in dungeons from depth 0, its kills, the secret rooms
+the party found and its time. Enter starts a new run from depth
 0 on a new seed, Esc returns to the title. The fall bench brings the knight
 down twice, goes again with Enter and back to the title with Esc, and exits
 with the number of failed checks:
@@ -339,10 +340,11 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 At the camp the witch reads the next dungeon: where it sits in its depth's
 range - high, in the middle or low - and what lives there, how many
 enemies, how many of them tough and weak, how many guardians and
-spitters. She reads it off the run's seed, the next dungeon's position
-and the knights the party has, the way the dungeon is built
-(`Game.foretell`), so the dungeon the knights walk down into holds what
-she said; one more press of E per line. In a session every knight hears
+spitters, and when it hides a secret room that a hidden chamber lies
+below and how to find it. She reads it off the run's seed, the next
+dungeon's position and the knights the party has, the way the dungeon is
+built (`Game.foretell`, `Game.secretsOf`), so the dungeon the knights
+walk down into holds what she said; one more press of E per line. In a session every knight hears
 the same reading: the seed, the position and the knights are the host's.
 The camp bench, on the dojo's seed, takes one knight out of a dungeon
 three times - little, half and most of its HP lost - and checks the
@@ -497,6 +499,322 @@ qml -I build/bin/qml tests/looks/looks.qml -- <out dir>
 python3 tests/dangerparty/run_dangerparty.py --mode local [--shots <out dir>]
 ```
 
+A dungeon's rooms are joined in a chain, the start room to the exit's,
+and some get a second entrance: `dungeon.extraCorridors` more corridors,
+one at low danger, two at middle and three at high, each between two
+rooms close but not neighbours in the chain, so a dungeon has loops to
+flank and to escape (`Game.addLoops`). They come from their own stream of
+the level's seed, so the rooms, the enemies and the witch's reading stay
+as the seed has them, and every screen of a session carves the same. Each
+is drawn from the `dungeon.loopChoice` closest pairs left and carved
+L-shaped, centre to centre, as the chain's corridors are; one that would
+cut through or open into a third room, run along one of its own rooms'
+walls, or run into the entrance's or the exit's shaft is passed over. The
+exit stays reachable and the entrance blocked. The loops bench checks the
+table, that a seed and danger carve the same corridors twice, and walks
+50 seeds for the rules: every room and the exit reachable, as many
+corridors as the table asks, none through or into a third room, along a
+wall or into a shaft, each closing a loop. With an out dir and a window it
+saves `loops.png`, the game's minimap of a dungeon with three loops, all
+of it explored, beside the same grid with its corridors off the chain in
+amber:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/loops/loops.qml
+qml -I build/bin/qml tests/loops/loops.qml -- <out dir>
+```
+
+A dungeon's features - what the knights read, use, find or break - are
+laid out once its rooms and corridors are carved (`Game.planFeatures`),
+each kind from its own stream of the level's seed and its name, so the
+rooms, the enemies, the torches and the debris stay as the seed has them,
+and a kind added or retuned moves another only off a cell it takes first.
+Every feature stands on a room's cell, never in the start room, on a
+doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
+from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
+cell. How many of a kind each room but the start room holds is the
+table's `dungeon.kinds`, per danger band as the looks have it. The kinds
+are the breakables, the spike plates and the arrow slits below; a slit stands
+only on a cell on the room's edge with a wall beside it. In
+the dojo `applyScenario("features")` lands in a dungeon with every kind at
+its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
+and on a seed; the next level is built without it. The features bench
+checks that the scenario places every kind and shows its breakables, that
+a seed and danger place the same features twice and the scenario seed's
+as recorded, that a kind laid out before the urns moves them only off the
+cells it takes, and walks the
+grid of 50 seeds for the rules; with an out dir and a window it saves
+`features.png`:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/features/features.qml
+qml -I build/bin/qml tests/features/features.qml -- <out dir>
+```
+
+Clay urns, wooden crates and barrels and crystal clusters stand on their
+features' cells (`src/Breakable.qml`), coloured by the dungeon's look, the
+crystals glowing; a crystal is rarer the shallower. An urn and a barrel
+stand upright, drawn from the side on a shadow of their own, smaller than
+a knight: they block a square of `dungeon.standing`'s `foot` wu and rise
+`tall` wu. Each blocks the knights and the enemies like a small wall, a
+crate and a crystal a square of `dungeon.breakableSize` wu, not the
+shots, and casts no shadow; the
+enemies' paths go around it. A swing breaks the nearest one in its arc, a
+charged swing and the whirlwind every one they reach. Only a charged swing
+breaks a crystal: a swing glances off it with sparks, the whirlwind passes
+it. A broken thing may hold gold, by its kind's row in `dungeon.loot`: a
+chance, an amount from `gold[0]` to `gold[1]` and `perDepth` more a depth,
+a crystal more often and more than an urn or a crate. The roll comes from
+the level's seed and the thing's cell, whoever breaks it, and the gold
+drops where it stood, a drop as an enemy's. In a session a blow breaks the
+thing at once on the screen that dealt it; the host rolls its gold, spawns
+the drop and keeps the cells broken in the level as the session property
+`broken`, so every screen breaks it too, a player who joins later as well,
+and the drop is picked up once. The heaps of bones still break on the
+breaker's screen only, with no gold. The breakables bench walks the knight
+into a crate, breaks each kind with its swing, a swing's nearest of three
+urns and a charged swing's other two, three crates with the whirlwind,
+then every thing of the features scenario, and checks each drop against
+the table on the scenario seed and the gold of 40 seeds against the
+chances and ranges; with an out dir and a window it saves
+`breakables.png`, an urn, a crate, a barrel and a crystal whole, and
+`breaking.png`, a charged swing breaking them:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/breakables/breakables.qml
+qml -I build/bin/qml tests/breakables/breakables.qml -- <out dir>
+```
+
+The break party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both stand
+the same breakables; the joiner's knight breaks one that holds gold, and
+it must be gone on both screens with the same drop where it stood; both
+knights step onto the drop and one of them gets it; the host's knight
+breaks a crystal, gone on the joiner's screen too. It needs the live
+loader (`-DCLAYGROUND_WITH_TOOLS=ON`) and exits with the number of failed
+checks:
+
+```
+python3 tests/breakparty/run_breakparty.py --mode local
+```
+
+A spike plate is a floor stone with small holes in it on its feature's
+cell (`src/SpikePlate.qml`), always the same, coloured by the dungeon's
+look; it does not block. A knight whose centre steps on it makes it
+click, and `dungeon.spikeDelay` seconds later its spikes rise: a knight
+still on it, and not dashing, takes `dungeon.spikeDamage` and
+`spikeDamagePerDepth` more a depth, never more than `spikeCap` of its
+max HP (`Game.spikeDamageAt`); no defence, shield or grace takes any of
+it. Then the plate stays sprung, bent spikes over a stain, and never
+fires again. The enemies walk over it. Alone the delay runs on the
+physics clock, so the dojo's pause holds it. In a session the knight's
+game that sets a plate off reports it and the moment its spikes rise on
+the session clock to the host, which keeps the plates set off in the
+level as the session property `sprung`; every other screen clicks and
+raises that plate at that moment, a player who joins later sees it
+sprung, and each game judges the spikes on its own knight alone. The
+spikes bench lands in the features scenario, checks its plates and that
+laying them out moved another feature only off a cell a plate took,
+stands an enemy on a plate, which stays armed, and the knight on
+another: it clicks, the spikes rise `spikeDelay` later and take what
+`spikeDamageAt` says, and the plate fires once. A knight that dashes
+at the click takes nothing; the damage stays under the cap from depth 0
+to 60, and at depth 0, 3, 8 and 20 the spikes take that much. With an
+out dir and a window it saves
+`plates.png`, a plate armed beside one sprung, and `rising.png`, the
+spikes rising under the knight:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/spikes/spikes.qml
+qml -I build/bin/qml tests/spikes/spikes.qml -- <out dir>
+```
+
+The spike party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both lay
+the same plates; the joiner's knight stands on one, its own game takes
+the damage and the host's screen shows the plate sprung and the joiner's
+HP as the joiner's game has it; the same the other way round; a knight
+that dashes at the click takes nothing; two knights on one plate each
+take the damage once, and a plate stepped on again does nothing. It
+needs the live loader and exits with the number of failed checks:
+
+```
+python3 tests/spikeparty/run_spikeparty.py --mode local
+```
+
+An arrow slit is a narrow dark opening in a stone frame, set into the
+wall beside its feature's cell on a room's edge (`src/ArrowSlit.qml`), and
+fires across the room along the cell's row or column to the wall facing
+it; its line never ends in a doorway. It fires on the beats of its rhythm,
+`dungeon.slitBeat` seconds each, from the table's `slitRhythms` - a
+single shot and a rest, "1 - 1 - pause", a volley of three, a stream and
+a hail of one a beat, the faster ones only at a higher danger. A room's
+second slit takes the first's rhythm half a turn later, so the two take
+turns. Before each shot a ring in the telegraph colour closes on the slit
+over `slitWarn` seconds and its opening glows, as an enemy's parry ring
+closes on it, and the ring flashes white as the arrow leaves. Every slit
+leaves a safe way past, and the generator checks it: a lane, the room's
+doorways joined by cells on no slit's line and under no breakable, or a
+gap, a rest in its rhythm longer than `slitGapMargin` times what a knight
+takes to walk over the line (`Game.slitGap`, `slitCrossTime`); a room
+with neither takes the band's first rhythm with a gap. An arrow
+(`src/Arrow.qml`) flies at `arrowSpeed` and hurts only knights: one in its
+line takes `arrowDamage`, `arrowDamagePerDepth` more a depth, never more
+than `arrowCap` of its max HP, less its defence (`Game.arrowDamageAt`), a
+blow with its knockback and grace. A held shield facing it stops it whole
+for the shield's mana, as it does a spitter's shot; a perfect block sends
+it back along its line to break on its slit; a dash passes through it, a
+volley too. The beats run on the trap clock: the session clock in a
+session (`Network.sessionTime`), so every screen fires the same arrow at
+the same moment, alone the physics clock, held by the dojo's pause. An
+arrow's flight is worked out from that clock, the same on every screen.
+Each game judges the arrows on its own knight and tells the others what
+became of one that hit, was blocked or sent back, which goes on their
+screens too. A room holds at most one slit at any danger, at high danger
+0.6 a room (`dungeon.kinds.slit`). The slits bench lands in the features
+scenario, one slit a room: it checks that slits stay that rare, each slit
+in its wall, on its line across its room, with a rhythm of its band, that
+laying them out moved no other feature and that two laid out in a room
+take turns. A knight in a line, its back to the slit,
+sees it glow and is hit by the arrow of its beat for what
+`arrowDamageAt` says; facing it with the shield held it blocks the next;
+raised just before one, a perfect block sends it back to its slit; a
+dash across the line as an arrow passes takes nothing and the arrow flies
+on to the wall. Then it walks the slits of 50 seeds across the danger
+bands for a lane or a gap. With an out dir and a window it saves
+`glowing.png`, a slit winding up, and `firing.png`, its arrow just out:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/slits/slits.qml
+qml -I build/bin/qml tests/slits/slits.qml -- <out dir>
+```
+
+The slit party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both lay
+the same slits with the same rhythms, and for three seconds fire the same
+arrows, each due at the same session time and leaving within a frame or
+two of it on both screens; the joiner's knight stands in a line, its own
+game takes the arrow and the host's screen shows its HP and the arrow
+gone; its perfect block sends the next arrow back to the slit on both
+screens.
+It needs the live loader and exits with the number of failed checks:
+
+```
+python3 tests/slitparty/run_slitparty.py --mode local
+```
+
+Some room entrances get a door (`src/Door.qml`): a doorway, a corridor's
+cell beside a room with rock on its two other sides, gets one with
+`dungeon.doorShare`'s chance at the danger's band, every doorway in the
+features scenario (`Game.planDoors`). The doors come from their own
+stream of the level's seed, so the rooms, the enemies and the features
+stay as the seed has them. Two jambs narrow the doorway to a wooden leaf
+`dungeon.doorWidth` wu wide, one knight, and every door starts closed.
+Closed it blocks the knights, the enemies and their shots like a wall,
+and the enemies' sight: an enemy does not see a knight behind it. E
+within `doorReach` wu of a door's centre, with no one to talk to, opens
+or closes the nearest - an E shows over it - unless a knight or an enemy
+stands where its leaf closes; open it swings into the room. An enemy
+chasing through a closed door stops within `doorBashReach` wu of it,
+winds up with its ring for `doorBash` seconds and bursts it open
+(`Game.bashDoor`); a bashed door lies in splinters and stays open, and E
+does nothing at it. The enemies' paths come from Clayground's
+`GridPathfinder`, fed the grid turned half a turn so they are the paths
+of the game's own A* before it; a closed door counts as `doorPathCost`
+cells more. The pathfinder takes no cost per cell (clayground#423), so
+the game searches twice, through the closed doors and around them, and
+takes the way around when it is no longer than the way through and the
+doors' cost. Alone the game owns the doors; in a session the host does:
+a node's E asks it, and it keeps the doors open or bashed in the level as
+the session property `doors`, so every screen shows them so, a player
+who joins later too. The doors bench lands in the features scenario: the
+knight walks into a closed door, which stops it, opens it with E and
+walks through, cannot close it standing in the doorway and closes it from
+beside it; a closed door hides the knight from an enemy beyond it and an
+open one does not; a grunt that spots the knight through the open door
+chases it, and with the door shut stops at it, winds up with its ring for
+`doorBash` seconds and bursts it open, and E leaves the bashed door
+open; a grunt that comes through another door and has it shut behind it
+does not bash it, since a door closing has the enemies on the chase plan
+their paths anew. Then it lays out the doors of 50 seeds across the bands: each on a
+doorway and never in the entrance's or the exit's shaft, about
+`doorShare` of the doorways, the same twice on a seed and danger. With an
+out dir and a window it saves `closed.png`, `open.png`, `bashing.png`
+(the ring half closed) and `bashed.png`:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/doors/doors.qml
+qml -I build/bin/qml tests/doors/doors.qml -- <out dir>
+```
+
+The door party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on a fixed seed. Both lay
+the same doors, all closed; the joiner's knight opens one with E and it
+is open on both screens; the host's closes it and it is closed on both;
+the joiner's E in the doorway of a door the host opened leaves it open;
+a door the host's enemy bashes is bashed on both screens, and the
+joiner's E leaves it so. It needs the live loader and exits with the
+number of failed checks:
+
+```
+python3 tests/doorparty/run_doorparty.py --mode local
+```
+
+Some dungeons hide a secret room off a room but the start room
+(`Game.planSecrets`): `dungeon.secrets` of them at the danger's band, a
+whole number and its fraction a chance of one more, one in the features
+scenario. Each is a chamber of `secretSize` by `secretSize` cells behind
+one cell of its room's wall, not at a corner, with rock all round, laid
+out from its own stream of the level's seed after the features and the
+doors, so nothing else of the dungeon moves. The cell shows a hairline
+crack with dust breathing out of it onto the floor in front
+(`src/SecretWall.qml`). Until it is opened the chamber is rock in the
+grid: the walls, their faces, the shadows, the enemies' sight and paths
+and the minimap take it as stone, so it never lies on a way to the exit.
+A dash whose knight reaches the cracked face - within `secretDashReach`
+wu of it, its centre in front of the cell - bursts it open when it heads
+in no more than `secretDashAngle` degrees off straight; at a flatter
+angle it glances off with a puff of dust and a knock, and E does nothing
+there. Opened, the walls on its cells go, the faces and rims it bares -
+built with the level, hidden, so they lie under the knights - show, and
+its cache stands on its floor: `cacheThings` urns and crates
+and, with `cacheCrystal`'s chance, a crystal cluster, each with the gold
+of its `cacheLoot` row, more than the same thing holds elsewhere. Alone
+the game owns the secrets; in a session the host does: a node's dash
+asks it, and it keeps the secrets opened in the level as the session
+property `secrets`, so every screen opens them, a player who joins later
+too. The secrets bench lands in the features scenario: the chamber is
+rock and the minimap shows it so with the knight in front of it; E there
+does nothing, nor does a dash into the plain wall one tile off; a dash
+65 degrees off straight glances off, one 20 degrees off bursts it open;
+then the door and room are floor on the grid and the minimap, the faces
+and rims it bared lie under the knight, the knight
+walks in, the cache stands with more gold than elsewhere and the run
+counts one secret. It walks 50 seeds across the bands: every chamber rock
+while closed, the exit reachable without it and the chamber not, its
+front cell reachable, the same twice on a seed and danger, more secrets
+the higher the band. On fixed seeds the witch mentions a hidden chamber
+exactly when the next dungeon has one. With an out dir and a window it
+saves `clue.png`, the cracked cell between plain wall, and `opened.png`:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/secrets/secrets.qml
+qml -I build/bin/qml tests/secrets/secrets.qml -- <out dir>
+```
+
+The secret party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on the first seed from
+424242 whose first dungeon hides a secret room. Both hide the same
+chambers, closed and rock; the joiner's dash into the wall one tile off
+leaves it closed on both screens, its dash into the cracked face opens it
+on both, the door and room floor and the cache standing on both, and
+both count one secret found. It needs the live loader and exits with the
+number of failed checks:
+
+```
+python3 tests/secretparty/run_secretparty.py --mode local
+```
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
@@ -507,6 +825,18 @@ with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/clock/clock.qml
+```
+
+A full hit stop steps the world by 0 s, and a blow can land inside it: a
+knockback sums its steps to find its start speed, and on a zero step it
+sums them on a normal step of 1/60 s instead, so it is as far as ever and
+the game goes on. The hit stop bench throws the knight back and an enemy
+off the shield on a normal single step, then again inside a full hit
+stop, checks the speeds match, the stop holds both knockbacks and they
+run out after it, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/hitstop/hitstop.qml
 ```
 
 Every enemy attack can be read and answered. An attack runs on the physics

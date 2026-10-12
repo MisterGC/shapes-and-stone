@@ -68,6 +68,18 @@ Item {
     signal goldClaimed(string fromId, string objectId)
     // The host gave this node's knight a drop (id, amount)
     signal goldGranted(var grant)
+    // Host: a node's knight broke the breakable on cell ("gx,gy") of
+    // that level (issue #123)
+    signal breakReported(int level, string cell)
+    // Host: a node's knight set off the spike plate on cell ("gx,gy") of
+    // that level, its spikes due at session time riseAt (issue #124)
+    signal springReported(int level, string cell, real riseAt)
+    // Host: a node's knight opened (open) or closed the door on that cell
+    // of that level
+    signal doorReported(int level, string cell, bool open)
+    // Host: a node's knight opened the secret door on that cell of that
+    // level (issue #128)
+    signal secretReported(int level, string cell)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -112,6 +124,24 @@ Item {
     // the session property "runs"
     readonly property var hostRuns: net.connected && net.sessionProperties.runs
                                     ? net.sessionProperties.runs : []
+    // The breakables the host's party broke in the level it plays, the
+    // session property "broken" ({seed, level, cells}); null before any
+    readonly property var broken: net.connected && net.sessionProperties.broken
+                                  ? net.sessionProperties.broken : null
+    // The spike plates set off in the level the host plays, the session
+    // property "sprung" ({seed, level, plates: {cell: riseAt}}); null
+    // before any
+    readonly property var sprung: net.connected && net.sessionProperties.sprung
+                                  ? net.sessionProperties.sprung : null
+    // The doors not closed in the level the host plays, the session
+    // property "doors" ({seed, level, doors: {cell: "open" or "bashed"}});
+    // null before any
+    readonly property var doors: net.connected && net.sessionProperties.doors
+                                 ? net.sessionProperties.doors : null
+    // The secret doors opened in the level the host plays, the session
+    // property "secrets" ({seed, level, cells}); null before any
+    readonly property var secrets: net.connected && net.sessionProperties.secrets
+                                   ? net.sessionProperties.secrets : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -168,6 +198,14 @@ Item {
                 session.enemyKillReceived(data)
             } else if (data.type === "goldClaim") {
                 if (net.isHost) session.goldClaimed(fromId, data.id)
+            } else if (data.type === "break") {
+                if (net.isHost) session.breakReported(data.level, data.cell)
+            } else if (data.type === "spring") {
+                if (net.isHost) session.springReported(data.level, data.cell, data.at)
+            } else if (data.type === "door") {
+                if (net.isHost) session.doorReported(data.level, data.cell, data.open === true)
+            } else if (data.type === "secret") {
+                if (net.isHost) session.secretReported(data.level, data.cell)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -415,6 +453,50 @@ Item {
     function claimGold(objectId) {
         if (net.isHost) goldClaimed(net.nodeId, objectId)
         else net.sendTo(net.hostId, {type: "goldClaim", id: objectId})
+    }
+    // This node's knight broke a breakable: the host breaks it for every
+    // node and rolls its gold. The host's own is taken at once
+    function reportBreak(level, cell) {
+        if (net.isHost) breakReported(level, cell)
+        else net.sendTo(net.hostId, {type: "break", level: level, cell: cell})
+    }
+    // Host: the breakables broken in its level, for every node
+    function publishBroken(broken) {
+        if (net.isHost) net.setSessionProperty("broken", broken)
+    }
+    // The session clock (Network.sessionTime), ms, the same on every
+    // node; -1 outside a session
+    function now() { return net.connected ? net.sessionTime : -1 }
+    // This node's knight set off a spike plate, its spikes due at riseAt
+    // on the session clock: the host tells every node. The host's own is
+    // taken at once
+    function reportSpring(level, cell, riseAt) {
+        if (net.isHost) springReported(level, cell, riseAt)
+        else net.sendTo(net.hostId, {type: "spring", level: level, cell: cell, at: riseAt})
+    }
+    // Host: the spike plates set off in its level, for every node
+    function publishSprung(sprung) {
+        if (net.isHost) net.setSessionProperty("sprung", sprung)
+    }
+    // This node's knight opened or closed a door: the host does it for
+    // every node. The host's own is taken at once
+    function reportDoor(level, cell, open) {
+        if (net.isHost) doorReported(level, cell, open)
+        else net.sendTo(net.hostId, {type: "door", level: level, cell: cell, open: open})
+    }
+    // Host: the doors not closed in its level, for every node
+    function publishDoors(doors) {
+        if (net.isHost) net.setSessionProperty("doors", doors)
+    }
+    // This node's knight opened a secret door: the host opens it for
+    // every node. The host's own is taken at once
+    function reportSecret(level, cell) {
+        if (net.isHost) secretReported(level, cell)
+        else net.sendTo(net.hostId, {type: "secret", level: level, cell: cell})
+    }
+    // Host: the secret doors opened in its level, for every node
+    function publishSecrets(secrets) {
+        if (net.isHost) net.setSessionProperty("secrets", secrets)
     }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {
