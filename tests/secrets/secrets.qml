@@ -198,6 +198,11 @@ Window {
             check(explored.length > 0 && explored.every(c => game.mapCell(c[0], c[1]) === "floor"),
                   "the minimap shows its " + explored.length + " explored cells as floor")
             check(game.runSecrets === 1, "the run counts 1 secret found (" + game.runSecrets + ")")
+            let kids = p().parent.children, at = x => { for (let i = 0; i < kids.length; i++) if (kids[i] === x) return i; return -1 }
+            let knightAt = at(p()), trimsAt = secret.trims.map(at)
+            check(secret.trims.length > 0 && trimsAt.every(i => i >= 0 && i < knightAt),
+                  "the " + secret.trims.length + " faces and rims its opening bared lie under the knight (at "
+                  + trimsAt.join(", ") + ", the knight at " + knightAt + ")")
             let cache = secret.cache
             let standing = cache.filter(f => game.breakableAt(f.gx + "," + f.gy) !== null)
             check(cache.length >= Balance.dungeon.cacheThings && standing.length === cache.length,

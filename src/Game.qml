@@ -4141,7 +4141,8 @@ ClayWorld2d {
     // "secrets", so every screen opens them, a player who joins later too
     Component { id: secretWallComponent; SecretWall {} }
     // [{cell, gx, gy, fx, fy, nx, ny, room: {x, y, w, h}, cache: [feature],
-    // open, built: [the walls, faces and rims on its cells], clue}]: gx, gy
+    // open, built: [the walls, faces and rims on its cells], trims: [the
+    // faces and rims its opening bared], clue}]: gx, gy
     // the cracked wall cell ("gx,gy" its cell), fx, fy the floor cell in
     // front of it, (nx, ny) the step from the one to the other
     property var secretRooms: []
@@ -4152,9 +4153,6 @@ ClayWorld2d {
     property var _cacheCells: ({})
     // Host, and alone: the cells of the secrets opened in this level
     property var _openedSecrets: []
-    // The last wall face or rim built: one built later, when a secret
-    // opens, goes right after it, under the knights and the enemies
-    property var _trimAnchor: null
 
     function _secretOf(gx, gy) {
         let i = _secretCells[gy * gridWidth + gx]
@@ -4246,7 +4244,7 @@ ClayWorld2d {
     // The planned secrets are this level's: their cells known before the
     // walls are built, so the walls on them run apart
     function _takeSecrets(list) {
-        secretRooms = list.map(s => Object.assign({ open: false, built: [], clue: null }, s))
+        secretRooms = list.map(s => Object.assign({ open: false, built: [], trims: [], clue: null }, s))
         let cells = {}, cache = {}
         secretRooms.forEach((s, i) => {
             cells[s.gy * gridWidth + s.gx] = i
@@ -4258,9 +4256,12 @@ ClayWorld2d {
         _cacheCells = cache
         _openedSecrets = []
     }
-    // The clue over each cracked cell
+    // The clue over each cracked cell, and the faces and rims its opening
+    // will bare, hidden till then: built with the level, before the
+    // knights and the enemies, they lie under them
     function placeSecrets() {
         for (let s of secretRooms) {
+            s.trims = _secretTrims(s)
             s.clue = secretWallComponent.createObject(world.room, {
                 cxWu: (s.gx + 0.5) * cellSize, cyWu: (s.gy + 0.5) * cellSize, sizeWu: cellSize,
                 nx: s.nx, ny: s.ny, seed: createRng(s.gx * 7349 + s.gy * 3571)(),
@@ -4268,6 +4269,32 @@ ClayWorld2d {
             })
             if (s.clue) dungeonObjects.push(s.clue)
         }
+    }
+    // The faces and rims secret s's opening bares, hidden: a face on a
+    // wall cell over one of its cells, a rim under one, each run of them
+    // along a row one piece
+    function _secretTrims(s) {
+        let out = []
+        let opened = (x, y) => (x === s.gx && y === s.gy)
+            || (x >= s.room.x && x < s.room.x + s.room.w && y >= s.room.y && y < s.room.y + s.room.h)
+        let x0 = Math.min(s.gx, s.room.x) - 1, x1 = Math.max(s.gx, s.room.x + s.room.w - 1) + 1
+        let y0 = Math.min(s.gy, s.room.y) - 1, y1 = Math.max(s.gy, s.room.y + s.room.h - 1) + 1
+        for (let gy = y0; gy <= y1; gy++) {
+            for (let which of [-1, 1]) {
+                let trim = x => grid[gy][x] === cellWall && !opened(x, gy) && opened(x, gy + which)
+                let gx = x0
+                while (gx <= x1) {
+                    if (!trim(gx)) { gx++; continue }
+                    let startX = gx
+                    while (gx <= x1 && trim(gx)) gx++
+                    let o = which < 0 ? _createWallFace(startX, gx, gy) : _createWallRim(startX, gx, gy)
+                    if (!o) continue
+                    o.visible = false
+                    out.push(o)
+                }
+            }
+        }
+        return out
     }
     function secretAt(cell) {
         return secretRooms.find(s => s.cell === cell) || null
@@ -4320,39 +4347,21 @@ ClayWorld2d {
     }
     // Secret s opens on this screen: the walls on its cells go, the grid,
     // the shadows and the paths open, the faces and rims its opening bares
-    // are built, and its cache stands on its floor
+    // show, and its cache stands on its floor
     function _showSecret(s) {
         if (s.open) return
         s.open = true
         for (let o of s.built) { try { if (o) o.destroy() } catch(err) {} }
         dungeonObjects = dungeonObjects.filter(o => s.built.indexOf(o) < 0)
         s.built = []
-        let opened = {}
         let carve = (x, y, type) => {
             grid[y][x] = type
-            opened[y * gridWidth + x] = true
             _setPathCell(x, y, true)
         }
         carve(s.gx, s.gy, cellHallway)
         for (let y = s.room.y; y < s.room.y + s.room.h; y++)
             for (let x = s.room.x; x < s.room.x + s.room.w; x++) carve(x, y, cellRoom)
-        let isOpened = (x, y) => opened[y * gridWidth + x] === true
-        let x0 = Math.min(s.gx, s.room.x) - 1, x1 = Math.max(s.gx, s.room.x + s.room.w - 1) + 1
-        let y0 = Math.min(s.gy, s.room.y) - 1, y1 = Math.max(s.gy, s.room.y + s.room.h - 1) + 1
-        for (let gy = y0; gy <= y1; gy++) {
-            // A face on a wall cell over an opened one, a rim under one
-            for (let which of [-1, 1]) {
-                let gx = x0
-                while (gx <= x1) {
-                    let trim = (x) => grid[gy][x] === cellWall && isOpened(x, gy + which)
-                    if (!trim(gx)) { gx++; continue }
-                    let startX = gx
-                    while (gx <= x1 && trim(gx)) gx++
-                    let o = which < 0 ? _createWallFace(startX, gx, gy) : _createWallRim(startX, gx, gy)
-                    if (o && _trimAnchor && _trimAnchor !== o) o.stackAfter(_trimAnchor)
-                }
-            }
-        }
+        for (let o of s.trims) o.visible = Qt.binding(() => world.fx)
         updateOccluders()
         let band = dangerBand(dangerPosition)
         for (let f of s.cache) {
@@ -4460,7 +4469,6 @@ ClayWorld2d {
             visible: Qt.binding(() => world.fx)
         })
         dungeonObjects.push(r)
-        _trimAnchor = r
         return r
     }
 
@@ -4492,7 +4500,6 @@ ClayWorld2d {
             visible: Qt.binding(() => world.fx)
         })
         dungeonObjects.push(f)
-        _trimAnchor = f
         return f
     }
 
@@ -4884,7 +4891,6 @@ ClayWorld2d {
         _secretCells = ({})
         _cacheCells = ({})
         _openedSecrets = []
-        _trimAnchor = null
         bonePiles = []
         torches = []
         stains = []

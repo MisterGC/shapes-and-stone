@@ -770,8 +770,9 @@ A dash whose knight reaches the cracked face - within `secretDashReach`
 wu of it, its centre in front of the cell - bursts it open when it heads
 in no more than `secretDashAngle` degrees off straight; at a flatter
 angle it glances off with a puff of dust and a knock, and E does nothing
-there. Opened, the walls on its cells go, the faces and rims it bares are
-built, and its cache stands on its floor: `cacheThings` urns and crates
+there. Opened, the walls on its cells go, the faces and rims it bares -
+built with the level, hidden, so they lie under the knights - show, and
+its cache stands on its floor: `cacheThings` urns and crates
 and, with `cacheCrystal`'s chance, a crystal cluster, each with the gold
 of its `cacheLoot` row, more than the same thing holds elsewhere. Alone
 the game owns the secrets; in a session the host does: a node's dash
@@ -781,7 +782,8 @@ too. The secrets bench lands in the features scenario: the chamber is
 rock and the minimap shows it so with the knight in front of it; E there
 does nothing, nor does a dash into the plain wall one tile off; a dash
 65 degrees off straight glances off, one 20 degrees off bursts it open;
-then the door and room are floor on the grid and the minimap, the knight
+then the door and room are floor on the grid and the minimap, the faces
+and rims it bared lie under the knight, the knight
 walks in, the cache stands with more gold than elsewhere and the run
 counts one secret. It walks 50 seeds across the bands: every chamber rock
 while closed, the exit reachable without it and the chamber not, its
