@@ -534,15 +534,15 @@ doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
 from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
 cell. How many of a kind each room but the start room holds is the
 table's `dungeon.kinds`, per danger band as the looks have it. The kinds
-are `test`, a violet diamond that lies in no dungeon played, the
-breakables, the spike plates and the arrow slits below; a slit stands
+are the breakables, the spike plates and the arrow slits below; a slit stands
 only on a cell on the room's edge with a wall beside it. In
 the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
-checks that the scenario shows the test kind, that a seed and danger place
-the same features twice and the scenario seed's as recorded, that a kind
-laid out before the test kind moves it only off the cells it takes, and walks the
+checks that the scenario places every kind and shows its breakables, that
+a seed and danger place the same features twice and the scenario seed's
+as recorded, that a kind laid out before the urns moves them only off the
+cells it takes, and walks the
 grid of 50 seeds for the rules; with an out dir and a window it saves
 `features.png`:
 
@@ -553,9 +553,12 @@ qml -I build/bin/qml tests/features/features.qml -- <out dir>
 
 Clay urns, wooden crates and barrels and crystal clusters stand on their
 features' cells (`src/Breakable.qml`), coloured by the dungeon's look, the
-crystals glowing; a crystal is rarer the shallower. Each blocks the
-knights and the enemies like a small wall, a square of
-`dungeon.breakableSize` wu, not the shots, and casts no shadow; the
+crystals glowing; a crystal is rarer the shallower. An urn and a barrel
+stand upright, drawn from the side on a shadow of their own, smaller than
+a knight: they block a square of `dungeon.standing`'s `foot` wu and rise
+`tall` wu. Each blocks the knights and the enemies like a small wall, a
+crate and a crystal a square of `dungeon.breakableSize` wu, not the
+shots, and casts no shadow; the
 enemies' paths go around it. A swing breaks the nearest one in its arc, a
 charged swing and the whirlwind every one they reach. Only a charged swing
 breaks a crystal: a swing glances off it with sparks, the whirlwind passes
@@ -667,10 +670,12 @@ the same moment, alone the physics clock, held by the dojo's pause. An
 arrow's flight is worked out from that clock, the same on every screen.
 Each game judges the arrows on its own knight and tells the others what
 became of one that hit, was blocked or sent back, which goes on their
-screens too. The slits bench lands in the features scenario, two slits a
-room: it checks each slit in its wall, on its line across its room, with
-a rhythm of its band, that laying them out moved no other feature and
-that a room's two take turns. A knight in a line, its back to the slit,
+screens too. A room holds at most one slit at any danger, at high danger
+0.6 a room (`dungeon.kinds.slit`). The slits bench lands in the features
+scenario, one slit a room: it checks that slits stay that rare, each slit
+in its wall, on its line across its room, with a rhythm of its band, that
+laying them out moved no other feature and that two laid out in a room
+take turns. A knight in a line, its back to the slit,
 sees it glow and is hit by the arrow of its beat for what
 `arrowDamageAt` says; facing it with the shield held it blocks the next;
 raised just before one, a perfect block sends it back to its slit; a
