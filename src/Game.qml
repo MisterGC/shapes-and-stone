@@ -1059,9 +1059,8 @@ ClayWorld2d {
         return out
     }
     // How many secret rooms the dungeon at level index and position holds:
-    // carved off its seed as generateDungeon carves it, its features and
-    // doors laid out, then its secrets (planSecrets), and the level played
-    // now put back as it was
+    // carved off its seed by carveDungeon, as generateDungeon carves it,
+    // and the level played now put back as it was
     function secretsOf(index, position) {
         let kept = { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
                      loopCorridors: loopCorridors }
@@ -1069,17 +1068,7 @@ ClayWorld2d {
         let band = dangerBand(position)
         let n = 0
         try {
-            initializeGrid()
-            rooms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin,
-                              Balance.spawn.roomSizeMax, createRng(levelSeed))
-            for (let room of rooms)
-                for (let y = room.y; y < room.y + room.h; y++)
-                    for (let x = room.x; x < room.x + room.w; x++) grid[y][x] = cellRoom
-            connectRooms()
-            addEntranceAndExit()
-            addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[band])
-            n = planSecrets(levelSeed, band, false, planFeatures(levelSeed, band, false),
-                            planDoors(levelSeed, band, false)).length
+            n = carveDungeon(levelSeed, band, false, createRng(levelSeed)).secrets.length
         } finally {
             grid = kept.grid
             rooms = kept.rooms
@@ -2717,28 +2706,15 @@ ClayWorld2d {
         nextPosition = settleDanger(dangerPosition, [{ lost: 0, fell: false }])
         console.log("[Game] Grid size:", gridWidth, "x", gridHeight, "cells")
 
-        // Step 1: Initialize grid with walls
-        initializeGrid()
+        // Steps 1 to 4c: the grid carved and its features, doors and
+        // secret rooms laid out (carveDungeon); a secret room's cells stay
+        // rock until opened
         initExploredCells()
-
-        // Step 2: Place rooms
-        placeRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax)
-
-        // Step 3: Connect rooms with spanning tree
-        connectRooms()
-
-        // Step 4: Add entrance (south) and exit (north)
-        addEntranceAndExit()
-
-        // Step 4b: Close loops with corridors off the chain
-        addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[dangerBand(dangerPosition)])
-
-        // Step 4c: Lay out the features, the doors and the secret rooms on
-        // the carved grid; a secret room's cells stay rock until opened
         let band = dangerBand(dangerPosition)
-        let featureList = planFeatures(levelSeed, band, featureShowcase)
-        let doorList = planDoors(levelSeed, band, featureShowcase)
-        _takeSecrets(planSecrets(levelSeed, band, featureShowcase, featureList, doorList))
+        let plan = carveDungeon(levelSeed, band, featureShowcase, rng)
+        let featureList = plan.features
+        let doorList = plan.doors
+        _takeSecrets(plan.secrets)
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
@@ -2798,6 +2774,36 @@ ClayWorld2d {
         console.log("[Game] generateDungeon() complete")
     }
 
+    // Steps 1 to 4c of a dungeon, the same for the one built
+    // (generateDungeon) and the one the witch reads (secretsOf), on the
+    // live grid: the grid filled with walls, the rooms drawn from rand and
+    // carved, the chain of corridors, the entrance and the exit, the loops;
+    // then its features, doors and secret rooms laid out on it, without
+    // touching the world: {features, doors, secrets}
+    function carveDungeon(levelSeed, band, showcase, rand) {
+        // Step 1: Initialize grid with walls
+        initializeGrid()
+
+        // Step 2: Place rooms
+        placeRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin,
+                   Balance.spawn.roomSizeMax, rand)
+
+        // Step 3: Connect rooms with spanning tree
+        connectRooms()
+
+        // Step 4: Add entrance (south) and exit (north)
+        addEntranceAndExit()
+
+        // Step 4b: Close loops with corridors off the chain
+        addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[band])
+
+        // Step 4c: Lay out the features, the doors and the secret rooms
+        let features = planFeatures(levelSeed, band, showcase)
+        let doors = planDoors(levelSeed, band, showcase)
+        return { features: features, doors: doors,
+                 secrets: planSecrets(levelSeed, band, showcase, features, doors) }
+    }
+
     function initializeGrid() {
         grid = []
         for (let y = 0; y < gridHeight; y++) {
@@ -2840,8 +2846,8 @@ ClayWorld2d {
         minimap.requestPaint()
     }
 
-    function placeRooms(minRooms, maxRooms, minSize, maxSize) {
-        rooms = planRooms(minRooms, maxRooms, minSize, maxSize, rng)
+    function placeRooms(minRooms, maxRooms, minSize, maxSize, rand) {
+        rooms = planRooms(minRooms, maxRooms, minSize, maxSize, rand || rng)
         // Carve the rooms into the grid
         for (let room of rooms)
             for (let y = room.y; y < room.y + room.h; y++)
