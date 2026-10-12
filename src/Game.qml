@@ -1036,7 +1036,8 @@ ClayWorld2d {
     // --- The witch reads the next dungeon (issue #98) ---
     // What the dungeon at level index holds, read off its seed the way
     // generateDungeon builds it: its depth, its position's band in the
-    // depth's range and its enemies counted by tier and type. Left out,
+    // depth's range, its enemies counted by tier and type and its secret
+    // rooms (secretsOf). Left out,
     // the dungeon is the next one, at nextPosition, for the knights the
     // party has now. In a session every node reads the same: the seed,
     // the position and the knights are the host's
@@ -1049,15 +1050,48 @@ ClayWorld2d {
         let rms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax, rand)
         let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
-                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0 }
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0,
+                    secrets: secretsOf(index, position) }
         for (let e of enemies) {
             out[["weak", "normal", "tough"][e.tier]]++
             out[e.type]++
         }
         return out
     }
+    // How many secret rooms the dungeon at level index and position holds:
+    // carved off its seed as generateDungeon carves it, its features and
+    // doors laid out, then its secrets (planSecrets), and the level played
+    // now put back as it was
+    function secretsOf(index, position) {
+        let kept = { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
+                     loopCorridors: loopCorridors }
+        let levelSeed = deriveSeed(masterSeed, index)
+        let band = dangerBand(position)
+        let n = 0
+        try {
+            initializeGrid()
+            rooms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin,
+                              Balance.spawn.roomSizeMax, createRng(levelSeed))
+            for (let room of rooms)
+                for (let y = room.y; y < room.y + room.h; y++)
+                    for (let x = room.x; x < room.x + room.w; x++) grid[y][x] = cellRoom
+            connectRooms()
+            addEntranceAndExit()
+            addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[band])
+            n = planSecrets(levelSeed, band, false, planFeatures(levelSeed, band, false),
+                            planDoors(levelSeed, band, false)).length
+        } finally {
+            grid = kept.grid
+            rooms = kept.rooms
+            entranceGridX = kept.entranceGridX
+            exitGridX = kept.exitGridX
+            loopCorridors = kept.loopCorridors
+        }
+        return n
+    }
     // The witch's reading of the next dungeon, one line per press of E:
-    // where it sits in its depth's range and what lives there
+    // where it sits in its depth's range, what lives there and, when it
+    // hides one, that a chamber lies behind its stones and how to find it
     function witchReading() {
         let f = foretell()
         let lines = ["Depth " + f.depth + " waits below. It sits "
@@ -1074,6 +1108,9 @@ ClayWorld2d {
                                      + " from afar" : ""].filter(t => t !== "")
         lines.push(kinds.length > 0 ? "Among them " + kinds.join(" and ") + "."
                                     : "No shields, nothing that spits - only teeth.")
+        if (f.secrets > 0)
+            lines.push("And a hidden chamber lies below, behind the stones. Where a wall is cracked "
+                       + "and breathes dust, throw yourself at it.")
         lines.push("Return to me... if you survive.")
         return lines
     }
