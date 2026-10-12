@@ -3367,7 +3367,6 @@ ClayWorld2d {
         let cell = f.gx + "," + f.gy
         let b = breakableComponent.createObject(world.room, {
             kind: f.kind, cell: cell, cxWu: f.xWu, cyWu: f.yWu, band: band,
-            sizeWu: Balance.dungeon.breakableSize,
             seed: createRng(f.gx * 7349 + f.gy * 3571)(),
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,

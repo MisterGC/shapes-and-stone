@@ -517,6 +517,13 @@ QtObject {
         // charged swing and the whirlwind every one they reach; a crystal
         // only a charged swing breaks
         breakableSize: 1.2,
+        // An urn and a barrel stand upright and are drawn from the side:
+        // they block a square of foot wu instead (a knight is 1 wu, a
+        // flagstone 0.5) and rise tall wu from its near edge
+        standing: {
+            urn: { foot: 0.6, tall: 0.85 },
+            barrel: { foot: 0.75, tall: 1.0 }
+        },
         // What a breakable holds: gold with chance, an amount from
         // gold[0] to gold[1], and perDepth more of both ends a depth.
         // Rolled by the host from the level's seed and the thing's cell,

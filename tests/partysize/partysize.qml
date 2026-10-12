@@ -55,8 +55,8 @@ Window {
     // depth 0, its breakables, spike plates, arrow slits and doors): the
     // fingerprint hash and enemy count at each danger, on the scenario seed
     readonly property var today: ({
-        "0.5": { hash: "7351d4e4", enemies: 15 },
-        "1.5": { hash: "a07ad568", enemies: 18 }
+        "0.5": { hash: "63976147", enemies: 15 },
+        "1.5": { hash: "a1c350e8", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
