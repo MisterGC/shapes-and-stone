@@ -1150,6 +1150,8 @@ ClayWorld2d {
     // simulated seconds since it started (a pause holds them)
     property int runKills: 0
     property real runSeconds: 0
+    // The secret rooms the party opened this run
+    property int runSecrets: 0
     // The record of the deepest descent on this machine: the depth (-1
     // before the first), the knights' names and the date, kept with
     // Clayground.Storage as soon as a run gets deeper (key "record", and
@@ -1186,6 +1188,7 @@ ClayWorld2d {
     function _startRunRecord() {
         runKills = 0
         runSeconds = 0
+        runSecrets = 0
         runStartRecord = ownRecord.depth
         recordPassed = false
     }
@@ -4356,6 +4359,7 @@ ClayWorld2d {
         spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
         impactSound.triggerOneShot(0.7)
         shake(0.4)
+        runSecrets++
         minimap.requestPaint()
         // A thing of its cache the host broke before this screen opened it
         _applyBroken(_sessionBroken)
@@ -5400,6 +5404,7 @@ ClayWorld2d {
             FallenScreen {
                 depth: world.depth
                 kills: world.runKills
+                secrets: world.runSecrets
                 seconds: world.runSeconds
                 recordLine: world.recordLine
                 newRecord: world.recordPassed
