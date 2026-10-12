@@ -294,8 +294,10 @@ Window {
             check(game.masterAsk === null && game.master === null && kept.get("dungeonMaster", "") === "0",
                   "with the mode off the next dungeon comes without the panel")
             console.log("[DungeonMaster] done,", failures, "failed")
-            Qt.exit(failures)
-        }]
+        }],
+        // Gone before the window, as every bench here ends
+        [300, () => game.destroy()],
+        [300, () => Qt.exit(failures)]
     ]
 
     Timer {
