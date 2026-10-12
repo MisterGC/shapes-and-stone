@@ -3,13 +3,13 @@
 // (issue #122).
 //
 // Lands in the dojo's features scenario and checks that it is a dungeon
-// showing the test kind and hiding a secret room (issue #128); builds
+// showing every kind and hiding a secret room (issue #128); builds
 // the same seed at the same danger twice and checks the same features on
 // the same cells, and the scenario seed's against the fingerprint
 // recorded below, so they are the same on every
 // run; builds the dungeon played at low, middle and high danger and
-// checks it holds as many of each kind as the table asks there (the test
-// kind none); then builds the features scenario on 50 seeds and walks
+// checks it holds as many of each kind as the table asks there; then
+// builds the features scenario on 50 seeds and walks
 // each grid itself: every feature on a room's cell, not in the start
 // room, not beside a corridor, the table's distance clear of the entrance
 // and the exit, one to a cell, and each room holding its showcase count
@@ -58,7 +58,7 @@ Window {
 
     // The features scenario on the scenario seed at danger 0: the
     // fingerprint of its features, recorded from this build
-    readonly property string recorded: "95c2cf41"
+    readonly property string recorded: "ba577bb5"
     readonly property int seeds: 50
 
     function kinds() { return Object.keys(Balance.dungeon.kinds) }
@@ -68,10 +68,10 @@ Window {
         for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0
         return h.toString(16)
     }
-    function shown(kind) {
-        return game.dungeonObjects.filter(o => o && o.kind === kind && o.xWu !== undefined
-                                          && o.visible && game.features.some(f => f.kind === kind
-                                              && f.xWu === o.xWu && f.yWu === o.yWu))
+    // The breakables drawn and visible on a feature of their kind
+    function shown() {
+        return game.breakables.filter(b => b && b.visible && game.features.some(f => f.kind === b.kind
+                                          && f.xWu === b.cxWu && f.yWu === b.cyWu))
     }
 
     // The rules, read off the grid here and not from the game's own check:
@@ -153,21 +153,27 @@ Window {
     property var steps: [
         [() => game.screen === "title", () => {
             check(Balance.dungeon && Balance.dungeon.clearOfEntrance > 0 && Balance.dungeon.clearOfExit > 0
-                  && kinds().indexOf("test") >= 0,
+                  && kinds().indexOf("test") < 0,
                   "Balance.dungeon has clearOfEntrance " + Balance.dungeon.clearOfEntrance + ", clearOfExit "
                   + Balance.dungeon.clearOfExit + " and the kinds " + kinds().join(", "))
             check(game.scenarios().indexOf("features") >= 0,
                   "the dojo offers the features scenario: " + game.scenarios().join(", "))
             game.applyScenario("features")
         }],
-        // The dojo's features scenario: a dungeon, the test kind shown
+        // The dojo's features scenario: a dungeon, every kind placed, the
+        // breakables shown
         [500, () => {
-            let t = shown("test").length, n = game.features.filter(f => f.kind === "test").length
+            let none = kinds().filter(k => !game.features.some(f => f.kind === k))
+            let n = game.features.filter(f => Balance.dungeon.loot[f.kind]).length
+            let t = shown().length
             check(game.screen === "game" && game.levelType === "dungeon" && !game.fightRoomActive && game.player,
                   "applyScenario(\"features\") lands in a dungeon (depth " + game.depth + ", "
                   + game.rooms.length + " rooms)")
+            check(none.length === 0, "it places every kind" + (none.length ? ", not " + none.join(", ") : "")
+                  + ", and no test kind: " + kinds().map(k => game.features.filter(f => f.kind === k).length
+                                                                + " " + k).join(", "))
             check(n > 0 && t === n,
-                  "it shows the test kind: " + n + " placed, " + t + " drawn and visible")
+                  "it shows its breakables: " + n + " placed, " + t + " drawn and visible")
             let h = hash(lines())
             console.log("[Features] scenario fingerprint:", h, game.features.length, "features")
             check(h === recorded, "seed " + game.scenarioSeed + " places the features recorded ("
@@ -206,22 +212,22 @@ Window {
                       "seed " + game.scenarioSeed + " at danger " + dg + " places the same "
                       + a.length + " features twice")
             }
-            // A kind laid out before test, at one count and another, moves
-            // a test feature only off a cell it takes
+            // A kind laid out before the urns, at one count and another,
+            // moves an urn only off a cell it takes
             game.applyScenario("features")
             let ls = game.deriveSeed(game.masterSeed, game.levelIndex)
-            let test = Balance.dungeon.kinds.test
+            let urn = { perRoom: [0, 0, 0], showcase: 2 }
             let at = (list, k) => list.filter(f => f.kind === k).map(f => f.gx + "," + f.gy)
-            let alone = at(game.planFeatures(ls, 0, true, { test: test }), "test")
+            let alone = at(game.planFeatures(ls, 0, true, { urn: urn }), "urn")
             for (let count of [1, 3]) {
                 let both = game.planFeatures(ls, 0, true, { early: { perRoom: [0, 0, 0], showcase: count },
-                                                            test: test })
-                let early = at(both, "early"), now = at(both, "test")
+                                                            urn: urn })
+                let early = at(both, "early"), now = at(both, "urn")
                 let moved = alone.filter(c => now.indexOf(c) < 0)
                 let pushed = moved.filter(c => early.indexOf(c) >= 0)
                 check(early.length > 0 && moved.length === pushed.length,
-                      "a kind laid out before test, " + count + " a room (" + early.length + " cells), moves "
-                      + moved.length + " of " + alone.length + " test features, each off a cell it took"
+                      "a kind laid out before the urns, " + count + " a room (" + early.length + " cells), moves "
+                      + moved.length + " of " + alone.length + " urns, each off a cell it took"
                       + (moved.length !== pushed.length ? "; " + (moved.length - pushed.length)
                                                           + " moved off a cell it left free" : ""))
             }
@@ -259,9 +265,11 @@ Window {
         }],
         [() => game.player && game.levelType === "village", () => game.resetDungeon()],
         [() => game.player && game.levelType === "dungeon", () => {
-            let n = game.features.filter(f => f.kind === "test").length
-            check(!game.featureShowcase && n === 0,
-                  "the next dungeon, depth " + game.depth + ", is built without the showcase: " + n + " test features")
+            let ls = game.deriveSeed(game.masterSeed, game.levelIndex), band = game.dangerBand(game.dangerPosition)
+            let played = game.planFeatures(ls, band, false).map(f => [f.kind, f.gx, f.gy].join(":"))
+            check(!game.featureShowcase && JSON.stringify(lines()) === JSON.stringify(played),
+                  "the next dungeon, depth " + game.depth + ", is built without the showcase: its "
+                  + game.features.length + " features are the " + played.length + " its danger asks")
             console.log("[Features] done,", failures, "failed")
         }],
         // Torn down before quitting, as the other benches do

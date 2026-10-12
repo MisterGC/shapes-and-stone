@@ -3308,26 +3308,6 @@ ClayWorld2d {
         return h
     }
 
-    // The test kind stands for the kinds to come: a violet diamond on its
-    // cell, glowing on its own so it shows in the dark
-    Component {
-        id: testFeatureComponent
-        Rectangle {
-            property real pixelPerUnit: 1
-            property real xWu: 0
-            property real yWu: 0
-            property string kind: "test"
-            z: -1
-            x: xWu * pixelPerUnit - width / 2
-            y: (parent ? parent.height : 0) - yWu * pixelPerUnit - height / 2
-            width: 0.9 * pixelPerUnit
-            height: width
-            rotation: 45
-            color: "#40B07CFF"
-            border.color: "#B07CFF"
-            border.width: Math.max(1, width * 0.12)
-        }
-    }
     function placeFeatures(list) {
         features = list
         breakables = []
@@ -3340,11 +3320,7 @@ ClayWorld2d {
         let band = dangerBand(dangerPosition)
         for (let f of list) {
             let o = null
-            if (f.kind === "test")
-                o = testFeatureComponent.createObject(glowParent(), {
-                        xWu: f.xWu, yWu: f.yWu, kind: f.kind,
-                        pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
-            else if (Balance.dungeon.loot[f.kind])
+            if (Balance.dungeon.loot[f.kind])
                 o = _placeBreakable(f, band)
             else if (f.kind === "spike")
                 o = _placePlate(f, band)

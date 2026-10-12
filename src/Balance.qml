@@ -469,8 +469,7 @@ QtObject {
     // order they are laid out: perRoom how many of the kind each room but
     // the start room holds at low, middle and high danger (as
     // danger.looks), a whole number, its fraction a chance of one more;
-    // showcase how many per room in the dojo's features scenario. "test"
-    // stands in for the kinds to come and lies in no dungeon played. The
+    // showcase how many per room in the dojo's features scenario. The
     // breakables: a clay "urn", a wooden "crate" (or barrel) and a
     // "crystal" cluster, rarer the shallower; then the traps: a "spike"
     // plate, more often the higher the danger, and an arrow "slit" in a
@@ -507,7 +506,6 @@ QtObject {
         clearOfEntrance: 8,
         clearOfExit: 8,
         kinds: {
-            test: { perRoom: [0, 0, 0], showcase: 2 },
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
             crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
