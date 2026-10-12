@@ -3,9 +3,10 @@
 // (issue #122).
 //
 // Lands in the dojo's features scenario and checks that it is a dungeon
-// showing the test kind; builds the same seed at the same danger twice
-// and checks the same features on the same cells, and the scenario seed's
-// against the fingerprint recorded below, so they are the same on every
+// showing the test kind and hiding a secret room (issue #128); builds
+// the same seed at the same danger twice and checks the same features on
+// the same cells, and the scenario seed's against the fingerprint
+// recorded below, so they are the same on every
 // run; builds the dungeon played at low, middle and high danger and
 // checks it holds as many of each kind as the table asks there (the test
 // kind none); then builds the features scenario on 50 seeds and walks
@@ -171,6 +172,11 @@ Window {
             console.log("[Features] scenario fingerprint:", h, game.features.length, "features")
             check(h === recorded, "seed " + game.scenarioSeed + " places the features recorded ("
                   + h + ", recorded " + recorded + ")")
+            let secret = game.secretRooms[0]
+            check(game.secretRooms.length === Balance.dungeon.secretShowcase && secret && secret.clue && secret.clue.visible
+                  && game.grid[secret.gy][secret.gx] === game.cellWall,
+                  "it hides " + game.secretRooms.length + " secret room behind a cracked wall a dash opens"
+                  + (secret ? " (" + secret.cell + ")" : ""))
             // Beside the first feature, the enemies still, the camera
             // snapped to the knight as the looks bench does
             if (outDir !== "") {
