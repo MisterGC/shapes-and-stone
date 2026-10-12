@@ -582,7 +582,35 @@ QtObject {
         arrowDamage: 12,
         arrowDamagePerDepth: 2,
         arrowCap: 0.2,
-        slitShotPitch: 7
+        slitShotPitch: 7,
+        // Secret rooms: secrets how many a dungeon hides at low, middle and
+        // high danger, a whole number, its fraction a chance of one more;
+        // secretShowcase in the features scenario. Each is a chamber of
+        // secretSize by secretSize cells off a room but the start room,
+        // behind one cell of its wall, with rock all round. The wall cell
+        // shows a hairline crack with dust breathing out of it. A dash
+        // that reaches its face - the knight's body within secretDashReach
+        // wu of it, its centre in front of the cell - bursts it open when
+        // it heads into the wall no more than secretDashAngle degrees off
+        // straight; at a flatter angle it glances off with a puff of dust
+        // and a knock. E does nothing at it. It lies on no way to the
+        // exit, and stays rock on the minimap until it is open. It holds a
+        // cache: cacheThings urns
+        // and crates and, with cacheCrystal's chance at the band, a
+        // crystal cluster, each with the gold of its cacheLoot row (as
+        // loot), always more than the same thing elsewhere
+        secrets: [0.3, 0.6, 1.3],
+        secretShowcase: 1,
+        secretSize: 3,
+        secretDashReach: 0.25,
+        secretDashAngle: 45,
+        cacheThings: 3,
+        cacheCrystal: [0.25, 0.4, 0.6],
+        cacheLoot: {
+            urn: { chance: 1, gold: [4, 7], perDepth: 1 },
+            crate: { chance: 1, gold: [5, 8], perDepth: 1 },
+            crystal: { chance: 1, gold: [14, 20], perDepth: 3 }
+        }
     })
 
     // Gold: what a killed enemy drops where it fell, for a knight to pick up

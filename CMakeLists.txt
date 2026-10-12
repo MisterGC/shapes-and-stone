@@ -58,6 +58,7 @@ clay_app(shapes_and_stone
         src/ArrowSlit.qml
         src/Arrow.qml
         src/Door.qml
+        src/SecretWall.qml
         src/GoldDrop.qml
         src/BodyShade.qml
         src/ExitStairs.qml

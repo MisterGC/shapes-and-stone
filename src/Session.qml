@@ -77,6 +77,9 @@ Item {
     // Host: a node's knight opened (open) or closed the door on that cell
     // of that level
     signal doorReported(int level, string cell, bool open)
+    // Host: a node's knight opened the secret door on that cell of that
+    // level (issue #128)
+    signal secretReported(int level, string cell)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -135,6 +138,10 @@ Item {
     // null before any
     readonly property var doors: net.connected && net.sessionProperties.doors
                                  ? net.sessionProperties.doors : null
+    // The secret doors opened in the level the host plays, the session
+    // property "secrets" ({seed, level, cells}); null before any
+    readonly property var secrets: net.connected && net.sessionProperties.secrets
+                                   ? net.sessionProperties.secrets : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -197,6 +204,8 @@ Item {
                 if (net.isHost) session.springReported(data.level, data.cell, data.at)
             } else if (data.type === "door") {
                 if (net.isHost) session.doorReported(data.level, data.cell, data.open === true)
+            } else if (data.type === "secret") {
+                if (net.isHost) session.secretReported(data.level, data.cell)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -478,6 +487,16 @@ Item {
     // Host: the doors not closed in its level, for every node
     function publishDoors(doors) {
         if (net.isHost) net.setSessionProperty("doors", doors)
+    }
+    // This node's knight opened a secret door: the host opens it for
+    // every node. The host's own is taken at once
+    function reportSecret(level, cell) {
+        if (net.isHost) secretReported(level, cell)
+        else net.sendTo(net.hostId, {type: "secret", level: level, cell: cell})
+    }
+    // Host: the secret doors opened in its level, for every node
+    function publishSecrets(secrets) {
+        if (net.isHost) net.setSessionProperty("secrets", secrets)
     }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {

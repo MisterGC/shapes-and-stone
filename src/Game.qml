@@ -683,6 +683,7 @@ ClayWorld2d {
         onBreakReported: (level, cell) => _hostBreak(level, cell)
         onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
         onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
+        onSecretReported: (level, cell) => _hostSecret(level, cell)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -2142,6 +2143,7 @@ ClayWorld2d {
             world._stepPlates()
             world._stepSlits()
             world._stepDoors()
+            world._stepSecrets()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -2329,9 +2331,9 @@ ClayWorld2d {
             // Draw explored cells
             for (var gy = 0; gy < gridHeight; gy++) {
                 for (var gx = 0; gx < gridWidth; gx++) {
-                    if (exploredCells[gy] && exploredCells[gy][gx]) {
-                        var cellType = grid[gy][gx]
-                        ctx.fillStyle = (cellType === cellWall) ? "#333" : "#666"
+                    var shown = mapCell(gx, gy)
+                    if (shown !== "") {
+                        ctx.fillStyle = shown === "rock" ? "#333" : "#666"
                         ctx.fillRect(gx * scale, (gridHeight - 1 - gy) * scale, scale, scale)
                     }
                 }
@@ -2691,12 +2693,20 @@ ClayWorld2d {
         // Step 4b: Close loops with corridors off the chain
         addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[dangerBand(dangerPosition)])
 
+        // Step 4c: Lay out the features, the doors and the secret rooms on
+        // the carved grid; a secret room's cells stay rock until opened
+        let band = dangerBand(dangerPosition)
+        let featureList = planFeatures(levelSeed, band, featureShowcase)
+        let doorList = planDoors(levelSeed, band, featureShowcase)
+        _takeSecrets(planSecrets(levelSeed, band, featureShowcase, featureList, doorList))
+
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
         placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
-        placeFeatures(planFeatures(levelSeed, dangerBand(dangerPosition), featureShowcase))
-        placeDoors(planDoors(levelSeed, dangerBand(dangerPosition), featureShowcase))
+        placeFeatures(featureList)
+        placeDoors(doorList)
+        placeSecrets()
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -2730,8 +2740,10 @@ ClayWorld2d {
             revealAroundPlayer()  // Initial reveal
         }
 
-        // The things the host's party broke here already, and the plates
-        // it set off, for a node that joins late
+        // The secret rooms the host's party opened here already, the
+        // things it broke, and the plates it set off, for a node that
+        // joins late
+        _applySecrets(_sessionSecrets)
         _applyBroken(_sessionBroken)
         _applySprung(_sessionSprung)
         _applyDoors(_sessionDoors)
@@ -3055,9 +3067,10 @@ ClayWorld2d {
             let gx = 0
             while (gx < gridWidth) {
                 if (grid[gy][gx] === cellWall) {
-                    // Found start of wall run, find its length
-                    let startX = gx
-                    while (gx < gridWidth && grid[gy][gx] === cellWall) {
+                    // Found start of wall run, find its length; a secret
+                    // room's cells run apart, so opening it takes them away
+                    let startX = gx, secret = _secretOf(gx, gy)
+                    while (gx < gridWidth && grid[gy][gx] === cellWall && _secretOf(gx, gy) === secret) {
                         gx++
                     }
                     let runLength = gx - startX
@@ -3066,7 +3079,7 @@ ClayWorld2d {
                     let wx = startX * cellSize
                     let wy = gy * cellSize
                     let ww = runLength * cellSize
-                    createWallAt(wx, wy + cellSize, ww, cellSize)
+                    _keepSecretBuilt(secret, createWallAt(wx, wy + cellSize, ww, cellSize))
                     wallCount++
                 } else {
                     gx++
@@ -3111,7 +3124,7 @@ ClayWorld2d {
             if (gy >= gridHeight) continue
             let spots = []
             for (let gx = room.x; gx < room.x + room.w; gx++)
-                if (grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                if (grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall && _secretOf(gx, gy) < 0)
                     spots.push(gx)
             if (spots.length === 0) continue
             let count = room.w >= 7 && spots.length >= 4 ? 2 : 1
@@ -3356,7 +3369,7 @@ ClayWorld2d {
     // The gold a breakable holds, from the level's seed and its cell
     // alone, whoever breaks it and when: 0 for none
     function breakableGold(kind, cell) {
-        let t = Balance.dungeon.loot[kind]
+        let t = (_cacheCells[cell] ? Balance.dungeon.cacheLoot : Balance.dungeon.loot)[kind]
         if (!t) return 0
         let c = cell.split(",").map(Number)
         let rand = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
@@ -3387,7 +3400,8 @@ ClayWorld2d {
     // Host: a node broke the thing on that cell of that level
     function _hostBreak(level, cell) {
         if (level !== levelIndex || levelType !== "dungeon") return
-        let f = features.find(f => f.gx + "," + f.gy === cell && Balance.dungeon.loot[f.kind])
+        let cache = [].concat(...secretRooms.filter(s => s.open).map(s => s.cache))
+        let f = features.concat(cache).find(f => f.gx + "," + f.gy === cell && Balance.dungeon.loot[f.kind])
         if (!f) return
         let b = breakableAt(cell)
         if (b) _wreck(b, 0, -1)
@@ -4062,6 +4076,292 @@ ClayWorld2d {
         return ""
     }
 
+    // --- Secret rooms (issue #128) ---
+    // Some dungeons hide a chamber off a room behind a secret door
+    // (Balance.dungeon.secrets): one cell of the room's wall, with a
+    // hairline crack and dust breathing out of it (SecretWall). The
+    // secrets come from their own stream of the level's seed, laid out
+    // after the features and the doors, so nothing else of the dungeon
+    // moves. Until it is opened a secret room is rock in the grid: the
+    // walls, their faces, the shadows, the enemies' sight and paths and
+    // the minimap take it as stone, and it lies on no way to the exit. A
+    // dash of this node's knight into the cracked face bursts it open
+    // (_stepSecrets, burstSecret), one that glances off it shows a puff of
+    // dust; E does nothing at it. Opened, the walls on its cells go, the grid opens
+    // and the cache inside - urns, crates, maybe a crystal - stands on its
+    // floor, richer than elsewhere (cacheLoot). Alone the game owns the
+    // secrets; in a session the host does: a node's E asks it, and it
+    // keeps the secrets opened in the level as the session property
+    // "secrets", so every screen opens them, a player who joins later too
+    Component { id: secretWallComponent; SecretWall {} }
+    // [{cell, gx, gy, fx, fy, nx, ny, room: {x, y, w, h}, cache: [feature],
+    // open, built: [the walls, faces and rims on its cells], clue}]: gx, gy
+    // the cracked wall cell ("gx,gy" its cell), fx, fy the floor cell in
+    // front of it, (nx, ny) the step from the one to the other
+    property var secretRooms: []
+    // The secret rooms' cells by grid key (gy * gridWidth + gx), the
+    // cracked one with them, to their index in secretRooms
+    property var _secretCells: ({})
+    // The cache things' cells, "gx,gy", which roll their gold by cacheLoot
+    property var _cacheCells: ({})
+    // Host, and alone: the cells of the secrets opened in this level
+    property var _openedSecrets: []
+    // The last wall face or rim built: one built later, when a secret
+    // opens, goes right after it, under the knights and the enemies
+    property var _trimAnchor: null
+
+    function _secretOf(gx, gy) {
+        let i = _secretCells[gy * gridWidth + gx]
+        return i === undefined ? -1 : i
+    }
+    function _keepSecretBuilt(i, o) {
+        if (i >= 0 && o) secretRooms[i].built.push(o)
+    }
+    // The secret rooms of the carved dungeon with these features and
+    // doors, at the band or the showcase count, without touching the
+    // world or the grid. Each hides behind one cell of a room's wall, not
+    // at its corners and not of the start room: the floor cell in front of
+    // it a feature's cell would be (featureCellOk) with no feature on it,
+    // the cell rock with rock beside it along the wall, and the chamber,
+    // secretSize cells square, beyond it with rock all round, out of every
+    // other room, corridor, shaft and secret. The candidates are taken in
+    // an order drawn from the secrets' own stream, one to a room, and the
+    // same stream lays out each one's cache
+    function planSecrets(levelSeed, band, showcase, featureList, doorList) {
+        let t = Balance.dungeon
+        let rand = createRng(levelSeed ^ 0x53656372)
+        let want = showcase ? t.secretShowcase : Math.floor(t.secrets[band] + rand())
+        let out = []
+        if (want <= 0 || rooms.length < 2) return out
+        let n = t.secretSize
+        let used = {}
+        for (let f of featureList || []) used[f.gx + "," + f.gy] = true
+        for (let d of doorList || []) used[d.gx + "," + d.gy] = true
+        let cands = []
+        for (let ri = 1; ri < rooms.length; ri++) {
+            let r = rooms[ri]
+            for (let d of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+                let len = d[0] === 0 ? r.w : r.h
+                for (let i = 1; i < len - 1; i++) {
+                    let fx = d[0] === 0 ? r.x + i : (d[0] > 0 ? r.x + r.w - 1 : r.x)
+                    let fy = d[0] !== 0 ? r.y + i : (d[1] > 0 ? r.y + r.h - 1 : r.y)
+                    let gx = fx + d[0], gy = fy + d[1]
+                    for (let off of [0, -1, 1]) {
+                        let x0 = d[0] === 0 ? gx - Math.floor(n / 2) + off : (d[0] > 0 ? gx + 1 : gx - n)
+                        let y0 = d[1] === 0 ? gy - Math.floor(n / 2) + off : (d[1] > 0 ? gy + 1 : gy - n)
+                        cands.push({ ri: ri, gx: gx, gy: gy, fx: fx, fy: fy, nx: -d[0], ny: -d[1],
+                                     room: { x: x0, y: y0, w: n, h: n } })
+                    }
+                }
+            }
+        }
+        for (let i = cands.length - 1; i > 0; i--) {
+            let j = Math.floor(rand() * (i + 1))
+            let c = cands[i]; cands[i] = cands[j]; cands[j] = c
+        }
+        let rock = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight && grid[y][x] === cellWall
+        let taken = {}, hosts = {}
+        for (let c of cands) {
+            if (out.length >= want) break
+            if (hosts[c.ri] || used[c.fx + "," + c.fy] || !featureCellOk(c.fx, c.fy)) continue
+            if (!rock(c.gx, c.gy) || !rock(c.gx + c.ny, c.gy + c.nx) || !rock(c.gx - c.ny, c.gy - c.nx))
+                continue
+            let m = c.room
+            if (m.x < 1 || m.y < 1 || m.x + m.w > gridWidth - 1 || m.y + m.h > gridHeight - 1) continue
+            let ok = true
+            for (let y = m.y - 1; ok && y <= m.y + m.h; y++)
+                for (let x = m.x - 1; ok && x <= m.x + m.w; x++)
+                    ok = rock(x, y) && !taken[y * gridWidth + x]
+            if (!ok) continue
+            for (let y = m.y - 1; y <= m.y + m.h; y++)
+                for (let x = m.x - 1; x <= m.x + m.w; x++) taken[y * gridWidth + x] = true
+            hosts[c.ri] = true
+            // The cache on the chamber's cells but the one inside the door
+            let inside = [c.gx - c.nx, c.gy - c.ny]
+            let cells = []
+            for (let y = m.y; y < m.y + m.h; y++)
+                for (let x = m.x; x < m.x + m.w; x++)
+                    if (x !== inside[0] || y !== inside[1]) cells.push([x, y])
+            for (let i = cells.length - 1; i > 0; i--) {
+                let j = Math.floor(rand() * (i + 1))
+                let q = cells[i]; cells[i] = cells[j]; cells[j] = q
+            }
+            let kinds = []
+            for (let i = 0; i < t.cacheThings; i++) kinds.push(rand() < 0.5 ? "urn" : "crate")
+            if (showcase || rand() < t.cacheCrystal[band]) kinds.push("crystal")
+            let cache = kinds.slice(0, cells.length).map((k, i) => ({
+                kind: k, gx: cells[i][0], gy: cells[i][1],
+                xWu: (cells[i][0] + 0.5) * cellSize, yWu: (cells[i][1] + 0.5) * cellSize }))
+            out.push({ cell: c.gx + "," + c.gy, gx: c.gx, gy: c.gy, fx: c.fx, fy: c.fy,
+                       nx: c.nx, ny: c.ny, room: m, cache: cache })
+        }
+        return out
+    }
+    // The planned secrets are this level's: their cells known before the
+    // walls are built, so the walls on them run apart
+    function _takeSecrets(list) {
+        secretRooms = list.map(s => Object.assign({ open: false, built: [], clue: null }, s))
+        let cells = {}, cache = {}
+        secretRooms.forEach((s, i) => {
+            cells[s.gy * gridWidth + s.gx] = i
+            for (let y = s.room.y; y < s.room.y + s.room.h; y++)
+                for (let x = s.room.x; x < s.room.x + s.room.w; x++) cells[y * gridWidth + x] = i
+            for (let f of s.cache) cache[f.gx + "," + f.gy] = true
+        })
+        _secretCells = cells
+        _cacheCells = cache
+        _openedSecrets = []
+    }
+    // The clue over each cracked cell
+    function placeSecrets() {
+        for (let s of secretRooms) {
+            s.clue = secretWallComponent.createObject(world.room, {
+                cxWu: (s.gx + 0.5) * cellSize, cyWu: (s.gy + 0.5) * cellSize, sizeWu: cellSize,
+                nx: s.nx, ny: s.ny, seed: createRng(s.gx * 7349 + s.gy * 3571)(),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+            if (s.clue) dungeonObjects.push(s.clue)
+        }
+    }
+    function secretAt(cell) {
+        return secretRooms.find(s => s.cell === cell) || null
+    }
+    // The closed secret whose cracked face a knight's body, its centre at
+    // (x, y) and half wu wide, reaches: within secretDashReach wu of the
+    // face, the centre in front of the cracked cell. null for none
+    function secretTouched(x, y, half) {
+        for (let s of secretRooms) {
+            if (s.open) continue
+            let dx = x - (s.gx + 0.5) * cellSize, dy = y - (s.gy + 0.5) * cellSize
+            let off = dx * s.nx + dy * s.ny - cellSize / 2 - half
+            let side = Math.abs(dx * s.ny - dy * s.nx)
+            if (off > -0.05 && off <= Balance.dungeon.secretDashReach && side < cellSize / 2) return s
+        }
+        return null
+    }
+    // How straight a dash along (dirX, dirY), y up, heads into secret s's
+    // wall: the cosine of the angle off straight, 1 head on, 0 along it
+    function secretDashInto(s, dirX, dirY) {
+        return -(dirX * s.nx + dirY * s.ny)
+    }
+    // A dash of this node's knight reached a cracked face and glanced off
+    // it (Balance.dungeon.secretDashAngle), once a dash
+    signal secretGlanced(string cell)
+    // The secret the dash under way glanced off already
+    property var _glancedBy: null
+    // This node's knight's dash burst secret s: alone it opens at once,
+    // in a session by the host. False when it does nothing
+    function burstSecret(s) {
+        if (!s || s.open) return false
+        if (session.connected && !session.isHost) session.reportSecret(levelIndex, s.cell)
+        else _openSecret(s.cell)
+        return true
+    }
+    // Host: a node's knight opened the secret on that cell
+    function _hostSecret(level, cell) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        _openSecret(cell)
+    }
+    // Alone, or the host: the secret on cell opens, and in a session every
+    // screen is told
+    function _openSecret(cell) {
+        let s = secretAt(cell)
+        if (!s || s.open) return
+        _showSecret(s)
+        _openedSecrets = _openedSecrets.concat([cell])
+        if (session.connected)
+            session.publishSecrets({ seed: session.runSeed, level: levelIndex, cells: _openedSecrets.slice() })
+    }
+    // Secret s opens on this screen: the walls on its cells go, the grid,
+    // the shadows and the paths open, the faces and rims its opening bares
+    // are built, and its cache stands on its floor
+    function _showSecret(s) {
+        if (s.open) return
+        s.open = true
+        for (let o of s.built) { try { if (o) o.destroy() } catch(err) {} }
+        dungeonObjects = dungeonObjects.filter(o => s.built.indexOf(o) < 0)
+        s.built = []
+        let opened = {}
+        let carve = (x, y, type) => {
+            grid[y][x] = type
+            opened[y * gridWidth + x] = true
+            _setPathCell(x, y, true)
+        }
+        carve(s.gx, s.gy, cellHallway)
+        for (let y = s.room.y; y < s.room.y + s.room.h; y++)
+            for (let x = s.room.x; x < s.room.x + s.room.w; x++) carve(x, y, cellRoom)
+        let isOpened = (x, y) => opened[y * gridWidth + x] === true
+        let x0 = Math.min(s.gx, s.room.x) - 1, x1 = Math.max(s.gx, s.room.x + s.room.w - 1) + 1
+        let y0 = Math.min(s.gy, s.room.y) - 1, y1 = Math.max(s.gy, s.room.y + s.room.h - 1) + 1
+        for (let gy = y0; gy <= y1; gy++) {
+            // A face on a wall cell over an opened one, a rim under one
+            for (let which of [-1, 1]) {
+                let gx = x0
+                while (gx <= x1) {
+                    let trim = (x) => grid[gy][x] === cellWall && isOpened(x, gy + which)
+                    if (!trim(gx)) { gx++; continue }
+                    let startX = gx
+                    while (gx <= x1 && trim(gx)) gx++
+                    let o = which < 0 ? _createWallFace(startX, gx, gy) : _createWallRim(startX, gx, gy)
+                    if (o && _trimAnchor && _trimAnchor !== o) o.stackAfter(_trimAnchor)
+                }
+            }
+        }
+        updateOccluders()
+        let band = dangerBand(dangerPosition)
+        for (let f of s.cache) {
+            let o = _placeBreakable(f, band)
+            if (o) dungeonObjects.push(o)
+        }
+        if (s.clue) s.clue.open = true
+        let cx = (s.gx + 0.5) * cellSize, cy = (s.gy + 0.5) * cellSize
+        spawnShards(cx, cy, s.nx, s.ny, 12, "#5A6272", 0.28)
+        spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
+        impactSound.triggerOneShot(0.7)
+        shake(0.4)
+        minimap.requestPaint()
+        // A thing of its cache the host broke before this screen opened it
+        _applyBroken(_sessionBroken)
+    }
+    // The host's secrets opened in the level: every one here opens
+    function _applySecrets(v) {
+        if (!v || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (v.seed !== session.runSeed || v.level !== levelIndex) return
+        for (let cell of v.cells) {
+            let s = secretAt(cell)
+            if (s) _showSecret(s)
+        }
+    }
+    readonly property var _sessionSecrets: session.secrets
+    on_SessionSecretsChanged: _applySecrets(_sessionSecrets)
+    // Each physics step: this node's knight dashing into a cracked face
+    // bursts it open, heading in within secretDashAngle of straight; at a
+    // flatter angle, still into the wall, the dash glances off with a puff
+    // of dust from the crack and a dull knock, once a dash
+    function _stepSecrets() {
+        if (secretRooms.length === 0) return
+        if (!player || fallen || !player.isDashing) { _glancedBy = null; return }
+        let s = secretTouched(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
+                              player.widthWu / 2)
+        if (!s) return
+        let into = secretDashInto(s, player.dashDirX, -player.dashDirY)
+        if (into >= Math.cos(Balance.dungeon.secretDashAngle * Math.PI / 180) - 1e-6) {
+            burstSecret(s)
+        } else if (into > 0 && _glancedBy !== s) {
+            _glancedBy = s
+            let cx = (s.gx + 0.5 + s.nx * 0.5) * cellSize, cy = (s.gy + 0.5 + s.ny * 0.5) * cellSize
+            spawnShards(cx, cy, s.nx, s.ny, 6, "#D8CDB6", 0.1)
+            impactSound.triggerOneShot(0.25)
+            secretGlanced(s.cell)
+        }
+    }
+    // What the minimap shows of cell (gx, gy): "" unexplored, "rock" or
+    // "floor". A secret room is rock until it is opened
+    function mapCell(gx, gy) {
+        if (!exploredCells[gy] || !exploredCells[gy][gx]) return ""
+        return grid[gy][gx] === cellWall ? "rock" : "floor"
+    }
+
     function placeTorch(wx, wy, color) {
         let t = torchComponent.createObject(glowParent(), {
             xWu: wx, yWu: wy,
@@ -4097,18 +4397,24 @@ ClayWorld2d {
             while (gx < gridWidth) {
                 let isRim = grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall
                 if (!isRim) { gx++; continue }
-                let startX = gx
-                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall)
+                let startX = gx, secret = _secretOf(gx, gy)
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy + 1][gx] !== cellWall
+                       && _secretOf(gx, gy) === secret)
                     gx++
-                let r = wallRimComponent.createObject(world.room, {
-                    xWu: startX * cellSize, yWu: (gy + 1) * cellSize,
-                    widthWu: (gx - startX) * cellSize,
-                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-                    visible: Qt.binding(() => world.fx)
-                })
-                dungeonObjects.push(r)
+                _keepSecretBuilt(secret, _createWallRim(startX, gx, gy))
             }
         }
+    }
+    function _createWallRim(fromGx, toGx, gy) {
+        let r = wallRimComponent.createObject(world.room, {
+            xWu: fromGx * cellSize, yWu: (gy + 1) * cellSize,
+            widthWu: (toGx - fromGx) * cellSize,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(r)
+        _trimAnchor = r
+        return r
     }
 
     // Brick faces on every wall cell whose southern neighbour is walkable,
@@ -4120,21 +4426,27 @@ ClayWorld2d {
             while (gx < gridWidth) {
                 let isFace = grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
                 if (!isFace) { gx++; continue }
-                let startX = gx
-                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall)
+                let startX = gx, secret = _secretOf(gx, gy)
+                while (gx < gridWidth && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                       && _secretOf(gx, gy) === secret)
                     gx++
-                let f = wallFaceComponent.createObject(world.room, {
-                    xWu: startX * cellSize,
-                    yWu: gy * cellSize + wallFaceWu,
-                    widthWu: (gx - startX) * cellSize,
-                    heightWu: wallFaceWu,
-                    color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
-                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-                    visible: Qt.binding(() => world.fx)
-                })
-                dungeonObjects.push(f)
+                _keepSecretBuilt(secret, _createWallFace(startX, gx, gy))
             }
         }
+    }
+    function _createWallFace(fromGx, toGx, gy) {
+        let f = wallFaceComponent.createObject(world.room, {
+            xWu: fromGx * cellSize,
+            yWu: gy * cellSize + wallFaceWu,
+            widthWu: (toGx - fromGx) * cellSize,
+            heightWu: wallFaceWu,
+            color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        dungeonObjects.push(f)
+        _trimAnchor = f
+        return f
     }
 
     function spawnPlayer(px, py) {
@@ -4521,6 +4833,11 @@ ClayWorld2d {
         _clearArrows()
         doors = []
         _doorStates = ({})
+        secretRooms = []
+        _secretCells = ({})
+        _cacheCells = ({})
+        _openedSecrets = []
+        _trimAnchor = null
         bonePiles = []
         torches = []
         stains = []
