@@ -837,14 +837,15 @@ depth - its enemies, their blows, the traps' damage and the gold - while
 the run, its gauge, record and the smith stay at the depth reached. In a
 session the host's settings and seed go with the level, so every knight
 plays the host's dungeon; the joiners wait where they are while the
-host's panel is up. A new setting is a row in `Balance.dungeonMaster`; a
+host's panel is up, told that the dungeon master prepares the next
+dungeon. A new setting is a row in `Balance.dungeonMaster`; a
 row with `kinds` sets those features per room with no code. The dungeon
 master bench sets every row, checks the preview's and the built
 dungeon's counts per room, that the dungeon entered is the one previewed,
 that Go with nothing set builds the game's own dungeon, the kept
 settings in a game started again, and Copy and Paste; the master party
 bench plays two dungeons in a session of two processes and checks that
-the joiner enters the dungeon the host generated:
+the joiner is told it waits and enters the dungeon the host generated:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dungeonmaster/dungeonmaster.qml
