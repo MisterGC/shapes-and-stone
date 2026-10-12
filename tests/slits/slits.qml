@@ -4,11 +4,12 @@
 // passes through it; and every slit leaves a safe gap or lane (issue #125).
 //
 // Lands in the dojo's features scenario, where every room but the first
-// holds two slits, and stills the enemies. Checks that the scenario shows
-// its slits, each in the wall beside a slit feature's cell, firing across
-// the room to a wall, with a rhythm of its band; that laying them out
-// moved none of the other features; and that the two slits of a room take
-// turns, never firing on the same beat. With an out dir and a window it
+// holds one slit, and stills the enemies. Checks that slits stay rare at
+// high danger, at most 0.6 a room; that the scenario shows its slits, each
+// in the wall beside a slit feature's cell, firing across the room to a
+// wall, with a rhythm of its band; that laying them out moved none of the
+// other features; and that two slits laid out in a room take turns, never
+// firing on the same beat. With an out dir and a window it
 // saves glowing.png, a slit winding up beside the knight, and firing.png,
 // its arrow just out. Then the knight stands in a slit's line, its back to
 // it: the slit glows before the shot, its ring at least half closed on
@@ -263,6 +264,9 @@ Window {
                   + ") on a " + t.slitBeat + " s beat, a " + t.slitWarn + " s wind-up, arrows at "
                   + t.arrowSpeed + " wu/s for " + t.arrowDamage + " (+" + t.arrowDamagePerDepth
                   + " a depth, cap " + t.arrowCap + ")")
+            check(t.kinds.slit.perRoom[2] <= 0.6 && t.kinds.slit.showcase === 1,
+                  "slits are rare at high danger, " + t.kinds.slit.perRoom[2] + " a room (at most 0.6), and the "
+                  + "features scenario lays out " + t.kinds.slit.showcase + " a room")
             for (let b = 0; b < 3; b++) {
                 let rs = t.slitRhythms.filter(r => r.bands.indexOf(b) >= 0)
                 let gapped = rs.find(r => game.slitGap(r.beats) >= game.slitGapNeed())
@@ -302,17 +306,20 @@ Window {
             let others = lines(game.features.filter(f => f.kind !== "slit"))
             check(JSON.stringify(without) === JSON.stringify(others),
                   "laying out the slits moved none of the " + others.length + " other features")
-            // Two in a room take turns
+            // Two in a room, laid out on this dungeon for the bench, take
+            // turns
+            let twos = game.planFeatures(ls, band, true, Object.assign({}, Balance.dungeon.kinds,
+                                         { slit: { perRoom: [0, 0, 0], showcase: 2 } })).filter(f => f.kind === "slit")
             let pairs = 0, clash = []
             for (let r = 1; r < game.rooms.length; r++) {
-                let two = feats.filter(f => roomOf(f.gx, f.gy) === r)
+                let two = twos.filter(f => roomOf(f.gx, f.gy) === r)
                 if (two.length !== 2) continue
                 pairs++
                 let a = shots(two[0]), b = shots(two[1])
                 if (two[0].rhythm !== two[1].rhythm || a.some(k => b.indexOf(k) >= 0))
                     clash.push("room " + r + ": " + two[0].rhythm + " " + a + " / " + two[1].rhythm + " " + b)
             }
-            check(pairs > 0 && clash.length === 0, pairs + " rooms hold two slits, each pair on one rhythm, "
+            check(pairs > 0 && clash.length === 0, "laid out two a room, " + pairs + " rooms hold two slits, each pair on one rhythm, "
                   + "taking turns: never on the same beat" + (clash.length ? ": " + clash.join("; ") : ""))
             let pick = pickSlit()
             check(pick !== null, "a slit with a clear line to answer it" + (pick ? ": " + pick.slit.cell + ", "

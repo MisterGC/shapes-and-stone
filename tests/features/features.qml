@@ -58,7 +58,7 @@ Window {
 
     // The features scenario on the scenario seed at danger 0: the
     // fingerprint of its features, recorded from this build
-    readonly property string recorded: "ba577bb5"
+    readonly property string recorded: "104b4168"
     readonly property int seeds: 50
 
     function kinds() { return Object.keys(Balance.dungeon.kinds) }

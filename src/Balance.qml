@@ -510,7 +510,7 @@ QtObject {
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
             crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
             spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 },
-            slit: { perRoom: [0.25, 0.5, 0.9], showcase: 2 }
+            slit: { perRoom: [0.25, 0.5, 0.6], showcase: 1 }
         },
         // A breakable blocks like a small wall: a square of sizeWu on its
         // cell's centre. A swing breaks the nearest one in its arc, a
