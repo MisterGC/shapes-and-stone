@@ -956,7 +956,14 @@ ClayWorld2d {
     // has ended in a fall, nextPosition is where the next run starts
     property real dangerPosition: Balance.danger.start
     property real nextPosition: Balance.danger.start
-    readonly property real danger: depth + dangerPosition
+    // The overrides the dungeon played now is built with (issue #142):
+    // {seed, rooms, enemies, depth, and per feature row its key}, each
+    // left out for the game's own, null for a dungeon wholly the game's
+    // and for a village. dangerDepth is the depth its danger counts from:
+    // the base depth set there, else depth
+    property var master: null
+    readonly property int dangerDepth: master && master.depth !== undefined ? master.depth : depth
+    readonly property real danger: dangerDepth + dangerPosition
     // 0 low, 1 middle, 2 high
     function dangerBand(position) {
         return position < Balance.danger.low ? 0 : position < Balance.danger.high ? 1 : 2
@@ -1062,21 +1069,29 @@ ClayWorld2d {
     // carved off its seed by carveDungeon, as generateDungeon carves it,
     // and the level played now put back as it was
     function secretsOf(index, position) {
-        let kept = { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
-                     loopCorridors: loopCorridors }
+        let kept = _keepCarved()
         let levelSeed = deriveSeed(masterSeed, index)
         let band = dangerBand(position)
         let n = 0
         try {
             n = carveDungeon(levelSeed, band, false, createRng(levelSeed)).secrets.length
         } finally {
-            grid = kept.grid
-            rooms = kept.rooms
-            entranceGridX = kept.entranceGridX
-            exitGridX = kept.exitGridX
-            loopCorridors = kept.loopCorridors
+            _putCarved(kept)
         }
         return n
+    }
+    // What carveDungeon carves on the live grid, kept to put back after a
+    // dungeon is carved only to be read
+    function _keepCarved() {
+        return { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
+                 loopCorridors: loopCorridors }
+    }
+    function _putCarved(kept) {
+        grid = kept.grid
+        rooms = kept.rooms
+        entranceGridX = kept.entranceGridX
+        exitGridX = kept.exitGridX
+        loopCorridors = kept.loopCorridors
     }
     // The witch's reading of the next dungeon, one line per press of E:
     // where it sits in its depth's range, what lives there and, when it
@@ -2698,7 +2713,7 @@ ClayWorld2d {
     function generateDungeon() {
         if (masterSeed < 0)
             masterSeed = Math.floor(Math.random() * 2147483647)
-        let levelSeed = deriveSeed(masterSeed, levelIndex)
+        let levelSeed = levelSeedNow()
         rng = createRng(levelSeed)
         console.log("[Game] Seed:", masterSeed, "Level:", levelIndex, "LevelSeed:", levelSeed)
         // Nothing lost here yet: were the party to leave at once, the next
@@ -2710,8 +2725,8 @@ ClayWorld2d {
         // secret rooms laid out (carveDungeon); a secret room's cells stay
         // rock until opened
         initExploredCells()
-        let band = dangerBand(dangerPosition)
-        let plan = carveDungeon(levelSeed, band, featureShowcase, rng)
+        let spec = dungeonSpec(dangerPosition, master)
+        let plan = carveDungeon(levelSeed, spec.band, featureShowcase, rng, spec)
         let featureList = plan.features
         let doorList = plan.doors
         _takeSecrets(plan.secrets)
@@ -2740,7 +2755,7 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        for (let e of rollEnemies(rooms, spawnRolls(danger, partyKnights), rng))
+        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng))
             spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
 
         // Bind player controls
@@ -2774,18 +2789,41 @@ ClayWorld2d {
         console.log("[Game] generateDungeon() complete")
     }
 
+    // The level seed the level played now is built on: the master's when
+    // it set one, else the run's seed's for the level
+    function levelSeedNow() {
+        return master && master.seed !== undefined ? master.seed : deriveSeed(masterSeed, levelIndex)
+    }
+    // What a dungeon at position is built from, with the master's
+    // overrides m (null for the game's own): its band, its rooms' count
+    // range, the feature kinds' table and its spawn rolls at a danger for
+    // knights (spawnRolls, with the enemies per room m sets). position
+    // left out is the middle of the range
+    function dungeonSpec(position, m) {
+        let sb = Balance.spawn
+        let spec = { band: position === undefined ? 1 : dangerBand(position),
+                     roomsMin: sb.roomsMin, roomsMax: sb.roomsMax, kinds: Balance.dungeon.kinds,
+                     enemiesPerRoom: undefined }
+        spec.rolls = (d, knights) => Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+        if (!m) return spec
+        if (m.rooms !== undefined) spec.roomsMin = spec.roomsMax = m.rooms
+        if (m.enemies !== undefined) spec.enemiesPerRoom = m.enemies
+        return spec
+    }
+
     // Steps 1 to 4c of a dungeon, the same for the one built
     // (generateDungeon) and the one the witch reads (secretsOf), on the
     // live grid: the grid filled with walls, the rooms drawn from rand and
     // carved, the chain of corridors, the entrance and the exit, the loops;
     // then its features, doors and secret rooms laid out on it, without
     // touching the world: {features, doors, secrets}
-    function carveDungeon(levelSeed, band, showcase, rand) {
+    function carveDungeon(levelSeed, band, showcase, rand, spec) {
+        spec = spec || dungeonSpec(undefined, null)
         // Step 1: Initialize grid with walls
         initializeGrid()
 
         // Step 2: Place rooms
-        placeRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin,
+        placeRooms(spec.roomsMin, spec.roomsMax, Balance.spawn.roomSizeMin,
                    Balance.spawn.roomSizeMax, rand)
 
         // Step 3: Connect rooms with spanning tree
@@ -2798,7 +2836,7 @@ ClayWorld2d {
         addLoops(createRng(levelSeed ^ 0x4c6f6f70), Balance.dungeon.extraCorridors[band])
 
         // Step 4c: Lay out the features, the doors and the secret rooms
-        let features = planFeatures(levelSeed, band, showcase)
+        let features = planFeatures(levelSeed, band, showcase, spec.kinds)
         let doors = planDoors(levelSeed, band, showcase)
         return { features: features, doors: doors,
                  secrets: planSecrets(levelSeed, band, showcase, features, doors) }
@@ -2895,14 +2933,19 @@ ClayWorld2d {
         return out
     }
 
-    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls),
+    // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls,
+    // or a dungeonSpec's rolls),
     // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
     // first, the knights' start, with the table's tier mix
     function rollEnemies(rms, sb, rand) {
         let out = []
         if (rms.length < 2) return out
         let spawnRooms = rms.slice(1)
-        let numEnemies = sb.enemiesMin + Math.floor(rand() * (sb.enemiesMax - sb.enemiesMin + 1))
+        // perRoom, when the rolls have it, sets the count: that many to a
+        // room, rounded over all of them; the roll is drawn all the same
+        let roll = rand()
+        let numEnemies = sb.perRoom !== undefined ? Math.round(sb.perRoom * spawnRooms.length)
+                                                  : sb.enemiesMin + Math.floor(roll * (sb.enemiesMax - sb.enemiesMin + 1))
         let tiers = dealTiers(numEnemies, sb, rand)
         for (let i = 0; i < numEnemies; i++) {
             let room = spawnRooms[i % spawnRooms.length]
@@ -3393,9 +3436,9 @@ ClayWorld2d {
         let t = (_cacheCells[cell] ? Balance.dungeon.cacheLoot : Balance.dungeon.loot)[kind]
         if (!t) return 0
         let c = cell.split(",").map(Number)
-        let rand = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
+        let rand = createRng(levelSeedNow() ^ 0x3c6ef372 ^ (c[1] * gridWidth + c[0]))
         if (rand() >= t.chance) return 0
-        let lo = t.gold[0] + t.perDepth * depth, hi = t.gold[1] + t.perDepth * depth
+        let lo = t.gold[0] + t.perDepth * dangerDepth, hi = t.gold[1] + t.perDepth * dangerDepth
         return lo + Math.floor(rand() * (hi - lo + 1))
     }
     // This node's knight broke b with a blow along (nx, ny)
@@ -3550,7 +3593,7 @@ ClayWorld2d {
         spawnSparks(p.xWu, p.yWu, 0, 1, 6, "#E6E2D6")
         let result = "clear"
         if (player && onPlate(p)) {
-            result = player.takeTrapDamage(spikeDamageAt(depth, player.maxHp))
+            result = player.takeTrapDamage(spikeDamageAt(dangerDepth, player.maxHp))
             console.log("[Game] Spikes rose under the knight at", p.cell, "-", result)
         }
         p.result = result
@@ -3827,7 +3870,7 @@ ClayWorld2d {
         // Where it comes from: on its line, two wu towards its slit
         let fx = a.dirX !== 0 ? cx - a.dirX * 2 : a.xWu
         let fy = a.dirY !== 0 ? cy - a.dirY * 2 : a.yWu
-        let result = player.meetArrow(arrowDamageAt(depth, player.maxHp), fx, fy, a.dirX, a.dirY)
+        let result = player.meetArrow(arrowDamageAt(dangerDepth, player.maxHp), fx, fy, a.dirX, a.dirY)
         console.log("[Game] Arrow", a.arrowId, "met the knight -", result)
         arrowMet(a.arrowId, result)
         if (result !== "hit" && result !== "blocked" && result !== "perfect") return
@@ -5222,7 +5265,7 @@ ClayWorld2d {
     // fight; only where the AI runs. Seeded anew with each level
     property var _attackRng: null
     function rollAttack() {
-        if (!_attackRng) _attackRng = createRng(deriveSeed(masterSeed, levelIndex) ^ 0x6372)
+        if (!_attackRng) _attackRng = createRng(levelSeedNow() ^ 0x6372)
         return _attackRng()
     }
 
