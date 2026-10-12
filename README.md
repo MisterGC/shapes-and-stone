@@ -815,6 +815,42 @@ number of failed checks:
 python3 tests/secretparty/run_secretparty.py --mode local
 ```
 
+**Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
+over, kept for the next visit) shows a panel before each dungeon to a solo
+player or the host, never to a joiner. Its rows are the settings of
+`Balance.dungeonMaster` - enemies, spike plates, arrow slits and
+breakables per room, rooms, base depth and relative difficulty (the
+danger's position in its depth's range) - at the values the game would
+use. W/S picks a row, A/D or the arrows turn it a step and set it (gold),
+Backspace or a double click gives it back to the game. G shows the
+dungeon Enter then enters, with its enemies by tier, breakables, spike
+plates, arrow slits, doors and secret rooms; G again rolls a new seed for
+it, and a row turned while a map is shown redraws it on the same seed.
+Enter or Space goes. The settings set hold for that dungeon and the ones
+after, until given back, and are kept (in the browser in `localStorage`);
+C puts them on the clipboard as JSON, V reads such a JSON back. They
+override `Balance` for that dungeon only: per-room counts are exact for a
+whole number in every room but the start room, as long as the room has
+the cells; breakables split their number between urns, crates and
+crystals as the band does. A base depth makes the dungeon as hard as that
+depth - its enemies, their blows, the traps' damage and the gold - while
+the run, its gauge, record and the smith stay at the depth reached. In a
+session the host's settings and seed go with the level, so every knight
+plays the host's dungeon; the joiners wait where they are while the
+host's panel is up. A new setting is a row in `Balance.dungeonMaster`; a
+row with `kinds` sets those features per room with no code. The dungeon
+master bench sets every row, checks the preview's and the built
+dungeon's counts per room, that the dungeon entered is the one previewed,
+that Go with nothing set builds the game's own dungeon, the kept
+settings in a game started again, and Copy and Paste; the master party
+bench plays two dungeons in a session of two processes and checks that
+the joiner enters the dungeon the host generated:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dungeonmaster/dungeonmaster.qml
+python3 tests/masterparty/run_masterparty.py --mode local
+```
+
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
 physics steps simulate (the AI thinks on a `PhysicsTimer`), not wall clock:
 the dojo's pause, its single step and a hit stop hold them with the world.
