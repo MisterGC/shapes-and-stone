@@ -185,7 +185,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
 ```
 
 At 0 HP the knight falls: the enemies stop and a screen shows how deep the
-run got, counted in dungeons from depth 0. Enter starts a new run from depth
+run got, counted in dungeons from depth 0, its kills, the secret rooms
+the party found and its time. Enter starts a new run from depth
 0 on a new seed, Esc returns to the title. The fall bench brings the knight
 down twice, goes again with Enter and back to the title with Esc, and exits
 with the number of failed checks:
@@ -339,10 +340,11 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 At the camp the witch reads the next dungeon: where it sits in its depth's
 range - high, in the middle or low - and what lives there, how many
 enemies, how many of them tough and weak, how many guardians and
-spitters. She reads it off the run's seed, the next dungeon's position
-and the knights the party has, the way the dungeon is built
-(`Game.foretell`), so the dungeon the knights walk down into holds what
-she said; one more press of E per line. In a session every knight hears
+spitters, and when it hides a secret room that a hidden chamber lies
+below and how to find it. She reads it off the run's seed, the next
+dungeon's position and the knights the party has, the way the dungeon is
+built (`Game.foretell`, `Game.secretsOf`), so the dungeon the knights
+walk down into holds what she said; one more press of E per line. In a session every knight hears
 the same reading: the seed, the position and the knights are the host's.
 The camp bench, on the dojo's seed, takes one knight out of a dungeon
 three times - little, half and most of its HP lost - and checks the
@@ -751,6 +753,59 @@ number of failed checks:
 
 ```
 python3 tests/doorparty/run_doorparty.py --mode local
+```
+
+Some dungeons hide a secret room off a room but the start room
+(`Game.planSecrets`): `dungeon.secrets` of them at the danger's band, a
+whole number and its fraction a chance of one more, one in the features
+scenario. Each is a chamber of `secretSize` by `secretSize` cells behind
+one cell of its room's wall, not at a corner, with rock all round, laid
+out from its own stream of the level's seed after the features and the
+doors, so nothing else of the dungeon moves. The cell shows a hairline
+crack with dust breathing out of it onto the floor in front
+(`src/SecretWall.qml`). Until it is opened the chamber is rock in the
+grid: the walls, their faces, the shadows, the enemies' sight and paths
+and the minimap take it as stone, so it never lies on a way to the exit.
+A dash whose knight reaches the cracked face - within `secretDashReach`
+wu of it, its centre in front of the cell - bursts it open when it heads
+in no more than `secretDashAngle` degrees off straight; at a flatter
+angle it glances off with a puff of dust and a knock, and E does nothing
+there. Opened, the walls on its cells go, the faces and rims it bares are
+built, and its cache stands on its floor: `cacheThings` urns and crates
+and, with `cacheCrystal`'s chance, a crystal cluster, each with the gold
+of its `cacheLoot` row, more than the same thing holds elsewhere. Alone
+the game owns the secrets; in a session the host does: a node's dash
+asks it, and it keeps the secrets opened in the level as the session
+property `secrets`, so every screen opens them, a player who joins later
+too. The secrets bench lands in the features scenario: the chamber is
+rock and the minimap shows it so with the knight in front of it; E there
+does nothing, nor does a dash into the plain wall one tile off; a dash
+65 degrees off straight glances off, one 20 degrees off bursts it open;
+then the door and room are floor on the grid and the minimap, the knight
+walks in, the cache stands with more gold than elsewhere and the run
+counts one secret. It walks 50 seeds across the bands: every chamber rock
+while closed, the exit reachable without it and the chamber not, its
+front cell reachable, the same twice on a seed and danger, more secrets
+the higher the band. On fixed seeds the witch mentions a hidden chamber
+exactly when the next dungeon has one. With an out dir and a window it
+saves `clue.png`, the cracked cell between plain wall, and `opened.png`:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/secrets/secrets.qml
+qml -I build/bin/qml tests/secrets/secrets.qml -- <out dir>
+```
+
+The secret party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on the first seed from
+424242 whose first dungeon hides a secret room. Both hide the same
+chambers, closed and rock; the joiner's dash into the wall one tile off
+leaves it closed on both screens, its dash into the cracked face opens it
+on both, the door and room floor and the cache standing on both, and
+both count one secret found. It needs the live loader and exits with the
+number of failed checks:
+
+```
+python3 tests/secretparty/run_secretparty.py --mode local
 ```
 
 Enemy AI, knockback and the knight's dash and cooldowns count the time the
