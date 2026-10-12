@@ -154,6 +154,13 @@ Item {
     property var lastStates: ({})
     // This node is leaving on its own: its session ending is no lost host
     property bool _leaving: false
+    // The host's dungeon master panel is up (the session property
+    // "mastering"): the joiners wait for the next dungeon and are told so
+    readonly property bool mastering: net.connected && net.sessionProperties.mastering === true
+    function setMastering(on) {
+        if (net.connected && net.isHost) net.setSessionProperty("mastering", on)
+    }
+
     // The knights in the session, this node's among them: what the host
     // builds the next level for
     readonly property int knights: net.connected ? net.nodeCount : 1

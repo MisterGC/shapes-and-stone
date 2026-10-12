@@ -1183,6 +1183,7 @@ ClayWorld2d {
         masterPreview = null
         masterNote = ""
         masterAsk = ask
+        session.setMastering(true)
         console.log("[Game] Dungeon master: the panel is up for level", ask.index)
     }
     // The level seed of the panel's dungeon
@@ -1273,6 +1274,7 @@ ClayWorld2d {
         let a = masterAsk, m = masterOverrides(), pos = _masterPosition()
         masterAsk = null
         masterPreview = null
+        session.setMastering(false)
         console.log("[Game] Dungeon master: go,", JSON.stringify(m), "at position", pos.toFixed(3))
         a.go(m, pos)
     }
@@ -5736,6 +5738,31 @@ ClayWorld2d {
                 onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
             }
+        }
+    }
+
+    // A joiner while the host's dungeon master panel is up, in the lobby,
+    // the village or on the fallen screen: the next dungeon is coming
+    Rectangle {
+        objectName: "masterWaitNote"
+        z: 5650
+        visible: session.mastering && !session.isHost
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 24
+        width: waitText.implicitWidth + 32
+        height: waitText.implicitHeight + 16
+        radius: 6
+        color: "#CC08070C"
+        border.color: "#E0B060"
+        border.width: 1
+        Text {
+            id: waitText
+            anchors.centerIn: parent
+            text: "The dungeon master prepares the next dungeon\u2026"
+            color: "#E0B060"
+            font.pixelSize: 16
+            font.italic: true
         }
     }
 
