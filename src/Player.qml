@@ -152,6 +152,9 @@ PhysicsItem {
     property real _dashTimer: 0
     property real _dashDirX: 0
     property real _dashDirY: 0
+    // The way the dash under way goes, a unit vector, y down as on screen
+    readonly property real dashDirX: _dashDirX
+    readonly property real dashDirY: _dashDirY
     // The dash under way is a whirlwind (Balance.knight.whirl...), let
     // loose with Q (unleash)
     property bool isWhirling: false
