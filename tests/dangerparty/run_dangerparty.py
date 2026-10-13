@@ -25,12 +25,17 @@ records of the dungeon and the host leads the party down:
 - both screens build the same camp: the look of its depth (the grotto at
   depth 0 to 2, the miners' hall at 3), the same layout and the same
   props (issue #146)
+- at the first camp both knights stand still by the fire and sit down,
+  and each screen shows both seated, their shields set down; the
+  joiner's knight walks off and stands up on both screens, the host's
+  stays seated (issue #148)
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
 depth 0 is saved as <dir>/<host|joiner>-depth<N>.png, the knight in the
 room after the first, and each camp before them as
-<dir>/<host|joiner>-camp<N-1>.png; that needs a window, so --shots leaves
+<dir>/<host|joiner>-camp<N-1>.png, and both knights seated at the first
+camp's fire as <dir>/<host|joiner>-sit.png; that needs a window, so --shots leaves
 QT_QPA_PLATFORM alone unless it is set.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
@@ -65,6 +70,8 @@ PULL = 0.5
 TOP = 0.999
 LOW, HIGH = 0.33, 0.67
 BANDS = ("low", "middle", "high")
+# Balance.camp.sitAfter
+SIT_AFTER = 3
 
 # Each dungeon's made-up records: (share lost, fell) of the host's knight
 # and of the joiner's
@@ -298,6 +305,8 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
     check_camps(tag, n - 1, H, J, check)
     if args.shots and n <= 3:
         shoot(tag, f"camp{n - 1}", H, J, args, check)
+    if n == 1:
+        check_sitting(tag, H, J, args, check)
 
     H.eval(["advance()"])
     if not wait_for(lambda: H.eval1("inRun()") is True and J.eval1("inRun()") is True
@@ -362,6 +371,31 @@ def check_camps(tag, depth, H, J, check):
     check(hc == jc and hc["look"] == want and len(hc["props"]) > 0,
           f"{tag} both screens build the same camp: the {hc['look']} (want {want}), layout {hc['layout']}, "
           f"{len(hc['props'])} props" + ("" if hc == jc else f" (host {hc}, joiner {jc})"))
+
+
+def check_sitting(tag, H, J, args, check):
+    """Both knights stand still by the fire and sit down on both screens;
+    the joiner's walks off and stands up on both, the host's stays seated
+    (issue #148)"""
+    H.eval1("sitBy(-1.5)")
+    J.eval1("sitBy(2)")
+    both = lambda: all(s["me"] and s["other"] for s in (H.json("seated()"), J.json("seated()")))
+    sat = wait_for(both, SIT_AFTER + 5)
+    hs, js = H.json("seated()"), J.json("seated()")
+    check(sat, f"{tag} both knights still by the fire sit down, and each screen shows both seated "
+          f"(host {hs}, joiner {js})")
+    check(hs["shield"] and js["shield"], f"{tag} both screens show their knight's shield set down")
+    if args.shots:
+        time.sleep(1.0)
+        shoot(tag, "sit", H, J, args, check)
+    x0 = js["x"]
+    J.eval1("walk(1)")
+    stood = wait_for(lambda: not J.json("seated()")["me"] and H.json("seated()")["other"] is False, 5)
+    hs, js = H.json("seated()"), J.json("seated()")
+    J.eval1("walk(0)")
+    check(stood and js["x"] > x0 and hs["me"],
+          f"{tag} the joiner's knight walks off and stands up on both screens, the host's stays seated "
+          f"(host {hs}, joiner {js}, joiner from x {x0})")
 
 
 def check_foes(tag, H, J, check):

@@ -6,8 +6,8 @@
 // The instance runs the real game. The driver makes up each knight's
 // record of a dungeon, lets the host lead the party down and reads what
 // each screen shows: the danger of the level, the dungeon's look and its
-// enemies, which grow with the party (issue #102), and its descent gauge
-// (issue #97).
+// enemies, which grow with the party (issue #102), its descent gauge
+// (issue #97), and whether the knights sit by the camp's fire (issue #148).
 
 import QtQuick
 import Clayground.Network
@@ -116,6 +116,23 @@ Item {
     function camp() {
         return {look: game.campLook.name, layout: game.campLayout,
                 props: game.campProps.map(p => [p.kind, r3(p.x), r3(p.y), r3(p.w), r3(p.h)])}
+    }
+    // Sitting by the fire (issue #148): this screen's knight stands still
+    // dx wu east of the campfire, walks east (1) or stands (0); seated()
+    // tells whether this screen draws its knight and the other's seated
+    function sitBy(dx) {
+        game.player.xWu = game.campfire.xWu + dx
+        game.player.yWu = game.campfire.yWu
+        // The camera follows only a knight that moves
+        game.camera.target = null
+        game.camera.target = game.player
+        return true
+    }
+    function walk(x) { game.player.moveX = x; return true }
+    function seated() {
+        let rp = Object.values(session.remotePlayers)[0]
+        return {me: game.player.seated, other: rp ? rp.seated : null,
+                x: r3(game.player.xWu), shield: _find(game.player, "shieldDown").visible}
     }
     // The enemies on this screen, by their replicated object, and the
     // knights the dungeon was built for: per enemy its id, type, tier, max
