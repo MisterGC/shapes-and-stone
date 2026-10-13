@@ -5254,6 +5254,7 @@ ClayWorld2d {
         createWallFaces()
         createWallRims()
         _tintBuildings(built)
+        _placeOverhangs(camp.seed)
         updateOccluders()
         spawnMotes()
 
@@ -5454,6 +5455,31 @@ ClayWorld2d {
         placeTorch((r.gx + 0.5) * cellSize, y0, "#FFC870")
         placeTorch((r.gx + r.w - 0.5) * cellSize, y0, "#FFC870")
     }
+    // The rock overhanging the cave's north-facing edges, one piece per
+    // run of face, as the faces are; the buildings have none
+    Component { id: overhangComponent; CaveOverhang {} }
+    function _placeOverhangs(seed) {
+        let o = Balance.camp.overhang
+        let isEdge = (gx, gy) => grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                                 && !_buildingCells[gy * gridWidth + gx]
+        for (let gy = 1; gy < gridHeight; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                if (!isEdge(gx, gy)) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && isEdge(gx, gy)) gx++
+                dungeonObjects.push(overhangComponent.createObject(world.room, {
+                    xWu: startX * cellSize, yWu: gy * cellSize + wallFaceWu,
+                    widthWu: (gx - startX) * cellSize, faceWu: wallFaceWu,
+                    lipWu: o.lip, stalactiteWu: o.stalactite, toothWu: o.tooth, shadowWu: o.shadow,
+                    seed: seed * 1000,
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                }))
+            }
+        }
+    }
+
     // dialogue: its lines, or a function making them when it is talked to
     function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting, wares) {
         let npc = npcComponent.createObject(world.room, {

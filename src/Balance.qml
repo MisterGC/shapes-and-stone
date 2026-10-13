@@ -783,6 +783,11 @@ QtObject {
         buildingFace: "#5C4836",
         // The campfire's light, in wu: it reaches the buildings, which
         // cast shadows from it
-        fireLight: 16
+        fireLight: 16,
+        // The rock overhangs the cave's north-facing edges: a lip of lip wu
+        // hangs over the top of the face, stalactites of up to stalactite
+        // wu below it, one in about every tooth wu along the edge, and
+        // their shadows fall up to shadow wu onto the floor
+        overhang: { lip: 0.3, stalactite: 0.55, tooth: 0.7, shadow: 1.6 }
     })
 }
