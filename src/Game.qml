@@ -5515,7 +5515,8 @@ ClayWorld2d {
     // The camp's props (issue #146): one of its look's layouts, picked
     // from the level's own stream (seed ^ Balance.camp.propSalt), so every
     // screen of a session lays out the same. A prop is left out unless it
-    // lies whole on the cave's floor, clear of the way to the stairs, the
+    // lies whole on the cave's floor, here or else mirrored to the camp's
+    // other side onto no other prop, clear of the way to the stairs, the
     // campfire, the buildings' fronts, and the people and where they walk
     // and the spots (points in wu) given. campProps holds what was laid:
     // { kind, x, y, w, h } in world units, the prop's centre
@@ -5548,9 +5549,16 @@ ClayWorld2d {
             y: (camp.midRow + b.raised) * cellSize }))
         for (let p of look.layouts[campLayout]) {
             let seed = rand()
-            let x0 = cx + p.x - p.w / 2, x1 = cx + p.x + p.w / 2
-            let y0 = cy + p.y - p.h / 2, y1 = cy + p.y + p.h / 2
-            if (!_propFits(x0, y0, x1, y1, cx, fire, fronts, spots)) continue
+            // Where the cave's edge cuts its place, the prop tries the
+            // other side of the camp
+            let px = p.x
+            let fits = x => _propFits(cx + x - p.w / 2, cy + p.y - p.h / 2, cx + x + p.w / 2, cy + p.y + p.h / 2,
+                                      cx, fire, fronts, spots)
+            if (!fits(px)) px = -p.x
+            if (!fits(px) || px !== p.x && campProps.some(q => Math.abs(q.x - cx - px) < (q.w + p.w) / 2
+                                                             && Math.abs(q.y - cy - p.y) < (q.h + p.h) / 2))
+                continue
+            let x0 = cx + px - p.w / 2, y1 = cy + p.y + p.h / 2
             let glows = ["mushrooms", "cracks", "coals"].indexOf(p.kind) >= 0
             let o = campPropComponent.createObject(glows ? glowParent() : world.room, {
                 xWu: x0, yWu: y1, widthWu: p.w, heightWu: p.h,
@@ -5560,7 +5568,7 @@ ClayWorld2d {
                 visible: Qt.binding(() => world.fx)
             })
             dungeonObjects.push(o)
-            campProps.push({ kind: p.kind, x: cx + p.x, y: cy + p.y, w: p.w, h: p.h })
+            campProps.push({ kind: p.kind, x: cx + px, y: cy + p.y, w: p.w, h: p.h })
         }
     }
     function _propFits(x0, y0, x1, y1, cx, fire, fronts, spots) {
