@@ -828,6 +828,35 @@ QtObject {
         // on the floor beside it
         sitAfter: 3,
         sit: { down: 0.45, up: 0.12, squash: 0.2, breath: 1.3, breathDepth: 0.05 },
+        // The camp rests (issue #147) once every knight in it has stood
+        // still restQuiet seconds: every knight seated, the last of them
+        // standing still since restQuiet - sitAfter before it sat
+        restQuiet: 10,
+        // The camp's near sounds (issue #147), each played at its source:
+        // the listening knight hears it at volume times (1 - d / reach)
+        // squared, d its distance in wu, and not at all from reach on. It
+        // plays again every every[0] to every[1] seconds, pitched by
+        // pitch[0] to pitch[1] semitones. The campfire crackles in every
+        // camp, the anvil rings while the smith stands at it hammering,
+        // and each look has its own at the props of its kinds: drips at
+        // the grotto's pond, the cart creaking in the miners' hall, the
+        // embers hissing at the ember camp's coals and cracks. While the
+        // camp rests the music falls to restMusic of its level in
+        // fadeDown seconds and the near sounds rise to restNear times
+        // their volume; a knight that moves brings both back in fadeUp
+        sounds: {
+            fire: { sample: "camp_crackle.wav", volume: 0.55, reach: 16, every: [0.12, 0.45], pitch: [-3, 2] },
+            anvil: { sample: "camp_anvil.wav", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
+            looks: {
+                grotto: { sample: "camp_drip.wav", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
+                hall: { sample: "camp_creak.wav", props: ["cart"], volume: 0.45, reach: 14, every: [3.0, 7.0], pitch: [-2, 2] },
+                ember: { sample: "camp_hiss.wav", props: ["coals", "cracks"], volume: 0.35, reach: 12, every: [1.5, 4.5], pitch: [-3, 1] }
+            },
+            restMusic: 0.3,
+            restNear: 1.5,
+            fadeDown: 3,
+            fadeUp: 0.8
+        },
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",

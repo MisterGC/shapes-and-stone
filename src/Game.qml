@@ -87,9 +87,14 @@ ClayWorld2d {
     LoopMusic {
         id: villageMusic
         source: "assets/village_music.mp3"
-        level: muted ? 0 : 0.35 * musicVolume
+        level: muted ? 0 : 0.35 * musicVolume * campSounds.musicShare
         loop: true
     }
+
+    // The camp's near sounds, each at its source, and the music stepping
+    // back while every knight rests (issue #147)
+    CampSounds { id: campAudio; game: world; party: session }
+    readonly property alias campSounds: campAudio
 
     onLevelTypeChanged: {
         if (levelType === "village") {
@@ -5183,6 +5188,7 @@ ClayWorld2d {
         }
         dungeonObjects = []
         campfire = null
+        campSounds.clear()
         features = []
         featureShowcase = false
         breakables = []
@@ -5334,9 +5340,10 @@ ClayWorld2d {
         _lightBuilding(smithy)
         // Anvil in front of the smithy
         _spawnAnvil(sx, sy0 - 1)
+        let anvilAt = Qt.point(sx, sy0 - 1)
         // Blacksmith NPC with routine
         _spawnVillageNpc(sx, sy0 + 3, "#B87333", "hammer", "Blacksmith", [
-            { x: sx, y: sy0 - 1, duration: 5, text: "*hammering*" },
+            { x: sx, y: sy0 - 1, duration: 5, text: "*hammering*", sound: "anvil" },
             { x: sx, y: sy0 + 5, duration: 3, text: "*sorting tools*" },
             { x: sx - 1, y: sy0 + 3, duration: 2, text: "*inspecting blade*" }
         ], [
@@ -5365,6 +5372,8 @@ ClayWorld2d {
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
         _placeCampProps(camp, levelSeed, [Qt.point(tree.xWu, tree.yWu)])
+        campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
+                         anvilAt, campLook, campProps)
 
         // Spawn player at entrance
         spawnPlayer(cx, (camp.oy + 2) * cellSize)
