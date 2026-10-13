@@ -65,6 +65,7 @@ clay_app(shapes_and_stone
         src/Floor.qml
         src/Campfire.qml
         src/CaveOverhang.qml
+        src/CampProp.qml
         src/Projectile.qml
         src/Npc.qml
         src/DialoguePanel.qml
@@ -109,5 +110,6 @@ qt_add_shaders(shapes_and_stone "shapes_and_stone_shaders"
         src/shaders/floor.frag
         src/shaders/motes.frag
         src/shaders/overhang.frag
+        src/shaders/prop.frag
         src/shaders/wall.frag
 )

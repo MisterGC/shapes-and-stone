@@ -22,6 +22,7 @@ ExitStairs 1.0 ExitStairs.qml
 Floor 1.0 Floor.qml
 Campfire 1.0 Campfire.qml
 CaveOverhang 1.0 CaveOverhang.qml
+CampProp 1.0 CampProp.qml
 Projectile 1.0 Projectile.qml
 Npc 1.0 Npc.qml
 DialoguePanel 1.0 DialoguePanel.qml
