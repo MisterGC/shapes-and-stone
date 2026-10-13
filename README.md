@@ -410,6 +410,29 @@ qml -I build/bin/qml tests/camps/camps.qml -- <out dir>
 In the dojo, `applyScenario("village", d)` lands in the camp after depth
 d: 0 the grotto, 4 the hall, 7 the ember camp.
 
+A knight that stands still `camp.sitAfter` seconds (3) in the campfire's
+warmth, its heal radius, sits down facing the fire: it sinks a little,
+breathes slow and deep, and its shield lies on the floor beside it. Any
+movement key, a swing, the shield or a dash stands it up in the physics
+step it comes, and the knight moves in that step, so sitting never holds
+anyone. It is the look only: the fire heals and refills the same, seated
+or not. In a session the knight sends "sit" and "stand" as it sends a
+swing, and every screen shows it seated, facing the fire there. The pose's
+numbers are `camp.sit`. The sit bench steps the world one physics step at
+a time: the knight sits on the step that reaches sitAfter, a press of D,
+Space, the right button or a click each stands it up in the next step,
+out of the fire's warmth it never sits, and five seconds at the fire heal
+and refill the same seated as for a knight that never sits. It exits with
+the number of failed checks; with a window and an output directory it
+saves the knight seated as `sit.png`. The danger party bench below sits
+both knights of a two-process session at the first camp's fire and checks
+both screens show them seated, then one walking off and standing up:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sit/sit.qml
+qml -I build/bin/qml tests/sit/sit.qml -- <out dir>
+```
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
@@ -540,8 +563,10 @@ window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
 settling each next one from both knights' records and building it for two,
 and checks that both screens' gauges show the same depth, at each camp and
-in each dungeon, and that both build the same camp in its depth's look
-(`--shots` saves both screens of the first three camps too):
+in each dungeon, that both build the same camp in its depth's look, and
+that at the first camp both show the knights sit down by the fire and one
+stand up again (`--shots` saves both screens of the first three camps and
+of the knights seated too):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
