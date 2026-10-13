@@ -798,11 +798,12 @@ QtObject {
         // earth, moss over that share of stone and that share of the
         // stones cracked; its air (motes of that colour, density and
         // size, drifting that far, blinking like fireflies or not, glowing
-        // on their own or seen in the light); and its screen grade: the
-        // darkness's ambient, the temperature, the saturation and the
-        // vignette. Its props are one of layouts, picked from the level's
-        // seed ^ propSalt, each a list of props: a kind of shaders/prop.frag
-        // centred x, y wu from the camp's centre (east, north), w x h wu.
+        // on their own or seen in the light); its moths (see moths below);
+        // and its screen grade: the darkness's ambient, the temperature,
+        // the saturation and the vignette. Its props are one of layouts,
+        // picked from the level's seed ^ propSalt, each a list of props:
+        // a kind of shaders/prop.frag centred x, y wu from the camp's
+        // centre (east, north), w x h wu.
         // A prop that would not lie whole on the cave's floor, clear of
         // the paths, the fire and the people, is left out. Props are drawn
         // only: the knights walk over them, nothing blocks or hurts
@@ -862,16 +863,37 @@ QtObject {
         // to depth of itself, one breath every seconds[0] to seconds[1]
         // seconds, each light on its own breath. Only the intensity
         // breathes, never the radius; the fire stays the brightest light.
-        // The breaths draw from the level's seed ^ lightSalt, so
-        // every screen of a session sees the same
+        // The breaths and the moths draw from the level's seed ^
+        // lightSalt, so every screen of a session sees the same
         lightSalt: 0x6d6f7468,
         breath: { seconds: [5, 8], depth: 0.1 },
+        // Moths circle the campfire and every lantern in slow, uneven
+        // loops (issue #149), as many as the look's moths says (fire,
+        // lantern: moths at each, at most 8), in its colour, drawn in one
+        // pass by shaders/moths.frag for up to 6 lights. A moth's loop is
+        // orbit wu around its light (fire or lantern), flattened to
+        // squash of that north to south, swelling and shrinking by swell
+        // of itself; it goes round at speed[0] to speed[1] radians a
+        // second, either way, wavering by waver, and darts aside up to
+        // dart wu. Its wings, size wu across, beat flutter times a second
+        moths: {
+            lantern: { orbit: 0.8 },
+            fire: { orbit: 1.6 },
+            squash: 0.6,
+            swell: 0.35,
+            speed: [0.5, 1.1],
+            waver: 0.6,
+            dart: 0.12,
+            size: 0.24,
+            flutter: 9
+        },
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",
               buildingWall: "#4A4232", buildingFace: "#5E5440", lantern: "#E8F0A0", tree: "#2A4A2A",
               floor: { style: "earth", color: "#34402E", grass: 0.8, moss: 0, crackShare: 0 },
               air: { color: "#BFFF73", alpha: 0.9, density: 0.06, size: 0.06, drift: 0.9, blink: true, glows: true },
+              moths: { color: "#F0F6E0", alpha: 0.95, fire: 4, lantern: 4 },
               grade: { ambient: "#3E5248", temperature: -0.1, saturation: 1.2, vignette: 0.35 },
               layouts: [
                   [ { kind: "pond", x: -20, y: -3, w: 7, h: 5 },
@@ -901,6 +923,7 @@ QtObject {
               buildingWall: "#5A3E22", buildingFace: "#8A6232", lantern: "#FFC870", tree: "#5A4128",
               floor: { style: "earth", color: "#4A3D2C", grass: 0, moss: 0, crackShare: 0 },
               air: { color: "#FFD99A", alpha: 0.35, density: 0.35, size: 0.045, drift: 0.35, blink: false, glows: false },
+              moths: { color: "#F2E2C4", alpha: 0.9, fire: 5, lantern: 3 },
               grade: { ambient: "#5A4E3E", temperature: 0.12, saturation: 1.1, vignette: 0.4 },
               layouts: [
                   [ { kind: "rails", x: -14, y: -15, w: 14, h: 1.4 },
@@ -930,6 +953,7 @@ QtObject {
               buildingWall: "#3A2A24", buildingFace: "#4E3A30", lantern: "#FF7A3A", tree: "#262022",
               floor: { style: "basalt", color: "#363030", grass: 0, moss: 0, crackShare: 0 },
               air: { color: "#FF5414", alpha: 0.9, density: 0.05, size: 0.05, drift: 0.8, blink: false, glows: true },
+              moths: { color: "#E8C4B0", alpha: 0.85, fire: 2, lantern: 2 },
               grade: { ambient: "#3C2622", temperature: 0.3, saturation: 1.15, vignette: 0.45 },
               layouts: [
                   [ { kind: "cracks", x: -20, y: -1, w: 7, h: 5 },

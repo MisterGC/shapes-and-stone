@@ -5372,7 +5372,7 @@ ClayWorld2d {
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
         _placeCampProps(camp, levelSeed, [Qt.point(tree.xWu, tree.yWu)])
-        _breatheLights(levelSeed, [cf].concat(torches))
+        _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
         campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
                          anvilAt, campLook, campProps)
 
@@ -5510,6 +5510,26 @@ ClayWorld2d {
             l.breathPhase = rand() * 2 * Math.PI
         }
         return rand
+    }
+    // Moths circle the campfire and the lanterns (issue #149), all of them
+    // in one item; how many at each light and their colour are the look's
+    Component { id: mothsComponent; Moths {} }
+    function _spawnMoths(rand, fire, lanterns) {
+        let m = Balance.camp.moths, look = campLook.moths
+        let col = Qt.color(look.color)
+        // Where the lights shine from (their Light2d offsets): the middle
+        // of the fire's body, half a wu in front of a lantern's wall
+        let lights = [{ x: fire.xWu + fire.widthWu / 2, y: fire.yWu - fire.heightWu / 2,
+                        orbit: m.fire.orbit, count: look.fire }]
+        for (let t of lanterns)
+            lights.push({ x: t.xWu, y: t.yWu - 0.5, orbit: m.lantern.orbit, count: look.lantern })
+        dungeonObjects.push(mothsComponent.createObject(glowParent(), {
+            mothLights: lights,
+            seed: Math.floor(rand() * 1000),
+            color: Qt.rgba(col.r, col.g, col.b, look.alpha),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        }))
     }
     // Lanterns flanking a building's open front
     function _lightBuilding(r) {

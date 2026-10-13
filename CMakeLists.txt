@@ -50,6 +50,7 @@ clay_app(shapes_and_stone
         src/WallFace.qml
         src/Torch.qml
         src/Motes.qml
+        src/Moths.qml
         src/FxParticle.qml
         src/Stain.qml
         src/Debris.qml
@@ -110,6 +111,7 @@ qt_add_shaders(shapes_and_stone "shapes_and_stone_shaders"
         src/shaders/body.frag
         src/shaders/floor.frag
         src/shaders/motes.frag
+        src/shaders/moths.frag
         src/shaders/overhang.frag
         src/shaders/prop.frag
         src/shaders/wall.frag
