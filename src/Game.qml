@@ -726,6 +726,19 @@ ClayWorld2d {
         }
         return best
     }
+    // The knights on this screen, this node's and the other players',
+    // that have not fallen: { knight, x, y, seated }, x and y its centre
+    // in wu. The camp's creatures watch them
+    function knightsHere() {
+        let knights = [player]
+        for (let id in session.remotePlayers) knights.push(session.remotePlayers[id])
+        let here = []
+        for (let k of knights) {
+            if (!k || (k === player ? player.fallen : !k.known || k.remoteHp <= 0)) continue
+            here.push({ knight: k, x: k.xWu + 0.5, y: k.yWu - 0.5, seated: !!k.seated })
+        }
+        return here
+    }
     // The node a knight belongs to
     function knightIdOf(knight) {
         if (!knight) return ""
