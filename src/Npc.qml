@@ -18,11 +18,14 @@ PhysicsItem {
     property var wares: []
     property string greetingSound: ""
 
-    // Routine: [{x, y, duration, text}, ...]
+    // Routine: [{x, y, duration, text, sound}, ...]; sound names what
+    // the camp hears while it is at that spot (CampSounds, issue #147)
     property var routine: []
     property int _routineIndex: 0
     property string _activityText: ""
     property bool _atDestination: false
+    // The routine's step it stands at doing, or null while it walks
+    readonly property var doing: _atDestination && routine.length > 0 ? routine[_routineIndex] : null
     property real _activityTimer: 0
     property real walkSpeed: 1.5
 
