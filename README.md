@@ -433,6 +433,28 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sit/sit.qml
 qml -I build/bin/qml tests/sit/sit.qml -- <out dir>
 ```
 
+The camp's sounds sit where they come from: the campfire crackles in every
+camp, the anvil rings while the smith stands at it hammering, water drips
+at the grotto's pond, the cart creaks in the miners' hall and the embers
+hiss at the ember camp's coals and cracks. Each screen hears them by its
+own knight's distance, quieter the further, silent from a sound's reach
+on; Clayground's sound is mono, so there is no left or right. When every
+knight in the camp has stood still `camp.restQuiet` seconds (10) - all of
+them seated by the fire - the camp music steps down to `restMusic` of its
+level and the near sounds come forward; a knight that moves brings the
+music back. M mutes all of it. Every number is in `Balance.camp.sounds`;
+the samples are made by `tools/camp_sounds.py`. The camp sound bench
+steps the world: the crackle's gain falls from beside the fire to the
+cave's far edge, the music holds until restQuiet, steps down and comes
+back on a press of D, the anvil rings only while the smith hammers, each
+look has its own sound on 12 seeds, and M silences it all. The danger
+party bench checks two screens: each hears the crackle by its own knight,
+and the music steps down on both only while both knights rest:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsound/campsound.qml
+```
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
