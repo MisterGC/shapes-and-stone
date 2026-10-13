@@ -818,6 +818,16 @@ QtObject {
         // A prop whose place the cave's edge cuts moves up to propShift wu
         // toward the middle, on its side and then on the other
         propShift: 4,
+        // A knight that stands still sitAfter seconds within the
+        // campfire's healRadius sits down facing the fire (issue #148):
+        // no key, no button, no knockback. Any of them stands it up at
+        // once. It is the look only: the fire heals and refills the same.
+        // The pose sinks in down seconds and rises in up seconds, squash
+        // of the knight's height lower; seated it breathes breath radians
+        // a second, breathDepth of its height deep, and its shield lies
+        // on the floor beside it
+        sitAfter: 3,
+        sit: { down: 0.45, up: 0.12, squash: 0.2, breath: 1.3, breathDepth: 0.05 },
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",

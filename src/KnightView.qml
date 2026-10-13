@@ -36,6 +36,15 @@ Item {
     // At 0 HP: the knight slumps to the floor, dark, its lantern low and
     // no aim shown - the same on every screen that draws it
     property bool downed: false
+    // Sitting by the fire (Balance.camp.sit): the knight sinks down,
+    // breathes slow and deep, and its shield lies on the floor beside it.
+    // _sit runs 0 standing to 1 seated, down slowly, up at once
+    property bool seated: false
+    property real _sit: seated ? 1 : 0
+    Behavior on _sit {
+        NumberAnimation { duration: (view.seated ? Balance.camp.sit.down : Balance.camp.sit.up) * 1000
+                          easing.type: Easing.InOutQuad }
+    }
     // How far an ally has lifted the downed knight up, 0..1: the ring
     // around it (Balance.party)
     property real reviveProgress: 0
@@ -187,6 +196,8 @@ Item {
         loops: Animation.Infinite
     }
     readonly property real _breath: Math.sin(_lifeT * 2.4) * (1 - moveAmount)
+    // Seated, the breath is slower and deeper
+    readonly property real _sitBreath: Math.sin(_lifeT * Balance.camp.sit.breath) * _sit
     // One bob a footstep, at the beat the footsteps sound (Balance.steps)
     readonly property real _step: Math.abs(Math.sin(_lifeT * Math.PI * Balance.steps.perSecond)) * moveAmount
 
@@ -198,8 +209,12 @@ Item {
         transform: [
             Scale {
                 origin.x: visual.width / 2; origin.y: visual.height
-                xScale: view.downed ? 1.2 : view._fx ? 1 - 0.02 * view._breath + 0.03 * view._step : 1
-                yScale: view.downed ? 0.5 : view._fx ? 1 + 0.03 * view._breath - 0.05 * view._step : 1
+                xScale: view.downed ? 1.2
+                    : (view._fx ? 1 - 0.02 * view._breath + 0.03 * view._step - 0.5 * Balance.camp.sit.breathDepth * view._sitBreath : 1)
+                      + 0.5 * Balance.camp.sit.squash * view._sit
+                yScale: view.downed ? 0.5
+                    : (view._fx ? 1 + 0.03 * view._breath - 0.05 * view._step + Balance.camp.sit.breathDepth * view._sitBreath : 1)
+                      - Balance.camp.sit.squash * view._sit
             },
             Translate {
                 x: view._fx ? view.moveX * visual.width * 0.04 : 0
@@ -445,6 +460,38 @@ Item {
                 radius: width / 2
                 color: "#FFFFFF"
             }
+        }
+    }
+
+    // Seated by the fire, the shield lies on the floor beside the knight,
+    // on its off side from the lantern, rim in the knight's own colour
+    Rectangle {
+        id: shieldDown
+        objectName: "shieldDown"
+        visible: view._sit > 0
+        opacity: view._sit
+        readonly property real angleRad: (view.facingAngle - 140) * Math.PI / 180
+        readonly property real orbit: view.width * 0.68
+        width: view.width * 0.5
+        height: view.width * 0.36
+        radius: height * 0.45
+        x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbit
+        y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbit + (1 - view._sit) * view.height * 0.2
+        rotation: -view.facingAngle + 50
+        z: -0.5
+        gradient: Gradient {
+            GradientStop { position: 0; color: "#C9D2D9" }
+            GradientStop { position: 0.5; color: "#9AA6AF" }
+            GradientStop { position: 1; color: "#4A535A" }
+        }
+        border.color: Qt.darker(view.accentColor, 1.6)
+        border.width: Math.max(1, view.width * 0.04)
+        // The boss in its middle
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.height * 0.3; height: width
+            radius: width / 2
+            color: "#3A4248"
         }
     }
 
