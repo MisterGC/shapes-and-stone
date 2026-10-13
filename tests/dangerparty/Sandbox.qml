@@ -7,7 +7,8 @@
 // record of a dungeon, lets the host lead the party down and reads what
 // each screen shows: the danger of the level, the dungeon's look and its
 // enemies, which grow with the party (issue #102), its descent gauge
-// (issue #97), and whether the knights sit by the camp's fire (issue #148).
+// (issue #97), whether the knights sit by the camp's fire (issue #148), and
+// whether the camp's music steps back while they rest (issue #147).
 
 import QtQuick
 import Clayground.Network
@@ -133,6 +134,13 @@ Item {
         let rp = Object.values(session.remotePlayers)[0]
         return {me: game.player.seated, other: rp ? rp.seated : null,
                 x: r3(game.player.xWu), shield: _find(game.player, "shieldDown").visible}
+    }
+    // The camp at rest on this screen (issue #147): whether it is quiet,
+    // the music's share of its level, and how loud this screen hears the
+    // campfire's crackle
+    function rest() {
+        let cs = game.campSounds
+        return {quiet: cs.quiet, music: r3(cs.musicShare), crackle: r3(cs.gainOf("crackle"))}
     }
     // The enemies on this screen, by their replicated object, and the
     // knights the dungeon was built for: per enemy its id, type, tier, max

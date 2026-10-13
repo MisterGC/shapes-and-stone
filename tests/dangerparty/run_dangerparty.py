@@ -26,9 +26,12 @@ records of the dungeon and the host leads the party down:
   depth 0 to 2, the miners' hall at 3), the same layout and the same
   props (issue #146)
 - at the first camp both knights stand still by the fire and sit down,
-  and each screen shows both seated, their shields set down; the
-  joiner's knight walks off and stands up on both screens, the host's
-  stays seated (issue #148)
+  and each screen shows both seated, their shields set down; each screen
+  hears the campfire's crackle by its own knight's distance, and once
+  both have stood still Balance.camp.restQuiet seconds both screens'
+  music steps down; the joiner's knight walks off and stands up on both
+  screens, the host's stays seated, and both screens' music comes back
+  (issues #147, #148)
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
@@ -70,8 +73,12 @@ PULL = 0.5
 TOP = 0.999
 LOW, HIGH = 0.33, 0.67
 BANDS = ("low", "middle", "high")
-# Balance.camp.sitAfter
+# Balance.camp.sitAfter, restQuiet and sounds' restMusic, fadeDown, fadeUp
 SIT_AFTER = 3
+REST_QUIET = 10
+REST_MUSIC = 0.3
+FADE_DOWN = 3
+FADE_UP = 0.8
 
 # Each dungeon's made-up records: (share lost, fell) of the host's knight
 # and of the joiner's
@@ -388,6 +395,17 @@ def check_sitting(tag, H, J, args, check):
     if args.shots:
         time.sleep(1.0)
         shoot(tag, "sit", H, J, args, check)
+    # The camp rests (issue #147): the host's knight sits 1.5 wu from the
+    # fire, the joiner's 2 wu, so the host's screen hears it louder
+    hr, jr = H.json("rest()"), J.json("rest()")
+    check(hr["crackle"] > jr["crackle"] > 0,
+          f"{tag} each screen hears the crackle by its own knight's distance "
+          f"(host at 1.5 wu {hr['crackle']}, joiner at 2 wu {jr['crackle']})")
+    down = lambda: all(r["quiet"] and r["music"] == REST_MUSIC for r in (H.json("rest()"), J.json("rest()")))
+    quiet = wait_for(down, REST_QUIET + FADE_DOWN + 5)
+    hr, jr = H.json("rest()"), J.json("rest()")
+    check(quiet, f"{tag} both knights still {REST_QUIET} s: both screens' music steps down to {REST_MUSIC} "
+          f"of its level (host {hr}, joiner {jr})")
     x0 = js["x"]
     J.eval1("walk(1)")
     stood = wait_for(lambda: not J.json("seated()")["me"] and H.json("seated()")["other"] is False, 5)
@@ -396,6 +414,11 @@ def check_sitting(tag, H, J, args, check):
     check(stood and js["x"] > x0 and hs["me"],
           f"{tag} the joiner's knight walks off and stands up on both screens, the host's stays seated "
           f"(host {hs}, joiner {js}, joiner from x {x0})")
+    up = lambda: all(not r["quiet"] and r["music"] == 1 for r in (H.json("rest()"), J.json("rest()")))
+    back = wait_for(up, FADE_UP + 3)
+    hr, jr = H.json("rest()"), J.json("rest()")
+    check(back, f"{tag} one knight up, both screens' music comes back, the host's knight still seated "
+          f"(host {hr}, joiner {jr})")
 
 
 def check_foes(tag, H, J, check):
