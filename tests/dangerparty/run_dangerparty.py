@@ -24,7 +24,8 @@ records of the dungeon and the host leads the party down:
   marker in its layer (issue #97)
 - both screens build the same camp: the look of its depth (the grotto at
   depth 0 to 2, the miners' hall at 3), the same layout and the same
-  props (issue #146)
+  props (issue #146), and the same cat in the same place, or none
+  (issue #150)
 - at the first camp both knights stand still by the fire and sit down,
   and each screen shows both seated, their shields set down; each screen
   hears the campfire's crackle by its own knight's distance, and once
@@ -32,6 +33,9 @@ records of the dungeon and the host leads the party down:
   music steps down; the joiner's knight walks off and stands up on both
   screens, the host's stays seated, and both screens' music comes back
   (issues #147, #148)
+- at the first camp the host's knight comes near the camp's cat: on both
+  screens it looks up at the host's knight, and sleeps again once the
+  knight is back at the entrance (issue #150)
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
@@ -79,6 +83,8 @@ REST_QUIET = 10
 REST_MUSIC = 0.3
 FADE_DOWN = 3
 FADE_UP = 0.8
+# Balance.camp.cat.settle
+CAT_SETTLE = 1.5
 
 # Each dungeon's made-up records: (share lost, fell) of the host's knight
 # and of the joiner's
@@ -313,6 +319,7 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
     if args.shots and n <= 3:
         shoot(tag, f"camp{n - 1}", H, J, args, check)
     if n == 1:
+        check_cat(tag, H, J, check)
         check_sitting(tag, H, J, args, check)
 
     H.eval(["advance()"])
@@ -377,7 +384,28 @@ def check_camps(tag, depth, H, J, check):
     want = "hall" if depth >= 3 else "grotto"
     check(hc == jc and hc["look"] == want and len(hc["props"]) > 0,
           f"{tag} both screens build the same camp: the {hc['look']} (want {want}), layout {hc['layout']}, "
-          f"{len(hc['props'])} props" + ("" if hc == jc else f" (host {hc}, joiner {jc})"))
+          f"{len(hc['props'])} props, the cat {hc['cat'] or 'not there'}"
+          + ("" if hc == jc else f" (host {hc}, joiner {jc})"))
+
+
+def check_cat(tag, H, J, check):
+    """The host's knight comes near the camp's cat: on the joiner's screen
+    the cat looks up at the host's knight, and once it has gone back to
+    the entrance it sleeps again on both screens (issue #150)"""
+    if H.json("cat()") is None:
+        check(False, f"{tag} the camp has a cat to check (none on this seed)")
+        return
+    H.eval1("byCat(true)")
+    up = wait_for(lambda: J.json("cat()") == {"mood": "alert", "watching": "other"}
+                  and H.json("cat()") == {"mood": "alert", "watching": "me"}, 5)
+    hc, jc = H.json("cat()"), J.json("cat()")
+    check(up, f"{tag} the host's knight comes near the cat: on both screens it looks up at the host's knight "
+          f"(host {hc}, joiner {jc})")
+    H.eval1("byCat(false)")
+    down = wait_for(lambda: all(c["mood"] == "idle" for c in (H.json("cat()"), J.json("cat()"))), CAT_SETTLE + 5)
+    hc, jc = H.json("cat()"), J.json("cat()")
+    check(down, f"{tag} the knight gone back to the entrance, the cat sleeps again on both screens "
+          f"(host {hc}, joiner {jc})")
 
 
 def check_sitting(tag, H, J, args, check):

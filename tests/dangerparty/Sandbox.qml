@@ -7,8 +7,9 @@
 // record of a dungeon, lets the host lead the party down and reads what
 // each screen shows: the danger of the level, the dungeon's look and its
 // enemies, which grow with the party (issue #102), its descent gauge
-// (issue #97), whether the knights sit by the camp's fire (issue #148), and
-// whether the camp's music steps back while they rest (issue #147).
+// (issue #97), whether the knights sit by the camp's fire (issue #148),
+// whether the camp's music steps back while they rest (issue #147), and
+// whom the camp's cat looks up at (issue #150).
 
 import QtQuick
 import Clayground.Network
@@ -113,10 +114,40 @@ Item {
         return out
     }
     // What the camp on this screen looks like (issue #146): its look,
-    // the layout of its props and every prop laid
+    // the layout of its props and every prop laid, and where its cat lies
+    // (issue #150), or null
     function camp() {
+        let c = game.campCat
         return {look: game.campLook.name, layout: game.campLayout,
-                props: game.campProps.map(p => [p.kind, r3(p.x), r3(p.y), r3(p.w), r3(p.h)])}
+                props: game.campProps.map(p => [p.kind, r3(p.x), r3(p.y), r3(p.w), r3(p.h)]),
+                cat: c ? [r3(c.xWu), r3(c.yWu), r3(c.seed)] : null}
+    }
+    // The camp's cat on this screen (issue #150): whether it looks up,
+    // and at this screen's knight ("me") or the other's ("other")
+    function cat() {
+        let c = game.campCat
+        if (!c) return null
+        let rp = Object.values(session.remotePlayers)[0]
+        return {mood: c.mood, watching: c.watching === game.player ? "me"
+                                        : c.watching && c.watching === rp ? "other" : null}
+    }
+    // This screen's knight comes near the cat: between it and the fire,
+    // just out of the fire's warmth so it does not sit down; or, far
+    // false, back at the entrance
+    function byCat(near) {
+        let c = game.campCat, f = game.campfire
+        let fx = f.xWu + f.widthWu / 2, fy = f.yWu - f.heightWu / 2
+        let d = Math.hypot(c.xWu - fx, c.yWu - fy), r = Balance.campfire.healRadius + 0.6
+        if (near) {
+            game.player.xWu = fx + r * (c.xWu - fx) / d - 0.5
+            game.player.yWu = fy + r * (c.yWu - fy) / d + 0.5
+        } else {
+            game.player.xWu = game.entranceGridX * game.cellSize
+            game.player.yWu = c.yWu - 12
+        }
+        game.camera.target = null
+        game.camera.target = game.player
+        return true
     }
     // Sitting by the fire (issue #148): this screen's knight stands still
     // dx wu east of the campfire, walks east (1) or stands (0); seated()
