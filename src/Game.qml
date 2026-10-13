@@ -5372,6 +5372,7 @@ ClayWorld2d {
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
         _placeCampProps(camp, levelSeed, [Qt.point(tree.xWu, tree.yWu)])
+        _breatheLights(levelSeed, [cf].concat(torches))
         campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
                          anvilAt, campLook, campProps)
 
@@ -5493,6 +5494,22 @@ ClayWorld2d {
             if (!_buildingCells[gy * gridWidth + gx]) continue
             o.color = face ? c.buildingFace : c.buildingWall
         }
+    }
+    // The camp's lights breathe, the campfire and the lanterns, each on its
+    // own breath from the level's seed ^ Balance.camp.lightSalt (issue
+    // #149). A breath is a whole share of the lights' 1000 s round of
+    // time, so it never jumps when the round starts over. Returns the
+    // stream, for what else hangs on the lights
+    function _breatheLights(levelSeed, lights) {
+        let b = Balance.camp.breath
+        let rand = createRng(levelSeed ^ Balance.camp.lightSalt)
+        for (let l of lights) {
+            let seconds = b.seconds[0] + rand() * (b.seconds[1] - b.seconds[0])
+            l.breath = b.depth
+            l.breathSeconds = 1000 / Math.round(1000 / seconds)
+            l.breathPhase = rand() * 2 * Math.PI
+        }
+        return rand
     }
     // Lanterns flanking a building's open front
     function _lightBuilding(r) {

@@ -857,6 +857,15 @@ QtObject {
             fadeDown: 3,
             fadeUp: 0.8
         },
+        // The camp's lights breathe (issue #149): on top of its flicker the
+        // campfire's and each lantern's intensity swells and sinks by up
+        // to depth of itself, one breath every seconds[0] to seconds[1]
+        // seconds, each light on its own breath. Only the intensity
+        // breathes, never the radius; the fire stays the brightest light.
+        // The breaths draw from the level's seed ^ lightSalt, so
+        // every screen of a session sees the same
+        lightSalt: 0x6d6f7468,
+        breath: { seconds: [5, 8], depth: 0.1 },
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",

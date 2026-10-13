@@ -44,8 +44,20 @@ RectBoxBody {
         offsetYWu: -campfire.heightWu / 2
         radius: Balance.camp.fireLight
         color: "#FF9440"
-        intensity: 1.1
+        intensity: 1.1 * campfire.breathing
         flicker: 0.6
+    }
+    // On top of its flicker the light breathes (Balance.camp.breath): it
+    // swells and sinks by breath of itself every breathSeconds, a whole
+    // number of breaths in each round of _t
+    property real breath: 0
+    property real breathSeconds: 6
+    property real breathPhase: 0
+    readonly property real breathing: 1 + breath * Math.sin(2 * Math.PI * _t / breathSeconds + breathPhase)
+    property real _t: 0
+    NumberAnimation on _t {
+        from: 0; to: 1000; duration: 1000000
+        loops: Animation.Infinite
     }
 
     // Warm glow with pulse
