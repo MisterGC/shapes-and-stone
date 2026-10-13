@@ -360,6 +360,29 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camp/camp.qml
 ```
 
+The camp is a cave, not a box: its outline has bays and outcrops and cut
+corners, drawn from a stream of its own (the level's seed ^
+`camp.seedSalt`), so the same seed builds the same cave on every screen
+of a session. It is about 1.5 times the old 20 x 20 cells, and sits
+right under the top of the map, so the walk from where the knights come
+in to the stairs stays at most `camp.maxWalk` seconds. Rock overhangs its
+north-facing edges, with stalactites and their shadows on the floor. The
+tavern and the smithy are walls of whole cells, with faces and rims, and
+cast shadows from the campfire. Every number is in `Balance.camp`. The
+cave bench builds the camp on 20 seeds and checks the outline's size and
+that it is no box, that 20 seeds build 20 outlines and another screen
+the same ones, the walk at move speed - and walks the knight to the
+stairs along it - where the campfire, the innkeeper, the smith and the
+witch stand, and that the buildings block the light and the campfire's
+light reaches them and casts shadows. It exits with the number of failed
+checks; with a window and an output directory it also saves the outline
+and the camp of three seeds and the buildings' shadows as PNGs:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cave/cave.qml
+qml -I build/bin/qml tests/cave/cave.qml -- <out dir>
+```
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
