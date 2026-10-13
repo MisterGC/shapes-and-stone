@@ -3614,6 +3614,7 @@ ClayWorld2d {
         features = list
         breakables = []
         _propCells = ({})
+        _buildingCells = ({})
         _brokenCells = []
         plates = []
         _sprungCells = ({})
@@ -5157,6 +5158,7 @@ ClayWorld2d {
         featureShowcase = false
         breakables = []
         _propCells = ({})
+        _buildingCells = ({})
         _brokenCells = []
         plates = []
         _sprungCells = ({})
@@ -5211,24 +5213,28 @@ ClayWorld2d {
         rng = createRng(levelSeed)
         console.log("[Game] Village - Seed:", masterSeed, "Level:", levelIndex)
 
-        let roomSize = 20
-        let ox = Math.floor((gridWidth - roomSize) / 2)
-        let oy = Math.floor((gridHeight - roomSize) / 2)
-
-        // Initialize grid and carve village area
+        // The cave, the tavern and the smithy are cells of the grid: they
+        // block the way, the light and the paths like a dungeon's rock
         initializeGrid()
         initExploredCells()
-        for (let y = oy; y < oy + roomSize; y++)
-            for (let x = ox; x < ox + roomSize; x++) {
-                grid[y][x] = cellRoom
-                exploredCells[y][x] = true
-            }
+        let camp = carveCamp(levelSeed)
+        let b = Balance.camp.building
+        let tavern = { gx: camp.mid - b.side - b.width, gy: camp.midRow + b.raised, w: b.width, h: b.height }
+        let smithy = { gx: camp.mid + b.side, gy: tavern.gy, w: b.width, h: b.height }
+        _buildingCells = ({})
+        _carveBuilding(tavern)
+        _carveBuilding(smithy)
+        for (let y = 0; y < gridHeight; y++)
+            for (let x = 0; x < gridWidth; x++)
+                if (grid[y][x] === cellRoom || _buildingCells[y * gridWidth + x])
+                    exploredCells[y][x] = true
 
-        // Entrance at bottom, exit at top
-        let entranceX = Math.floor(ox + roomSize / 2)
+        // Entrance at the bottom, exit at the top: a tunnel each from the
+        // edge of the map to the cave's bay
+        let entranceX = camp.mid
         let exitX = entranceX
-        for (let y = 0; y < oy; y++) grid[y][entranceX] = cellHallway
-        for (let y = oy + roomSize; y < gridHeight; y++) grid[y][exitX] = cellHallway
+        for (let y = 0; y < gridHeight && grid[y][entranceX] === cellWall; y++) grid[y][entranceX] = cellHallway
+        for (let y = gridHeight - 1; y >= 0 && grid[y][exitX] === cellWall; y--) grid[y][exitX] = cellHallway
         entranceGridX = entranceX
         exitGridX = exitX
 
@@ -5242,16 +5248,19 @@ ClayWorld2d {
         })
         floorObj.color = "#2A3A4A"
         dungeonObjects.push(floorObj)
+        let built = dungeonObjects.length
         createMergedWalls()
         createBoundaryWalls()
         createWallFaces()
         createWallRims()
+        _tintBuildings(built)
         updateOccluders()
         spawnMotes()
 
-        // Room center in world units
-        let cx = (ox + roomSize / 2) * cellSize
-        let cy = (oy + roomSize / 2) * cellSize
+        // The camp's centre in world units: the middle column's west edge,
+        // the middle row's south edge
+        let cx = camp.mid * cellSize
+        let cy = camp.midRow * cellSize
 
         // Campfire (bottom-center of village)
         let cf = campfireComponent.createObject(world.room, {
@@ -5262,13 +5271,16 @@ ClayWorld2d {
         })
         dungeonObjects.push(cf)
 
-        // Tavern building (top-left) — entrance facing south
-        _buildVillageBuilding(cx - 8, cy + 5, 6, 5, "south")
+        // Tavern (west of the middle), open to the south: x the middle of
+        // its floor, y0 its south edge
+        let tx = (tavern.gx + tavern.w / 2) * cellSize
+        let ty0 = tavern.gy * cellSize
+        _lightBuilding(tavern)
         // Innkeeper NPC with routine
-        _spawnVillageNpc(cx - 8, cy + 4, "#C9A227", "mug", "Innkeeper", [
-            { x: cx - 8, y: cy + 6, duration: 4, text: "*polishing mugs*" },
-            { x: cx - 8, y: cy + 4, duration: 3, text: "*sweeping floor*" },
-            { x: cx - 9, y: cy + 3, duration: 2, text: "*checking supplies*" }
+        _spawnVillageNpc(tx, ty0 + 5, "#C9A227", "mug", "Innkeeper", [
+            { x: tx, y: ty0 + 5, duration: 4, text: "*polishing mugs*" },
+            { x: tx, y: ty0 + 3, duration: 3, text: "*sweeping floor*" },
+            { x: tx - 1, y: ty0 + 2, duration: 2, text: "*checking supplies*" }
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
@@ -5280,15 +5292,17 @@ ClayWorld2d {
               price: Balance.shop.draughtPrice }
         ])
 
-        // Blacksmith building (top-right) — entrance facing south
-        _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
-        // Anvil in front of blacksmith
-        _spawnAnvil(cx + 6, cy + 2)
+        // Smithy (east of the middle), open to the south
+        let sx = (smithy.gx + smithy.w / 2) * cellSize
+        let sy0 = smithy.gy * cellSize
+        _lightBuilding(smithy)
+        // Anvil in front of the smithy
+        _spawnAnvil(sx, sy0 - 1)
         // Blacksmith NPC with routine
-        _spawnVillageNpc(cx + 6, cy + 4, "#B87333", "hammer", "Blacksmith", [
-            { x: cx + 6, y: cy + 2, duration: 5, text: "*hammering*" },
-            { x: cx + 6, y: cy + 6, duration: 3, text: "*sorting tools*" },
-            { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
+        _spawnVillageNpc(sx, sy0 + 3, "#B87333", "hammer", "Blacksmith", [
+            { x: sx, y: sy0 - 1, duration: 5, text: "*hammering*" },
+            { x: sx, y: sy0 + 5, duration: 3, text: "*sorting tools*" },
+            { x: sx - 1, y: sy0 + 3, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
             "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
@@ -5316,8 +5330,8 @@ ClayWorld2d {
         ], witchReading, "assets/witch_greeting.wav")
 
         // Spawn player at entrance
-        spawnPlayer(cx, (oy + 2) * cellSize)
-        session.spawnRemotePlayers(cx, (oy + 2) * cellSize)
+        spawnPlayer(cx, (camp.oy + 2) * cellSize)
+        session.spawnRemotePlayers(cx, (camp.oy + 2) * cellSize)
 
         // Block entrance + exit sensor
         blockEntrance()
@@ -5338,31 +5352,108 @@ ClayWorld2d {
         console.log("[Game] Village generated")
     }
 
-    function _buildVillageBuilding(cx, cy, bw, bh, entrance) {
-        // All params in world units. Builds 3 walls with one side open.
-        let wallColor = "#1E2E3E"
-        let t = 0.5  // Wall thickness in wu
-        let x1 = cx - bw / 2
-        let x2 = cx + bw / 2
-        let y1 = cy - bh / 2
-        let y2 = cy + bh / 2
-
-        // Top wall (always present)
-        createWallAt(x1, y2 + t, bw, t).color = wallColor
-        // Left wall
-        createWallAt(x1, y2 + t, t, bh + t).color = wallColor
-        // Right wall
-        createWallAt(x2 - t, y2 + t, t, bh + t).color = wallColor
-        // Bottom wall (skip if entrance is south)
-        if (entrance !== "south")
-            createWallAt(x1, y1 + t, bw, t).color = wallColor
-        // Lanterns flanking the open front
-        if (entrance === "south") {
-            placeTorch(x1 + t / 2, y1 + 0.35, "#FFC870")
-            placeTorch(x2 - t / 2, y1 + 0.35, "#FFC870")
+    // The camp's cave in the grid (issue #145): the floor of a box of
+    // Balance.camp cells, its edge moved out into bays and in as outcrops
+    // and its corners cut off, all from the level's own stream. Returns
+    // the box (ox, oy), its middle column and row, and a seed for what is
+    // drawn along the edge
+    function carveCamp(levelSeed) {
+        let c = Balance.camp
+        let rand = createRng(levelSeed ^ c.seedSalt)
+        let ox = Math.floor((gridWidth - c.width) / 2)
+        let oy = gridHeight - c.exitTunnel - c.height
+        let mid = Math.floor(ox + c.width / 2)
+        let midRow = Math.floor(oy + c.height / 2)
+        let pick = (range) => range[0] + Math.floor(rand() * (range[1] - range[0] + 1))
+        // A side's edge, per cell along it: how many cells it moves in
+        // from its base line (an outcrop) or, below 0, out (a bay). It
+        // steps by one or two cells at a time, so it terraces rather than
+        // growing fingers of rock or floor one cell wide, and leans back
+        // to the base line, so no side stays in or out all along
+        let side = (n) => {
+            let edge = []
+            let inset = pick([-c.bay, c.outcrop])
+            while (edge.length < n) {
+                let run = pick(c.stretch)
+                for (let i = 0; i < run && edge.length < n; i++) edge.push(inset)
+                let back = 0.5 + 0.2 * inset
+                let step = pick([1, 2]) * (rand() < back ? -1 : 1)
+                inset = Math.max(-c.bay, Math.min(c.outcrop, inset + step))
+            }
+            return edge
         }
+        let south = side(c.width), north = side(c.width)
+        let west = side(c.height), east = side(c.height)
+        // The entrance and the exit open in a bay
+        for (let i = -1; i <= 1; i++) {
+            south[mid - ox + i] = -c.bay
+            north[mid - ox + i] = -c.bay
+        }
+        // Cut off: south-west, south-east, north-west, north-east
+        let corners = [pick(c.corner), pick(c.corner), pick(c.corner), pick(c.corner)]
+        for (let y = 0; y < c.height; y++)
+            for (let x = 0; x < c.width; x++) {
+                let xe = c.width - 1 - x, yn = c.height - 1 - y
+                if (y < c.bay + south[x] || yn < c.bay + north[x]
+                    || x < c.bay + west[y] || xe < c.bay + east[y])
+                    continue
+                if (x + y < corners[0] || xe + y < corners[1] || x + yn < corners[2] || xe + yn < corners[3])
+                    continue
+                grid[oy + y][ox + x] = cellRoom
+            }
+        // Only what the knights can walk to from the entrance stays floor
+        let reached = ({})
+        let open = [[mid, oy + 2]]
+        reached[(oy + 2) * gridWidth + mid] = true
+        while (open.length > 0) {
+            let at = open.pop()
+            for (let d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                let nx = at[0] + d[0], ny = at[1] + d[1], k = ny * gridWidth + nx
+                if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight || reached[k]
+                    || grid[ny][nx] !== cellRoom) continue
+                reached[k] = true
+                open.push([nx, ny])
+            }
+        }
+        for (let y = oy; y < oy + c.height; y++)
+            for (let x = ox; x < ox + c.width; x++)
+                if (grid[y][x] === cellRoom && !reached[y * gridWidth + x]) grid[y][x] = cellWall
+        return { ox: ox, oy: oy, mid: mid, midRow: midRow, seed: rand() }
     }
 
+    // The cells of the tavern's and the smithy's walls, (gy * gridWidth + gx)
+    property var _buildingCells: ({})
+    // A building of whole cells at (gx, gy), its south-west cell: walls
+    // west, north and east, open to the south
+    function _carveBuilding(r) {
+        for (let y = r.gy; y < r.gy + r.h; y++)
+            for (let x = r.gx; x < r.gx + r.w; x++) {
+                if (x !== r.gx && x !== r.gx + r.w - 1 && y !== r.gy + r.h - 1) continue
+                grid[y][x] = cellWall
+                _buildingCells[y * gridWidth + x] = true
+            }
+    }
+    // The walls and faces made since dungeonObjects held `from` that stand
+    // on a building's cells take its timber colours
+    function _tintBuildings(from) {
+        let c = Balance.camp
+        for (let i = from; i < dungeonObjects.length; i++) {
+            let o = dungeonObjects[i]
+            let face = o.shadowWu !== undefined
+            if (!face && o.categories === undefined) continue
+            // A wall's yWu is its top edge, a face's the top of the face
+            let gy = face ? Math.floor(o.yWu / cellSize) : Math.round(o.yWu / cellSize) - 1
+            let gx = Math.round(o.xWu / cellSize)
+            if (!_buildingCells[gy * gridWidth + gx]) continue
+            o.color = face ? c.buildingFace : c.buildingWall
+        }
+    }
+    // Lanterns flanking a building's open front
+    function _lightBuilding(r) {
+        let y0 = r.gy * cellSize + 0.35
+        placeTorch((r.gx + 0.5) * cellSize, y0, "#FFC870")
+        placeTorch((r.gx + r.w - 0.5) * cellSize, y0, "#FFC870")
+    }
     // dialogue: its lines, or a function making them when it is talked to
     function _spawnVillageNpc(wx, wy, color, iconType, name, routine, dialogue, greeting, wares) {
         let npc = npcComponent.createObject(world.room, {

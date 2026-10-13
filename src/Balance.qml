@@ -751,4 +751,38 @@ QtObject {
         healRadius: 3.0,
         healTick: 0.2
     })
+
+    // The camp (issue #145): a cave, not a box. Sizes in grid cells (2 wu)
+    // unless named in wu. The cave fills a box of width x height cells
+    // whose top sits exitTunnel rows below the top of the map, where the
+    // stairs are. Its edge runs bay cells inside the box, and along each
+    // side it moves out by up to bay cells (a bay) or in by up to outcrop
+    // cells (an outcrop), stepping by one or two cells every stretch[0] to
+    // stretch[1] cells;
+    // each corner of the box is cut off diagonally by corner[0] to
+    // corner[1] cells. The entrance and the exit open in a bay. The
+    // outline draws from its own stream, the level's seed ^ seedSalt, so
+    // every screen of a session builds the same cave
+    readonly property var camp: ({
+        width: 32,
+        height: 26,
+        exitTunnel: 3,
+        bay: 2,
+        outcrop: 2,
+        stretch: [3, 6],
+        corner: [4, 7],
+        seedSalt: 0x63617665,
+        // The walk from where the knights come in to the stairs, at
+        // knight.moveSpeed, takes at most this many seconds
+        maxWalk: 8,
+        // The tavern and the smithy: walls of whole cells, open to the
+        // south, width x height cells each, building cells to either side
+        // of the camp's middle column and raised cells above its middle row
+        building: { width: 5, height: 4, side: 4, raised: 2 },
+        buildingWall: "#4A3A2E",
+        buildingFace: "#5C4836",
+        // The campfire's light, in wu: it reaches the buildings, which
+        // cast shadows from it
+        fireLight: 16
+    })
 }

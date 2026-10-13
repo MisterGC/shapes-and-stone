@@ -21,16 +21,16 @@ RectBoxBody {
     property real healRadius: Balance.campfire.healRadius
     property bool _isHealing: false
 
-    // The camp's main light, burning restlessly
+    // The camp's main light, burning restlessly; the tavern and the
+    // smithy cast shadows from it
     Light2d {
         // xWu/yWu of a body are its top-left corner
         offsetXWu: campfire.widthWu / 2
         offsetYWu: -campfire.heightWu / 2
-        radius: 11
+        radius: Balance.camp.fireLight
         color: "#FF9440"
         intensity: 1.1
         flicker: 0.6
-        castsShadows: false
     }
 
     // Warm glow with pulse
