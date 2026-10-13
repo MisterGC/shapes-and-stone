@@ -14,6 +14,8 @@ Item {
     property real heightWu: 0.7
     property real shadowWu: 0.9
     property color color: "#3A4658"
+    // "bricks", or a camp's (issue #146): "moss", "strata" or "basalt"
+    property string faceStyle: "bricks"
 
     x: xWu * pixelPerUnit
     y: parent ? parent.height - yWu * pixelPerUnit : 0
@@ -29,6 +31,7 @@ Item {
         property vector2d sizeWu: Qt.vector2d(wf.widthWu, wf.heightWu)
         property real pixelsPerWu: 12
         property real face: 1
+        property real faceStyle: Math.max(0, ["bricks", "moss", "strata", "basalt"].indexOf(wf.faceStyle))
         property color baseColor: wf.color
     }
 
