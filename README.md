@@ -383,6 +383,33 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cave/cave.qml
 qml -I build/bin/qml tests/cave/cave.qml -- <out dir>
 ```
 
+The camps are the stations of the way down, and their look follows the
+depth: down to depth 2 a mossy grotto (green earth, moss over the rock,
+a pond, ferns, glowing mushrooms, fireflies), from depth 3 a miners' hall
+(ochre ground, rock strata between timber props, a rail track and its
+cart, crates, ore, dust in the lantern light), from depth 6 an ember camp
+(basalt ground and columns, glowing cracks and coals, embers in the
+air). Each look has its own rock, faces, floor, lanterns, air and screen
+grade, and its props are one of two or three layouts, picked from the
+level's seed (`camp.propSalt`), so every screen of a session lays out the
+same. A prop lies whole on the cave's floor, off the way to the stairs,
+the campfire and the people, and is only drawn: the knights walk over
+it. The campfire stays the brightest light, and the campfire, the
+innkeeper, the smith and the witch keep their places at every depth.
+The looks are a table in `Balance.camp.looks`: a fourth is a row with
+its depth, its colours and its layouts. The camps bench lands at every
+depth from 0 to 12, checks each look on 12 seeds and has another screen
+build the same camps; with a window, the copied shaders and an output
+directory it saves each look at two seeds, whole and at the campfire:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camps/camps.qml
+qml -I build/bin/qml tests/camps/camps.qml -- <out dir>
+```
+
+In the dojo, `applyScenario("village", d)` lands in the camp after depth
+d: 0 the grotto, 4 the hall, 7 the ember camp.
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
@@ -513,8 +540,8 @@ window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
 settling each next one from both knights' records and building it for two,
 and checks that both screens' gauges show the same depth, at each camp and
-in each dungeon (`--shots` saves both screens of the first three camps
-too):
+in each dungeon, and that both build the same camp in its depth's look
+(`--shots` saves both screens of the first three camps too):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
