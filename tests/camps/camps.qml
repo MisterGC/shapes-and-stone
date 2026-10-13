@@ -7,8 +7,8 @@
 // rock, the faces, the light and the screen grade differ from the other
 // looks', and the camp takes them. On 12 seeds per look the props lie
 // whole on the cave's floor, off the way to the stairs, the campfire and
-// the people, at least minProps of them, from at least two of the look's
-// layouts; nothing of them blocks or is anyone the benches look for. The
+// the people, at least minProps of them, the layout's landmark among
+// them, from at least two of the look's layouts; nothing of them blocks or is anyone the benches look for. The
 // campfire stays the brightest light and the innkeeper, the smith and the
 // witch keep their places at every depth. Another game, another screen,
 // builds the same camp - look, layout and props - from the same seed and
@@ -116,6 +116,7 @@ Window {
         return {
             seed: seed, depth: d, look: look.name, layout: g.campLayout,
             props: JSON.stringify(g.campProps), count: g.campProps.length,
+            landmark: g.campProps.some(p => p.kind === look.layouts[g.campLayout][0].kind),
             onFloor: g.campProps.every(cellsFloor),
             clear: g.campProps.every(p => Math.abs(p.x - cx) >= p.w / 2 + c.clearOfPath
                                      && off(p, fire.xWu, fire.yWu) >= c.clearOfFire
@@ -276,6 +277,8 @@ Window {
             check(Object.keys(layouts).length >= 2, look.name + ": the seeds pick layouts "
                   + Object.keys(layouts).sort().join(", ") + " of " + look.layouts.length)
         }
+        check(results.every(r => r.landmark), "every camp lays its layout's first prop, the look's landmark "
+              + "(the pond, the rail track, the cracks) " + list(results, r => !r.landmark))
         check(results.every(r => r.onFloor), "every prop lies whole on the cave's floor " + list(results, r => !r.onFloor))
         check(results.every(r => r.clear), "every prop keeps off the way to the stairs, the campfire and the people "
               + list(results, r => !r.clear))
