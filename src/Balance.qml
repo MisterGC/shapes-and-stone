@@ -815,6 +815,9 @@ QtObject {
         clearOfFire: 5,
         clearOfFront: 3,
         clearOfPeople: 2.5,
+        // A prop whose place the cave's edge cuts moves up to propShift wu
+        // toward the middle, on its side and then on the other
+        propShift: 4,
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",
@@ -823,14 +826,14 @@ QtObject {
               air: { color: "#BFFF73", alpha: 0.9, density: 0.06, size: 0.06, drift: 0.9, blink: true, glows: true },
               grade: { ambient: "#3E5248", temperature: -0.1, saturation: 1.2, vignette: 0.35 },
               layouts: [
-                  [ { kind: "pond", x: -20, y: -1, w: 7, h: 5 },
+                  [ { kind: "pond", x: -20, y: -3, w: 7, h: 5 },
                     { kind: "stones", x: -13, y: -14, w: 4, h: 3 },
                     { kind: "mushrooms", x: -21, y: 6, w: 3, h: 2 },
                     { kind: "ferns", x: 13, y: -14, w: 4, h: 3 },
                     { kind: "stones", x: 20, y: -2, w: 4, h: 3 },
                     { kind: "mushrooms", x: 12, y: 15, w: 3, h: 2 },
                     { kind: "ferns", x: -12, y: 15, w: 4, h: 2 } ],
-                  [ { kind: "pond", x: 20, y: -2, w: 7, h: 5 },
+                  [ { kind: "pond", x: 20, y: -3, w: 7, h: 5 },
                     { kind: "ferns", x: -20, y: 0, w: 4, h: 3 },
                     { kind: "stones", x: 13, y: -14, w: 5, h: 3 },
                     { kind: "mushrooms", x: -14, y: -13, w: 3, h: 2 },

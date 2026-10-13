@@ -5515,8 +5515,8 @@ ClayWorld2d {
     // The camp's props (issue #146): one of its look's layouts, picked
     // from the level's own stream (seed ^ Balance.camp.propSalt), so every
     // screen of a session lays out the same. A prop is left out unless it
-    // lies whole on the cave's floor, here or else mirrored to the camp's
-    // other side onto no other prop, clear of the way to the stairs, the
+    // lies whole on the cave's floor - in its place, else moved in or to
+    // the camp's other side onto no other prop - clear of the way to the stairs, the
     // campfire, the buildings' fronts, and the people and where they walk
     // and the spots (points in wu) given. campProps holds what was laid:
     // { kind, x, y, w, h } in world units, the prop's centre
@@ -5549,15 +5549,18 @@ ClayWorld2d {
             y: (camp.midRow + b.raised) * cellSize }))
         for (let p of look.layouts[campLayout]) {
             let seed = rand()
-            // Where the cave's edge cuts its place, the prop tries the
-            // other side of the camp
-            let px = p.x
-            let fits = x => _propFits(cx + x - p.w / 2, cy + p.y - p.h / 2, cx + x + p.w / 2, cy + p.y + p.h / 2,
-                                      cx, fire, fronts, spots)
-            if (!fits(px)) px = -p.x
-            if (!fits(px) || px !== p.x && campProps.some(q => Math.abs(q.x - cx - px) < (q.w + p.w) / 2
-                                                             && Math.abs(q.y - cy - p.y) < (q.h + p.h) / 2))
-                continue
+            // Where the cave's edge cuts its place, the prop steps in
+            // toward the middle, wu by wu up to c.propShift, then tries the
+            // same on the other side of the camp; moved, it lands on no
+            // other prop
+            let tries = []
+            for (let side of [1, -1])
+                for (let k = 0; k <= c.propShift; k++) tries.push(side * (p.x - Math.sign(p.x) * k))
+            let px = tries.find(x => _propFits(cx + x - p.w / 2, cy + p.y - p.h / 2, cx + x + p.w / 2,
+                                               cy + p.y + p.h / 2, cx, fire, fronts, spots)
+                                     && (x === p.x || !campProps.some(q => Math.abs(q.x - cx - x) < (q.w + p.w) / 2
+                                                                      && Math.abs(q.y - cy - p.y) < (q.h + p.h) / 2)))
+            if (px === undefined) continue
             let x0 = cx + px - p.w / 2, y1 = cy + p.y + p.h / 2
             let glows = ["mushrooms", "cracks", "coals"].indexOf(p.kind) >= 0
             let o = campPropComponent.createObject(glows ? glowParent() : world.room, {
