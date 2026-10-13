@@ -477,6 +477,48 @@ another screen builds the same:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/moths/moths.qml
 ```
 
+In most camps a cave cat sleeps curled by the campfire, a few soft
+shapes breathing slowly. When a knight comes within `notice` wu (3) it
+lifts its head and follows the knight with its eyes; once no knight has
+been within `forget` wu (4) for `settle` seconds (1.5) it tucks its head
+back in; now and then, asleep, it stretches. A knight that sits down by
+the fire lets it sleep. It lies on a ring round the fire, out of the
+warmth where the knights sit, on the floor and clear of the way to the
+stairs, the people and the props. It is drawn only: nothing collides with
+it, nobody talks to it, nothing depends on it. Whether it is there and
+where it lies come from the level's seed (`camp.catSalt`), so every
+screen of a session sees the same cat or none, and each screen sees it
+look up at whichever knight comes near. Its numbers and colours are
+`camp.cat`. The cat bench checks on 20 seeds in each look that most camps
+have a cat and not all, where it lies, that it is no body, npc or prop,
+and that another screen places the same; then that it looks up at a
+knight coming near, follows it round, settles after the knight leaves,
+sleeps by a seated knight, watches the nearer of two knights and stops
+its stretch when woken. The danger party bench checks the same cat on two
+screens, and on both it looks up at the host's knight:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cat/cat.qml
+```
+
+The cat is made from a creature template, `src/Creature.qml`, for the
+camp's next creatures (bats, fish, a salamander). The template does the
+watching: every `tick` seconds it asks the game for this screen's knights
+(`Game.knightsHere()`), turns `mood` from `"idle"` to `"alert"` when a
+standing knight is within `notice` wu, and back once none has been within
+`forget` wu for `settle` seconds. It hands its shapes a few numbers to
+draw by: `lift` (0 idle to 1 alert, eased over `rise` and `fall`
+seconds), `lookX` and `lookY` (the way to the knight it watches),
+`breathing` (-1 to 1, one breath every `breath` seconds) and `act` (0 to
+1 and back while its idle act plays, every `act.every` seconds, for
+`act.seconds`; a knight coming ends it). A new creature is a QML file
+`Creature { creature: "bat"; numbers: Balance.camp.bat; ... }` with its
+shapes reading those numbers (`src/CaveCat.qml` is the example), a group
+of numbers in `Balance.camp`, and a place in `Game.generateVillage`,
+drawn from its own stream (the level's seed ^ its own salt) like
+`_placeCat`. A creature of a few shapes can be QML items, as the cat is;
+a swarm (bats, a shoal of fish) is one shader pass, as the moths are.
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
@@ -607,9 +649,10 @@ window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
 settling each next one from both knights' records and building it for two,
 and checks that both screens' gauges show the same depth, at each camp and
-in each dungeon, that both build the same camp in its depth's look, and
-that at the first camp both show the knights sit down by the fire and one
-stand up again (`--shots` saves both screens of the first three camps and
+in each dungeon, that both build the same camp in its depth's look, with
+the same cat or none, and that at the first camp the cat looks up at the
+host's knight on both screens and both show the knights sit down by the
+fire and one stand up again (`--shots` saves both screens of the first three camps and
 of the knights seated too):
 
 ```
