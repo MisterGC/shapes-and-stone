@@ -22,6 +22,9 @@ records of the dungeon and the host leads the party down:
 - both screens' descent gauges show the same depth: at the camp large,
   the marker sunk into the next dungeon's layer; in the dungeon small, the
   marker in its layer (issue #97)
+- both screens build the same camp: the look of its depth (the grotto at
+  depth 0 to 2, the miners' hall at 3), the same layout and the same
+  props (issue #146)
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
@@ -292,6 +295,7 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
     check(abs(want - alone) > 0.01,
           f"{tag} the host's record alone would have given {alone:.3f} ({BANDS[band(alone)]})")
     check_gauges(tag, n - 1, True, H, J, check)
+    check_camps(tag, n - 1, H, J, check)
     if args.shots and n <= 3:
         shoot(tag, f"camp{n - 1}", H, J, args, check)
 
@@ -349,6 +353,15 @@ def check_gauges(tag, depth, camp, H, J, check):
           f"{tag} in {where} both gauges show depth {depth}, "
           f"{'large, the marker sunk into layer' if camp else 'small, the marker in layer'} {shown}"
           + ("" if hg == jg else f" (host {hg}, joiner {jg})"))
+
+
+def check_camps(tag, depth, H, J, check):
+    """Both screens build the same camp, in its depth's look"""
+    hc, jc = H.json("camp()"), J.json("camp()")
+    want = "hall" if depth >= 3 else "grotto"
+    check(hc == jc and hc["look"] == want and len(hc["props"]) > 0,
+          f"{tag} both screens build the same camp: the {hc['look']} (want {want}), layout {hc['layout']}, "
+          f"{len(hc['props'])} props" + ("" if hc == jc else f" (host {hc}, joiner {jc})"))
 
 
 def check_foes(tag, H, J, check):

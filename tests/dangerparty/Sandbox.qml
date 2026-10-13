@@ -111,6 +111,12 @@ Item {
         }
         return out
     }
+    // What the camp on this screen looks like (issue #146): its look,
+    // the layout of its props and every prop laid
+    function camp() {
+        return {look: game.campLook.name, layout: game.campLayout,
+                props: game.campProps.map(p => [p.kind, r3(p.x), r3(p.y), r3(p.w), r3(p.h)])}
+    }
     // The enemies on this screen, by their replicated object, and the
     // knights the dungeon was built for: per enemy its id, type, tier, max
     // HP and the HP the table gives it for these knights; the spawn
