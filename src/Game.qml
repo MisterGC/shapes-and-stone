@@ -1020,6 +1020,17 @@ ClayWorld2d {
     // its band. The village and the fight room keep their own look
     readonly property bool dangerLook: levelType === "dungeon" && !fightRoomActive
     readonly property var look: Balance.danger.looks[dangerBand(dangerPosition)]
+    // What the camp looks like at its depth (issue #146): the last of
+    // Balance.camp.looks it is deep enough for - a mossy grotto, a miners'
+    // hall, an ember camp. The fight room keeps its own look
+    readonly property bool campStyled: levelType === "village" && !fightRoomActive
+    readonly property var campLook: campLookAt(depth)
+    function campLookAt(d) {
+        let looks = Balance.camp.looks
+        for (let i = looks.length - 1; i > 0; i--)
+            if (d >= looks[i].from) return looks[i]
+        return looks[0]
+    }
     function _setDanger(position, next) {
         if (position === undefined || isNaN(position)) return
         dangerPosition = position
@@ -2525,7 +2536,7 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : look.ambient
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -2536,14 +2547,14 @@ ClayWorld2d {
     ScreenFx2d {
         id: screenFxItem
         world: world
-        vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
+        vignette: world.fx ? (campStyled ? campLook.grade.vignette : 0.55) : 0
         vignetteColor: "#000000"
-        // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15
+        // Danger rooms run warm, the camps as their look (README: Atmosphere Toolkit)
+        temperature: !world.fx ? 0 : campStyled ? campLook.grade.temperature
                      : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
-        saturation: world.fx ? 1.15 : 1
+        saturation: !world.fx ? 1 : campStyled ? campLook.grade.saturation : 1.15
         contrast: world.fx ? 1.05 : 1
         // The heartbeat sets in below a quarter of the health and grows
         // gently - a warning, not an alarm
@@ -2742,11 +2753,22 @@ ClayWorld2d {
     Component { id: motesComponent; Motes {} }
 
     function spawnMotes() {
-        // Fireflies glow on their own; dust only shows where light falls
-        let village = levelType === "village" && !fightRoomActive
-        let m = motesComponent.createObject(village ? glowParent() : world.room, {
+        // Fireflies and embers glow on their own; dust only shows where
+        // light falls. A camp's air is its look's
+        if (campStyled) {
+            let a = campLook.air
+            let col = Qt.color(a.color)
+            dungeonObjects.push(motesComponent.createObject(a.glows ? glowParent() : world.room, {
+                widthWu: xWuMax, heightWu: yWuMax,
+                fireflies: a.blink, density: a.density, moteSize: a.size, drift: a.drift,
+                color: Qt.rgba(col.r, col.g, col.b, a.alpha),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                visible: Qt.binding(() => world.fx)
+            }))
+            return
+        }
+        let m = motesComponent.createObject(world.room, {
             widthWu: xWuMax, heightWu: yWuMax,
-            fireflies: village,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -3456,6 +3478,7 @@ ClayWorld2d {
             collidesWith: catPlayer | catEnemy | catProjectile,
             fx: Qt.binding(() => world.fx)
         })
+        if (campStyled) wall.color = campLook.rock
         dungeonObjects.push(wall)
         return wall
     }
@@ -4746,6 +4769,7 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
+        if (campStyled) r.color = campLook.rim
         dungeonObjects.push(r)
         return r
     }
@@ -4773,7 +4797,8 @@ ClayWorld2d {
             yWu: gy * cellSize + wallFaceWu,
             widthWu: (toGx - fromGx) * cellSize,
             heightWu: wallFaceWu,
-            color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+            color: campStyled ? campLook.face : "#3A4658",
+            faceStyle: campStyled ? campLook.faceStyle : "bricks",
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -5184,6 +5209,8 @@ ClayWorld2d {
 
         grid = []
         rooms = []
+        campProps = []
+        campLayout = -1
         // The minimap paints what is explored of the grid, and the grid is gone
         exploredCells = []
     }
@@ -5243,10 +5270,13 @@ ClayWorld2d {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             fx: Qt.binding(() => world.fx),
-            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            style: campLook.floor.style,
+            grass: campLook.floor.grass,
+            moss: campLook.floor.moss,
+            crackShare: campLook.floor.crackShare,
             seed: (levelIndex * 0.137) % 1
         })
-        floorObj.color = "#2A3A4A"
+        floorObj.color = campLook.floor.color
         dungeonObjects.push(floorObj)
         let built = dungeonObjects.length
         createMergedWalls()
@@ -5318,7 +5348,7 @@ ClayWorld2d {
             world: world.physics,
             categories: catWall,
             collidesWith: catPlayer,
-            color: "#2A4A2A"
+            color: campLook.tree
         })
         tree.radius = tree.width * 0.5
         dungeonObjects.push(tree)
@@ -5329,6 +5359,7 @@ ClayWorld2d {
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
+        _placeCampProps(camp, levelSeed, [Qt.point(tree.xWu, tree.yWu)])
 
         // Spawn player at entrance
         spawnPlayer(cx, (camp.oy + 2) * cellSize)
@@ -5437,7 +5468,7 @@ ClayWorld2d {
     // The walls and faces made since dungeonObjects held `from` that stand
     // on a building's cells take its timber colours
     function _tintBuildings(from) {
-        let c = Balance.camp
+        let c = campLook
         for (let i = from; i < dungeonObjects.length; i++) {
             let o = dungeonObjects[i]
             let face = o.shadowWu !== undefined
@@ -5452,8 +5483,8 @@ ClayWorld2d {
     // Lanterns flanking a building's open front
     function _lightBuilding(r) {
         let y0 = r.gy * cellSize + 0.35
-        placeTorch((r.gx + 0.5) * cellSize, y0, "#FFC870")
-        placeTorch((r.gx + r.w - 0.5) * cellSize, y0, "#FFC870")
+        placeTorch((r.gx + 0.5) * cellSize, y0, campLook.lantern)
+        placeTorch((r.gx + r.w - 0.5) * cellSize, y0, campLook.lantern)
     }
     // The rock overhanging the cave's north-facing edges, one piece per
     // run of face, as the faces are; the buildings have none
@@ -5473,11 +5504,79 @@ ClayWorld2d {
                     widthWu: (gx - startX) * cellSize, faceWu: wallFaceWu,
                     lipWu: o.lip, stalactiteWu: o.stalactite, toothWu: o.tooth, shadowWu: o.shadow,
                     seed: seed * 1000,
+                    baseColor: campLook.rock,
                     pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
                     visible: Qt.binding(() => world.fx)
                 }))
             }
         }
+    }
+
+    // The camp's props (issue #146): one of its look's layouts, picked
+    // from the level's own stream (seed ^ Balance.camp.propSalt), so every
+    // screen of a session lays out the same. A prop is left out unless it
+    // lies whole on the cave's floor, clear of the way to the stairs, the
+    // campfire, the buildings' fronts, and the people and where they walk
+    // and the spots (points in wu) given. campProps holds what was laid:
+    // { kind, x, y, w, h } in world units, the prop's centre
+    Component { id: campPropComponent; CampProp {} }
+    property var campProps: []
+    property var campLayout: -1
+    property real campClock: 0
+    NumberAnimation on campClock {
+        from: 0; to: 3600; duration: 3600000
+        loops: Animation.Infinite
+        running: campStyled && world.fx
+    }
+    function _placeCampProps(camp, levelSeed, spots) {
+        let c = Balance.camp, look = campLook
+        // The innkeeper, the smith and the witch, and every spot of their
+        // routines
+        for (let o of dungeonObjects)
+            if (o && o.objectName === "npc") {
+                spots.push(Qt.point(o.xWu, o.yWu))
+                for (let r of o.routine) spots.push(Qt.point(r.x, r.y))
+            }
+        let rand = createRng(levelSeed ^ c.propSalt)
+        campLayout = Math.floor(rand() * look.layouts.length)
+        campProps = []
+        let cx = camp.mid * cellSize, cy = camp.midRow * cellSize
+        let fire = dungeonObjects.find(o => o && o.healRadius !== undefined)
+        let b = c.building
+        let fronts = [camp.mid - b.side - b.width, camp.mid + b.side].map(gx => ({
+            x0: gx * cellSize, x1: (gx + b.width) * cellSize,
+            y: (camp.midRow + b.raised) * cellSize }))
+        for (let p of look.layouts[campLayout]) {
+            let seed = rand()
+            let x0 = cx + p.x - p.w / 2, x1 = cx + p.x + p.w / 2
+            let y0 = cy + p.y - p.h / 2, y1 = cy + p.y + p.h / 2
+            if (!_propFits(x0, y0, x1, y1, cx, fire, fronts, spots)) continue
+            let glows = ["mushrooms", "cracks", "coals"].indexOf(p.kind) >= 0
+            let o = campPropComponent.createObject(glows ? glowParent() : world.room, {
+                xWu: x0, yWu: y1, widthWu: p.w, heightWu: p.h,
+                propKind: p.kind, seed: seed,
+                time: Qt.binding(() => campClock),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                visible: Qt.binding(() => world.fx)
+            })
+            dungeonObjects.push(o)
+            campProps.push({ kind: p.kind, x: cx + p.x, y: cy + p.y, w: p.w, h: p.h })
+        }
+    }
+    function _propFits(x0, y0, x1, y1, cx, fire, fronts, spots) {
+        let c = Balance.camp
+        // How far the rectangle is from a point
+        let off = (px, py) => Math.hypot(px - Math.max(x0, Math.min(px, x1)), py - Math.max(y0, Math.min(py, y1)))
+        if (x1 > cx - c.clearOfPath && x0 < cx + c.clearOfPath) return false
+        if (off(fire.xWu, fire.yWu) < c.clearOfFire) return false
+        for (let f of fronts)
+            if (x1 > f.x0 && x0 < f.x1 && y1 > f.y - c.clearOfFront && y0 < f.y) return false
+        for (let s of spots)
+            if (off(s.x, s.y) < c.clearOfPeople) return false
+        for (let gy = Math.floor(y0 / cellSize); gy <= Math.floor((y1 - 0.001) / cellSize); gy++)
+            for (let gx = Math.floor(x0 / cellSize); gx <= Math.floor((x1 - 0.001) / cellSize); gx++)
+                if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+        return true
     }
 
     // dialogue: its lines, or a function making them when it is talked to

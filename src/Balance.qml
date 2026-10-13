@@ -779,8 +779,6 @@ QtObject {
         // south, width x height cells each, building cells to either side
         // of the camp's middle column and raised cells above its middle row
         building: { width: 5, height: 4, side: 4, raised: 2 },
-        buildingWall: "#4A3A2E",
-        buildingFace: "#5C4836",
         // The campfire's light, in wu: it reaches the buildings, which
         // cast shadows from it
         fireLight: 16,
@@ -788,6 +786,121 @@ QtObject {
         // hangs over the top of the face, stalactites of up to stalactite
         // wu below it, one in about every tooth wu along the edge, and
         // their shadows fall up to shadow wu onto the floor
-        overhang: { lip: 0.3, stalactite: 0.55, tooth: 0.7, shadow: 1.6 }
+        overhang: { lip: 0.3, stalactite: 0.55, tooth: 0.7, shadow: 1.6 },
+        // The camp's look follows the depth (issue #146): a camp takes the
+        // last of looks whose from is at most its depth, the depth of the
+        // dungeon before it. Each look has its rock (the walls' tops and
+        // the overhang), its faces in faceStyle ("bricks", "moss",
+        // "strata" or "basalt") with their rims, the tavern's and the
+        // smithy's walls and faces, the lanterns at their fronts, the
+        // witch's tree (or what stands in its place); its floor in style
+        // ("stone", "earth" or "basalt") with grass over that share of
+        // earth, moss over that share of stone and that share of the
+        // stones cracked; its air (motes of that colour, density and
+        // size, drifting that far, blinking like fireflies or not, glowing
+        // on their own or seen in the light); and its screen grade: the
+        // darkness's ambient, the temperature, the saturation and the
+        // vignette. Its props are one of layouts, picked from the level's
+        // seed ^ propSalt, each a list of props: a kind of shaders/prop.frag
+        // centred x, y wu from the camp's centre (east, north), w x h wu.
+        // A prop that would not lie whole on the cave's floor, clear of
+        // the paths, the fire and the people, is left out. Props are drawn
+        // only: the knights walk over them, nothing blocks or hurts
+        propSalt: 0x70726f70,
+        // Props stay this far, in wu, off the middle column (the way from
+        // the entrance to the stairs), off the campfire's centre, off the
+        // fronts of the buildings, and off the innkeeper, the smith, the
+        // witch, her tree and every spot of their routines
+        clearOfPath: 3,
+        clearOfFire: 5,
+        clearOfFront: 3,
+        clearOfPeople: 2.5,
+        looks: [
+            { name: "grotto", from: 0,
+              rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",
+              buildingWall: "#4A4232", buildingFace: "#5E5440", lantern: "#E8F0A0", tree: "#2A4A2A",
+              floor: { style: "earth", color: "#34402E", grass: 0.8, moss: 0, crackShare: 0 },
+              air: { color: "#BFFF73", alpha: 0.9, density: 0.06, size: 0.06, drift: 0.9, blink: true, glows: true },
+              grade: { ambient: "#3E5248", temperature: -0.1, saturation: 1.2, vignette: 0.35 },
+              layouts: [
+                  [ { kind: "pond", x: -20, y: -1, w: 7, h: 5 },
+                    { kind: "stones", x: -13, y: -14, w: 4, h: 3 },
+                    { kind: "mushrooms", x: -21, y: 6, w: 3, h: 2 },
+                    { kind: "ferns", x: 13, y: -14, w: 4, h: 3 },
+                    { kind: "stones", x: 20, y: -2, w: 4, h: 3 },
+                    { kind: "mushrooms", x: 12, y: 15, w: 3, h: 2 },
+                    { kind: "ferns", x: -12, y: 15, w: 4, h: 2 } ],
+                  [ { kind: "pond", x: 20, y: -2, w: 7, h: 5 },
+                    { kind: "ferns", x: -20, y: 0, w: 4, h: 3 },
+                    { kind: "stones", x: 13, y: -14, w: 5, h: 3 },
+                    { kind: "mushrooms", x: -14, y: -13, w: 3, h: 2 },
+                    { kind: "stones", x: -12, y: 15, w: 4, h: 2 },
+                    { kind: "ferns", x: 13, y: 15, w: 4, h: 2 },
+                    { kind: "mushrooms", x: 21, y: 6, w: 3, h: 2 } ],
+                  [ { kind: "pond", x: -13, y: -13, w: 8, h: 5 },
+                    { kind: "stones", x: 13, y: -13, w: 4, h: 3 },
+                    { kind: "ferns", x: -20, y: 1, w: 4, h: 3 },
+                    { kind: "mushrooms", x: 20, y: 0, w: 3, h: 2 },
+                    { kind: "ferns", x: 12, y: 15, w: 4, h: 2 },
+                    { kind: "stones", x: -12, y: 15, w: 4, h: 2 },
+                    { kind: "mushrooms", x: 8, y: -9, w: 2, h: 2 } ]
+              ] },
+            { name: "hall", from: 3,
+              rock: "#2A221C", face: "#7A6040", faceStyle: "strata", rim: "#A08860",
+              buildingWall: "#5A3E22", buildingFace: "#8A6232", lantern: "#FFC870", tree: "#5A4128",
+              floor: { style: "earth", color: "#4A3D2C", grass: 0, moss: 0, crackShare: 0 },
+              air: { color: "#FFD99A", alpha: 0.35, density: 0.35, size: 0.045, drift: 0.35, blink: false, glows: false },
+              grade: { ambient: "#5A4E3E", temperature: 0.12, saturation: 1.1, vignette: 0.4 },
+              layouts: [
+                  [ { kind: "rails", x: -14, y: -15, w: 14, h: 1.4 },
+                    { kind: "cart", x: -10, y: -15, w: 2.4, h: 1.8 },
+                    { kind: "timber", x: -20, y: 0, w: 3, h: 4 },
+                    { kind: "ore", x: 13, y: -13, w: 4, h: 3 },
+                    { kind: "crates", x: 20, y: -2, w: 3, h: 3 },
+                    { kind: "crates", x: 12, y: 15, w: 3, h: 2 },
+                    { kind: "ore", x: -12, y: 15, w: 4, h: 2 } ],
+                  [ { kind: "rails", x: 20, y: -3, w: 1.4, h: 12 },
+                    { kind: "cart", x: 20, y: 1, w: 1.8, h: 2.4 },
+                    { kind: "crates", x: -20, y: -1, w: 3, h: 3 },
+                    { kind: "ore", x: -13, y: -13, w: 4, h: 3 },
+                    { kind: "timber", x: 13, y: -14, w: 4, h: 3 },
+                    { kind: "ore", x: 12, y: 15, w: 4, h: 2 },
+                    { kind: "crates", x: -12, y: 15, w: 3, h: 2 } ],
+                  [ { kind: "rails", x: 12, y: 15, w: 12, h: 1.4 },
+                    { kind: "cart", x: 15, y: 15, w: 2.4, h: 1.8 },
+                    { kind: "ore", x: -20, y: 0, w: 4, h: 4 },
+                    { kind: "crates", x: 13, y: -13, w: 3, h: 3 },
+                    { kind: "timber", x: -13, y: -14, w: 4, h: 3 },
+                    { kind: "crates", x: 20, y: -1, w: 3, h: 2 },
+                    { kind: "ore", x: -12, y: 15, w: 4, h: 2 } ]
+              ] },
+            { name: "ember", from: 6,
+              rock: "#181414", face: "#3A302E", faceStyle: "basalt", rim: "#8A4A30",
+              buildingWall: "#3A2A24", buildingFace: "#4E3A30", lantern: "#FF7A3A", tree: "#262022",
+              floor: { style: "basalt", color: "#363030", grass: 0, moss: 0, crackShare: 0 },
+              air: { color: "#FF5414", alpha: 0.9, density: 0.05, size: 0.05, drift: 0.8, blink: false, glows: true },
+              grade: { ambient: "#3C2622", temperature: 0.3, saturation: 1.15, vignette: 0.45 },
+              layouts: [
+                  [ { kind: "cracks", x: -20, y: -1, w: 7, h: 5 },
+                    { kind: "basalt", x: -13, y: -14, w: 5, h: 3 },
+                    { kind: "coals", x: 13, y: -13, w: 3, h: 2 },
+                    { kind: "slag", x: 20, y: -2, w: 4, h: 3 },
+                    { kind: "cracks", x: 12, y: 15, w: 8, h: 2 },
+                    { kind: "basalt", x: -12, y: 15, w: 5, h: 2 } ],
+                  [ { kind: "cracks", x: 20, y: -1, w: 7, h: 5 },
+                    { kind: "basalt", x: -20, y: 0, w: 4, h: 4 },
+                    { kind: "slag", x: -13, y: -13, w: 4, h: 3 },
+                    { kind: "coals", x: 8, y: -9, w: 2, h: 2 },
+                    { kind: "basalt", x: 13, y: -14, w: 5, h: 3 },
+                    { kind: "cracks", x: -12, y: 15, w: 8, h: 2 },
+                    { kind: "coals", x: 12, y: 15, w: 3, h: 2 } ],
+                  [ { kind: "cracks", x: -13, y: -13, w: 8, h: 4 },
+                    { kind: "basalt", x: 20, y: 0, w: 4, h: 4 },
+                    { kind: "slag", x: -20, y: 1, w: 4, h: 3 },
+                    { kind: "coals", x: 13, y: -13, w: 3, h: 2 },
+                    { kind: "basalt", x: 12, y: 15, w: 5, h: 2 },
+                    { kind: "slag", x: -12, y: 15, w: 4, h: 2 } ]
+              ] }
+        ]
     })
 }
