@@ -68,6 +68,7 @@ clay_app(shapes_and_stone
         src/CaveOverhang.qml
         src/CampProp.qml
         src/Creature.qml
+        src/CaveCat.qml
         src/CampSounds.qml
         src/Projectile.qml
         src/Npc.qml

@@ -5201,6 +5201,7 @@ ClayWorld2d {
         }
         dungeonObjects = []
         campfire = null
+        campCat = null
         campSounds.clear()
         features = []
         featureShowcase = false
@@ -5384,8 +5385,10 @@ ClayWorld2d {
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
-        _placeCampProps(camp, levelSeed, [Qt.point(tree.xWu, tree.yWu)])
+        let spots = [Qt.point(tree.xWu, tree.yWu)]
+        _placeCampProps(camp, levelSeed, spots)
         _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
+        _placeCat(camp, levelSeed, cf, spots)
         campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
                          anvilAt, campLook, campProps)
 
@@ -5543,6 +5546,48 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         }))
+    }
+    // The cave cat (issue #150): in Balance.camp.cat.share of the camps,
+    // curled on a ring round the campfire, out of the warmth where the
+    // knights sit, on the floor and clear of the way to the stairs, the
+    // people's spots (the routines' and the tree, as _placeCampProps
+    // leaves them) and the props. Its own stream, the level's seed ^
+    // Balance.camp.catSalt, so every screen of a session sees the same cat
+    // or none. campCat is it, or null
+    Component { id: caveCatComponent; CaveCat {} }
+    property var campCat: null
+    function _placeCat(camp, levelSeed, fire, spots) {
+        let c = Balance.camp, n = c.cat
+        let rand = createRng(levelSeed ^ c.catSalt)
+        campCat = null
+        if (rand() >= n.share) return
+        let r = n.ring[0] + rand() * (n.ring[1] - n.ring[0])
+        let start = rand() * 2 * Math.PI
+        let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
+        let cx = camp.mid * cellSize, half = n.size / 2
+        let fits = []
+        for (let i = 0; i < n.angles; i++) {
+            let a = start + i * 2 * Math.PI / n.angles
+            let x = fx + r * Math.cos(a), y = fy + r * Math.sin(a)
+            if (x + half > cx - c.clearOfPath && x - half < cx + c.clearOfPath) continue
+            if (spots.some(s => Math.hypot(s.x - x, s.y - y) < c.clearOfPeople)) continue
+            if (campProps.some(p => Math.hypot(Math.max(0, Math.abs(p.x - x) - p.w / 2),
+                                               Math.max(0, Math.abs(p.y - y) - p.h / 2)) < half + n.clearOfProps)) continue
+            let floor = true
+            for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+                for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                    if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) floor = false
+            if (floor) fits.push(Qt.point(x, y))
+        }
+        let at = fits[Math.floor(rand() * fits.length)]
+        let seed = rand()
+        if (!at) return
+        campCat = caveCatComponent.createObject(world.room, {
+            xWu: at.x, yWu: at.y, seed: seed,
+            gameWorld: world,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(campCat)
     }
     // Lanterns flanking a building's open front
     function _lightBuilding(r) {

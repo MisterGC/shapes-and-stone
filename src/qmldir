@@ -25,6 +25,7 @@ Campfire 1.0 Campfire.qml
 CaveOverhang 1.0 CaveOverhang.qml
 CampProp 1.0 CampProp.qml
 Creature 1.0 Creature.qml
+CaveCat 1.0 CaveCat.qml
 CampSounds 1.0 CampSounds.qml
 Projectile 1.0 Projectile.qml
 Npc 1.0 Npc.qml

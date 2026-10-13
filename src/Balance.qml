@@ -887,6 +887,38 @@ QtObject {
             size: 0.24,
             flutter: 9
         },
+        // A cave cat sleeps curled by the campfire (issue #150) in share
+        // of the camps, drawn from the level's seed ^ catSalt, so every
+        // screen of a session sees the same cat or none. It lies ring[0]
+        // to ring[1] wu from the fire's centre, out of the warmth where
+        // the knights sit, at one of angles spots round it that lies
+        // whole on the floor, clearOfPath, clearOfPeople and clearOfProps
+        // wu off the way to the stairs, the people's spots and the props;
+        // with none it is not there. It is size wu across and breathes
+        // once every breath seconds. Every tick seconds it looks for a
+        // standing knight: one within notice wu lifts its head in rise
+        // seconds, and once none is within forget wu for settle seconds it
+        // tucks it back in fall seconds. Asleep it stretches every
+        // act.every[0] to [1] seconds, for act.seconds
+        catSalt: 0x63617421,
+        cat: {
+            share: 0.8,
+            ring: [4.5, 5],
+            angles: 24,
+            clearOfProps: 0.5,
+            size: 1.1,
+            breath: 4,
+            tick: 0.1,
+            notice: 3,
+            forget: 4,
+            settle: 1.5,
+            rise: 0.4,
+            fall: 1.2,
+            act: { every: [20, 45], seconds: 2.5 },
+            fur: "#6E5E52",
+            light: "#A89380",
+            eyes: "#E8D27A"
+        },
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",
