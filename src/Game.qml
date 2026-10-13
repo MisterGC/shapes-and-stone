@@ -3686,6 +3686,9 @@ ClayWorld2d {
     // The whole ones still standing, and their cells by grid key, which
     // the enemies' paths go around
     property var breakables: []
+    // The camp's campfire, null in a dungeon: a knight that stands still
+    // in its warmth sits down (Player, issue #148)
+    property var campfire: null
     property var _propCells: ({})
     // Host, and alone: the cells broken in this level, "gx,gy"
     property var _brokenCells: []
@@ -5179,6 +5182,7 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        campfire = null
         features = []
         featureShowcase = false
         breakables = []
@@ -5301,6 +5305,7 @@ ClayWorld2d {
             gameWorld: world
         })
         dungeonObjects.push(cf)
+        campfire = cf
 
         // Tavern (west of the middle), open to the south: x the middle of
         // its floor, y0 its south edge
