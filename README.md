@@ -455,6 +455,28 @@ and the music steps down on both only while both knights rest:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsound/campsound.qml
 ```
 
+Moths circle the campfire and every lantern in slow, uneven loops, now
+faster, now slower, the loop swelling and shrinking, their wings beating.
+Each look has its own: pale green-white and many in the grotto, dusty
+and gathered at the fire in the miners' hall, few and ash-coloured in
+the ember camp. All of them are one shader pass (`Moths.qml`,
+`shaders/moths.frag`), as the fireflies are: no item per moth. On top of
+its flicker the camp's light breathes: the fire's and each lantern's
+light swells and sinks over five to eight seconds, each on its own
+breath. Only the brightness breathes, never the reach; the heal radius
+is the fire's own, and the fire stays the brightest light. The moths and
+the breaths come from the level's seed (`camp.lightSalt`), so every
+screen of a session sees the same; their numbers are `camp.moths`,
+`camp.breath` and each look's `moths`. The moths bench checks one moth
+layer per camp at the fire and the four lanterns with its look's moths,
+that more moths add no item, that the light breathes while its radius
+and the heal stay put, that a dungeon's torches do not, and that
+another screen builds the same:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/moths/moths.qml
+```
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
