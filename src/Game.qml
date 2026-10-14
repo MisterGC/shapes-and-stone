@@ -6588,9 +6588,11 @@ ClayWorld2d {
     }
     // The gem of the vein on cell is this node's knight's: the chime, and
     // it shows as won (gemWonComponent) on its way into the pouch
+    property int gemsWon: 0
     function _gemWon(cell, gem) {
         let cut = _cutsAsked[cell]
         delete _cutsAsked[cell]
+        gemsWon++
         addGem(gem)
         if (!player) return
         playChime()
@@ -6759,13 +6761,12 @@ ClayWorld2d {
     function _pouchDropAnswered(ok) {
         let n = _pouchDropAsked
         _pouchDropAsked = 0
-        if (!player || n === 0) return
-        if (ok) {
-            player.pouch = player.pouch.slice(n)
+        if (!ok) {
+            pouchDropsRefused++
+            console.log("[Game] The host is on another level: the pouch stays with the knight")
             return
         }
-        pouchDropsRefused++
-        console.log("[Game] The host is on another level: the pouch stays with the knight")
+        if (player && n > 0) player.pouch = player.pouch.slice(n)
     }
     // Host: a node's knight dropped its pouch on that level; on another
     // level than the host's it stays with the knight
