@@ -13,7 +13,8 @@
 // steps is judged by the steps alone. The vein's last strike splits it,
 // and the gem's size follows its clean strikes, 0 to all of them. Raising
 // the shield or walking off ends the dig, and the pickaxe folds back into
-// the sword. Prints one PASS or FAIL line per check and exits with the
+// the sword; a swing or a dash ends it too, and E mid-swing starts none.
+// Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/deep/deep.qml
@@ -216,7 +217,7 @@ Window {
                   && heard[2] === "tink+" + cfg.chime[0],
                   "the split crumbles and the chime begins: " + heard.join())
         }],
-        // The dig ends with the shield, or walking off
+        // The dig ends with the shield, walking off, a swing or a dash
         [1500, () => {
             check(game.veinSounds.slice(-cfg.chime.length).join()
                   === cfg.chime.map(p => "tink+" + p).join(),
@@ -235,6 +236,18 @@ Window {
             game.player.xWu -= cfg.leave + 0.5
             step(1)
             check(!game.player.digging && !game.dig, "walking off ends the dig")
+            freshDig()
+            step(2)
+            game.player.attack()
+            step(1)
+            check(game.player.isAttacking && !game.player.digging && !game.dig, "a swing ends the dig")
+            pressE()
+            check(!game.player.digging && !game.dig, "E mid-swing starts no dig")
+            freshDig()
+            step(2)
+            game.player.dash()
+            step(1)
+            check(game.player.isDashing && !game.player.digging && !game.dig, "a dash ends the dig")
             Clayground.paused = false
             console.log("[Deep] done,", failures, "failed")
             game.destroy()
