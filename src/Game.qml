@@ -748,6 +748,7 @@ ClayWorld2d {
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
+        onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
         onPouchSpawned: (objectId, props) => _makePouchDrop(props, objectId)
         onPouchDespawned: (objectId) => _removePouchDrop(objectId)
@@ -6224,6 +6225,52 @@ ClayWorld2d {
             }
         }
     }
+    // A gem lost: grey as the stone, it rises a little off the face, shakes,
+    // and crumbles into grey shards with the crumble, LOST over it
+    Component {
+        id: gemLostComponent
+        Item {
+            id: lost
+            objectName: "lostGem"
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real sizeWu: 0.5
+            property string shape: "tetrahedron"
+            property real rise: 0
+            property real shake: 0
+            width: sizeWu * pixelPerUnit
+            height: width
+            x: xWu * pixelPerUnit - width / 2 + Math.sin(shake * Math.PI * 10) * width * 0.08
+            y: (parent ? parent.height : 0) - (yWu + 0.5 * rise) * pixelPerUnit - height / 2
+            z: 6
+            Gem {
+                anchors.fill: parent
+                shape: lost.shape
+                color: "#77736C"
+                notches: 2
+                light: 0.8
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.top
+                anchors.bottomMargin: 4
+                text: "LOST"
+                color: "#A8A49C"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 13
+                font.bold: true
+                font.letterSpacing: 1
+            }
+            SequentialAnimation {
+                running: true
+                NumberAnimation { target: lost; property: "rise"; to: 1; duration: 300; easing.type: Easing.OutCubic }
+                NumberAnimation { target: lost; property: "shake"; to: 1; duration: 350 }
+                ScriptAction { script: { world._gemCrumbled(lost.xWu, lost.yWu + 0.5); lost.destroy() } }
+            }
+        }
+    }
     property var veins: []
     // The dig under way, null when there is none: {vein, t, used, endAt},
     // t its seconds of physics steps, used the last close a clean strike
@@ -6512,6 +6559,26 @@ ClayWorld2d {
         wonGems = wonGems.concat([w])
         w.landed.connect(() => _gemLanded(w, gem.shape))
     }
+    // The gem of the vein on cell is not this node's knight's: another
+    // knight split it first. A grey gem rises off the face, shakes and
+    // crumbles (gemLostComponent)
+    property int gemsLost: 0
+    function _gemLost(cell) {
+        let cut = _cutsAsked[cell]
+        delete _cutsAsked[cell]
+        gemsLost++
+        if (!player) return
+        let c = _knightCentre()
+        gemLostComponent.createObject(glowParent(), {
+            xWu: cut ? cut.x : c.x, yWu: cut ? cut.y : c.y + 0.6,
+            sizeWu: cut ? Math.max(cut.sizeWu, 0.5) : 0.5, shape: cut ? cut.shape : gemOf(dangerDepth).shape,
+            pixelPerUnit: world.pixelPerUnit
+        })
+    }
+    function _gemCrumbled(x, y) {
+        spawnShards(x, y, 0, 1, 9, Balance.deep.chipColor, 0.12)
+        playCrumble()
+    }
     // A gem won dropped into the pouch: the HUD counts it, its count bumps
     function _gemLanded(w, shape) {
         wonGems = wonGems.filter(x => x !== w)
@@ -6523,11 +6590,16 @@ ClayWorld2d {
         pouchBump.restart()
     }
     // Host: a node's knight split the vein on that cell of that level, the
-    // first one gets its gem; one split already gives nothing
+    // first one gets its gem; one split already, or on another level than
+    // the host's, is refused
     function _hostCut(fromId, level, cell, clean) {
-        if (level !== levelIndex || levelType !== "dungeon" || _cutVeins.indexOf(cell) >= 0) return
-        let v = veinAt(cell)
-        if (!v) return
+        let v = level === levelIndex && levelType === "dungeon" && _cutVeins.indexOf(cell) < 0 ? veinAt(cell) : null
+        if (!v) {
+            console.log("[Game] The vein at", cell, "of level", level, "was split by", fromId, "- refused")
+            if (fromId === session.nodeId) _gemLost(cell)
+            else session.refuseGem(fromId, cell)
+            return
+        }
         _cutVeins.push(cell)
         session.publishVeins({ seed: session.runSeed, level: levelIndex, cells: _cutVeins.slice() })
         let gem = { shape: v.shape, value: gemValue(v.shape, clean, v.strikes) }

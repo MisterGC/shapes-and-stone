@@ -86,8 +86,10 @@ Item {
     // level, clean of its strikes clean (issue #156)
     signal cutReported(string fromId, int level, string cell, int clean)
     // The host gave this node's knight the gem of a vein it split
-    // (shape, value)
+    // (cell, shape, value), or refused it: another knight split it first,
+    // or the host is on another level (issue #169)
     signal gemGranted(var gem)
+    signal gemRefused(string cell)
     // The host owns every fallen knight's pouch as a replicated object of
     // type "pouch", as it owns the gold; it came to life or went on this
     // node
@@ -242,6 +244,8 @@ Item {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
+            } else if (data.type === "gemRefuse") {
+                session.gemRefused(data.cell)
             } else if (data.type === "pouchDrop") {
                 if (net.isHost) session.pouchDropped(fromId, data)
             } else if (data.type === "pouchClaim") {
@@ -557,6 +561,10 @@ Item {
     // Host: the gem goes to that node's knight
     function grantGem(nodeId, gem) {
         net.sendTo(nodeId, Object.assign({type: "gemGrant"}, gem))
+    }
+    // Host: that node's knight gets no gem for the vein on cell
+    function refuseGem(nodeId, cell) {
+        net.sendTo(nodeId, {type: "gemRefuse", cell: cell})
     }
     // This node's knight fell with gems in its pouch: the host lays the
     // pouch where it fell, for every node. The host's own is taken at once
