@@ -479,7 +479,9 @@ QtObject {
     // petrified: a room but the start room that holds a vein holds a
     // petrified traveller (Balance.deep.stone, issue #158) with chance at
     // low, middle and high danger, in its vein's rock face beside the
-    // vein, a miner with minerShare's chance, else a lost one
+    // vein, a miner with minerShare's chance, else a lost one. With
+    // specialShare's chance it is one of Balance.deep.specials not yet
+    // with the camps (issue #159), of that special's kind
     readonly property var dungeon: ({
         // Loops: the rooms are joined in a chain, and extraCorridors more
         // corridors at low, middle and high danger (as danger.looks) join
@@ -511,7 +513,7 @@ QtObject {
         doorPathCost: 6,
         clearOfEntrance: 8,
         clearOfExit: 8,
-        petrified: { chance: [0.35, 0.45, 0.55], minerShare: 0.5 },
+        petrified: { chance: [0.35, 0.45, 0.55], minerShare: 0.5, specialShare: 0.1 },
         kinds: {
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
@@ -703,7 +705,23 @@ QtObject {
     // toward the room's way to the exit at leaveSpeed, fading out over
     // fade seconds after fadeAfter. A working miner flees too when the
     // hole's first wave comes. A freed miner nods for nod seconds before
-    // it walks to its work
+    // it walks to its work.
+    // specials (issue #159): the few special travellers of the whole
+    // game, each its id, name, title, kind ("miner" or "lost"), the line
+    // it says when freed (line) and at the camp to a knight within
+    // camp.sayReach wu (campLine), and its comfort at the campfire, never
+    // fight power: heal times the fire's healing, mana times its mana, light
+    // times its light's reach. One stands in the stone with an edge of
+    // specialEdge, freed it leaves toward the exit and joins the camps for
+    // good: kept with this machine's record (key "specials"), in a
+    // session the host's.
+    // camp: the travellers freed this run that left toward the exit
+    // (issue #159) and the specials with the camps sit in every later camp
+    // of the run, round the fire: at one of angles spots ring wu from the
+    // fire's centre, on the floor, at least clear wu off the camp's
+    // travellers, its cat and each other, the specials first, most of
+    // them in all; their spots start at an angle from the level's seed ^
+    // salt
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -785,6 +803,26 @@ QtObject {
             lostLines: ["...how long was I down here?", "Thank you - I'll find the way up now.",
                         "Light! I thought I'd never see it again."],
             nod: 0.7
+        },
+        specialEdge: "#E8C35A",
+        specials: [
+            { id: "healer", name: "Maren", title: "the healer", kind: "lost",
+              line: "Free... Then let me mend you, as you mended me.",
+              campLine: "Sit close. The fire and I will see to those cuts.", heal: 2 },
+            { id: "cook", name: "Brannoc", title: "the cook", kind: "miner",
+              line: "Stone's no place for a cook. I'll have a pot on at the camp.",
+              campLine: "Eat. Steady hands come from a full belly.", mana: 2 },
+            { id: "lamplighter", name: "Tamsin", title: "the lamplighter", kind: "lost",
+              line: "The dark had me. I'll keep it off the camps from now on.",
+              campLine: "I keep the fire bright. Rest easy.", light: 1.35 }
+        ],
+        camp: {
+            ring: 3.7,
+            angles: 20,
+            clear: 1.1,
+            most: 10,
+            sayReach: 3.2,
+            salt: 0x66726565
         },
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },

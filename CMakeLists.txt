@@ -67,6 +67,7 @@ clay_app(shapes_and_stone
         src/GoldDrop.qml
         src/PouchDrop.qml
         src/FloorClaims.qml
+        src/CampFreed.qml
         src/BodyShade.qml
         src/ExitStairs.qml
         src/Floor.qml

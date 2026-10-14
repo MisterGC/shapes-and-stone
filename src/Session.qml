@@ -191,6 +191,15 @@ Item {
     // (issue #158)
     readonly property var stones: net.connected && net.sessionProperties.stones
                                   ? net.sessionProperties.stones : null
+    // The travellers the host's party freed this run and how each went
+    // on, the session property "freed" ({seed, run: [{key, kind, outcome,
+    // special}]}); null before any (issue #159)
+    readonly property var freedRun: net.connected && net.sessionProperties.freed
+                                    ? net.sessionProperties.freed : null
+    // The specials with the host's camps, its record's (ids), the session
+    // property "specials"; null before the host has set it (issue #159)
+    readonly property var hostSpecials: net.connected && net.sessionProperties.specials
+                                        ? net.sessionProperties.specials : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -614,6 +623,14 @@ Item {
     // not
     function refuseFreed(nodeId, cell) {
         net.sendTo(nodeId, {type: "freeRefuse", cell: cell})
+    }
+    // Host: the travellers its party freed this run, for every camp
+    function publishFreed(freed) {
+        if (net.isHost) net.setSessionProperty("freed", freed)
+    }
+    // Host: the specials with its camps, for every camp
+    function publishSpecials(ids) {
+        if (net.isHost) net.setSessionProperty("specials", ids)
     }
     // Host: the gem goes to that node's knight
     function grantGem(nodeId, gem) {

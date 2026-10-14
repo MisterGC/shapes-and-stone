@@ -77,7 +77,7 @@ Window {
         let k = 0
         while (game.dig && game.dig.t < n * dt - 1e-6 && k++ < 4000) step(1)
     }
-    function stone(kind) { return game.stones.find(s => s.kind === kind) }
+    function stone(kind) { return game.stones.find(s => s.kind === kind && s.special === "") }
     function vein() { return game.veins[0] }
     function hole() { return game.holes[0] }
     // A fresh deep room, paused, the knight out of reach of harm
@@ -206,9 +206,12 @@ Window {
         [100, () => {
             freshRoom()
             let m = stone("miner"), l = stone("lost")
-            check(game.stones.length === 2 && m && l && !m.freed && !l.freed && m.colour === 0 && l.colour === 0,
+            let sp = game.stones.find(s => s.special !== "")
+            check(game.stones.length === 3 && m && l && sp && m.special === "" && l.special === ""
+                  && !m.freed && !l.freed && m.colour === 0 && l.colour === 0,
                   "the dojo's deep scenario shows a petrified miner (" + (m ? m.cell : "none") + ") and a lost one ("
-                  + (l ? l.cell : "none") + ") in the vein's rock face, stone")
+                  + (l ? l.cell : "none") + ") in the vein's rock face, stone, and a special beside them ("
+                  + (sp ? sp.special + " " + sp.cell : "none") + ")")
 
             // Off-beat strikes never harm it: the ring starts over
             check(aimAt(m) && game.dig.stone === m && !game.dig.vein,
