@@ -751,4 +751,357 @@ QtObject {
         healRadius: 3.0,
         healTick: 0.2
     })
+
+    // The camp (issue #145): a cave, not a box. Sizes in grid cells (2 wu)
+    // unless named in wu. The cave fills a box of width x height cells
+    // whose top sits exitTunnel rows below the top of the map, where the
+    // stairs are. Its edge runs bay cells inside the box, and along each
+    // side it moves out by up to bay cells (a bay) or in by up to outcrop
+    // cells (an outcrop), stepping by one or two cells every stretch[0] to
+    // stretch[1] cells;
+    // each corner of the box is cut off diagonally by corner[0] to
+    // corner[1] cells. The entrance and the exit open in a bay. The
+    // outline draws from its own stream, the level's seed ^ seedSalt, so
+    // every screen of a session builds the same cave
+    readonly property var camp: ({
+        width: 32,
+        height: 26,
+        exitTunnel: 3,
+        bay: 2,
+        outcrop: 2,
+        stretch: [3, 6],
+        corner: [4, 7],
+        seedSalt: 0x63617665,
+        // The walk from where the knights come in to the stairs, at
+        // knight.moveSpeed, takes at most this many seconds
+        maxWalk: 8,
+        // The tavern and the smithy: walls of whole cells, open to the
+        // south, width x height cells each, building cells to either side
+        // of the camp's middle column and raised cells above its middle row
+        building: { width: 5, height: 4, side: 4, raised: 2 },
+        // The campfire's light, in wu: it reaches the buildings, which
+        // cast shadows from it
+        fireLight: 16,
+        // The rock overhangs the cave's north-facing edges: a lip of lip wu
+        // hangs over the top of the face, stalactites of up to stalactite
+        // wu below it, one in about every tooth wu along the edge, and
+        // their shadows fall up to shadow wu onto the floor
+        overhang: { lip: 0.3, stalactite: 0.55, tooth: 0.7, shadow: 1.6 },
+        // The camp's look follows the depth (issue #146): a camp takes the
+        // last of looks whose from is at most its depth, the depth of the
+        // dungeon before it. Each look has its rock (the walls' tops and
+        // the overhang), its faces in faceStyle ("bricks", "moss",
+        // "strata" or "basalt") with their rims, the tavern's and the
+        // smithy's walls and faces, the lanterns at their fronts, the
+        // witch's tree (or what stands in its place); its floor in style
+        // ("stone", "earth" or "basalt") with grass over that share of
+        // earth, moss over that share of stone and that share of the
+        // stones cracked; its air (motes of that colour, density and
+        // size, drifting that far, blinking like fireflies or not, glowing
+        // on their own or seen in the light); its moths (see moths below);
+        // and its screen grade: the darkness's ambient, the temperature,
+        // the saturation and the vignette. Its props are one of layouts,
+        // picked from the level's seed ^ propSalt, each a list of props:
+        // a kind of shaders/prop.frag centred x, y wu from the camp's
+        // centre (east, north), w x h wu.
+        // A prop that would not lie whole on the cave's floor, clear of
+        // the paths, the fire and the people, is left out. Props are drawn
+        // only: the knights walk over them, nothing blocks or hurts
+        propSalt: 0x70726f70,
+        // Props stay this far, in wu, off the middle column (the way from
+        // the entrance to the stairs), off the campfire's centre, off the
+        // fronts of the buildings, and off the innkeeper, the smith, the
+        // witch, her tree and every spot of their routines
+        clearOfPath: 3,
+        clearOfFire: 5,
+        clearOfFront: 3,
+        clearOfPeople: 2.5,
+        // A prop whose place the cave's edge cuts moves up to propShift wu
+        // toward the middle, on its side and then on the other
+        propShift: 4,
+        // A knight that stands still sitAfter seconds within the
+        // campfire's healRadius sits down facing the fire (issue #148):
+        // no key, no button, no knockback. Any of them stands it up at
+        // once. It is the look only: the fire heals and refills the same.
+        // The pose sinks in down seconds and rises in up seconds, squash
+        // of the knight's height lower; seated it breathes breath radians
+        // a second, breathDepth of its height deep, and its shield lies
+        // on the floor beside it
+        sitAfter: 3,
+        sit: { down: 0.45, up: 0.12, squash: 0.2, breath: 1.3, breathDepth: 0.05 },
+        // The camp rests (issue #147) once every knight in it has stood
+        // still restQuiet seconds: every knight seated, the last of them
+        // standing still since restQuiet - sitAfter before it sat
+        restQuiet: 10,
+        // The camp's near sounds (issue #147), each played at its source:
+        // the listening knight hears it at volume times (1 - d / reach)
+        // squared, d its distance in wu, and not at all from reach on. It
+        // plays again every every[0] to every[1] seconds, pitched by
+        // pitch[0] to pitch[1] semitones. The campfire crackles in every
+        // camp, the anvil rings while the smith stands at it hammering,
+        // and each look has its own at the props of its kinds: drips at
+        // the grotto's pond, the cart creaking in the miners' hall, the
+        // embers hissing at the ember camp's coals and cracks. While the
+        // camp rests the music falls to restMusic of its level in
+        // fadeDown seconds and the near sounds rise to restNear times
+        // their volume; a knight that moves brings both back in fadeUp
+        sounds: {
+            fire: { sample: "camp_crackle.wav", volume: 0.55, reach: 16, every: [0.12, 0.45], pitch: [-3, 2] },
+            anvil: { sample: "camp_anvil.wav", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
+            looks: {
+                grotto: { sample: "camp_drip.wav", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
+                hall: { sample: "camp_creak.wav", props: ["cart"], volume: 0.45, reach: 14, every: [3.0, 7.0], pitch: [-2, 2] },
+                ember: { sample: "camp_hiss.wav", props: ["coals", "cracks"], volume: 0.35, reach: 12, every: [1.5, 4.5], pitch: [-3, 1] }
+            },
+            restMusic: 0.3,
+            restNear: 1.5,
+            fadeDown: 3,
+            fadeUp: 0.8
+        },
+        // The camp's lights breathe (issue #149): on top of its flicker the
+        // campfire's and each lantern's intensity swells and sinks by up
+        // to depth of itself, one breath every seconds[0] to seconds[1]
+        // seconds, each light on its own breath. Only the intensity
+        // breathes, never the radius; the fire stays the brightest light.
+        // The breaths and the moths draw from the level's seed ^
+        // lightSalt, so every screen of a session sees the same
+        lightSalt: 0x6d6f7468,
+        breath: { seconds: [5, 8], depth: 0.1 },
+        // Moths circle the campfire and every lantern in slow, uneven
+        // loops (issue #149), as many as the look's moths says (fire,
+        // lantern: moths at each, at most 8), in its colour, drawn in one
+        // pass by shaders/moths.frag for up to 6 lights. A moth's loop is
+        // orbit wu around its light (fire or lantern), flattened to
+        // squash of that north to south, swelling and shrinking by swell
+        // of itself; it goes round at speed[0] to speed[1] radians a
+        // second, either way, wavering by waver, and darts aside up to
+        // dart wu. Its wings, size wu across, beat flutter times a second
+        moths: {
+            lantern: { orbit: 0.8 },
+            fire: { orbit: 1.6 },
+            squash: 0.6,
+            swell: 0.35,
+            speed: [0.5, 1.1],
+            waver: 0.6,
+            dart: 0.12,
+            size: 0.24,
+            flutter: 9
+        },
+        // A cave cat sleeps curled by the campfire (issue #150) in share
+        // of the camps, drawn from the level's seed ^ catSalt, so every
+        // screen of a session sees the same cat or none. It lies ring[0]
+        // to ring[1] wu from the fire's centre, out of the warmth where
+        // the knights sit, at one of angles spots round it that lies
+        // whole on the floor, clearOfPath, clearOfPeople and clearOfProps
+        // wu off the way to the stairs, the people's spots and the props;
+        // with none it is not there. It is size wu across and breathes
+        // once every breath seconds. Every tick seconds it looks for a
+        // standing knight: one within notice wu lifts its head in rise
+        // seconds, and once none is within forget wu for settle seconds it
+        // tucks it back in fall seconds. Asleep it stretches every
+        // act.every[0] to [1] seconds, for act.seconds
+        catSalt: 0x63617421,
+        cat: {
+            share: 0.8,
+            ring: [4.5, 5],
+            angles: 24,
+            clearOfProps: 0.5,
+            size: 1.1,
+            breath: 4,
+            tick: 0.1,
+            notice: 3,
+            forget: 4,
+            settle: 1.5,
+            rise: 0.4,
+            fall: 1.2,
+            act: { every: [20, 45], seconds: 2.5 },
+            fur: "#6E5E52",
+            light: "#A89380",
+            eyes: "#E8D27A"
+        },
+        // Travellers rest at the camp (issue #151): count[0] to count[1]
+        // of kinds, other adventurers on their way, each its own name,
+        // shape, colour and icon, drawn from the level's seed ^
+        // travellerSalt, so every screen of a session sees the same. Each
+        // sits at one of angles spots ring[0] to ring[1] wu from the
+        // fire's centre, on the floor, for rest[0] to rest[1] seconds,
+        // then wanders to one of the look's wander props - off wu off its
+        // edge toward the camp's middle, apart wu aside of the traveller
+        // before it, doing its text - for wander[0]
+        // to wander[1] seconds, and back; without such a prop it moves to
+        // another seat. They walk at walk wu a second and the knights walk
+        // through them. Talked to (E) one gives hearsayLines of hearsay,
+        // and sells nothing. Two of them standing within reach wu of each
+        // other exchange one of exchanges, the first after first[0] to
+        // first[1] seconds in the camp, then every every[0] to every[1]
+        // seconds: one says the first line, the other answers after answer
+        // seconds, each bubble up for show seconds. A dog follows one of
+        // them (dog below). The lines are tables: more are written here
+        travellerSalt: 0x74726176,
+        travellers: {
+            count: [1, 3],
+            kinds: [
+                { name: "Wanderer", shape: "square", color: "#5E8CB8", icon: "pack" },
+                { name: "Pilgrim", shape: "diamond", color: "#9AB85E", icon: "staff" },
+                { name: "Minstrel", shape: "circle", color: "#C8607A", icon: "lute" },
+                { name: "Prospector", shape: "square", color: "#B89A5E", icon: "pack" },
+                { name: "Hermit", shape: "diamond", color: "#8A7AA8", icon: "staff" }
+            ],
+            ring: [2.2, 2.8],
+            angles: 16,
+            rest: [16, 26],
+            wander: [7, 11],
+            walk: 1.2,
+            off: 1.2,
+            apart: 1.4,
+            props: {
+                grotto: [ { kind: "pond", text: "*watching the water*" } ],
+                hall: [ { kind: "cart", text: "*peering into the cart*" } ],
+                ember: [ { kind: "coals", text: "*warming hands*" }, { kind: "cracks", text: "*staring into the glow*" } ]
+            },
+            seatText: "*resting*",
+            hearsayLines: 2,
+            reach: 9,
+            first: [4, 8],
+            every: [10, 18],
+            answer: 2.5,
+            show: 4,
+            // A dog follows one traveller: it trots after it, stays follow
+            // wu beside it, runs at speed wu a second, and is a Creature
+            // like the cat: it looks up at a standing knight within notice
+            // wu and settles once none is within forget wu for settle
+            // seconds; at rest it scratches every act.every[0] to [1]
+            // seconds, for act.seconds
+            dog: {
+                size: 0.75,
+                follow: 0.9,
+                speed: 2.4,
+                breath: 1.6,
+                tick: 0.1,
+                notice: 3,
+                forget: 4,
+                settle: 1.5,
+                rise: 0.3,
+                fall: 0.8,
+                act: { every: [12, 25], seconds: 1.4 },
+                fur: "#8A6A44",
+                light: "#C9A878",
+                eyes: "#2A1E14"
+            },
+            exchanges: [
+                [ "Heard the slits on four fire in threes.", "Then dash on the third." ],
+                [ "The big ones swing slow.", "Slow, but you only get to be wrong once." ],
+                [ "Lost my lantern two floors down.", "Lost my brother three floors down. Keep the lantern." ],
+                [ "Some walls down there sound hollow.", "Hit them. Gold likes to hide." ],
+                [ "This fire's the best thing I've seen all week.", "Week's not over." ],
+                [ "Spitters keep their distance.", "So close it for them." ],
+                [ "Any of you been past the embers?", "Once. Came back with less eyebrow." ],
+                [ "Smith says the blade gets better deeper down.", "So does the trouble." ],
+                [ "Hold the shield too long and it runs dry.", "Like my purse." ],
+                [ "The plates on the floor click before they bite.", "Then listen for the click." ]
+            ],
+            hearsay: [
+                "They say the deeper camps keep warmer fires. Something down there keeps them lit.",
+                "A guardian shoves you back when you stand in its way. Step aside, then strike.",
+                "Folk say the witch reads the next dungeon true. I've never caught her wrong.",
+                "Heard of a knight who parried a crushing blow. Heard it from him, mind.",
+                "The arrow slits fire in rhythm. Count, then walk.",
+                "Down past the miners' hall the rock gets hot enough to cook on.",
+                "Some hollow walls hide a whole chamber. Look for the cracked ones.",
+                "Rest a while by the fire. It mends more than skin.",
+                "Tough ones carry more gold. Weak ones carry their friends.",
+                "A dash takes you through a blow if you time it. Most don't."
+            ]
+        },
+        looks: [
+            { name: "grotto", from: 0,
+              rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",
+              buildingWall: "#4A4232", buildingFace: "#5E5440", lantern: "#E8F0A0", tree: "#2A4A2A",
+              floor: { style: "earth", color: "#34402E", grass: 0.8, moss: 0, crackShare: 0 },
+              air: { color: "#BFFF73", alpha: 0.9, density: 0.06, size: 0.06, drift: 0.9, blink: true, glows: true },
+              moths: { color: "#F0F6E0", alpha: 0.95, fire: 4, lantern: 4 },
+              grade: { ambient: "#3E5248", temperature: -0.1, saturation: 1.2, vignette: 0.35 },
+              layouts: [
+                  [ { kind: "pond", x: -20, y: -3, w: 7, h: 5 },
+                    { kind: "stones", x: -13, y: -14, w: 4, h: 3 },
+                    { kind: "mushrooms", x: -21, y: 6, w: 3, h: 2 },
+                    { kind: "ferns", x: 13, y: -14, w: 4, h: 3 },
+                    { kind: "stones", x: 20, y: -2, w: 4, h: 3 },
+                    { kind: "mushrooms", x: 12, y: 15, w: 3, h: 2 },
+                    { kind: "ferns", x: -12, y: 15, w: 4, h: 2 } ],
+                  [ { kind: "pond", x: 20, y: -3, w: 7, h: 5 },
+                    { kind: "ferns", x: -20, y: 0, w: 4, h: 3 },
+                    { kind: "stones", x: 13, y: -14, w: 5, h: 3 },
+                    { kind: "mushrooms", x: -14, y: -13, w: 3, h: 2 },
+                    { kind: "stones", x: -12, y: 15, w: 4, h: 2 },
+                    { kind: "ferns", x: 13, y: 15, w: 4, h: 2 },
+                    { kind: "mushrooms", x: 21, y: 6, w: 3, h: 2 } ],
+                  [ { kind: "pond", x: -13, y: -13, w: 8, h: 5 },
+                    { kind: "stones", x: 13, y: -13, w: 4, h: 3 },
+                    { kind: "ferns", x: -20, y: 1, w: 4, h: 3 },
+                    { kind: "mushrooms", x: 20, y: 0, w: 3, h: 2 },
+                    { kind: "ferns", x: 12, y: 15, w: 4, h: 2 },
+                    { kind: "stones", x: -12, y: 15, w: 4, h: 2 },
+                    { kind: "mushrooms", x: 8, y: -9, w: 2, h: 2 } ]
+              ] },
+            { name: "hall", from: 3,
+              rock: "#2A221C", face: "#7A6040", faceStyle: "strata", rim: "#A08860",
+              buildingWall: "#5A3E22", buildingFace: "#8A6232", lantern: "#FFC870", tree: "#5A4128",
+              floor: { style: "earth", color: "#4A3D2C", grass: 0, moss: 0, crackShare: 0 },
+              air: { color: "#FFD99A", alpha: 0.35, density: 0.35, size: 0.045, drift: 0.35, blink: false, glows: false },
+              moths: { color: "#F2E2C4", alpha: 0.9, fire: 5, lantern: 3 },
+              grade: { ambient: "#5A4E3E", temperature: 0.12, saturation: 1.1, vignette: 0.4 },
+              layouts: [
+                  [ { kind: "rails", x: -14, y: -15, w: 14, h: 1.4 },
+                    { kind: "cart", x: -10, y: -15, w: 2.4, h: 1.8 },
+                    { kind: "timber", x: -20, y: 0, w: 3, h: 4 },
+                    { kind: "ore", x: 13, y: -13, w: 4, h: 3 },
+                    { kind: "crates", x: 20, y: -2, w: 3, h: 3 },
+                    { kind: "crates", x: 12, y: 15, w: 3, h: 2 },
+                    { kind: "ore", x: -12, y: 15, w: 4, h: 2 } ],
+                  [ { kind: "rails", x: 20, y: -3, w: 1.4, h: 12 },
+                    { kind: "cart", x: 20, y: 1, w: 1.8, h: 2.4 },
+                    { kind: "crates", x: -20, y: -1, w: 3, h: 3 },
+                    { kind: "ore", x: -13, y: -13, w: 4, h: 3 },
+                    { kind: "timber", x: 13, y: -14, w: 4, h: 3 },
+                    { kind: "ore", x: 12, y: 15, w: 4, h: 2 },
+                    { kind: "crates", x: -12, y: 15, w: 3, h: 2 } ],
+                  [ { kind: "rails", x: 12, y: 15, w: 12, h: 1.4 },
+                    { kind: "cart", x: 15, y: 15, w: 2.4, h: 1.8 },
+                    { kind: "ore", x: -20, y: 0, w: 4, h: 4 },
+                    { kind: "crates", x: 13, y: -13, w: 3, h: 3 },
+                    { kind: "timber", x: -13, y: -14, w: 4, h: 3 },
+                    { kind: "crates", x: 20, y: -1, w: 3, h: 2 },
+                    { kind: "ore", x: -12, y: 15, w: 4, h: 2 } ]
+              ] },
+            { name: "ember", from: 6,
+              rock: "#181414", face: "#3A302E", faceStyle: "basalt", rim: "#8A4A30",
+              buildingWall: "#3A2A24", buildingFace: "#4E3A30", lantern: "#FF7A3A", tree: "#262022",
+              floor: { style: "basalt", color: "#363030", grass: 0, moss: 0, crackShare: 0 },
+              air: { color: "#FF5414", alpha: 0.9, density: 0.05, size: 0.05, drift: 0.8, blink: false, glows: true },
+              moths: { color: "#E8C4B0", alpha: 0.85, fire: 2, lantern: 2 },
+              grade: { ambient: "#3C2622", temperature: 0.3, saturation: 1.15, vignette: 0.45 },
+              layouts: [
+                  [ { kind: "cracks", x: -20, y: -1, w: 7, h: 5 },
+                    { kind: "basalt", x: -13, y: -14, w: 5, h: 3 },
+                    { kind: "coals", x: 13, y: -13, w: 3, h: 2 },
+                    { kind: "slag", x: 20, y: -2, w: 4, h: 3 },
+                    { kind: "cracks", x: 12, y: 15, w: 8, h: 2 },
+                    { kind: "basalt", x: -12, y: 15, w: 5, h: 2 } ],
+                  [ { kind: "cracks", x: 20, y: -1, w: 7, h: 5 },
+                    { kind: "basalt", x: -20, y: 0, w: 4, h: 4 },
+                    { kind: "slag", x: -13, y: -13, w: 4, h: 3 },
+                    { kind: "coals", x: 8, y: -9, w: 2, h: 2 },
+                    { kind: "basalt", x: 13, y: -14, w: 5, h: 3 },
+                    { kind: "cracks", x: -12, y: 15, w: 8, h: 2 },
+                    { kind: "coals", x: 12, y: 15, w: 3, h: 2 } ],
+                  [ { kind: "cracks", x: -13, y: -13, w: 8, h: 4 },
+                    { kind: "basalt", x: 20, y: 0, w: 4, h: 4 },
+                    { kind: "slag", x: -20, y: 1, w: 4, h: 3 },
+                    { kind: "coals", x: 13, y: -13, w: 3, h: 2 },
+                    { kind: "basalt", x: 12, y: 15, w: 5, h: 2 },
+                    { kind: "slag", x: -12, y: 15, w: 4, h: 2 } ]
+              ] }
+        ]
+    })
 }

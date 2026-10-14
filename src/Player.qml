@@ -292,23 +292,56 @@ PhysicsItem {
                 _breakBones(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
                 _breakThings(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
             }
+            _countStill(dt)
         }
     }
 
     // A moment others should see: "attack", "heavy", "whirlwind", "dash",
-    // "parry", "block", "perfectBlock", "hurt" or "shieldBreak".
+    // "parry", "block", "perfectBlock", "hurt", "shieldBreak", "sit" or
+    // "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
     // Healing state (set by Campfire)
     property bool isHealing: false
 
+    // Sitting by the fire (Balance.camp.sitAfter, issue #148): a knight
+    // that stands still sitAfter seconds in the campfire's warmth sits
+    // down facing it; any key or button stands it up in the step it comes,
+    // the knight moving in that step. The look only: nothing the knight
+    // does or gets reads it. A bench sets sitAfter out of reach for a
+    // knight that never sits
+    property real sitAfter: Balance.camp.sitAfter
+    property real _stillFor: 0
+    property bool seated: false
+    // The way to the fire as the knight sat down: seated, it faces it
+    property real sitAngle: 0
+    onSeatedChanged: acted(seated ? "sit" : "stand")
+    function _countStill(dt) {
+        let fire = gameWorld ? gameWorld.campfire : null
+        let still = !!fire && !fallen && moveX === 0 && moveY === 0
+            && !isBlocking && !_shieldWanted && !swingInput.pressed && !isCharging
+            && !isAttacking && !isDashing && _knockT <= 0 && _lungeT <= 0 && gameWorld.talking !== true
+            && fire.warms(xWu, yWu)
+        if (!still) {
+            _stillFor = 0
+            seated = false
+            return
+        }
+        _stillFor += dt
+        if (!seated && _stillFor >= sitAfter - 1e-6) {
+            sitAngle = fire.angleFrom(xWu, yWu)
+            seated = true
+        }
+    }
+
     // How the knight looks: shared with the RemotePlayer
     KnightView {
         id: view
         host: player
         gameWorld: player.gameWorld
-        facingAngle: player.facingAngle
+        facingAngle: player.seated ? player.sitAngle : player.facingAngle
+        seated: player.seated
         moveX: player.moveX
         moveAmount: Math.min(1, Math.sqrt(player.moveX * player.moveX + player.moveY * player.moveY))
         // Up through the bash's lunge too, however short the right-click

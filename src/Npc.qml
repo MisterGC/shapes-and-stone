@@ -9,7 +9,11 @@ PhysicsItem {
     property var gameWorld: null
     property string npcName: ""
     property color npcColor: "#C9A227"
-    property string iconType: ""  // "mug", "hammer", "crystal"
+    property string iconType: ""  // "mug", "hammer", "crystal", "pack", "staff", "lute"
+    // Its shape: "circle", "square" or "diamond"
+    property string shape: "circle"
+    // Solid, a knight bumps into it; else the knights walk through it
+    property bool solid: true
     property var dialogueLines: []
     // Lines made when it is talked to, instead of dialogueLines: a
     // function returning them (the witch's reading), or null
@@ -18,11 +22,14 @@ PhysicsItem {
     property var wares: []
     property string greetingSound: ""
 
-    // Routine: [{x, y, duration, text}, ...]
+    // Routine: [{x, y, duration, text, sound}, ...]; sound names what
+    // the camp hears while it is at that spot (CampSounds, issue #147)
     property var routine: []
     property int _routineIndex: 0
     property string _activityText: ""
     property bool _atDestination: false
+    // The routine's step it stands at doing, or null while it walks
+    readonly property var doing: _atDestination && routine.length > 0 ? routine[_routineIndex] : null
     property real _activityTimer: 0
     property real walkSpeed: 1.5
 
@@ -77,7 +84,9 @@ PhysicsItem {
             Translate { y: (gameWorld ? gameWorld.fx : false) ? -npc._bob * visual.height * 0.06 : 0 }
         ]
         anchors.fill: parent
-        radius: width * 0.5
+        anchors.margins: shape === "diamond" ? parent.width * 0.13 : 0
+        radius: shape === "circle" ? width * 0.5 : width * 0.18
+        rotation: shape === "diamond" ? 45 : 0
         color: npcColor
 
         BodyShade {
@@ -126,6 +135,24 @@ PhysicsItem {
                     // Base
                     ctx.fillStyle = dark
                     ctx.fillRect(w * 0.35, h * 0.62, w * 0.3, h * 0.08)
+                } else if (iconType === "pack") {
+                    // A bedroll on a pack
+                    ctx.fillRect(w * 0.28, h * 0.38, w * 0.44, h * 0.4)
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.3, w * 0.12, 0, Math.PI * 2)
+                    ctx.fill()
+                } else if (iconType === "staff") {
+                    // A crooked staff
+                    ctx.fillRect(w * 0.46, h * 0.3, w * 0.08, h * 0.55)
+                    ctx.beginPath()
+                    ctx.arc(w * 0.42, h * 0.3, w * 0.12, Math.PI, Math.PI * 2)
+                    ctx.stroke()
+                } else if (iconType === "lute") {
+                    // A lute's belly and neck
+                    ctx.beginPath()
+                    ctx.arc(w * 0.42, h * 0.6, w * 0.18, 0, Math.PI * 2)
+                    ctx.fill()
+                    ctx.fillRect(w * 0.5, h * 0.2, w * 0.08, h * 0.35)
                 }
             }
         }
@@ -151,15 +178,56 @@ PhysicsItem {
         font.italic: true
         style: Text.Outline
         styleColor: "#000000"
-        opacity: _atDestination && _activityText !== "" ? 1.0 : 0
+        opacity: _atDestination && _activityText !== "" && saying === "" ? 1.0 : 0
         Behavior on opacity { NumberAnimation { duration: 300 } }
+    }
+
+    // What it says aloud, in a bubble over its head, for a few seconds
+    property string saying: ""
+    function say(line, seconds) {
+        saying = line
+        sayTimer.interval = seconds * 1000
+        sayTimer.restart()
+    }
+    Timer { id: sayTimer; onTriggered: npc.saying = "" }
+    Rectangle {
+        id: bubble
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.top
+        anchors.bottomMargin: 6
+        width: Math.min(bubbleText.implicitWidth, 160) + 12
+        height: bubbleText.height + 8
+        radius: 6
+        color: "#E8E2D0"
+        border.color: Qt.darker(npcColor, 1.4)
+        border.width: 1
+        opacity: npc.saying !== "" ? 0.95 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Text {
+            id: bubbleText
+            x: 6; y: 4
+            width: Math.min(implicitWidth, 160)
+            text: npc.saying
+            wrapMode: Text.WordWrap
+            color: "#2A2420"
+            font.pixelSize: 10
+        }
+        // The tail, down to the speaker
+        Rectangle {
+            width: 7; height: 7
+            rotation: 45
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height - 4
+            color: parent.color
+        }
     }
 
     // Interaction prompt
     Text {
         id: promptLabel
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: activityLabel.top
+        anchors.bottom: npc.saying !== "" ? bubble.top : activityLabel.top
         anchors.bottomMargin: 2
         text: "[E] Talk"
         color: "#FFFFFF"
@@ -179,6 +247,7 @@ PhysicsItem {
             density: 1.0
             friction: 0.0
             restitution: 0.0
+            collidesWith: npc.solid ? Box.All : Box.None
         },
         Circle {
             id: interactionSensor

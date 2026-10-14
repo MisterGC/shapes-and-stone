@@ -360,6 +360,190 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camp/camp.qml
 ```
 
+The camp is a cave, not a box: its outline has bays and outcrops and cut
+corners, drawn from a stream of its own (the level's seed ^
+`camp.seedSalt`), so the same seed builds the same cave on every screen
+of a session. It is about 1.5 times the old 20 x 20 cells, and sits
+right under the top of the map, so the walk from where the knights come
+in to the stairs stays at most `camp.maxWalk` seconds. Rock overhangs its
+north-facing edges, with stalactites and their shadows on the floor. The
+tavern and the smithy are walls of whole cells, with faces and rims, and
+cast shadows from the campfire. Every number is in `Balance.camp`. The
+cave bench builds the camp on 20 seeds and checks the outline's size and
+that it is no box, that 20 seeds build 20 outlines and another screen
+the same ones, the walk at move speed - and walks the knight to the
+stairs along it - where the campfire, the innkeeper, the smith and the
+witch stand, and that the buildings block the light and the campfire's
+light reaches them and casts shadows. It exits with the number of failed
+checks; with a window and an output directory it also saves the outline
+and the camp of three seeds and the buildings' shadows as PNGs:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cave/cave.qml
+qml -I build/bin/qml tests/cave/cave.qml -- <out dir>
+```
+
+The camps are the stations of the way down, and their look follows the
+depth: down to depth 2 a mossy grotto (green earth, moss over the rock,
+a pond, ferns, glowing mushrooms, fireflies), from depth 3 a miners' hall
+(ochre ground, rock strata between timber props, a rail track and its
+cart, crates, ore, dust in the lantern light), from depth 6 an ember camp
+(basalt ground and columns, glowing cracks and coals, embers in the
+air). Each look has its own rock, faces, floor, lanterns, air and screen
+grade, and its props are one of two or three layouts, picked from the
+level's seed (`camp.propSalt`), so every screen of a session lays out the
+same. A prop lies whole on the cave's floor, off the way to the stairs,
+the campfire and the people, and is only drawn: the knights walk over
+it. The campfire stays the brightest light, and the campfire, the
+innkeeper, the smith and the witch keep their places at every depth.
+The looks are a table in `Balance.camp.looks`: a fourth is a row with
+its depth, its colours and its layouts. The camps bench lands at every
+depth from 0 to 12, checks each look on 12 seeds and has another screen
+build the same camps; with a window, the copied shaders and an output
+directory it saves each look at two seeds, whole and at the campfire:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camps/camps.qml
+qml -I build/bin/qml tests/camps/camps.qml -- <out dir>
+```
+
+In the dojo, `applyScenario("village", d)` lands in the camp after depth
+d: 0 the grotto, 4 the hall, 7 the ember camp.
+
+A knight that stands still `camp.sitAfter` seconds (3) in the campfire's
+warmth, its heal radius, sits down facing the fire: it sinks a little,
+breathes slow and deep, and its shield lies on the floor beside it. Any
+movement key, a swing, the shield or a dash stands it up in the physics
+step it comes, and the knight moves in that step, so sitting never holds
+anyone. It is the look only: the fire heals and refills the same, seated
+or not. In a session the knight sends "sit" and "stand" as it sends a
+swing, and every screen shows it seated, facing the fire there. The pose's
+numbers are `camp.sit`. The sit bench steps the world one physics step at
+a time: the knight sits on the step that reaches sitAfter, a press of D,
+Space, the right button or a click each stands it up in the next step,
+out of the fire's warmth it never sits, and five seconds at the fire heal
+and refill the same seated as for a knight that never sits. It exits with
+the number of failed checks; with a window and an output directory it
+saves the knight seated as `sit.png`. The danger party bench below sits
+both knights of a two-process session at the first camp's fire and checks
+both screens show them seated, then one walking off and standing up:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sit/sit.qml
+qml -I build/bin/qml tests/sit/sit.qml -- <out dir>
+```
+
+The camp's sounds sit where they come from: the campfire crackles in every
+camp, the anvil rings while the smith stands at it hammering, water drips
+at the grotto's pond, the cart creaks in the miners' hall and the embers
+hiss at the ember camp's coals and cracks. Each screen hears them by its
+own knight's distance, quieter the further, silent from a sound's reach
+on; Clayground's sound is mono, so there is no left or right. When every
+knight in the camp has stood still `camp.restQuiet` seconds (10) - all of
+them seated by the fire - the camp music steps down to `restMusic` of its
+level and the near sounds come forward; a knight that moves brings the
+music back. M mutes all of it. Every number is in `Balance.camp.sounds`;
+the samples are made by `tools/camp_sounds.py`. The camp sound bench
+steps the world: the crackle's gain falls from beside the fire to the
+cave's far edge, the music holds until restQuiet, steps down and comes
+back on a press of D, the anvil rings only while the smith hammers, each
+look has its own sound on 12 seeds, and M silences it all. The danger
+party bench checks two screens: each hears the crackle by its own knight,
+and the music steps down on both only while both knights rest:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsound/campsound.qml
+```
+
+Moths circle the campfire and every lantern in slow, uneven loops, now
+faster, now slower, the loop swelling and shrinking, their wings beating.
+Each look has its own: pale green-white and many in the grotto, dusty
+and gathered at the fire in the miners' hall, few and ash-coloured in
+the ember camp. All of them are one shader pass (`Moths.qml`,
+`shaders/moths.frag`), as the fireflies are: no item per moth. On top of
+its flicker the camp's light breathes: the fire's and each lantern's
+light swells and sinks over five to eight seconds, each on its own
+breath. Only the brightness breathes, never the reach; the heal radius
+is the fire's own, and the fire stays the brightest light. The moths and
+the breaths come from the level's seed (`camp.lightSalt`), so every
+screen of a session sees the same; their numbers are `camp.moths`,
+`camp.breath` and each look's `moths`. The moths bench checks one moth
+layer per camp at the fire and the four lanterns with its look's moths,
+that more moths add no item, that the light breathes while its radius
+and the heal stay put, that a dungeon's torches do not, and that
+another screen builds the same:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/moths/moths.qml
+```
+
+In most camps a cave cat sleeps curled by the campfire, a few soft
+shapes breathing slowly. When a knight comes within `notice` wu (3) it
+lifts its head and follows the knight with its eyes; once no knight has
+been within `forget` wu (4) for `settle` seconds (1.5) it tucks its head
+back in; now and then, asleep, it stretches. A knight that sits down by
+the fire lets it sleep. It lies on a ring round the fire, out of the
+warmth where the knights sit, on the floor and clear of the way to the
+stairs, the people and the props. It is drawn only: nothing collides with
+it, nobody talks to it, nothing depends on it. Whether it is there and
+where it lies come from the level's seed (`camp.catSalt`), so every
+screen of a session sees the same cat or none, and each screen sees it
+look up at whichever knight comes near. Its numbers and colours are
+`camp.cat`. The cat bench checks on 20 seeds in each look that most camps
+have a cat and not all, where it lies, that it is no body, npc or prop,
+and that another screen places the same; then that it looks up at a
+knight coming near, follows it round, settles after the knight leaves,
+sleeps by a seated knight, watches the nearer of two knights and stops
+its stretch when woken. The danger party bench checks the same cat on two
+screens, and on both it looks up at the host's knight:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cat/cat.qml
+```
+
+The cat is made from a creature template, `src/Creature.qml`, for the
+camp's next creatures (bats, fish, a salamander). The template does the
+watching: every `tick` seconds it asks the game for this screen's knights
+(`Game.knightsHere()`), turns `mood` from `"idle"` to `"alert"` when a
+standing knight is within `notice` wu, and back once none has been within
+`forget` wu for `settle` seconds. It hands its shapes a few numbers to
+draw by: `lift` (0 idle to 1 alert, eased over `rise` and `fall`
+seconds), `lookX` and `lookY` (the way to the knight it watches),
+`breathing` (-1 to 1, one breath every `breath` seconds) and `act` (0 to
+1 and back while its idle act plays, every `act.every` seconds, for
+`act.seconds`; a knight coming ends it). A new creature is a QML file
+`Creature { creature: "bat"; numbers: Balance.camp.bat; ... }` with its
+shapes reading those numbers (`src/CaveCat.qml` is the example), a group
+of numbers in `Balance.camp`, and a place in `Game.generateVillage`,
+drawn from its own stream (the level's seed ^ its own salt) like
+`_placeCat`. A creature of a few shapes can be QML items, as the cat is;
+a swarm (bats, a shoal of fish) is one shader pass, as the moths are.
+
+One to three travellers rest at the camp, other adventurers on their
+way: a Wanderer, a Pilgrim, a Minstrel, a Prospector or a Hermit, each a
+shape in its own colour. Each sits at the fire, wanders to a prop of the
+look - the grotto's pond, the hall's cart, the ember camp's coals or
+cracks - and back. Now and then two of them exchange a pair of lines in
+speech bubbles ("Heard the slits on four fire in threes." / "Then dash on
+the third."), and a dog, a creature like the cat, follows one of them.
+E at a traveller gives two lines of hearsay about the depths; they sell
+nothing, and the knights walk through them. Who comes, where each sits
+and wanders, its hearsay and the order of the exchanges come from the
+level's seed (`camp.travellerSalt`), so every screen of a session sees
+and hears the same; when each exchange comes is each screen's own. A
+traveller's `objectName` is `"traveller"`, not `"npc"`, so the benches
+that look for the innkeeper, the smith and the witch never find one. The
+kinds, the lines, the hearsay and the numbers are `camp.travellers`: a
+new line or kind is a row there. The travellers bench checks on 20 seeds
+in each look who comes, where they sit, their hearsay and the dog, that
+another screen picks the same, that two travellers exchange a pair of
+lines within a minute of a knight standing by the fire, that E gives the
+hearsay and no wares, and that the dog follows its traveller:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/travellers/travellers.qml
+```
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
@@ -490,8 +674,11 @@ window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
 settling each next one from both knights' records and building it for two,
 and checks that both screens' gauges show the same depth, at each camp and
-in each dungeon (`--shots` saves both screens of the first three camps
-too):
+in each dungeon, that both build the same camp in its depth's look, with
+the same cat or none, and that at the first camp the cat looks up at the
+host's knight on both screens and both show the knights sit down by the
+fire and one stand up again (`--shots` saves both screens of the first three camps and
+of the knights seated too):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml

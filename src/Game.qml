@@ -87,9 +87,14 @@ ClayWorld2d {
     LoopMusic {
         id: villageMusic
         source: "assets/village_music.mp3"
-        level: muted ? 0 : 0.35 * musicVolume
+        level: muted ? 0 : 0.35 * musicVolume * campSounds.musicShare
         loop: true
     }
+
+    // The camp's near sounds, each at its source, and the music stepping
+    // back while every knight rests (issue #147)
+    CampSounds { id: campAudio; game: world; party: session }
+    readonly property alias campSounds: campAudio
 
     onLevelTypeChanged: {
         if (levelType === "village") {
@@ -721,6 +726,19 @@ ClayWorld2d {
         }
         return best
     }
+    // The knights on this screen, this node's and the other players',
+    // that have not fallen: { knight, x, y, seated }, x and y its centre
+    // in wu. The camp's creatures watch them
+    function knightsHere() {
+        let knights = [player]
+        for (let id in session.remotePlayers) knights.push(session.remotePlayers[id])
+        let here = []
+        for (let k of knights) {
+            if (!k || (k === player ? player.fallen : !k.known || k.remoteHp <= 0)) continue
+            here.push({ knight: k, x: k.xWu + 0.5, y: k.yWu - 0.5, seated: !!k.seated })
+        }
+        return here
+    }
     // The node a knight belongs to
     function knightIdOf(knight) {
         if (!knight) return ""
@@ -1020,6 +1038,17 @@ ClayWorld2d {
     // its band. The village and the fight room keep their own look
     readonly property bool dangerLook: levelType === "dungeon" && !fightRoomActive
     readonly property var look: Balance.danger.looks[dangerBand(dangerPosition)]
+    // What the camp looks like at its depth (issue #146): the last of
+    // Balance.camp.looks it is deep enough for - a mossy grotto, a miners'
+    // hall, an ember camp. The fight room keeps its own look
+    readonly property bool campStyled: levelType === "village" && !fightRoomActive
+    readonly property var campLook: campLookAt(depth)
+    function campLookAt(d) {
+        let looks = Balance.camp.looks
+        for (let i = looks.length - 1; i > 0; i--)
+            if (d >= looks[i].from) return looks[i]
+        return looks[0]
+    }
     function _setDanger(position, next) {
         if (position === undefined || isNaN(position)) return
         dangerPosition = position
@@ -1616,7 +1645,7 @@ ClayWorld2d {
                 let talked = false
                 for (let i = 0; i < items.length; i++) {
                     let npc = items[i]
-                    if (npc.objectName === "npc" && npc.nearbyPlayer) {
+                    if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
                         npc.interact()
                         talked = true
                         break
@@ -2525,7 +2554,7 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : look.ambient
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -2536,14 +2565,14 @@ ClayWorld2d {
     ScreenFx2d {
         id: screenFxItem
         world: world
-        vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
+        vignette: world.fx ? (campStyled ? campLook.grade.vignette : 0.55) : 0
         vignetteColor: "#000000"
-        // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15
+        // Danger rooms run warm, the camps as their look (README: Atmosphere Toolkit)
+        temperature: !world.fx ? 0 : campStyled ? campLook.grade.temperature
                      : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
-        saturation: world.fx ? 1.15 : 1
+        saturation: !world.fx ? 1 : campStyled ? campLook.grade.saturation : 1.15
         contrast: world.fx ? 1.05 : 1
         // The heartbeat sets in below a quarter of the health and grows
         // gently - a warning, not an alarm
@@ -2742,11 +2771,22 @@ ClayWorld2d {
     Component { id: motesComponent; Motes {} }
 
     function spawnMotes() {
-        // Fireflies glow on their own; dust only shows where light falls
-        let village = levelType === "village" && !fightRoomActive
-        let m = motesComponent.createObject(village ? glowParent() : world.room, {
+        // Fireflies and embers glow on their own; dust only shows where
+        // light falls. A camp's air is its look's
+        if (campStyled) {
+            let a = campLook.air
+            let col = Qt.color(a.color)
+            dungeonObjects.push(motesComponent.createObject(a.glows ? glowParent() : world.room, {
+                widthWu: xWuMax, heightWu: yWuMax,
+                fireflies: a.blink, density: a.density, moteSize: a.size, drift: a.drift,
+                color: Qt.rgba(col.r, col.g, col.b, a.alpha),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                visible: Qt.binding(() => world.fx)
+            }))
+            return
+        }
+        let m = motesComponent.createObject(world.room, {
             widthWu: xWuMax, heightWu: yWuMax,
-            fireflies: village,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -3456,6 +3496,7 @@ ClayWorld2d {
             collidesWith: catPlayer | catEnemy | catProjectile,
             fx: Qt.binding(() => world.fx)
         })
+        if (campStyled) wall.color = campLook.rock
         dungeonObjects.push(wall)
         return wall
     }
@@ -3614,6 +3655,7 @@ ClayWorld2d {
         features = list
         breakables = []
         _propCells = ({})
+        _buildingCells = ({})
         _brokenCells = []
         plates = []
         _sprungCells = ({})
@@ -3662,6 +3704,9 @@ ClayWorld2d {
     // The whole ones still standing, and their cells by grid key, which
     // the enemies' paths go around
     property var breakables: []
+    // The camp's campfire, null in a dungeon: a knight that stands still
+    // in its warmth sits down (Player, issue #148)
+    property var campfire: null
     property var _propCells: ({})
     // Host, and alone: the cells broken in this level, "gx,gy"
     property var _brokenCells: []
@@ -4745,6 +4790,7 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
+        if (campStyled) r.color = campLook.rim
         dungeonObjects.push(r)
         return r
     }
@@ -4772,7 +4818,8 @@ ClayWorld2d {
             yWu: gy * cellSize + wallFaceWu,
             widthWu: (toGx - fromGx) * cellSize,
             heightWu: wallFaceWu,
-            color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+            color: campStyled ? campLook.face : "#3A4658",
+            faceStyle: campStyled ? campLook.faceStyle : "bricks",
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -5153,10 +5200,17 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        campfire = null
+        campCat = null
+        campTravellers = []
+        campDog = null
+        campTalk = null
+        campSounds.clear()
         features = []
         featureShowcase = false
         breakables = []
         _propCells = ({})
+        _buildingCells = ({})
         _brokenCells = []
         plates = []
         _sprungCells = ({})
@@ -5182,6 +5236,8 @@ ClayWorld2d {
 
         grid = []
         rooms = []
+        campProps = []
+        campLayout = -1
         // The minimap paints what is explored of the grid, and the grid is gone
         exploredCells = []
     }
@@ -5211,24 +5267,28 @@ ClayWorld2d {
         rng = createRng(levelSeed)
         console.log("[Game] Village - Seed:", masterSeed, "Level:", levelIndex)
 
-        let roomSize = 20
-        let ox = Math.floor((gridWidth - roomSize) / 2)
-        let oy = Math.floor((gridHeight - roomSize) / 2)
-
-        // Initialize grid and carve village area
+        // The cave, the tavern and the smithy are cells of the grid: they
+        // block the way, the light and the paths like a dungeon's rock
         initializeGrid()
         initExploredCells()
-        for (let y = oy; y < oy + roomSize; y++)
-            for (let x = ox; x < ox + roomSize; x++) {
-                grid[y][x] = cellRoom
-                exploredCells[y][x] = true
-            }
+        let camp = carveCamp(levelSeed)
+        let b = Balance.camp.building
+        let tavern = { gx: camp.mid - b.side - b.width, gy: camp.midRow + b.raised, w: b.width, h: b.height }
+        let smithy = { gx: camp.mid + b.side, gy: tavern.gy, w: b.width, h: b.height }
+        _buildingCells = ({})
+        _carveBuilding(tavern)
+        _carveBuilding(smithy)
+        for (let y = 0; y < gridHeight; y++)
+            for (let x = 0; x < gridWidth; x++)
+                if (grid[y][x] === cellRoom || _buildingCells[y * gridWidth + x])
+                    exploredCells[y][x] = true
 
-        // Entrance at bottom, exit at top
-        let entranceX = Math.floor(ox + roomSize / 2)
+        // Entrance at the bottom, exit at the top: a tunnel each from the
+        // edge of the map to the cave's bay
+        let entranceX = camp.mid
         let exitX = entranceX
-        for (let y = 0; y < oy; y++) grid[y][entranceX] = cellHallway
-        for (let y = oy + roomSize; y < gridHeight; y++) grid[y][exitX] = cellHallway
+        for (let y = 0; y < gridHeight && grid[y][entranceX] === cellWall; y++) grid[y][entranceX] = cellHallway
+        for (let y = gridHeight - 1; y >= 0 && grid[y][exitX] === cellWall; y--) grid[y][exitX] = cellHallway
         entranceGridX = entranceX
         exitGridX = exitX
 
@@ -5237,21 +5297,28 @@ ClayWorld2d {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             fx: Qt.binding(() => world.fx),
-            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            style: campLook.floor.style,
+            grass: campLook.floor.grass,
+            moss: campLook.floor.moss,
+            crackShare: campLook.floor.crackShare,
             seed: (levelIndex * 0.137) % 1
         })
-        floorObj.color = "#2A3A4A"
+        floorObj.color = campLook.floor.color
         dungeonObjects.push(floorObj)
+        let built = dungeonObjects.length
         createMergedWalls()
         createBoundaryWalls()
         createWallFaces()
         createWallRims()
+        _tintBuildings(built)
+        _placeOverhangs(camp.seed)
         updateOccluders()
         spawnMotes()
 
-        // Room center in world units
-        let cx = (ox + roomSize / 2) * cellSize
-        let cy = (oy + roomSize / 2) * cellSize
+        // The camp's centre in world units: the middle column's west edge,
+        // the middle row's south edge
+        let cx = camp.mid * cellSize
+        let cy = camp.midRow * cellSize
 
         // Campfire (bottom-center of village)
         let cf = campfireComponent.createObject(world.room, {
@@ -5261,14 +5328,18 @@ ClayWorld2d {
             gameWorld: world
         })
         dungeonObjects.push(cf)
+        campfire = cf
 
-        // Tavern building (top-left) — entrance facing south
-        _buildVillageBuilding(cx - 8, cy + 5, 6, 5, "south")
+        // Tavern (west of the middle), open to the south: x the middle of
+        // its floor, y0 its south edge
+        let tx = (tavern.gx + tavern.w / 2) * cellSize
+        let ty0 = tavern.gy * cellSize
+        _lightBuilding(tavern)
         // Innkeeper NPC with routine
-        _spawnVillageNpc(cx - 8, cy + 4, "#C9A227", "mug", "Innkeeper", [
-            { x: cx - 8, y: cy + 6, duration: 4, text: "*polishing mugs*" },
-            { x: cx - 8, y: cy + 4, duration: 3, text: "*sweeping floor*" },
-            { x: cx - 9, y: cy + 3, duration: 2, text: "*checking supplies*" }
+        _spawnVillageNpc(tx, ty0 + 5, "#C9A227", "mug", "Innkeeper", [
+            { x: tx, y: ty0 + 5, duration: 4, text: "*polishing mugs*" },
+            { x: tx, y: ty0 + 3, duration: 3, text: "*sweeping floor*" },
+            { x: tx - 1, y: ty0 + 2, duration: 2, text: "*checking supplies*" }
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
@@ -5280,15 +5351,18 @@ ClayWorld2d {
               price: Balance.shop.draughtPrice }
         ])
 
-        // Blacksmith building (top-right) — entrance facing south
-        _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
-        // Anvil in front of blacksmith
-        _spawnAnvil(cx + 6, cy + 2)
+        // Smithy (east of the middle), open to the south
+        let sx = (smithy.gx + smithy.w / 2) * cellSize
+        let sy0 = smithy.gy * cellSize
+        _lightBuilding(smithy)
+        // Anvil in front of the smithy
+        _spawnAnvil(sx, sy0 - 1)
+        let anvilAt = Qt.point(sx, sy0 - 1)
         // Blacksmith NPC with routine
-        _spawnVillageNpc(cx + 6, cy + 4, "#B87333", "hammer", "Blacksmith", [
-            { x: cx + 6, y: cy + 2, duration: 5, text: "*hammering*" },
-            { x: cx + 6, y: cy + 6, duration: 3, text: "*sorting tools*" },
-            { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
+        _spawnVillageNpc(sx, sy0 + 3, "#B87333", "hammer", "Blacksmith", [
+            { x: sx, y: sy0 - 1, duration: 5, text: "*hammering*", sound: "anvil" },
+            { x: sx, y: sy0 + 5, duration: 3, text: "*sorting tools*" },
+            { x: sx - 1, y: sy0 + 3, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
             "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
@@ -5303,7 +5377,7 @@ ClayWorld2d {
             world: world.physics,
             categories: catWall,
             collidesWith: catPlayer,
-            color: "#2A4A2A"
+            color: campLook.tree
         })
         tree.radius = tree.width * 0.5
         dungeonObjects.push(tree)
@@ -5314,10 +5388,17 @@ ClayWorld2d {
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
+        let spots = [Qt.point(tree.xWu, tree.yWu)]
+        _placeCampProps(camp, levelSeed, spots)
+        _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
+        _placeCat(camp, levelSeed, cf, spots)
+        _placeTravellers(camp, levelSeed, cf)
+        campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
+                         anvilAt, campLook, campProps)
 
         // Spawn player at entrance
-        spawnPlayer(cx, (oy + 2) * cellSize)
-        session.spawnRemotePlayers(cx, (oy + 2) * cellSize)
+        spawnPlayer(cx, (camp.oy + 2) * cellSize)
+        session.spawnRemotePlayers(cx, (camp.oy + 2) * cellSize)
 
         // Block entrance + exit sensor
         blockEntrance()
@@ -5338,29 +5419,409 @@ ClayWorld2d {
         console.log("[Game] Village generated")
     }
 
-    function _buildVillageBuilding(cx, cy, bw, bh, entrance) {
-        // All params in world units. Builds 3 walls with one side open.
-        let wallColor = "#1E2E3E"
-        let t = 0.5  // Wall thickness in wu
-        let x1 = cx - bw / 2
-        let x2 = cx + bw / 2
-        let y1 = cy - bh / 2
-        let y2 = cy + bh / 2
-
-        // Top wall (always present)
-        createWallAt(x1, y2 + t, bw, t).color = wallColor
-        // Left wall
-        createWallAt(x1, y2 + t, t, bh + t).color = wallColor
-        // Right wall
-        createWallAt(x2 - t, y2 + t, t, bh + t).color = wallColor
-        // Bottom wall (skip if entrance is south)
-        if (entrance !== "south")
-            createWallAt(x1, y1 + t, bw, t).color = wallColor
-        // Lanterns flanking the open front
-        if (entrance === "south") {
-            placeTorch(x1 + t / 2, y1 + 0.35, "#FFC870")
-            placeTorch(x2 - t / 2, y1 + 0.35, "#FFC870")
+    // The camp's cave in the grid (issue #145): the floor of a box of
+    // Balance.camp cells, its edge moved out into bays and in as outcrops
+    // and its corners cut off, all from the level's own stream. Returns
+    // the box (ox, oy), its middle column and row, and a seed for what is
+    // drawn along the edge
+    function carveCamp(levelSeed) {
+        let c = Balance.camp
+        let rand = createRng(levelSeed ^ c.seedSalt)
+        let ox = Math.floor((gridWidth - c.width) / 2)
+        let oy = gridHeight - c.exitTunnel - c.height
+        let mid = Math.floor(ox + c.width / 2)
+        let midRow = Math.floor(oy + c.height / 2)
+        let pick = (range) => range[0] + Math.floor(rand() * (range[1] - range[0] + 1))
+        // A side's edge, per cell along it: how many cells it moves in
+        // from its base line (an outcrop) or, below 0, out (a bay). It
+        // steps by one or two cells at a time, so it terraces rather than
+        // growing fingers of rock or floor one cell wide, and leans back
+        // to the base line, so no side stays in or out all along
+        let side = (n) => {
+            let edge = []
+            let inset = pick([-c.bay, c.outcrop])
+            while (edge.length < n) {
+                let run = pick(c.stretch)
+                for (let i = 0; i < run && edge.length < n; i++) edge.push(inset)
+                let back = 0.5 + 0.2 * inset
+                let step = pick([1, 2]) * (rand() < back ? -1 : 1)
+                inset = Math.max(-c.bay, Math.min(c.outcrop, inset + step))
+            }
+            return edge
         }
+        let south = side(c.width), north = side(c.width)
+        let west = side(c.height), east = side(c.height)
+        // The entrance and the exit open in a bay
+        for (let i = -1; i <= 1; i++) {
+            south[mid - ox + i] = -c.bay
+            north[mid - ox + i] = -c.bay
+        }
+        // Cut off: south-west, south-east, north-west, north-east
+        let corners = [pick(c.corner), pick(c.corner), pick(c.corner), pick(c.corner)]
+        for (let y = 0; y < c.height; y++)
+            for (let x = 0; x < c.width; x++) {
+                let xe = c.width - 1 - x, yn = c.height - 1 - y
+                if (y < c.bay + south[x] || yn < c.bay + north[x]
+                    || x < c.bay + west[y] || xe < c.bay + east[y])
+                    continue
+                if (x + y < corners[0] || xe + y < corners[1] || x + yn < corners[2] || xe + yn < corners[3])
+                    continue
+                grid[oy + y][ox + x] = cellRoom
+            }
+        // Only what the knights can walk to from the entrance stays floor
+        let reached = ({})
+        let open = [[mid, oy + 2]]
+        reached[(oy + 2) * gridWidth + mid] = true
+        while (open.length > 0) {
+            let at = open.pop()
+            for (let d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                let nx = at[0] + d[0], ny = at[1] + d[1], k = ny * gridWidth + nx
+                if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight || reached[k]
+                    || grid[ny][nx] !== cellRoom) continue
+                reached[k] = true
+                open.push([nx, ny])
+            }
+        }
+        for (let y = oy; y < oy + c.height; y++)
+            for (let x = ox; x < ox + c.width; x++)
+                if (grid[y][x] === cellRoom && !reached[y * gridWidth + x]) grid[y][x] = cellWall
+        return { ox: ox, oy: oy, mid: mid, midRow: midRow, seed: rand() }
+    }
+
+    // The cells of the tavern's and the smithy's walls, (gy * gridWidth + gx)
+    property var _buildingCells: ({})
+    // A building of whole cells at (gx, gy), its south-west cell: walls
+    // west, north and east, open to the south
+    function _carveBuilding(r) {
+        for (let y = r.gy; y < r.gy + r.h; y++)
+            for (let x = r.gx; x < r.gx + r.w; x++) {
+                if (x !== r.gx && x !== r.gx + r.w - 1 && y !== r.gy + r.h - 1) continue
+                grid[y][x] = cellWall
+                _buildingCells[y * gridWidth + x] = true
+            }
+    }
+    // The walls and faces made since dungeonObjects held `from` that stand
+    // on a building's cells take its timber colours
+    function _tintBuildings(from) {
+        let c = campLook
+        for (let i = from; i < dungeonObjects.length; i++) {
+            let o = dungeonObjects[i]
+            let face = o.shadowWu !== undefined
+            if (!face && o.categories === undefined) continue
+            // A wall's yWu is its top edge, a face's the top of the face
+            let gy = face ? Math.floor(o.yWu / cellSize) : Math.round(o.yWu / cellSize) - 1
+            let gx = Math.round(o.xWu / cellSize)
+            if (!_buildingCells[gy * gridWidth + gx]) continue
+            o.color = face ? c.buildingFace : c.buildingWall
+        }
+    }
+    // The camp's lights breathe, the campfire and the lanterns, each on its
+    // own breath from the level's seed ^ Balance.camp.lightSalt (issue
+    // #149). A breath is a whole share of the lights' 1000 s round of
+    // time, so it never jumps when the round starts over. Returns the
+    // stream, for what else hangs on the lights
+    function _breatheLights(levelSeed, lights) {
+        let b = Balance.camp.breath
+        let rand = createRng(levelSeed ^ Balance.camp.lightSalt)
+        for (let l of lights) {
+            let seconds = b.seconds[0] + rand() * (b.seconds[1] - b.seconds[0])
+            l.breath = b.depth
+            l.breathSeconds = 1000 / Math.round(1000 / seconds)
+            l.breathPhase = rand() * 2 * Math.PI
+        }
+        return rand
+    }
+    // Moths circle the campfire and the lanterns (issue #149), all of them
+    // in one item; how many at each light and their colour are the look's
+    Component { id: mothsComponent; Moths {} }
+    function _spawnMoths(rand, fire, lanterns) {
+        let m = Balance.camp.moths, look = campLook.moths
+        let col = Qt.color(look.color)
+        // Where the lights shine from (their Light2d offsets): the middle
+        // of the fire's body, half a wu in front of a lantern's wall
+        let lights = [{ x: fire.xWu + fire.widthWu / 2, y: fire.yWu - fire.heightWu / 2,
+                        orbit: m.fire.orbit, count: look.fire }]
+        for (let t of lanterns)
+            lights.push({ x: t.xWu, y: t.yWu - 0.5, orbit: m.lantern.orbit, count: look.lantern })
+        dungeonObjects.push(mothsComponent.createObject(glowParent(), {
+            mothLights: lights,
+            seed: Math.floor(rand() * 1000),
+            color: Qt.rgba(col.r, col.g, col.b, look.alpha),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        }))
+    }
+    // The cave cat (issue #150): in Balance.camp.cat.share of the camps,
+    // curled on a ring round the campfire, out of the warmth where the
+    // knights sit, on the floor and clear of the way to the stairs, the
+    // people's spots (the routines' and the tree, as _placeCampProps
+    // leaves them) and the props. Its own stream, the level's seed ^
+    // Balance.camp.catSalt, so every screen of a session sees the same cat
+    // or none. campCat is it, or null
+    Component { id: caveCatComponent; CaveCat {} }
+    property var campCat: null
+    function _placeCat(camp, levelSeed, fire, spots) {
+        let c = Balance.camp, n = c.cat
+        let rand = createRng(levelSeed ^ c.catSalt)
+        campCat = null
+        if (rand() >= n.share) return
+        let r = n.ring[0] + rand() * (n.ring[1] - n.ring[0])
+        let start = rand() * 2 * Math.PI
+        let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
+        let cx = camp.mid * cellSize, half = n.size / 2
+        let fits = []
+        for (let i = 0; i < n.angles; i++) {
+            let a = start + i * 2 * Math.PI / n.angles
+            let x = fx + r * Math.cos(a), y = fy + r * Math.sin(a)
+            if (x + half > cx - c.clearOfPath && x - half < cx + c.clearOfPath) continue
+            if (spots.some(s => Math.hypot(s.x - x, s.y - y) < c.clearOfPeople)) continue
+            if (campProps.some(p => Math.hypot(Math.max(0, Math.abs(p.x - x) - p.w / 2),
+                                               Math.max(0, Math.abs(p.y - y) - p.h / 2)) < half + n.clearOfProps)) continue
+            let floor = true
+            for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+                for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                    if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) floor = false
+            if (floor) fits.push(Qt.point(x, y))
+        }
+        let at = fits[Math.floor(rand() * fits.length)]
+        let seed = rand()
+        if (!at) return
+        campCat = caveCatComponent.createObject(world.room, {
+            xWu: at.x, yWu: at.y, seed: seed,
+            gameWorld: world,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(campCat)
+    }
+    // Travellers rest at the camp (issue #151): Balance.camp.travellers
+    // other adventurers, each sitting at the fire and wandering to one of
+    // the look's props and back, two now and then exchanging a pair of
+    // lines, one of them followed by a dog. All of it - who comes, where
+    // each sits and wanders, what each says - draws from its own stream,
+    // the level's seed ^ Balance.camp.travellerSalt, so every screen of a
+    // session sees the same. A traveller is an Npc named "traveller", not
+    // "npc": the benches that look for the innkeeper, the smith and the
+    // witch never find one. It sells nothing, and the knights walk
+    // through it
+    Component { id: travellerComponent; Npc { objectName: "traveller"; solid: false } }
+    Component { id: campDogComponent; CampDog {} }
+    Component { id: campTalkComponent; CampTalk {} }
+    property var campTravellers: []
+    property var campDog: null
+    property var campTalk: null
+    function _placeTravellers(camp, levelSeed, fire) {
+        let c = Balance.camp, n = c.travellers
+        let rand = createRng(levelSeed ^ c.travellerSalt)
+        campTravellers = []
+        campDog = null
+        campTalk = null
+        let pick = (range) => range[0] + rand() * (range[1] - range[0])
+        let half = 0.4
+        let onFloor = (x, y) => {
+            for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+                for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                    if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+            return true
+        }
+        let count = n.count[0] + Math.floor(rand() * (n.count[1] - n.count[0] + 1))
+        // The seats: on a ring round the fire, on the floor, off the cat
+        let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
+        let r = pick(n.ring), start = rand() * 2 * Math.PI
+        let seats = []
+        for (let i = 0; i < n.angles; i++) {
+            let a = start + i * 2 * Math.PI / n.angles
+            let x = fx + r * Math.cos(a), y = fy + r * Math.sin(a)
+            if (!onFloor(x, y)) continue
+            if (campCat && Math.hypot(campCat.xWu - x, campCat.yWu - y) < campCat.sizeWu / 2 + half + 0.3) continue
+            seats.push(Qt.point(x, y))
+        }
+        // The props they wander to, by the look
+        let goals = n.props[campLook.name] || []
+        let wanders = campProps.filter(p => goals.some(g => g.kind === p.kind))
+        let cx = camp.mid * cellSize, cy = camp.midRow * cellSize
+        let kinds = n.kinds.slice()
+        let spread = Math.max(1, Math.floor(seats.length / count))
+        for (let i = 0; i < count && i < seats.length; i++) {
+            let kind = kinds.splice(Math.floor(rand() * kinds.length), 1)[0]
+            let seat = seats[i * spread]
+            // Its walk: off the prop's edge toward the camp's middle, each
+            // apart wu aside of the one before, so they stand side by side
+            let spot = null, text = n.seatText
+            let p = wanders.length > 0 ? wanders[Math.floor(rand() * wanders.length)] : null
+            let aside = (i - (count - 1) / 2) * n.apart + (rand() - 0.5) * 0.4
+            if (p) {
+                let dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1
+                let ux = dx / d, uy = dy / d
+                let t = Math.min(Math.abs(ux) > 1e-6 ? (p.w / 2 + n.off) / Math.abs(ux) : Infinity,
+                                 Math.abs(uy) > 1e-6 ? (p.h / 2 + n.off) / Math.abs(uy) : Infinity)
+                let x = p.x + ux * t - uy * aside, y = p.y + uy * t + ux * aside
+                if (onFloor(x, y)) {
+                    spot = Qt.point(x, y)
+                    text = goals.find(g => g.kind === p.kind).text
+                }
+            }
+            if (!spot) spot = seats[(i * spread + Math.floor(seats.length / 2)) % seats.length]
+            let rest = pick(n.rest), wander = pick(n.wander)
+            let heard = n.hearsay.slice(), lines = []
+            for (let k = 0; k < n.hearsayLines && heard.length > 0; k++)
+                lines.push(heard.splice(Math.floor(rand() * heard.length), 1)[0])
+            // An Npc's xWu, yWu is its top-left corner; seats are centres
+            let at = (q) => ({ x: q.x - half, y: q.y + half })
+            let t = travellerComponent.createObject(world.room, {
+                xWu: at(seat).x, yWu: at(seat).y,
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                world: world.physics,
+                gameWorld: world,
+                interactionCategories: catWall,
+                interactionCollidesWith: catPlayer,
+                npcColor: kind.color,
+                iconType: kind.icon,
+                shape: kind.shape,
+                npcName: kind.name,
+                walkSpeed: n.walk,
+                routine: [ Object.assign(at(seat), { duration: rest, text: n.seatText }),
+                           Object.assign(at(spot), { duration: wander, text: text }) ],
+                dialogueLines: lines
+            })
+            dungeonObjects.push(t)
+            campTravellers.push(t)
+        }
+        if (campTravellers.length === 0) return
+        // The dog, beside the traveller it follows
+        let leader = campTravellers[Math.floor(rand() * campTravellers.length)]
+        let dogSeed = rand()
+        campDog = campDogComponent.createObject(world.room, {
+            leader: leader, seed: dogSeed,
+            xWu: leader.xWu + half + (dogSeed < 0.5 ? 1 : -1) * n.dog.follow, yWu: leader.yWu - half - 0.25,
+            gameWorld: world,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(campDog)
+        // The talk: every exchange once in an order of the stream, each
+        // between two of them
+        let order = n.exchanges.map((e, i) => i)
+        let plan = [], waits = []
+        while (order.length > 0) {
+            let e = n.exchanges[order.splice(Math.floor(rand() * order.length), 1)[0]]
+            let a = Math.floor(rand() * campTravellers.length)
+            let b = campTravellers.length > 1
+                ? (a + 1 + Math.floor(rand() * (campTravellers.length - 1))) % campTravellers.length : a
+            plan.push({ a: a, b: b, lines: e })
+            waits.push(pick(n.every))
+        }
+        campTalk = campTalkComponent.createObject(world.room, {
+            travellers: campTravellers, plan: plan, first: pick(n.first), waits: waits
+        })
+        dungeonObjects.push(campTalk)
+    }
+    // Lanterns flanking a building's open front
+    function _lightBuilding(r) {
+        let y0 = r.gy * cellSize + 0.35
+        placeTorch((r.gx + 0.5) * cellSize, y0, campLook.lantern)
+        placeTorch((r.gx + r.w - 0.5) * cellSize, y0, campLook.lantern)
+    }
+    // The rock overhanging the cave's north-facing edges, one piece per
+    // run of face, as the faces are; the buildings have none
+    Component { id: overhangComponent; CaveOverhang {} }
+    function _placeOverhangs(seed) {
+        let o = Balance.camp.overhang
+        let isEdge = (gx, gy) => grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                                 && !_buildingCells[gy * gridWidth + gx]
+        for (let gy = 1; gy < gridHeight; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                if (!isEdge(gx, gy)) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && isEdge(gx, gy)) gx++
+                dungeonObjects.push(overhangComponent.createObject(world.room, {
+                    xWu: startX * cellSize, yWu: gy * cellSize + wallFaceWu,
+                    widthWu: (gx - startX) * cellSize, faceWu: wallFaceWu,
+                    lipWu: o.lip, stalactiteWu: o.stalactite, toothWu: o.tooth, shadowWu: o.shadow,
+                    seed: seed * 1000,
+                    baseColor: campLook.rock,
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                }))
+            }
+        }
+    }
+
+    // The camp's props (issue #146): one of its look's layouts, picked
+    // from the level's own stream (seed ^ Balance.camp.propSalt), so every
+    // screen of a session lays out the same. A prop is left out unless it
+    // lies whole on the cave's floor - in its place, else moved in or to
+    // the camp's other side onto no other prop - clear of the way to the stairs, the
+    // campfire, the buildings' fronts, and the people and where they walk
+    // and the spots (points in wu) given. campProps holds what was laid:
+    // { kind, x, y, w, h } in world units, the prop's centre
+    Component { id: campPropComponent; CampProp {} }
+    property var campProps: []
+    property var campLayout: -1
+    property real campClock: 0
+    NumberAnimation on campClock {
+        from: 0; to: 3600; duration: 3600000
+        loops: Animation.Infinite
+        running: campStyled && world.fx
+    }
+    function _placeCampProps(camp, levelSeed, spots) {
+        let c = Balance.camp, look = campLook
+        // The innkeeper, the smith and the witch, and every spot of their
+        // routines
+        for (let o of dungeonObjects)
+            if (o && o.objectName === "npc") {
+                spots.push(Qt.point(o.xWu, o.yWu))
+                for (let r of o.routine) spots.push(Qt.point(r.x, r.y))
+            }
+        let rand = createRng(levelSeed ^ c.propSalt)
+        campLayout = Math.floor(rand() * look.layouts.length)
+        campProps = []
+        let cx = camp.mid * cellSize, cy = camp.midRow * cellSize
+        let fire = dungeonObjects.find(o => o && o.healRadius !== undefined)
+        let b = c.building
+        let fronts = [camp.mid - b.side - b.width, camp.mid + b.side].map(gx => ({
+            x0: gx * cellSize, x1: (gx + b.width) * cellSize,
+            y: (camp.midRow + b.raised) * cellSize }))
+        for (let p of look.layouts[campLayout]) {
+            let seed = rand()
+            // Where the cave's edge cuts its place, the prop steps in
+            // toward the middle, wu by wu up to c.propShift, then tries the
+            // same on the other side of the camp; moved, it lands on no
+            // other prop
+            let tries = []
+            for (let side of [1, -1])
+                for (let k = 0; k <= c.propShift; k++) tries.push(side * (p.x - Math.sign(p.x) * k))
+            let px = tries.find(x => _propFits(cx + x - p.w / 2, cy + p.y - p.h / 2, cx + x + p.w / 2,
+                                               cy + p.y + p.h / 2, cx, fire, fronts, spots)
+                                     && (x === p.x || !campProps.some(q => Math.abs(q.x - cx - x) < (q.w + p.w) / 2
+                                                                      && Math.abs(q.y - cy - p.y) < (q.h + p.h) / 2)))
+            if (px === undefined) continue
+            let x0 = cx + px - p.w / 2, y1 = cy + p.y + p.h / 2
+            let glows = ["mushrooms", "cracks", "coals"].indexOf(p.kind) >= 0
+            let o = campPropComponent.createObject(glows ? glowParent() : world.room, {
+                xWu: x0, yWu: y1, widthWu: p.w, heightWu: p.h,
+                propKind: p.kind, seed: seed,
+                time: Qt.binding(() => campClock),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                visible: Qt.binding(() => world.fx)
+            })
+            dungeonObjects.push(o)
+            campProps.push({ kind: p.kind, x: cx + px, y: cy + p.y, w: p.w, h: p.h })
+        }
+    }
+    function _propFits(x0, y0, x1, y1, cx, fire, fronts, spots) {
+        let c = Balance.camp
+        // How far the rectangle is from a point
+        let off = (px, py) => Math.hypot(px - Math.max(x0, Math.min(px, x1)), py - Math.max(y0, Math.min(py, y1)))
+        if (x1 > cx - c.clearOfPath && x0 < cx + c.clearOfPath) return false
+        if (off(fire.xWu, fire.yWu) < c.clearOfFire) return false
+        for (let f of fronts)
+            if (x1 > f.x0 && x0 < f.x1 && y1 > f.y - c.clearOfFront && y0 < f.y) return false
+        for (let s of spots)
+            if (off(s.x, s.y) < c.clearOfPeople) return false
+        for (let gy = Math.floor(y0 / cellSize); gy <= Math.floor((y1 - 0.001) / cellSize); gy++)
+            for (let gx = Math.floor(x0 / cellSize); gx <= Math.floor((x1 - 0.001) / cellSize); gx++)
+                if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+        return true
     }
 
     // dialogue: its lines, or a function making them when it is talked to

@@ -21,6 +21,10 @@ PhysicsItem {
     property bool known: false
     // How far an ally has lifted this knight up while it is down, 0..1
     property real reviveRing: 0
+    // Sat down by the fire, and the way to it (the "sit" and "stand"
+    // actions)
+    property bool seated: false
+    property real sitAngle: 0
     visible: known
 
     widthWu: 1.0
@@ -98,6 +102,15 @@ PhysicsItem {
     // the sampled action state misses the moment.
     // Its sounds are the local knight's, quieter and fading with distance.
     function triggerAction(name) {
+        // Seated by the fire (issue #148) it faces the fire on this
+        // screen; whatever else it does stands it up
+        if (name === "sit") {
+            let fire = gameWorld ? gameWorld.campfire : null
+            sitAngle = fire ? fire.angleFrom(xWu, yWu) : facingAngle
+            seated = true
+            return
+        }
+        seated = false
         let gain = gameWorld ? gameWorld.remoteGain(xWu, yWu) : 0
         if (name === "attack") {
             view.swing()
@@ -176,7 +189,8 @@ PhysicsItem {
         accentColor: Qt.lighter(rp.playerColor, 1.3)
         bladeColor: Qt.lighter(rp.playerColor, 1.1)
         ridgeColor: Qt.darker(rp.playerColor, 1.15)
-        facingAngle: rp.facingAngle
+        facingAngle: rp.seated ? rp.sitAngle : rp.facingAngle
+        seated: rp.seated
         moveX: rp._moveX
         moveAmount: rp._moveAmount
         blocking: rp.remoteBlocking

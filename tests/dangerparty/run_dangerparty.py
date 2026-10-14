@@ -22,12 +22,27 @@ records of the dungeon and the host leads the party down:
 - both screens' descent gauges show the same depth: at the camp large,
   the marker sunk into the next dungeon's layer; in the dungeon small, the
   marker in its layer (issue #97)
+- both screens build the same camp: the look of its depth (the grotto at
+  depth 0 to 2, the miners' hall at 3), the same layout and the same
+  props (issue #146), and the same cat in the same place, or none
+  (issue #150)
+- at the first camp both knights stand still by the fire and sit down,
+  and each screen shows both seated, their shields set down; each screen
+  hears the campfire's crackle by its own knight's distance, and once
+  both have stood still Balance.camp.restQuiet seconds both screens'
+  music steps down; the joiner's knight walks off and stands up on both
+  screens, the host's stays seated, and both screens' music comes back
+  (issues #147, #148)
+- at the first camp the host's knight comes near the camp's cat: on both
+  screens it looks up at the host's knight, and sleeps again once the
+  knight is back at the entrance (issue #150)
 
 The records take the party to a middle, a low, a middle and a high
 dungeon. With --shots <dir> each screen of the first three dungeons after
 depth 0 is saved as <dir>/<host|joiner>-depth<N>.png, the knight in the
 room after the first, and each camp before them as
-<dir>/<host|joiner>-camp<N-1>.png; that needs a window, so --shots leaves
+<dir>/<host|joiner>-camp<N-1>.png, and both knights seated at the first
+camp's fire as <dir>/<host|joiner>-sit.png; that needs a window, so --shots leaves
 QT_QPA_PLATFORM alone unless it is set.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
@@ -62,6 +77,14 @@ PULL = 0.5
 TOP = 0.999
 LOW, HIGH = 0.33, 0.67
 BANDS = ("low", "middle", "high")
+# Balance.camp.sitAfter, restQuiet and sounds' restMusic, fadeDown, fadeUp
+SIT_AFTER = 3
+REST_QUIET = 10
+REST_MUSIC = 0.3
+FADE_DOWN = 3
+FADE_UP = 0.8
+# Balance.camp.cat.settle
+CAT_SETTLE = 1.5
 
 # Each dungeon's made-up records: (share lost, fell) of the host's knight
 # and of the joiner's
@@ -292,8 +315,12 @@ def descend(n, position, host_rec, joiner_rec, H, J, args, check):
     check(abs(want - alone) > 0.01,
           f"{tag} the host's record alone would have given {alone:.3f} ({BANDS[band(alone)]})")
     check_gauges(tag, n - 1, True, H, J, check)
+    check_camps(tag, n - 1, H, J, check)
     if args.shots and n <= 3:
         shoot(tag, f"camp{n - 1}", H, J, args, check)
+    if n == 1:
+        check_cat(tag, H, J, check)
+        check_sitting(tag, H, J, args, check)
 
     H.eval(["advance()"])
     if not wait_for(lambda: H.eval1("inRun()") is True and J.eval1("inRun()") is True
@@ -349,6 +376,77 @@ def check_gauges(tag, depth, camp, H, J, check):
           f"{tag} in {where} both gauges show depth {depth}, "
           f"{'large, the marker sunk into layer' if camp else 'small, the marker in layer'} {shown}"
           + ("" if hg == jg else f" (host {hg}, joiner {jg})"))
+
+
+def check_camps(tag, depth, H, J, check):
+    """Both screens build the same camp, in its depth's look"""
+    hc, jc = H.json("camp()"), J.json("camp()")
+    want = "hall" if depth >= 3 else "grotto"
+    check(hc == jc and hc["look"] == want and len(hc["props"]) > 0,
+          f"{tag} both screens build the same camp: the {hc['look']} (want {want}), layout {hc['layout']}, "
+          f"{len(hc['props'])} props, the cat {hc['cat'] or 'not there'}"
+          + ("" if hc == jc else f" (host {hc}, joiner {jc})"))
+
+
+def check_cat(tag, H, J, check):
+    """The host's knight comes near the camp's cat: on the joiner's screen
+    the cat looks up at the host's knight, and once it has gone back to
+    the entrance it sleeps again on both screens (issue #150)"""
+    if H.json("cat()") is None:
+        check(False, f"{tag} the camp has a cat to check (none on this seed)")
+        return
+    H.eval1("byCat(true)")
+    up = wait_for(lambda: J.json("cat()") == {"mood": "alert", "watching": "other"}
+                  and H.json("cat()") == {"mood": "alert", "watching": "me"}, 5)
+    hc, jc = H.json("cat()"), J.json("cat()")
+    check(up, f"{tag} the host's knight comes near the cat: on both screens it looks up at the host's knight "
+          f"(host {hc}, joiner {jc})")
+    H.eval1("byCat(false)")
+    down = wait_for(lambda: all(c["mood"] == "idle" for c in (H.json("cat()"), J.json("cat()"))), CAT_SETTLE + 5)
+    hc, jc = H.json("cat()"), J.json("cat()")
+    check(down, f"{tag} the knight gone back to the entrance, the cat sleeps again on both screens "
+          f"(host {hc}, joiner {jc})")
+
+
+def check_sitting(tag, H, J, args, check):
+    """Both knights stand still by the fire and sit down on both screens;
+    the joiner's walks off and stands up on both, the host's stays seated
+    (issue #148)"""
+    H.eval1("sitBy(-1.5)")
+    J.eval1("sitBy(2)")
+    both = lambda: all(s["me"] and s["other"] for s in (H.json("seated()"), J.json("seated()")))
+    sat = wait_for(both, SIT_AFTER + 5)
+    hs, js = H.json("seated()"), J.json("seated()")
+    check(sat, f"{tag} both knights still by the fire sit down, and each screen shows both seated "
+          f"(host {hs}, joiner {js})")
+    check(hs["shield"] and js["shield"], f"{tag} both screens show their knight's shield set down")
+    if args.shots:
+        time.sleep(1.0)
+        shoot(tag, "sit", H, J, args, check)
+    # The camp rests (issue #147): the host's knight sits 1.5 wu from the
+    # fire, the joiner's 2 wu, so the host's screen hears it louder
+    hr, jr = H.json("rest()"), J.json("rest()")
+    check(hr["crackle"] > jr["crackle"] > 0,
+          f"{tag} each screen hears the crackle by its own knight's distance "
+          f"(host at 1.5 wu {hr['crackle']}, joiner at 2 wu {jr['crackle']})")
+    down = lambda: all(r["quiet"] and r["music"] == REST_MUSIC for r in (H.json("rest()"), J.json("rest()")))
+    quiet = wait_for(down, REST_QUIET + FADE_DOWN + 5)
+    hr, jr = H.json("rest()"), J.json("rest()")
+    check(quiet, f"{tag} both knights still {REST_QUIET} s: both screens' music steps down to {REST_MUSIC} "
+          f"of its level (host {hr}, joiner {jr})")
+    x0 = js["x"]
+    J.eval1("walk(1)")
+    stood = wait_for(lambda: not J.json("seated()")["me"] and H.json("seated()")["other"] is False, 5)
+    hs, js = H.json("seated()"), J.json("seated()")
+    J.eval1("walk(0)")
+    check(stood and js["x"] > x0 and hs["me"],
+          f"{tag} the joiner's knight walks off and stands up on both screens, the host's stays seated "
+          f"(host {hs}, joiner {js}, joiner from x {x0})")
+    up = lambda: all(not r["quiet"] and r["music"] == 1 for r in (H.json("rest()"), J.json("rest()")))
+    back = wait_for(up, FADE_UP + 3)
+    hr, jr = H.json("rest()"), J.json("rest()")
+    check(back, f"{tag} one knight up, both screens' music comes back, the host's knight still seated "
+          f"(host {hr}, joiner {jr})")
 
 
 def check_foes(tag, H, J, check):

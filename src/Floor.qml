@@ -15,13 +15,16 @@ Rectangle {
 
     // Procedural ground (see shaders/floor.frag); false shows the flat floor
     property bool fx: true
-    // "stone" (dungeon flagstones) or "earth" (village ground)
+    // "stone" (dungeon flagstones), "earth" (village ground) or "basalt"
+    // (the ember camp, issue #146)
     property string style: "stone"
     property real seed: 0
     // The flagstones' wear (Balance.danger.looks): the share of them
     // cracked across, and the share of the floor moss grows over
     property real crackShare: 0.035
     property real moss: 0
+    // The share of the earth grass grows over
+    property real grass: 0.45
 
     // Beneath stains, walls and everything that moves
     z: -2
@@ -57,10 +60,11 @@ Rectangle {
         property real stoneWu: 0.5
         // Half a chunky pixel: a full one made the gaps as loud as the stones
         property real seamPx: 0.5
-        property real style: floor.style === "earth" ? 1 : 0
+        property real style: ["stone", "earth", "basalt"].indexOf(floor.style)
         property real seed: floor.seed
         property real crackShare: floor.crackShare
         property real moss: floor.moss
+        property real grass: floor.grass
         property color baseColor: floor.color
         property color seamColor: Qt.darker(floor.color, 1.45)
     }
