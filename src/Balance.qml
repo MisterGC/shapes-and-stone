@@ -919,6 +919,98 @@ QtObject {
             light: "#A89380",
             eyes: "#E8D27A"
         },
+        // Travellers rest at the camp (issue #151): count[0] to count[1]
+        // of kinds, other adventurers on their way, each its own name,
+        // shape, colour and icon, drawn from the level's seed ^
+        // travellerSalt, so every screen of a session sees the same. Each
+        // sits at one of angles spots ring[0] to ring[1] wu from the
+        // fire's centre, on the floor, for rest[0] to rest[1] seconds,
+        // then wanders to one of the look's wander props - off wu off its
+        // edge toward the camp's middle, doing its text - for wander[0]
+        // to wander[1] seconds, and back; without such a prop it moves to
+        // another seat. They walk at walk wu a second and the knights walk
+        // through them. Talked to (E) one gives hearsayLines of hearsay,
+        // and sells nothing. Two of them standing within reach wu of each
+        // other exchange one of exchanges, the first after first[0] to
+        // first[1] seconds in the camp, then every every[0] to every[1]
+        // seconds: one says the first line, the other answers after answer
+        // seconds, each bubble up for show seconds. A dog follows one of
+        // them (dog below). The lines are tables: more are written here
+        travellerSalt: 0x74726176,
+        travellers: {
+            count: [1, 3],
+            kinds: [
+                { name: "Wanderer", shape: "square", color: "#5E8CB8", icon: "pack" },
+                { name: "Pilgrim", shape: "diamond", color: "#9AB85E", icon: "staff" },
+                { name: "Minstrel", shape: "circle", color: "#C8607A", icon: "lute" },
+                { name: "Prospector", shape: "square", color: "#B89A5E", icon: "pack" },
+                { name: "Hermit", shape: "diamond", color: "#8A7AA8", icon: "staff" }
+            ],
+            ring: [2.2, 2.8],
+            angles: 16,
+            rest: [16, 26],
+            wander: [7, 11],
+            walk: 1.2,
+            off: 1.2,
+            props: {
+                grotto: [ { kind: "pond", text: "*watching the water*" } ],
+                hall: [ { kind: "cart", text: "*peering into the cart*" } ],
+                ember: [ { kind: "coals", text: "*warming hands*" }, { kind: "cracks", text: "*staring into the glow*" } ]
+            },
+            seatText: "*resting*",
+            hearsayLines: 2,
+            reach: 9,
+            first: [4, 8],
+            every: [10, 18],
+            answer: 2.5,
+            show: 4,
+            // A dog follows one traveller: it trots after it, stays follow
+            // wu beside it, runs at speed wu a second, and is a Creature
+            // like the cat: it looks up at a standing knight within notice
+            // wu and settles once none is within forget wu for settle
+            // seconds; at rest it scratches every act.every[0] to [1]
+            // seconds, for act.seconds
+            dog: {
+                size: 0.75,
+                follow: 0.9,
+                speed: 2.4,
+                breath: 1.6,
+                tick: 0.1,
+                notice: 3,
+                forget: 4,
+                settle: 1.5,
+                rise: 0.3,
+                fall: 0.8,
+                act: { every: [12, 25], seconds: 1.4 },
+                fur: "#8A6A44",
+                light: "#C9A878",
+                eyes: "#2A1E14"
+            },
+            exchanges: [
+                [ "Heard the slits on four fire in threes.", "Then dash on the third." ],
+                [ "The big ones swing slow.", "Slow, but you only get to be wrong once." ],
+                [ "Lost my lantern two floors down.", "Lost my brother three floors down. Keep the lantern." ],
+                [ "Some walls down there sound hollow.", "Hit them. Gold likes to hide." ],
+                [ "This fire's the best thing I've seen all week.", "Week's not over." ],
+                [ "Spitters keep their distance.", "So close it for them." ],
+                [ "Any of you been past the embers?", "Once. Came back with less eyebrow." ],
+                [ "Smith says the blade gets better deeper down.", "So does the trouble." ],
+                [ "Hold the shield too long and it runs dry.", "Like my purse." ],
+                [ "The plates on the floor click before they bite.", "Then listen for the click." ]
+            ],
+            hearsay: [
+                "They say the deeper camps keep warmer fires. Something down there keeps them lit.",
+                "A guardian shoves you back when you stand in its way. Step aside, then strike.",
+                "Folk say the witch reads the next dungeon true. I've never caught her wrong.",
+                "Heard of a knight who parried a crushing blow. Heard it from him, mind.",
+                "The arrow slits fire in rhythm. Count, then walk.",
+                "Down past the miners' hall the rock gets hot enough to cook on.",
+                "Some hollow walls hide a whole chamber. Look for the cracked ones.",
+                "Rest a while by the fire. It mends more than skin.",
+                "Tough ones carry more gold. Weak ones carry their friends.",
+                "A dash takes you through a blow if you time it. Most don't."
+            ]
+        },
         looks: [
             { name: "grotto", from: 0,
               rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",

@@ -1645,7 +1645,7 @@ ClayWorld2d {
                 let talked = false
                 for (let i = 0; i < items.length; i++) {
                     let npc = items[i]
-                    if (npc.objectName === "npc" && npc.nearbyPlayer) {
+                    if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
                         npc.interact()
                         talked = true
                         break
@@ -5202,6 +5202,9 @@ ClayWorld2d {
         dungeonObjects = []
         campfire = null
         campCat = null
+        campTravellers = []
+        campDog = null
+        campTalk = null
         campSounds.clear()
         features = []
         featureShowcase = false
@@ -5389,6 +5392,7 @@ ClayWorld2d {
         _placeCampProps(camp, levelSeed, spots)
         _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
         _placeCat(camp, levelSeed, cf, spots)
+        _placeTravellers(camp, levelSeed, cf)
         campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
                          anvilAt, campLook, campProps)
 
@@ -5588,6 +5592,127 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
         dungeonObjects.push(campCat)
+    }
+    // Travellers rest at the camp (issue #151): Balance.camp.travellers
+    // other adventurers, each sitting at the fire and wandering to one of
+    // the look's props and back, two now and then exchanging a pair of
+    // lines, one of them followed by a dog. All of it - who comes, where
+    // each sits and wanders, what each says - draws from its own stream,
+    // the level's seed ^ Balance.camp.travellerSalt, so every screen of a
+    // session sees the same. A traveller is an Npc named "traveller", not
+    // "npc": the benches that look for the innkeeper, the smith and the
+    // witch never find one. It sells nothing, and the knights walk
+    // through it
+    Component { id: travellerComponent; Npc { objectName: "traveller"; solid: false } }
+    Component { id: campDogComponent; CampDog {} }
+    Component { id: campTalkComponent; CampTalk {} }
+    property var campTravellers: []
+    property var campDog: null
+    property var campTalk: null
+    function _placeTravellers(camp, levelSeed, fire) {
+        let c = Balance.camp, n = c.travellers
+        let rand = createRng(levelSeed ^ c.travellerSalt)
+        campTravellers = []
+        campDog = null
+        campTalk = null
+        let pick = (range) => range[0] + rand() * (range[1] - range[0])
+        let half = 0.4
+        let onFloor = (x, y) => {
+            for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+                for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                    if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+            return true
+        }
+        let count = n.count[0] + Math.floor(rand() * (n.count[1] - n.count[0] + 1))
+        // The seats: on a ring round the fire, on the floor, off the cat
+        let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
+        let r = pick(n.ring), start = rand() * 2 * Math.PI
+        let seats = []
+        for (let i = 0; i < n.angles; i++) {
+            let a = start + i * 2 * Math.PI / n.angles
+            let x = fx + r * Math.cos(a), y = fy + r * Math.sin(a)
+            if (!onFloor(x, y)) continue
+            if (campCat && Math.hypot(campCat.xWu - x, campCat.yWu - y) < campCat.sizeWu / 2 + half + 0.3) continue
+            seats.push(Qt.point(x, y))
+        }
+        // The props they wander to, by the look
+        let goals = n.props[campLook.name] || []
+        let wanders = campProps.filter(p => goals.some(g => g.kind === p.kind))
+        let cx = camp.mid * cellSize, cy = camp.midRow * cellSize
+        let kinds = n.kinds.slice()
+        let spread = Math.max(1, Math.floor(seats.length / count))
+        for (let i = 0; i < count && i < seats.length; i++) {
+            let kind = kinds.splice(Math.floor(rand() * kinds.length), 1)[0]
+            let seat = seats[i * spread]
+            // Its walk: off the prop's edge toward the camp's middle, a
+            // little aside so two do not stand in one place
+            let spot = null, text = n.seatText
+            let p = wanders.length > 0 ? wanders[Math.floor(rand() * wanders.length)] : null
+            let aside = (rand() - 0.5) * 2
+            if (p) {
+                let dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1
+                let ux = dx / d, uy = dy / d
+                let t = Math.min(Math.abs(ux) > 1e-6 ? (p.w / 2 + n.off) / Math.abs(ux) : Infinity,
+                                 Math.abs(uy) > 1e-6 ? (p.h / 2 + n.off) / Math.abs(uy) : Infinity)
+                let x = p.x + ux * t - uy * aside, y = p.y + uy * t + ux * aside
+                if (onFloor(x, y)) {
+                    spot = Qt.point(x, y)
+                    text = goals.find(g => g.kind === p.kind).text
+                }
+            }
+            if (!spot) spot = seats[(i * spread + Math.floor(seats.length / 2)) % seats.length]
+            let rest = pick(n.rest), wander = pick(n.wander)
+            let heard = n.hearsay.slice(), lines = []
+            for (let k = 0; k < n.hearsayLines && heard.length > 0; k++)
+                lines.push(heard.splice(Math.floor(rand() * heard.length), 1)[0])
+            // An Npc's xWu, yWu is its top-left corner; seats are centres
+            let at = (q) => ({ x: q.x - half, y: q.y + half })
+            let t = travellerComponent.createObject(world.room, {
+                xWu: at(seat).x, yWu: at(seat).y,
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                world: world.physics,
+                gameWorld: world,
+                interactionCategories: catWall,
+                interactionCollidesWith: catPlayer,
+                npcColor: kind.color,
+                iconType: kind.icon,
+                shape: kind.shape,
+                npcName: kind.name,
+                walkSpeed: n.walk,
+                routine: [ Object.assign(at(seat), { duration: rest, text: n.seatText }),
+                           Object.assign(at(spot), { duration: wander, text: text }) ],
+                dialogueLines: lines
+            })
+            dungeonObjects.push(t)
+            campTravellers.push(t)
+        }
+        if (campTravellers.length === 0) return
+        // The dog, beside the traveller it follows
+        let leader = campTravellers[Math.floor(rand() * campTravellers.length)]
+        let dogSeed = rand()
+        campDog = campDogComponent.createObject(world.room, {
+            leader: leader, seed: dogSeed,
+            xWu: leader.xWu + half + (dogSeed < 0.5 ? 1 : -1) * n.dog.follow, yWu: leader.yWu - half - 0.25,
+            gameWorld: world,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(campDog)
+        // The talk: every exchange once in an order of the stream, each
+        // between two of them
+        let order = n.exchanges.map((e, i) => i)
+        let plan = [], waits = []
+        while (order.length > 0) {
+            let e = n.exchanges[order.splice(Math.floor(rand() * order.length), 1)[0]]
+            let a = Math.floor(rand() * campTravellers.length)
+            let b = campTravellers.length > 1
+                ? (a + 1 + Math.floor(rand() * (campTravellers.length - 1))) % campTravellers.length : a
+            plan.push({ a: a, b: b, lines: e })
+            waits.push(pick(n.every))
+        }
+        campTalk = campTalkComponent.createObject(world.room, {
+            travellers: campTravellers, plan: plan, first: pick(n.first), waits: waits
+        })
+        dungeonObjects.push(campTalk)
     }
     // Lanterns flanking a building's open front
     function _lightBuilding(r) {

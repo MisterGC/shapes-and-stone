@@ -69,6 +69,8 @@ clay_app(shapes_and_stone
         src/CampProp.qml
         src/Creature.qml
         src/CaveCat.qml
+        src/CampDog.qml
+        src/CampTalk.qml
         src/CampSounds.qml
         src/Projectile.qml
         src/Npc.qml
