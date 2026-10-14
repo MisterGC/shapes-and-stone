@@ -473,7 +473,9 @@ QtObject {
     // breakables: a clay "urn", a wooden "crate" (or barrel) and a
     // "crystal" cluster, rarer the shallower; then the traps: a "spike"
     // plate, more often the higher the danger, and an arrow "slit" in a
-    // room's wall, the more and the faster the higher the danger
+    // room's wall, the more and the faster the higher the danger; last a
+    // "vein" of gems (Balance.deep, issue #156) in the face of the wall
+    // north of its cell, a room's cell with that wall beside it
     readonly property var dungeon: ({
         // Loops: the rooms are joined in a chain, and extraCorridors more
         // corridors at low, middle and high danger (as danger.looks) join
@@ -510,7 +512,8 @@ QtObject {
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
             crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
             spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 },
-            slit: { perRoom: [0.25, 0.5, 0.6], showcase: 1 }
+            slit: { perRoom: [0.25, 0.5, 0.6], showcase: 1 },
+            vein: { perRoom: [0.3, 0.4, 0.5], showcase: 1 }
         },
         // A breakable blocks like a small wall: a square of sizeWu on its
         // cell's centre. A swing breaks the nearest one in its arc, a
@@ -638,8 +641,11 @@ QtObject {
     // tink at each of chime, chimeGap seconds apart, and the crumble.
     // Within glintReach wu of the knight a vein glints, brighter the
     // nearer in litLevels steps; coming within shimmerReach it shimmers once, the tink at
-    // shimmerPitch and shimmerVolume times its volume. shapes: the gem by depth, the last
-    // whose from is at most the depth: the five Platonic solids
+    // shimmerPitch and shimmerVolume times its volume, and a faint
+    // shimmer of its colour shows round it while the knight is that near.
+    // The lantern of any knight lights it, the nearest one. shapes: the
+    // gem by depth, the last whose from is at most the depth: the five
+    // Platonic solids, a selfLit one glowing in the dark on its own
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -670,7 +676,7 @@ QtObject {
             { from: 2, shape: "cube", color: "#4FC48A" },
             { from: 4, shape: "octahedron", color: "#4A86F0" },
             { from: 6, shape: "dodecahedron", color: "#B072E8" },
-            { from: 8, shape: "icosahedron", color: "#FF4A2A" }
+            { from: 8, shape: "icosahedron", color: "#FF4A2A", selfLit: true }
         ]
     })
 
@@ -734,7 +740,9 @@ QtObject {
             { key: "depth", label: "Base depth", step: 1, min: 0, max: 30, decimals: 0 },
             { key: "position", label: "Relative difficulty", step: 0.05, min: 0, max: 0.999, decimals: 2 },
             { key: "breakables", label: "Breakables per room", step: 0.1, min: 0, max: 6, decimals: 2,
-              kinds: ["urn", "crate", "crystal"] }
+              kinds: ["urn", "crate", "crystal"] },
+            { key: "veins", label: "Veins per room", step: 0.1, min: 0, max: 3, decimals: 2,
+              kinds: ["vein"] }
         ]
     })
 

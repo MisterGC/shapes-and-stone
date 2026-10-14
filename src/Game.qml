@@ -3070,7 +3070,8 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
-        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look,
+                         featureList.filter(f => f.kind === "vein").map(f => f.wgx + "," + f.wgy))
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
         placeFeatures(featureList)
         placeDoors(doorList)
@@ -3566,7 +3567,11 @@ ClayWorld2d {
     // With a look (Balance.danger.looks) only its torchShare of them burn,
     // in its torch colour
     property var torches: []
-    function placeRoomTorches(decoRng, look) {
+    // A torch whose spot holds a vein (veinCells, "gx,gy") takes the
+    // nearest spot of its wall without one, the stream drawn the same
+    function placeRoomTorches(decoRng, look, veinCells) {
+        let veined = {}
+        for (let c of veinCells || []) veined[c] = true
         torches = []
         for (let room of rooms) {
             let gy = room.y + room.h
@@ -3581,8 +3586,12 @@ ClayWorld2d {
                 // Spread two torches across the wall, one sits near the middle
                 let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
                 t += (decoRng() - 0.5) * 0.15
-                let gx = spots[Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))]
+                let at = Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))
+                let free = spots.map((x, i) => i).filter(i => !veined[spots[i] + "," + gy])
+                    .sort((a, b) => Math.abs(a - at) - Math.abs(b - at))
+                let gx = free.length > 0 ? spots[free[0]] : -1
                 if (look && decoRng() >= look.torchShare) continue
+                if (gx < 0) continue
                 placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75,
                            look ? look.torch : undefined)
             }
@@ -3665,7 +3674,8 @@ ClayWorld2d {
     // the first of them still free (a slit one on the room's edge,
     // _slitAim). So a kind added or retuned moves another only off a cell
     // it takes first. kinds is Balance.dungeon's when left out. The slits
-    // get their rhythms last (_rhythmSlits)
+    // get their rhythms last (_rhythmSlits). A vein's cell is one with a
+    // wall north of it, whose face it sits in (_veinAim)
     function planFeatures(levelSeed, band, showcase, kinds) {
         kinds = kinds || Balance.dungeon.kinds
         let out = []
@@ -3692,7 +3702,8 @@ ClayWorld2d {
                 for (let c of cells) {
                     if (n <= 0) break
                     if (taken[c[1] * gridWidth + c[0]]) continue
-                    let aim = kind === "slit" ? _slitAim(c[0], c[1], room, picked) : {}
+                    let aim = kind === "slit" ? _slitAim(c[0], c[1], room, picked)
+                        : kind === "vein" ? _veinAim(c[0], c[1]) : {}
                     if (!aim) continue
                     taken[c[1] * gridWidth + c[0]] = true
                     let f = Object.assign({ kind: kind, gx: c[0], gy: c[1],
@@ -3704,6 +3715,12 @@ ClayWorld2d {
             }
         }
         return _rhythmSlits(out, levelSeed, band)
+    }
+    // A vein for the room's cell (gx, gy): the wall cell north of it,
+    // {wgx, wgy}, or null when that is no wall
+    function _veinAim(gx, gy) {
+        let row = grid[gy + 1]
+        return row && row[gx] === cellWall ? { wgx: gx, wgy: gy + 1 } : null
     }
     function _nameHash(name) {
         let h = 5381
@@ -3730,6 +3747,8 @@ ClayWorld2d {
                 o = _placePlate(f, band)
             else if (f.kind === "slit")
                 o = _placeSlit(f, band)
+            else if (f.kind === "vein")
+                placeVein(f.wgx, f.wgy)
             if (o) dungeonObjects.push(o)
         }
     }
@@ -5936,8 +5955,9 @@ ClayWorld2d {
     // hit stop holds it. E within window of a close strikes clean, once a
     // close, any other E chips; the last of its strikes splits the stone
     // and the gem pops out, the bigger the more of them were clean, spins
-    // once and drifts to the knight. This node's knight alone, in the
-    // dojo's deep scenario for now (enterDeepRoom)
+    // once and drifts to the knight. This node's knight alone; a
+    // dungeon's veins are its features (issue #156), the dojo's deep
+    // scenario has one (enterDeepRoom)
     Component { id: veinComponent; Vein {} }
     // The gem coming free: it rises off the face spinning once, catches
     // the light, then drifts into the knight and is gone
@@ -6031,7 +6051,7 @@ ClayWorld2d {
         let cell = gx + "," + gy
         let v = veinComponent.createObject(world.room, {
             cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
-            faceWu: wallFaceWu, cell: cell, shape: g.shape, gemColor: g.color,
+            faceWu: wallFaceWu, cell: cell, shape: g.shape, gemColor: g.color, selfLit: g.selfLit === true,
             strikes: veinStrikes(cell), seed: createRng(gx * 7349 + gy * 3571)(),
             glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
@@ -6179,12 +6199,14 @@ ClayWorld2d {
     // one, and shimmers once as the knight comes close
     function _stepVeins() {
         if (veins.length === 0 || !player) return
-        let cfg = Balance.deep, c = _knightCentre()
+        let cfg = Balance.deep, c = _knightCentre(), lanterns = knightsHere()
         for (let v of veins) {
             let d = Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y)
-            let lit = Math.max(0, Math.min(1, 2 * (cfg.glintReach - d) / cfg.glintReach))
+            let nearest = d
+            for (let k of lanterns) nearest = Math.min(nearest, Math.hypot(v.faceXWu - k.x, v.faceYWu - k.y))
+            let lit = Math.max(0, Math.min(1, 2 * (cfg.glintReach - nearest) / cfg.glintReach))
             v.lit = Math.ceil(lit * cfg.litLevels) / cfg.litLevels
-            let near = d <= cfg.shimmerReach && !v.split
+            let near = d <= cfg.shimmerReach && !v.split && !player.fallen
             if (near && !v.knightNear) playTink(cfg.shimmerPitch, cfg.shimmerVolume)
             v.knightNear = near
         }

@@ -6,8 +6,11 @@ import QtQuick
 // above the darkness. While a knight digs it, a ring closes on it in the
 // parry ring's language, white while a strike would be clean; each clean
 // strike runs a crack through the stone, and once split the cluster is
-// gone and a dark hollow stays. Visual only - the cell stays a wall, and
-// the game counts the strikes (Game.strikeVein)
+// gone and a dark hollow stays. A deep gem (selfLit) glows on its own in
+// the dark, and while a knight is near a faint shimmer of its colour
+// breathes round it. Visual only - the cell stays a wall, and the game
+// counts the strikes (Game.strikeVein) or splits it for a knight of
+// another screen (cut)
 Item {
     id: vein
 
@@ -24,6 +27,8 @@ Item {
     property string shape: "tetrahedron"
     property color gemColor: "#F2B33D"
     property int strikes: 4
+    // Glows on its own (Balance.deep.shapes)
+    property bool selfLit: false
     // 0..1 from its cell, for the cluster's and the cracks' course
     property real seed: 0
     // Where the darkness is drawn over: the ring and the glint go there
@@ -33,7 +38,9 @@ Item {
     property int clean: 0
     property int chips: 0
     readonly property int struck: clean + chips
-    readonly property bool split: struck >= strikes
+    // Split by a knight of another screen
+    property bool cut: false
+    readonly property bool split: cut || struck >= strikes
     // The lantern's light on it, 0..1, and whether the knight is near
     // enough for its shimmer
     property real lit: 0
@@ -120,6 +127,42 @@ Item {
                 line(1, "rgba(170, 180, 195, 0.4)", 1)
                 line(0, "rgba(6, 5, 4, 0.9)", Math.max(1, w * 0.016))
             }
+        }
+    }
+
+    // The glow of a selfLit gem, and the shimmer while a knight is near:
+    // soft discs of its colour round the cluster, above the darkness
+    Rectangle {
+        id: glow
+        parent: vein.glowParent || vein
+        readonly property real sizePx: vein.width * 1.1
+        width: sizePx
+        height: sizePx
+        radius: sizePx / 2
+        x: (parent === vein ? 0 : vein.x) + vein.width / 2 - width / 2
+        y: (parent === vein ? 0 : vein.y) + vein.height * 0.76 - height / 2
+        visible: vein.selfLit && !vein.split
+        color: vein.gemColor
+        opacity: 0.2
+    }
+    Rectangle {
+        id: shimmer
+        parent: vein.glowParent || vein
+        readonly property real sizePx: vein.width * 0.8
+        width: sizePx
+        height: sizePx
+        radius: sizePx / 2
+        x: (parent === vein ? 0 : vein.x) + vein.width / 2 - width / 2
+        y: (parent === vein ? 0 : vein.y) + vein.height * 0.76 - height / 2
+        visible: vein.knightNear && !vein.split
+        color: Qt.lighter(vein.gemColor, 1.4)
+        property real breath: 0
+        opacity: 0.06 + 0.12 * breath
+        SequentialAnimation on breath {
+            running: shimmer.visible
+            loops: Animation.Infinite
+            NumberAnimation { from: 0; to: 1; duration: 900; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 1; to: 0; duration: 900; easing.type: Easing.InOutSine }
         }
     }
 
