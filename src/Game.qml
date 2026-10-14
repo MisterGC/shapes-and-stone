@@ -1700,7 +1700,8 @@ ClayWorld2d {
                         break
                     }
                 }
-                if (!talked && !fallen && !pressDig())
+                // A held E repeating strikes nothing: a strike is a press
+                if (!talked && !fallen && !(event.isAutoRepeat ? dig !== null : pressDig()))
                     useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
                                         Balance.dungeon.doorReach))
             }
