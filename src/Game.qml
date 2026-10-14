@@ -6045,15 +6045,20 @@ ClayWorld2d {
         }
         return best
     }
+    // Whether knight p is free to dig: no shield up or wanted (also one
+    // out of mana), no swing, no charge and no dash
+    function _canDig(p) {
+        return !p.isBlocking && !p.shieldWanted && !p.isAttacking && !p.isCharging && !p.isDashing
+    }
     // E: a strike on the vein dug, or the dig of the vein in reach begins;
-    // false when there is none, or the shield is up or the knight dashes
+    // false when there is none, or the knight is not free to dig (_canDig)
     function pressDig() {
         if (!player || fallen) return false
         if (dig) {
             if (dig.endAt < 0) strikeVein()
             return true
         }
-        if (player.isBlocking || player.isDashing) return false
+        if (!_canDig(player)) return false
         let c = _knightCentre()
         let v = veinNear(c.x, c.y, Balance.deep.reach)
         if (!v) return false
@@ -6101,7 +6106,7 @@ ClayWorld2d {
         dig.t += world.physics.timeStep
         let c = _knightCentre(), v = dig.vein
         if ((dig.endAt >= 0 && dig.t >= dig.endAt - 1e-6)
-                || p.isBlocking || p._shieldWanted || p.isAttacking || p.isCharging || p.isDashing
+                || !_canDig(p)
                 || Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) > Balance.deep.leave) {
             endDig()
             return

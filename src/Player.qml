@@ -107,6 +107,7 @@ PhysicsItem {
     // The right button is held: the shield rises again once a crushing
     // blow's lockout is over
     property bool _shieldWanted: false
+    readonly property bool shieldWanted: _shieldWanted
     // No mana, no shield: it cannot be raised, and drops when it runs dry
     onIsBlockingChanged: {
         if (isBlocking && (mana <= 0 || shieldLock > 0)) {
