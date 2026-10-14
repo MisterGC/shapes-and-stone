@@ -1130,30 +1130,49 @@ their rock face, a torch, a slit, a secret, a feature's cell and a
 doorway; a small room whose wall leaves no such cell lets go of those
 one after the other, last putting out a torch to take its place. Holes
 are laid out after everything else, from their own stream of the
-level's seed, so nothing moves for them. Clean strikes on any vein of
-the room wake it: at `dustAt` of them dust puffs from its rim and a low
-rumble plays, at `eyesAt` two eyes open in its dark and a groan comes
-from inside. `telegraph` seconds after the eyes (never less than
-`enemy.minTelegraph`) creatures of the depth's kinds crawl out of its
-mouth, each with the rumble: `waves` waves of `perWave`, `waveGap`
-seconds apart. `closeAfter` seconds after the last one its rim crumbles
-shut, a heap of rubble, and it never wakes again; chipped strikes wake
-nothing. The hole's sounds are quieter the further it is from the
-knight. Every number is `Balance.deep.hole`; the rumble and the groan
-are synthesised by `tools/deep_sounds.py`. In a session each node tells
-the host of its knight's clean strikes; the host runs every hole, sends
-its creatures as it sends every enemy, and publishes the holes' stages
-and waves (the session property `holes`), which every screen shows and
-hears in order, a node that joins later too. The dojo's deep scenario
-has the vein's hole in the same wall. The holes bench builds 20 seeds at
+level's seed, so nothing moves for them. Each gem cut from a vein of
+the room wakes it by chance (#175), likelier the more the gem is worth
+and the more knights the level was built for: `wakeChance` plus
+`wakePerGold` for each gold of the gem's worth, times `wakePerKnight`
+more for each knight past the first, at most `wakeMost`. With the
+numbers today, on the holes bench's seeds, one knight wakes it for two
+in five of the shallow tetrahedrons cut clean and three in four of the
+deep icosahedrons, two knights for half of the one and nearly all of
+the other. The roll is the vein's
+own, from the level's seed and its cell, so the same seed and party
+wake the same holes, and a gem worth more never wakes fewer; the
+strikes before the cut wake nothing. Woken, dust puffs from its rim and
+a low rumble plays, `eyesAfter` seconds later two eyes open in its dark
+and a groan comes from inside. `telegraph` seconds after the eyes
+(never less than `enemy.minTelegraph`) creatures of the depth's kinds
+crawl out of its mouth, each with the rumble: `waves` waves of
+`perWave`, `waveGap` seconds apart. `closeAfter` seconds after the last
+one its rim crumbles shut, a heap of rubble, and it never wakes again.
+The hole's sounds are quieter the further it is from the knight. Every
+number is `Balance.deep.hole`; the rumble and the groan are synthesised
+by `tools/deep_sounds.py`. In a session the host, which decides every
+cut gem, rolls the wake, runs every hole, sends its creatures as it
+sends every enemy, and publishes the holes' stages and waves (the
+session property `holes`), which every screen shows and hears in order,
+a node that joins later too. The dojo's deep scenario has the vein's
+hole in the same wall; whether its gem wakes it depends on the seed
+(`eval applyScenario("deep", 3, 424243)` wakes it for a gem cut clean,
+the scenario's own 424242 does not). The holes bench builds 20 seeds at
 a low, a middle and a high danger twice and checks the same holes on the
 same cells, one in each room with a vein and none elsewhere, each on its
 wall's face off the veins, torches, slits and secrets, none in the camp
-or the fight room; that the deep scenario shows one; that chipped
-strikes wake nothing, clean ones dust then eyes with the rumble then the
-groan, the first creature `telegraph` after the eyes, the waves from the
-hole's cell, the close with the crumble, and that a clean strike after
-it wakes nothing:
+or the fight room; that the deep scenario shows one; that on a seed
+whose roll fails the cut gem leaves it at rest, and on one whose roll
+wakes it the cut brings dust with the rumble, then eyes with the groan
+`eyesAfter` later, the first creature `telegraph` after the eyes, the
+waves from the hole's cell, the close with the crumble, and that a gem
+cut after it wakes nothing. Then it rolls the first vein of each hole
+on 40 seeds at a shallow and a deep danger for 1 to 4 knights, its gem
+cut all chipped and all clean, and checks that the share of woken holes
+rises with the gem's worth and with the knights (unless every chance is
+at `wakeMost`) and lies near the mean chance; and on 10 of the seeds,
+built and cut twice for two knights through the game's own cut, that it
+wakes the holes the roll says, the same both times:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/holes/holes.qml
@@ -1161,12 +1180,13 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/holes/holes.qml
 
 The hole party bench checks it over the network: two processes of
 Clayground's live loader, a host and a joiner, on seed 424242. Both show
-the same holes at rest; the joiner's knight cuts a vein, every strike
-clean, and both screens see its hole go through the same stages and show
-the same creatures at its mouth, the first no sooner than
-`enemy.minTelegraph` after the eyes; then the host's knight does the same
-at another hole. It needs the live loader and exits with the number of
-failed checks:
+the same holes at rest; the knights cut a vein of each hole's room in
+turn, every strike clean, the joiner's first. Where the host's roll says
+the gem wakes the hole, both screens see it go through the same stages
+and show the same creatures at its mouth, the first no sooner than
+`enemy.minTelegraph` after the eyes; where it says not, the hole stays at
+rest on both screens. On that seed the roll wakes two of its three holes.
+It needs the live loader and exits with the number of failed checks:
 
 ```
 python3 tests/holeparty/run_holeparty.py --mode local
