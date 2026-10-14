@@ -747,7 +747,7 @@ ClayWorld2d {
         onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
-        onGemGranted: (gem) => addGem(gem)
+        onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
         onPouchSpawned: (objectId, props) => _makePouchDrop(props, objectId)
         onPouchDespawned: (objectId) => _removePouchDrop(objectId)
@@ -2011,7 +2011,33 @@ ClayWorld2d {
     }
 
     // The knight's pouch beside its gold: a gem of each shape it holds
-    // and how many (issue #156)
+    // and how many (issue #156), a gem won counted once it dropped into
+    // the pouch; then its shape's count bumps, bigger and white a moment
+    // (issue #169)
+    property string _bumpShape: ""
+    property real _bumpScale: 1
+    property int pouchBumps: 0
+    NumberAnimation {
+        id: pouchBump
+        target: world
+        property: "_bumpScale"
+        from: 1.7
+        to: 1
+        duration: 500
+        easing.type: Easing.OutQuad
+    }
+    // The pouch without the gems won still on their way into it
+    function _pouchShown() {
+        let out = player ? player.pouch.slice() : []
+        for (let shape of _gemsFlying) {
+            for (let i = out.length - 1; i >= 0; i--)
+                if (out[i].shape === shape) {
+                    out.splice(i, 1)
+                    break
+                }
+        }
+        return out
+    }
     Row {
         id: hudPouch
         objectName: "hudPouch"
@@ -2020,25 +2046,38 @@ ClayWorld2d {
         anchors.verticalCenter: hudGold.verticalCenter
         z: 1000
         spacing: 8
-        visible: player !== null && player.pouch.length > 0
-        readonly property var counts: player ? pouchCounts(player.pouch) : []
+        readonly property var shown: player ? _pouchShown() : []
+        visible: shown.length > 0
+        readonly property var counts: pouchCounts(shown)
         // "cube 2, tetrahedron 1", for the benches
         readonly property string summary: counts.map(c => c.shape + " " + c.count).join(", ")
         Repeater {
             model: hudPouch.counts
             Row {
                 required property var modelData
+                readonly property bool bumped: modelData.shape === world._bumpShape && world._bumpScale > 1
                 spacing: 3
+                transformOrigin: Item.Left
+                scale: bumped ? world._bumpScale : 1
                 Gem {
                     width: 16
                     height: 16
                     shape: modelData.shape
                     color: modelData.color
                     anchors.verticalCenter: parent.verticalCenter
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width * 2
+                        height: width
+                        radius: width / 2
+                        z: -1
+                        color: modelData.color
+                        opacity: parent.parent.bumped ? 0.5 * (world._bumpScale - 1) : 0
+                    }
                 }
                 Text {
                     text: modelData.count
-                    color: "#E8E0D0"
+                    color: parent.bumped && world._bumpScale > 1.2 ? "#FFFFFF" : "#E8E0D0"
                     style: Text.Outline
                     styleColor: "#000000"
                     font.pixelSize: 14
@@ -5352,6 +5391,10 @@ ClayWorld2d {
         dig = null
         veins = []
         _cutVeins = []
+        _cutsAsked = ({})
+        for (let w of wonGems.slice()) w.destroy()
+        wonGems = []
+        _gemsFlying = []
         veinSounds = []
         deepRoomActive = false
 
@@ -6041,12 +6084,17 @@ ClayWorld2d {
     // a dungeon's veins are its features (issue #156, below), the dojo's
     // deep scenario has one (enterDeepRoom)
     Component { id: veinComponent; Vein {} }
-    // The gem coming free: it rises off the face spinning once, catches
-    // the light, then drifts into the knight and is gone
+    // The gem won (issue #169): it rises off the face spinning once, flies
+    // up above the knight and holds there a moment, bigger and lit, then
+    // drops into the knight's pouch (landed) and is gone. A clean cut,
+    // every strike clean, holds in a white ring with a star turning on it
+    // and says CLEAN CUT; a chipped one shows its notches, sheds grey
+    // flakes and says CHIPPED
     Component {
-        id: gemPopComponent
+        id: gemWonComponent
         Item {
-            id: pop
+            id: won
+            objectName: "wonGem"
             property real pixelPerUnit: 1
             property real xWu: 0
             property real yWu: 0
@@ -6054,43 +6102,125 @@ ClayWorld2d {
             property string shape: "tetrahedron"
             property color color: "#F2B33D"
             property var knight: null
+            property bool clean: false
+            property int notches: 0
+            // "rise", "fly", "hold" or "drop"
+            property string phase: "rise"
             property real rise: 0
             property real spin: 0
-            property real drift: 0
+            property real fly: 0
+            property real grow: 0
+            property real shine: 0
+            property real drop: 0
+            signal landed()
+            readonly property var cfg: Balance.deep
             readonly property real kx: knight ? knight.xWu + knight.widthWu / 2 : xWu
             readonly property real ky: knight ? knight.yWu - knight.heightWu / 2 : yWu
-            readonly property real upWu: yWu + 0.8 * rise
-            readonly property real atX: xWu + (kx - xWu) * drift
-            readonly property real atY: upWu + (ky - upWu) * drift
+            readonly property real upWu: yWu + 0.6 * rise
+            readonly property real holdY: ky + cfg.wonAbove
+            readonly property real atX: xWu + (kx - xWu) * fly
+            readonly property real atY: upWu + (holdY - upWu) * fly + (ky - holdY) * drop
             width: sizeWu * pixelPerUnit
             height: width
             x: atX * pixelPerUnit - width / 2
             y: (parent ? parent.height : 0) - atY * pixelPerUnit - height / 2
             z: 6
-            scale: 1 - 0.6 * drift
-            opacity: 1 - drift * drift
+            // Held at least wonMin wu across, so a small chipped gem shows
+            // its notches too
+            readonly property real held: Math.max(cfg.wonScale, cfg.wonMin / Math.max(0.01, sizeWu))
+            scale: (1 + (held - 1) * grow) * (1 - 0.75 * drop)
+            opacity: 1 - drop * drop
             Rectangle {
                 anchors.centerIn: parent
-                width: parent.width * 2.2
+                width: parent.width * 2.4
                 height: width
                 radius: width / 2
-                color: pop.color
-                opacity: 0.12 + 0.3 * Math.sin(Math.PI * pop.spin)
+                color: won.color
+                opacity: 0.12 + (won.clean ? 0.3 : 0.12) * won.grow
+            }
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 1.7
+                height: width
+                radius: width / 2
+                color: "transparent"
+                border.color: "#FFFFFF"
+                border.width: Math.max(1, parent.width * 0.06)
+                visible: won.clean
+                opacity: 0.8 * won.grow
+            }
+            Repeater {
+                model: won.clean ? [0, 90] : []
+                Rectangle {
+                    required property real modelData
+                    anchors.centerIn: parent
+                    width: won.width * 2.1
+                    height: Math.max(1.5, won.width * 0.07)
+                    radius: height / 2
+                    rotation: modelData + 45 + 90 * won.shine
+                    color: Qt.lighter(won.color, 1.8)
+                    opacity: won.grow * (0.5 + 0.5 * Math.sin(Math.PI * won.shine))
+                }
             }
             Gem {
                 anchors.fill: parent
-                shape: pop.shape
-                color: pop.color
-                rotation: 360 * pop.spin
+                shape: won.shape
+                color: won.color
+                notches: won.notches
+                light: won.clean ? 1 : 0.8
+                rotation: 360 * won.spin
             }
+            Repeater {
+                model: won.clean ? 0 : 2 + 2 * won.notches
+                Rectangle {
+                    required property int index
+                    readonly property real k: (index * 0.618) % 1
+                    width: Math.max(1.5, won.width * 0.1)
+                    height: width
+                    rotation: 45 + 70 * index
+                    color: "#8C8A86"
+                    x: won.width * (0.15 + 0.7 * k) - width / 2
+                    y: won.height * (0.55 + (1.2 + 0.6 * k) * ((won.shine + k * 0.5) % 1))
+                    opacity: won.phase === "hold" ? 1 - ((won.shine + k * 0.5) % 1) : 0
+                }
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.top
+                anchors.bottomMargin: parent.height * 0.4
+                scale: 1 / Math.max(0.01, won.scale)
+                text: won.clean ? "CLEAN CUT" : "CHIPPED"
+                color: won.clean ? Qt.lighter(won.color, 1.5) : "#A8A49C"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 13
+                font.bold: true
+                font.letterSpacing: 1
+                opacity: won.grow * (1 - won.drop)
+            }
+            property bool _landed: false
+            function _land() {
+                if (_landed) return
+                _landed = true
+                landed()
+            }
+            Component.onDestruction: _land()
             SequentialAnimation {
                 running: true
                 ParallelAnimation {
-                    NumberAnimation { target: pop; property: "rise"; to: 1; duration: 550; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: pop; property: "spin"; to: 1; duration: 550; easing.type: Easing.InOutQuad }
+                    NumberAnimation { target: won; property: "rise"; to: 1; duration: won.cfg.wonRise * 1000; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: won; property: "spin"; to: 1; duration: won.cfg.wonRise * 1000; easing.type: Easing.InOutQuad }
                 }
-                NumberAnimation { target: pop; property: "drift"; to: 1; duration: 450; easing.type: Easing.InQuad }
-                ScriptAction { script: pop.destroy() }
+                ScriptAction { script: won.phase = "fly" }
+                ParallelAnimation {
+                    NumberAnimation { target: won; property: "fly"; to: 1; duration: won.cfg.wonFly * 1000; easing.type: Easing.InOutQuad }
+                    NumberAnimation { target: won; property: "grow"; to: 1; duration: won.cfg.wonFly * 1000; easing.type: Easing.OutBack }
+                }
+                ScriptAction { script: won.phase = "hold" }
+                NumberAnimation { target: won; property: "shine"; to: 1; duration: won.cfg.wonHold * 1000 }
+                ScriptAction { script: won.phase = "drop" }
+                NumberAnimation { target: won; property: "drop"; to: 1; duration: won.cfg.wonDrop * 1000; easing.type: Easing.InQuad }
+                ScriptAction { script: { won._land(); won.destroy() } }
             }
         }
     }
@@ -6104,6 +6234,13 @@ ClayWorld2d {
     // chips, strikes}, for the benches
     property var lastStrike: null
     property var lastGem: null
+    // The gems won on their way to the pouch (gemWonComponent), and their
+    // shapes, which the HUD counts once they landed
+    property var wonGems: []
+    property var _gemsFlying: []
+    // The veins this node's knight split, by cell, until the gem is won:
+    // what the gem won shows ({shape, color, sizeWu, clean, chips, x, y})
+    property var _cutsAsked: ({})
     // The dojo's deep room is up
     property bool deepRoomActive: false
 
@@ -6283,19 +6420,17 @@ ClayWorld2d {
                     "off the close by", off.toFixed(3), "s")
         if (v.split) _splitVein(v, nx, ny)
     }
-    // The last strike split the stone: the gem pops out, its size by the
-    // clean strikes, and the dig ends a moment later
+    // The last strike split the stone: it crumbles, the gem's size by the
+    // clean strikes, and the dig ends a moment later; the gem is won once
+    // the game gives it (_veinCut, _gemWon)
     function _splitVein(v, nx, ny) {
         let size = gemSize(v.clean, v.strikes)
         lastGem = { shape: v.shape, color: String(v.gemColor), sizeWu: size,
                     clean: v.clean, chips: v.chips, strikes: v.strikes }
-        gemPopComponent.createObject(glowParent(), {
-            xWu: v.faceXWu, yWu: v.faceYWu, sizeWu: size, shape: v.shape, color: v.gemColor,
-            knight: player, pixelPerUnit: world.pixelPerUnit
-        })
+        _cutsAsked[v.cell] = { shape: v.shape, color: v.gemColor, sizeWu: size, clean: v.clean,
+                               chips: v.chips, x: v.faceXWu, y: v.faceYWu }
         spawnShards(v.faceXWu, v.faceYWu, nx, ny, 10, "#4E525A", 0.16)
         playCrumble()
-        playChime()
         _veinCut(v)
         dig.endAt = dig.t + 0.4
         v.ringShows = false
@@ -6346,15 +6481,46 @@ ClayWorld2d {
         let g = Balance.deep.shapes.find(x => x.shape === shape)
         return g ? g.color : Balance.deep.shapes[0].color
     }
-    // This node's knight split v: alone its gem goes into the pouch, in a
-    // session the host is asked for it
+    // This node's knight split v: alone its gem is won, in a session the
+    // host is asked for it
     function _veinCut(v) {
         if (session.connected && !deepRoomActive) {
             session.reportCut(levelIndex, v.cell, v.clean)
             return
         }
         if (_cutVeins.indexOf(v.cell) < 0) _cutVeins.push(v.cell)
-        addGem({ shape: v.shape, value: gemValue(v.shape, v.clean, v.strikes) })
+        _gemWon(v.cell, { shape: v.shape, value: gemValue(v.shape, v.clean, v.strikes) })
+    }
+    // The gem of the vein on cell is this node's knight's: the chime, and
+    // it shows as won (gemWonComponent) on its way into the pouch
+    function _gemWon(cell, gem) {
+        let cut = _cutsAsked[cell]
+        delete _cutsAsked[cell]
+        addGem(gem)
+        if (!player) return
+        playChime()
+        let c = _knightCentre()
+        let w = gemWonComponent.createObject(glowParent(), {
+            xWu: cut ? cut.x : c.x, yWu: cut ? cut.y : c.y,
+            sizeWu: cut ? cut.sizeWu : Balance.deep.gemSize[0], shape: gem.shape,
+            color: cut ? cut.color : gemColorOf(gem.shape), knight: player,
+            clean: cut ? cut.chips === 0 : false, notches: cut ? Math.min(3, cut.chips) : 1,
+            pixelPerUnit: world.pixelPerUnit
+        })
+        if (!w) return
+        _gemsFlying = _gemsFlying.concat([gem.shape])
+        wonGems = wonGems.concat([w])
+        w.landed.connect(() => _gemLanded(w, gem.shape))
+    }
+    // A gem won dropped into the pouch: the HUD counts it, its count bumps
+    function _gemLanded(w, shape) {
+        wonGems = wonGems.filter(x => x !== w)
+        let i = _gemsFlying.indexOf(shape)
+        if (i < 0) return
+        _gemsFlying = _gemsFlying.slice(0, i).concat(_gemsFlying.slice(i + 1))
+        _bumpShape = shape
+        pouchBumps++
+        pouchBump.restart()
     }
     // Host: a node's knight split the vein on that cell of that level, the
     // first one gets its gem; one split already gives nothing
@@ -6367,11 +6533,11 @@ ClayWorld2d {
         let gem = { shape: v.shape, value: gemValue(v.shape, clean, v.strikes) }
         console.log("[Game] The vein at", cell, "was split by", fromId, "- a", gem.shape, "worth", gem.value)
         if (fromId === session.nodeId) {
-            addGem(gem)
+            _gemWon(cell, gem)
             return
         }
         _veinGone(v)
-        session.grantGem(fromId, gem)
+        session.grantGem(fromId, Object.assign({ cell: cell }, gem))
     }
     // The host's veins split in the level: those still whole here split
     function _applyVeins(val) {
@@ -6393,11 +6559,10 @@ ClayWorld2d {
         if (dig && dig.vein === v) endDig()
     }
 
-    // The pouch: a gem into it, shown over the knight in its colour
+    // The pouch: a gem into it
     function addGem(gem) {
         if (!player) return
         player.pouch = player.pouch.concat([{ shape: gem.shape, value: gem.value }])
-        spawnDamageNumber(player.xWu, player.yWu, "+1 " + gem.shape, gemColorOf(gem.shape))
         console.log("[Game] A", gem.shape, "worth", gem.value, "into the pouch,", player.pouch.length, "gems in it")
     }
     // The gems of a pouch per shape, in the table's order and only those

@@ -275,6 +275,9 @@ Window {
                   && solo.player.pouch.map(g => g.value).join() === want.join(),
                   "two cubes cut, one clean and one chipped all through, go into the pouch worth the table's "
                   + want.join(" and ") + " gold: " + JSON.stringify(solo.player.pouch))
+        }],
+        // The gems won land in the pouch and the HUD counts them
+        [() => solo.wonGems.length === 0, () => {
             let h = find(solo, "hudPouch")
             check(h.visible && h.summary === "cube 2", "the HUD shows the pouch's count per shape (" + h.summary + ")")
             pouchWorth = solo.pouchWorth(solo.player.pouch)

@@ -653,7 +653,11 @@ QtObject {
     // rounded; the smith buys every gem in the pouch at once for that.
     // A knight that falls drops its pouch where it fell: any other knight
     // whose centre comes within pouchReach wu of it, or that lifts the
-    // fallen one up, takes it
+    // fallen one up, takes it. A gem won (issue #169) rises off the face
+    // in wonRise seconds, flies up to wonAbove wu above the knight's
+    // centre in wonFly, growing to wonScale times its size and at least
+    // wonMin wu across, holds there
+    // wonHold seconds and drops into the pouch in wonDrop
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -682,6 +686,13 @@ QtObject {
         shimmerPitch: 19,
         shimmerVolume: 0.12,
         pouchReach: 0.9,
+        wonRise: 0.45,
+        wonFly: 0.35,
+        wonHold: 0.9,
+        wonDrop: 0.25,
+        wonScale: 1.8,
+        wonMin: 1.1,
+        wonAbove: 1.3,
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
             { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },
