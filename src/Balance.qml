@@ -804,7 +804,7 @@ QtObject {
             chordDelay: 0.25,
             chordVolume: 0.75,
             lostLines: ["...how long was I down here?", "Thank you - I'll find the way up now.",
-                        "A knight! Then the way up is clear. I'm going."],
+                        "Light! I thought I'd never see it again."],
             minerLines: ["Too dangerous, you say? ...Aye, I've pushed my luck.",
                          "That hole's been stirring. Fine - I'm off.",
                          "Not worth my neck, is it? I'll go up."],
