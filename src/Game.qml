@@ -5644,11 +5644,11 @@ ClayWorld2d {
         for (let i = 0; i < count && i < seats.length; i++) {
             let kind = kinds.splice(Math.floor(rand() * kinds.length), 1)[0]
             let seat = seats[i * spread]
-            // Its walk: off the prop's edge toward the camp's middle, a
-            // little aside so two do not stand in one place
+            // Its walk: off the prop's edge toward the camp's middle, each
+            // apart wu aside of the one before, so they stand side by side
             let spot = null, text = n.seatText
             let p = wanders.length > 0 ? wanders[Math.floor(rand() * wanders.length)] : null
-            let aside = (rand() - 0.5) * 2
+            let aside = (i - (count - 1) / 2) * n.apart + (rand() - 0.5) * 0.4
             if (p) {
                 let dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1
                 let ux = dx / d, uy = dy / d

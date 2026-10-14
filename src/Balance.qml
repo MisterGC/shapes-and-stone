@@ -926,7 +926,8 @@ QtObject {
         // sits at one of angles spots ring[0] to ring[1] wu from the
         // fire's centre, on the floor, for rest[0] to rest[1] seconds,
         // then wanders to one of the look's wander props - off wu off its
-        // edge toward the camp's middle, doing its text - for wander[0]
+        // edge toward the camp's middle, apart wu aside of the traveller
+        // before it, doing its text - for wander[0]
         // to wander[1] seconds, and back; without such a prop it moves to
         // another seat. They walk at walk wu a second and the knights walk
         // through them. Talked to (E) one gives hearsayLines of hearsay,
@@ -952,6 +953,7 @@ QtObject {
             wander: [7, 11],
             walk: 1.2,
             off: 1.2,
+            apart: 1.4,
             props: {
                 grotto: [ { kind: "pond", text: "*watching the water*" } ],
                 hall: [ { kind: "cart", text: "*peering into the cart*" } ],
