@@ -88,6 +88,17 @@ Item {
     // The host gave this node's knight the gem of a vein it split
     // (shape, value)
     signal gemGranted(var gem)
+    // The host owns every fallen knight's pouch as a replicated object of
+    // type "pouch", as it owns the gold; it came to life or went on this
+    // node
+    signal pouchSpawned(string objectId, var props)
+    signal pouchDespawned(string objectId)
+    // Host: a node's knight dropped its pouch (x, y, gems); a node's
+    // knight reached one or lifted its owner up and asks for it
+    signal pouchDropped(string fromId, var props)
+    signal pouchClaimed(string fromId, string objectId)
+    // The host gave this node's knight a pouch (id, gems)
+    signal pouchGranted(var grant)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -231,6 +242,12 @@ Item {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
+            } else if (data.type === "pouchDrop") {
+                if (net.isHost) session.pouchDropped(fromId, data)
+            } else if (data.type === "pouchClaim") {
+                if (net.isHost) session.pouchClaimed(fromId, data.id)
+            } else if (data.type === "pouchGrant") {
+                session.pouchGranted(data)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -261,10 +278,12 @@ Item {
         onObjectSpawned: (id, type, owner, props) => {
             if (type === "enemy") session.enemySpawned(id, props)
             else if (type === "gold") session.goldSpawned(id, props)
+            else if (type === "pouch") session.pouchSpawned(id, props)
         }
         onObjectDespawned: (id, type) => {
             if (type === "enemy") session.enemyDespawned(id)
             else if (type === "gold") session.goldDespawned(id)
+            else if (type === "pouch") session.pouchDespawned(id)
         }
 
         // A node that joins a run under way gets its knight here; the
@@ -538,6 +557,30 @@ Item {
     // Host: the gem goes to that node's knight
     function grantGem(nodeId, gem) {
         net.sendTo(nodeId, Object.assign({type: "gemGrant"}, gem))
+    }
+    // This node's knight fell with gems in its pouch: the host lays the
+    // pouch where it fell, for every node. The host's own is taken at once
+    function dropPouch(props) {
+        if (net.isHost) pouchDropped(net.nodeId, props)
+        else net.sendTo(net.hostId, Object.assign({type: "pouchDrop"}, props))
+    }
+    // Host: a pouch on the floor, for every node, and gone again
+    function spawnPouch(props) {
+        return net.spawn("pouch", props)
+    }
+    function despawnPouch(objectId) {
+        net.despawn(objectId)
+    }
+    // This node's knight reached a pouch or lifted its owner up: the host
+    // gives it to the first node that claims it. The host's own claim is
+    // answered at once
+    function claimPouch(objectId) {
+        if (net.isHost) pouchClaimed(net.nodeId, objectId)
+        else net.sendTo(net.hostId, {type: "pouchClaim", id: objectId})
+    }
+    // Host: the pouch goes to that node's knight
+    function grantPouch(nodeId, grant) {
+        net.sendTo(nodeId, Object.assign({type: "pouchGrant"}, grant))
     }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {

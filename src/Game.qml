@@ -748,6 +748,11 @@ ClayWorld2d {
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
         onGemGranted: (gem) => addGem(gem)
+        onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
+        onPouchSpawned: (objectId, props) => _makePouchDrop(props, objectId)
+        onPouchDespawned: (objectId) => _removePouchDrop(objectId)
+        onPouchClaimed: (fromId, objectId) => _givePouch(fromId, objectId)
+        onPouchGranted: (grant) => _takePouch(grant.gems)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -2359,6 +2364,7 @@ ClayWorld2d {
         menuOpen = false
         knightPanelOpen = false
         fallen = true
+        _dropPouch()
         _keepRecord(true)
         if (!session.connected) _countRun()
         countFight("fall")
@@ -2424,6 +2430,7 @@ ClayWorld2d {
             if (before < 1 && player.reviveProgress >= 1) {
                 console.log("[Game] Lifted up the knight of", id)
                 session.liftKnight(id)
+                _claimPouchesOf(id)
                 countFight("lift")
             }
         }
@@ -2531,6 +2538,7 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world._pickUpGold()
+            world._pickUpPouches()
             world._stepRevive()
             world._stepPlates()
             world._stepSlits()
@@ -5311,6 +5319,17 @@ ClayWorld2d {
         }
         goldDrops = goldDrops.filter(d => d && d.objectId !== "" && session.connected
                                      && _goldById[d.objectId] === d)
+        // And so do the pouches: one left on the floor is lost
+        for (let d of pouchDrops.slice()) {
+            if (!d) continue
+            if (d.objectId !== "" && session.connected) {
+                if (session.isHost) session.despawnPouch(d.objectId)
+                continue
+            }
+            try { d.destroy() } catch(err) {}
+        }
+        pouchDrops = pouchDrops.filter(d => d && d.objectId !== "" && session.connected
+                                       && _pouchById[d.objectId] === d)
 
         // Destroy remote players
         session.clearRemotePlayers()
@@ -6355,6 +6374,17 @@ ClayWorld2d {
     function pouchWorth(pouch) {
         return (pouch || []).reduce((a, g) => a + g.value, 0)
     }
+    // A pouch as text and back, "shape:value,shape:value", for the network
+    function pouchText(pouch) {
+        return (pouch || []).map(g => g.shape + ":" + g.value).join(",")
+    }
+    function pouchOf(text) {
+        if (!text) return []
+        return String(text).split(",").map(t => {
+            let p = t.split(":")
+            return { shape: p[0], value: Number(p[1]) }
+        })
+    }
 
     // The smith buys the gems: his ware while the pouch holds any, the
     // whole pouch for its worth
@@ -6374,6 +6404,93 @@ ClayWorld2d {
         Qt.callLater(_clink)
         console.log("[Game] Sold the gems for", offer.price, "gold,", player.gold, "now")
         return true
+    }
+
+    // A fallen knight's pouch lies where it fell (PouchDrop): any other
+    // knight that walks over it or lifts the fallen one up takes it. In a
+    // session the host owns it as it owns the gold: a replicated object
+    // every node claims for its own knight, given to the first claim
+    Component { id: pouchDropComponent; PouchDrop {} }
+    property var pouchDrops: []
+    property var _pouchById: ({})
+    // This node's knight fell: its pouch drops where it lies
+    function _dropPouch() {
+        if (!player || player.pouch.length === 0) return
+        let c = _knightCentre()
+        let props = { xWu: c.x, yWu: c.y, gems: pouchText(player.pouch) }
+        console.log("[Game] The pouch drops with", player.pouch.length, "gems at", c.x.toFixed(2), c.y.toFixed(2))
+        player.pouch = []
+        if (session.connected) session.dropPouch(props)
+        else _makePouchDrop(props)
+    }
+    // Host: a node's knight dropped its pouch
+    function _hostDropPouch(fromId, props) {
+        if (screen !== "game" || levelType !== "dungeon") return
+        session.spawnPouch({ xWu: props.xWu, yWu: props.yWu, gems: props.gems, owner: fromId })
+    }
+    function _makePouchDrop(props, objectId) {
+        objectId = objectId || ""
+        if (objectId !== "" && _pouchById[objectId]) return _pouchById[objectId]
+        let gems = pouchOf(props.gems)
+        let best = gems.reduce((a, g) => !a || g.value > a.value ? g : a, null)
+        let drop = pouchDropComponent.createObject(world.room, Object.assign({}, props, {
+            objectId: objectId, gemColor: best ? gemColorOf(best.shape) : "#F2B33D",
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        }))
+        if (!drop) return null
+        pouchDrops.push(drop)
+        if (objectId !== "") _pouchById[objectId] = drop
+        return drop
+    }
+    function _removePouchDrop(objectId) {
+        let drop = _pouchById[objectId]
+        if (!drop) return
+        delete _pouchById[objectId]
+        _forgetPouchDrop(drop)
+    }
+    function _forgetPouchDrop(drop) {
+        pouchDrops = pouchDrops.filter(d => d !== drop)
+        try { drop.destroy() } catch (err) {}
+    }
+    // Each step: a pouch this node's knight stands on is its, or claimed
+    // from the host in a session
+    function _pickUpPouches() {
+        if (!player || player.fallen || pouchDrops.length === 0) return
+        let c = _knightCentre(), reach = Balance.deep.pouchReach
+        for (let drop of pouchDrops.slice())
+            if (drop && Math.hypot(drop.xWu - c.x, drop.yWu - c.y) <= reach) _claimPouch(drop)
+    }
+    // This node's knight lifted that node's knight up: its pouch too
+    function _claimPouchesOf(nodeId) {
+        for (let drop of pouchDrops.slice())
+            if (drop && drop.owner === nodeId) _claimPouch(drop)
+    }
+    function _claimPouch(drop) {
+        if (drop.claimed) return
+        if (drop.objectId === "") {
+            _takePouch(drop.gems)
+            _forgetPouchDrop(drop)
+        } else if (session.connected) {
+            drop.claimed = true
+            session.claimPouch(drop.objectId)
+        }
+    }
+    // Host: a node's knight reached a pouch; the first claim takes it
+    function _givePouch(nodeId, objectId) {
+        let drop = _pouchById[objectId]
+        if (!drop || !session.isHost) return
+        let grant = { id: objectId, gems: drop.gems }
+        session.despawnPouch(objectId)
+        if (nodeId === session.nodeId) _takePouch(grant.gems)
+        else session.grantPouch(nodeId, grant)
+    }
+    function _takePouch(gems) {
+        if (!player) return
+        let got = pouchOf(gems)
+        player.pouch = player.pouch.concat(got)
+        spawnDamageNumber(player.xWu, player.yWu, "+" + got.length + (got.length === 1 ? " gem" : " gems"), "#E8B83A")
+        Qt.callLater(_clink)
+        console.log("[Game] Took a pouch of", got.length, "gems,", player.pouch.length, "in this one now")
     }
 
     // The dojo's deep scenario: a walled room with a vein in the middle of

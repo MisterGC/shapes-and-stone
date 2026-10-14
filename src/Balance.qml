@@ -648,7 +648,10 @@ QtObject {
     // Platonic solids, a selfLit one glowing in the dark on its own. A
     // gem cut goes into the knight's pouch, worth value[0] gold with no
     // clean strike to value[1] with all of them clean, by their share,
-    // rounded; the smith buys every gem in the pouch at once for that
+    // rounded; the smith buys every gem in the pouch at once for that.
+    // A knight that falls drops its pouch where it fell: any other knight
+    // whose centre comes within pouchReach wu of it, or that lifts the
+    // fallen one up, takes it
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -674,6 +677,7 @@ QtObject {
         shimmerReach: 3.5,
         shimmerPitch: 19,
         shimmerVolume: 0.12,
+        pouchReach: 0.9,
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
             { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },

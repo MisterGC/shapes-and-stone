@@ -53,7 +53,7 @@ PhysicsItem {
     // Gold picked up this run, for the village's wares
     property int gold: 0
     // The gems cut and not yet sold, [{shape, value}] (Balance.deep,
-    // issue #156): kept across levels as the gold is
+    // issue #156): kept across levels as the gold is, dropped on a fall
     property var pouch: []
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0

@@ -18,6 +18,7 @@ SpikePlate 1.0 SpikePlate.qml
 ArrowSlit 1.0 ArrowSlit.qml
 Arrow 1.0 Arrow.qml
 GoldDrop 1.0 GoldDrop.qml
+PouchDrop 1.0 PouchDrop.qml
 BodyShade 1.0 BodyShade.qml
 ExitStairs 1.0 ExitStairs.qml
 Floor 1.0 Floor.qml
