@@ -3175,8 +3175,9 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
-        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look,
-                         featureList.filter(f => f.kind === "vein").map(f => f.wgx + "," + f.wgy))
+        let veinCells = featureList.filter(f => f.kind === "vein").map(f => f.wgx + "," + f.wgy)
+        placeRockFaces(veinCells)
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look, veinCells)
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
         placeFeatures(featureList)
         placeDoors(doorList)
@@ -5392,6 +5393,7 @@ ClayWorld2d {
         if (player) player.digging = false
         dig = null
         veins = []
+        rockFaces = []
         _cutVeins = []
         _cutsAsked = ({})
         for (let w of wonGems.slice()) w.destroy()
@@ -6311,6 +6313,51 @@ ClayWorld2d {
         let g = Balance.deep.gemSize
         return g[0] + (g[1] - g[0]) * Math.max(0, Math.min(1, clean / Math.max(1, strikes)))
     }
+    // The wall face round each vein's cell ("gx,gy") is rough rock, a
+    // miners' face (issue #169): rockCells cells to each side of it as far
+    // as the face runs, merged where they meet, ragged over rockRagged wu
+    // at an end where the bricks go on. Laid over the bricks before the
+    // torches, which stand on it
+    property var rockFaces: []
+    function _isFace(gx, gy) {
+        return gx >= 0 && gx < gridWidth && gy >= 1 && gy < gridHeight
+               && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+    }
+    function placeRockFaces(cells) {
+        let cfg = Balance.deep, rows = {}
+        for (let cell of cells) {
+            let c = cell.split(",").map(Number)
+            if (!_isFace(c[0], c[1])) continue
+            let row = rows[c[1]] = rows[c[1]] || {}
+            row[c[0]] = true
+            for (let dir of [-1, 1])
+                for (let k = 1; k <= cfg.rockCells && _isFace(c[0] + dir * k, c[1]); k++)
+                    row[c[0] + dir * k] = true
+        }
+        for (let gy in rows) {
+            let xs = Object.keys(rows[gy]).map(Number).sort((a, b) => a - b)
+            let y = Number(gy)
+            for (let i = 0; i < xs.length; ) {
+                let from = xs[i]
+                while (i + 1 < xs.length && xs[i + 1] === xs[i] + 1) i++
+                let to = xs[i] + 1
+                i++
+                let left = _isFace(from - 1, y) ? cfg.rockRagged : 0
+                let right = _isFace(to, y) ? cfg.rockRagged : 0
+                let f = wallFaceComponent.createObject(world.room, {
+                    xWu: from * cellSize - left, yWu: y * cellSize + wallFaceWu,
+                    widthWu: (to - from) * cellSize + left + right, heightWu: wallFaceWu,
+                    color: cfg.rockColor, faceStyle: "rock", raggedLeft: left, raggedRight: right,
+                    shadow: false, objectName: "rockFace",
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                })
+                if (!f) continue
+                rockFaces.push(f)
+                dungeonObjects.push(f)
+            }
+        }
+    }
     // A vein on the wall cell (gx, gy), whose face looks onto the floor
     // south of it
     function placeVein(gx, gy) {
@@ -6800,8 +6847,10 @@ ClayWorld2d {
         console.log("[Game] Entering the deep room")
         clearDungeon()
         deepRoomActive = true
-        let a = _buildArena(11)
-        let gx = a.ox + Math.floor(a.size / 2), gy = a.oy + a.size
+        let size = 11
+        let ox = Math.floor((gridWidth - size) / 2), oy = Math.floor((gridHeight - size) / 2)
+        let gx = ox + Math.floor(size / 2), gy = oy + size
+        let a = _buildArena(size, [gx + "," + gy])
         placeVein(gx, gy)
         spawnPlayer((gx + 0.5) * cellSize - 0.5, gy * cellSize - 0.4)
         _bindKnight()
@@ -6829,7 +6878,7 @@ ClayWorld2d {
     // A walled square room of size cells in the middle of the grid, all of
     // it explored, with its floor, walls, torches and motes: {ox, oy, size},
     // its lower left cell and its size
-    function _buildArena(size) {
+    function _buildArena(size, rockCells) {
         let ox = Math.floor((gridWidth - size) / 2)
         let oy = Math.floor((gridHeight - size) / 2)
 
@@ -6858,6 +6907,7 @@ ClayWorld2d {
         updateOccluders()
         spawnMotes()
         rooms = [{x: ox, y: oy, w: size, h: size}]
+        placeRockFaces(rockCells || [])
         placeRoomTorches(createRng(7))
         return { ox: ox, oy: oy, size: size }
     }

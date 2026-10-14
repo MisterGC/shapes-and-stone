@@ -14,8 +14,14 @@ Item {
     property real heightWu: 0.7
     property real shadowWu: 0.9
     property color color: "#3A4658"
-    // "bricks", or a camp's (issue #146): "moss", "strata" or "basalt"
+    // "bricks", or a camp's (issue #146): "moss", "strata" or "basalt", or
+    // round a vein (issue #169) "rock"
     property string faceStyle: "bricks"
+    // The wu at its left and its right end that break off raggedly, and
+    // whether it drops its shadow (one laid over another face does not)
+    property real raggedLeft: 0
+    property real raggedRight: 0
+    property bool shadow: true
 
     x: xWu * pixelPerUnit
     y: parent ? parent.height - yWu * pixelPerUnit : 0
@@ -31,12 +37,14 @@ Item {
         property vector2d sizeWu: Qt.vector2d(wf.widthWu, wf.heightWu)
         property real pixelsPerWu: 12
         property real face: 1
-        property real faceStyle: Math.max(0, ["bricks", "moss", "strata", "basalt"].indexOf(wf.faceStyle))
+        property real faceStyle: Math.max(0, ["bricks", "moss", "strata", "basalt", "rock"].indexOf(wf.faceStyle))
         property color baseColor: wf.color
+        property vector2d ragged: Qt.vector2d(wf.raggedLeft, wf.raggedRight)
     }
 
     // Soft contact shadow on the floor at the foot of the face
     Rectangle {
+        visible: wf.shadow
         anchors.top: bricks.bottom
         width: parent.width
         height: wf.shadowWu * wf.pixelPerUnit

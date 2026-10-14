@@ -657,7 +657,10 @@ QtObject {
     // in wonRise seconds, flies up to wonAbove wu above the knight's
     // centre in wonFly, growing to wonScale times its size and at least
     // wonMin wu across, holds there
-    // wonHold seconds and drops into the pouch in wonDrop
+    // wonHold seconds and drops into the pouch in wonDrop. The wall face
+    // round a vein is rough rock in rockColor, rockCells cells to each
+    // side as far as the face runs, its ends breaking off over up to
+    // rockRagged wu where the bricks go on
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -693,6 +696,9 @@ QtObject {
         wonScale: 1.8,
         wonMin: 1.1,
         wonAbove: 1.3,
+        rockCells: 1,
+        rockRagged: 0.45,
+        rockColor: "#5E564C",
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
             { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },

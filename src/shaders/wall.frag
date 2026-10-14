@@ -2,8 +2,9 @@
 // Procedural wall: the rock top of a wall run, or (face > 0.5) the face a
 // wall shows towards the floor south of it: bricks, or in the camps (issue
 // #146) rough rock under moss, rock strata between timber props, or
-// basalt columns. Computed in world units so neighbouring pieces continue
-// each other's pattern.
+// basalt columns, or round a vein (issue #169) a miners' rough rock face,
+// its ends ragged where bricks go on. Computed in world units so
+// neighbouring pieces continue each other's pattern.
 
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
@@ -15,8 +16,9 @@ layout(std140, binding = 0) uniform buf {
     vec2 sizeWu;
     float pixelsPerWu;
     float face;        // 0 = rock top, 1 = face
-    float faceStyle;   // 0 = bricks, 1 = moss, 2 = strata, 3 = basalt
+    float faceStyle;   // 0 = bricks, 1 = moss, 2 = strata, 3 = basalt, 4 = rock
     vec4 baseColor;
+    vec2 ragged;       // wu at the left and the right end that break off
 } ubuf;
 
 float hash(vec2 p) {
@@ -107,6 +109,45 @@ vec3 basaltFace(vec2 p, vec2 local) {
     return col;
 }
 
+vec3 rockFace(vec2 p, vec2 local) {
+    // A miners' face: rough chunks of rock, each two flat facets, one lit
+    // from the upper left, dark seams between them, and pick scars here
+    // and there
+    vec2 q = vec2(p.x / 0.62, local.y / 0.36);
+    vec2 cell = floor(q);
+    vec2 f = fract(q);
+    float d1 = 9.0, d2 = 9.0;
+    vec2 best = cell, bestPt = vec2(0.5);
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            vec2 c = cell + vec2(i, j);
+            vec2 pt = vec2(i, j) + 0.15 + 0.7 * vec2(hash(c), hash(c + 17.0));
+            float d = length(pt - f);
+            if (d < d1) { d2 = d1; d1 = d; best = c; bestPt = pt; }
+            else if (d < d2) d2 = d;
+        }
+    }
+    vec3 base = ubuf.baseColor.rgb;
+    float h = hash(best);
+    vec3 col = base * (0.72 + 0.4 * h);
+    float ang = 6.2832 * hash(best + 3.1);
+    vec2 n = vec2(cos(ang), sin(ang));
+    float side = dot(f - bestPt, n);
+    float lit = dot(n, vec2(-0.6, -0.8));
+    col *= side * lit > 0.0 ? 1.2 : 0.82;
+    float seam = d2 - d1;
+    if (seam < 0.06) col = base * 0.32;
+    else if (seam < 0.1) col *= 0.75;
+    if (h > 0.78) {
+        vec2 s = f - bestPt;
+        float along = dot(s, vec2(0.8, 0.6));
+        float across = dot(s, vec2(-0.6, 0.8));
+        if (abs(across) < 0.035 && abs(along) < 0.2) col = mix(col, vec3(0.8, 0.76, 0.68), 0.5);
+    }
+    col *= mix(1.0, 0.7, local.y / ubuf.sizeWu.y);
+    return col;
+}
+
 void main() {
     vec2 local = qt_TexCoord0 * ubuf.sizeWu;                  // y down
     vec2 p = vec2(ubuf.originWu.x + local.x, ubuf.originWu.y - local.y);
@@ -116,6 +157,14 @@ void main() {
              : ubuf.faceStyle < 0.5 ? brickFace(p, local)
              : ubuf.faceStyle < 1.5 ? mossFace(p, local)
              : ubuf.faceStyle < 2.5 ? strataFace(p, local)
-             : basaltFace(p, local);
-    fragColor = vec4(col, 1.0) * ubuf.qt_Opacity;
+             : ubuf.faceStyle < 3.5 ? basaltFace(p, local)
+             : rockFace(p, local);
+    // Ragged ends: each course of chunks breaks off at its own place
+    float course = floor(local.y / 0.12);
+    float a = 1.0;
+    if (local.x < ubuf.ragged.x * (0.3 + 0.7 * hash(vec2(course, floor(ubuf.originWu.x) + 3.0))))
+        a = 0.0;
+    if (ubuf.sizeWu.x - local.x < ubuf.ragged.y * (0.3 + 0.7 * hash(vec2(course, floor(ubuf.originWu.x) + 7.0))))
+        a = 0.0;
+    fragColor = vec4(col, 1.0) * a * ubuf.qt_Opacity;
 }
