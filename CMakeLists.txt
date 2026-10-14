@@ -61,6 +61,7 @@ clay_app(shapes_and_stone
         src/Door.qml
         src/SecretWall.qml
         src/Vein.qml
+        src/Hole.qml
         src/Gem.qml
         src/GoldDrop.qml
         src/PouchDrop.qml

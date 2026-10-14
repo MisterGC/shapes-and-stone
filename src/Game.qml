@@ -306,6 +306,36 @@ ClayWorld2d {
         repeat: true
         onTriggered: world._chimeNext()
     }
+    // A spawn hole (Balance.deep.hole): the rumble as it wakes and as a
+    // creature crawls out, the groan as its eyes open, the crumble as it
+    // closes, quieter the further it is from the knight. holeSounds lists
+    // the last veinSoundsKept of them as they play, "rumble", "groan" or
+    // "crumble", muted too, and holeSoundCount counts them all, for the
+    // benches; a new level starts the list over
+    Sound {
+        id: rumbleSound
+        source: "assets/deep_rumble.wav"
+        volume: muted ? 0 : Balance.deep.hole.rumbleVolume * soundVolume
+    }
+    Sound {
+        id: groanSound
+        source: "assets/deep_groan.wav"
+        volume: muted ? 0 : Balance.deep.hole.groanVolume * soundVolume
+    }
+    property var holeSounds: []
+    property int holeSoundCount: 0
+    function playHoleSound(name, h) {
+        let cfg = Balance.deep.hole, gain = 1
+        if (player && h) {
+            let c = _knightCentre()
+            gain = Math.max(cfg.quietest, 1 - Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y) / cfg.hearReach)
+        }
+        if (name === "rumble") rumbleSound.triggerOneShot(gain)
+        else if (name === "groan") groanSound.triggerOneShot(gain)
+        else crumbleSound.triggerOneShot(gain)
+        holeSounds = holeSounds.slice(1 - veinSoundsKept).concat([name])
+        holeSoundCount++
+    }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
     // knight, and fading to silence about a screen away from you
@@ -747,6 +777,7 @@ ClayWorld2d {
         onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
+        onWakeReported: (level, cell) => _hostWake(level, cell)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
@@ -2597,6 +2628,7 @@ ClayWorld2d {
             world._stepSecrets()
             world._stepVeins()
             world._stepDig()
+            world._stepHoles()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -3182,6 +3214,7 @@ ClayWorld2d {
         placeFeatures(featureList)
         placeDoors(doorList)
         placeSecrets()
+        placeHoles(planHoles(levelSeed, featureList))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -3223,6 +3256,7 @@ ClayWorld2d {
         _applySprung(_sessionSprung)
         _applyDoors(_sessionDoors)
         _applyVeins(_sessionVeins)
+        _applyHoles(_sessionHoles, true)
 
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
@@ -3674,6 +3708,9 @@ ClayWorld2d {
     // With a look (Balance.danger.looks) only its torchShare of them burn,
     // in its torch colour
     property var torches: []
+    // The wall cells the torches stand on, "gx,gy": a spawn hole keeps
+    // off them (planHoles)
+    property var _torchCells: ({})
     // A torch whose spot holds a vein (veinCells, "gx,gy") takes the
     // nearest spot of its wall without one and without the wall's other
     // torch, the stream drawn the same
@@ -3681,6 +3718,7 @@ ClayWorld2d {
         let veined = {}
         for (let c of veinCells || []) veined[c] = true
         torches = []
+        _torchCells = ({})
         for (let room of rooms) {
             let gy = room.y + room.h
             if (gy >= gridHeight) continue
@@ -3702,6 +3740,7 @@ ClayWorld2d {
                 if (look && decoRng() >= look.torchShare) continue
                 if (gx < 0) continue
                 lit[gx] = true
+                _torchCells[gx + "," + gy] = true
                 placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75,
                            look ? look.torch : undefined)
             }
@@ -5085,8 +5124,9 @@ ClayWorld2d {
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
-    // knights: the knights the dungeon is built for, 1 when left out
-    function spawnEnemy(ex, ey, tier, type, knights) {
+    // knights: the knights the dungeon is built for, 1 when left out;
+    // fromHole the spawn hole it crawls out of, "gx,gy" (issue #157)
+    function spawnEnemy(ex, ey, tier, type, knights, fromHole) {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
@@ -5099,7 +5139,8 @@ ClayWorld2d {
             hp: ehp, maxHp: ehp,
             atk: eatk, def: edef,
             tier: tier,
-            enemyType: type
+            enemyType: type,
+            fromHole: fromHole || ""
         }
         // In a session only the host spawns, for every node
         if (!session.connected)
@@ -5130,6 +5171,8 @@ ClayWorld2d {
             if (!remote) enemy.target = player
             enemies.push(enemy)
             if (objectId !== "") _enemyById[objectId] = enemy
+            let h = enemy.fromHole !== "" ? holeAt(enemy.fromHole) : null
+            if (h) _holeEvent(h, "creature")
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
         }
@@ -5400,6 +5443,11 @@ ClayWorld2d {
         wonGems = []
         _gemsFlying = []
         veinSounds = []
+        holes = []
+        _holeRuns = ({})
+        _holePuffs = ({})
+        holeEvents = []
+        holeSounds = []
         deepRoomActive = false
 
         // Destroy player
@@ -6503,6 +6551,7 @@ ClayWorld2d {
         let len = Math.max(0.01, Math.hypot(c.x - v.faceXWu, c.y - v.faceYWu))
         let nx = (c.x - v.faceXWu) / len, ny = (c.y - v.faceYWu) / len
         if (clean) {
+            _holeStruck(v)
             spawnSparks(v.faceXWu, v.faceYWu, nx, ny, cfg.sparks, v.gemColor)
             _trauma(0.06)
             playChink(0)
@@ -6681,6 +6730,270 @@ ClayWorld2d {
         if (dig && dig.vein === v) endDig()
     }
 
+    // --- Spawn holes (issue #157) ---
+    // A room that holds a vein has one spawn hole low in its north wall
+    // (Hole.qml, Balance.deep.hole), laid out after everything else from
+    // its own stream of the level's seed, so nothing moves for it. Clean
+    // strikes on its room's veins wake it in stages, dust and then eyes;
+    // telegraph seconds after the eyes creatures of the depth crawl out of
+    // its mouth in waves, and then it closes for good. Alone the game runs
+    // it. In a session each node tells the host of its knight's clean
+    // strikes; the host runs every hole, spawns its creatures as it does
+    // every enemy, and publishes the holes' stages and waves (session
+    // property "holes"), which every screen shows and hears, a node that
+    // joins later too. holeEvents lists what the holes did on this screen,
+    // for the benches: {cell, what, t}, what "dust", "eyes", "waves",
+    // "wave" (each wave), "creature" (one shown here) or "closed", t the
+    // holes' physics clock, seconds
+    Component { id: holeComponent; Hole {} }
+    property var holes: []
+    property var holeEvents: []
+    property real _holeClock: 0
+    // A woken hole's run on the node that runs it, by cell: {t, plan,
+    // closeAt, rand}, t its seconds since the eyes, plan the creatures
+    // still to come [{at, wave}], rand its stream of the level's seed
+    property var _holeRuns: ({})
+    // The seconds since each awake hole last puffed dust, by cell
+    property var _holePuffs: ({})
+    readonly property var holeStages: ["rest", "dust", "eyes", "waves", "closed"]
+
+    // The spawn holes of the carved dungeon with its features (list): one
+    // for each room but the first that holds a vein, [{gx, gy, veins}],
+    // gx, gy its wall cell, veins the cells of its room's veins. Each
+    // room draws from its own stream of the level's seed
+    function planHoles(levelSeed, list) {
+        let out = [], taken = {}, blocked = {}
+        for (let f of list) {
+            taken[f.gx + "," + f.gy] = true
+            if (f.kind === "slit") blocked[(f.gx - f.dx) + "," + (f.gy - f.dy)] = true
+        }
+        rooms.forEach((room, ri) => {
+            if (ri === 0) return
+            let veins = list.filter(f => f.kind === "vein" && f.gx >= room.x && f.gx < room.x + room.w
+                                         && f.gy >= room.y && f.gy < room.y + room.h)
+            if (veins.length === 0) return
+            let spot = _holeSpot(room, veins, blocked, _torchCells, _mouthsTaken(taken),
+                                 createRng(levelSeed ^ 0x686f6c65 ^ ri))
+            if (!spot) {
+                console.log("[Game] No spot for the spawn hole of room", ri)
+                return
+            }
+            out.push({ gx: spot.gx, gy: spot.gy, veins: veins.map(v => v.wgx + "," + v.wgy) })
+        })
+        return out
+    }
+    // The wall cells over the features' cells, which a hole keeps off
+    function _mouthsTaken(taken) {
+        let out = {}
+        for (let c in taken) {
+            let p = c.split(",").map(Number)
+            out[p[0] + "," + (p[1] + 1)] = true
+        }
+        return out
+    }
+    // The spot of a room's spawn hole, {gx, gy}, or null: a cell of the
+    // face of its north wall, not blocked ("gx,gy": a slit), not a torch
+    // (torchCells), a secret nor a vein, off its veins' ({wgx, wgy}) rock
+    // faces, over a room cell that holds no feature (overFeature, "gx,gy"
+    // of the wall cell) and lies beside no corridor; drawn by rand from
+    // those at least gap cells from each vein, else from those furthest
+    // from them. A small room with no such cell lets go of the rules one
+    // after the other until one is left: the rock face, the feature, the
+    // corridor, and last the torch, which goes out (placeHole)
+    function _holeSpot(room, veins, blocked, torchCells, overFeature, rand) {
+        let cfg = Balance.deep, gy = room.y + room.h, spots = []
+        for (let relax = 0; relax <= 4 && spots.length === 0; relax++) {
+            for (let gx = room.x; gx < room.x + room.w; gx++) {
+                if (!_isFace(gx, gy) || blocked[gx + "," + gy] || _secretOf(gx, gy) >= 0) continue
+                if (torchCells[gx + "," + gy] && relax < 4) continue
+                if (grid[gy - 1][gx] !== cellRoom) continue
+                let d = Math.min(...veins.map(v => Math.abs(v.wgx - gx) + Math.abs(v.wgy - gy)))
+                if (d === 0 || (d <= cfg.rockCells && relax < 1)) continue
+                if (overFeature[gx + "," + gy] && relax < 2) continue
+                let corridor = [[1, 0], [-1, 0], [0, -1]].some(n => grid[gy - 1 + n[1]]
+                                                             && grid[gy - 1 + n[1]][gx + n[0]] === cellHallway)
+                if (corridor && relax < 3) continue
+                spots.push({ gx: gx, gy: gy, d: d })
+            }
+        }
+        if (spots.length === 0) return null
+        let far = spots.filter(s => s.d >= cfg.hole.gap)
+        let top = Math.max(...spots.map(s => s.d))
+        let pool = far.length > 0 ? far : spots.filter(s => s.d === top)
+        return pool[Math.floor(rand() * pool.length)]
+    }
+    function placeHoles(list) {
+        for (let h of list) placeHole(h.gx, h.gy, h.veins)
+    }
+    // A spawn hole in the face of the wall cell (gx, gy), woken by the
+    // veins on veinCells ("gx,gy"); a torch on the cell goes out
+    function placeHole(gx, gy, veinCells) {
+        if (_torchCells[gx + "," + gy]) {
+            delete _torchCells[gx + "," + gy]
+            let row = gy * cellSize
+            for (let t of torches.filter(t => Math.floor(t.xWu / cellSize) === gx && t.yWu >= row && t.yWu < row + cellSize)) {
+                torches = torches.filter(x => x !== t)
+                dungeonObjects = dungeonObjects.filter(x => x !== t)
+                t.destroy()
+            }
+        }
+        let h = holeComponent.createObject(world.room, {
+            cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
+            faceWu: wallFaceWu, cell: gx + "," + gy, veinCells: veinCells,
+            seed: createRng(gx * 7349 + gy * 3571 + 17)(),
+            glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!h) return null
+        holes.push(h)
+        dungeonObjects.push(h)
+        console.log("[Game] A spawn hole at", h.cell, "for the veins at", veinCells.join(" "))
+        return h
+    }
+    function holeAt(cell) {
+        return holes.find(h => h.cell === cell) || null
+    }
+    // The hole the vein on cell wakes, or null
+    function holeOf(veinCell) {
+        return holes.find(h => h.veinCells.indexOf(veinCell) >= 0) || null
+    }
+    // This node's knight struck vein v clean: alone its hole wakes, in a
+    // session the host is told
+    function _holeStruck(v) {
+        if (session.connected && !deepRoomActive) session.reportWake(levelIndex, v.cell)
+        else _wakeHole(holeOf(v.cell))
+    }
+    // Host: a knight struck the vein on cell of that level clean
+    function _hostWake(level, cell) {
+        if (level !== levelIndex || levelType !== "dungeon") return
+        _wakeHole(holeOf(cell))
+    }
+    // A clean strike on a vein of hole h's room: at dustAt of them it
+    // wakes, at eyesAt its eyes open and its creatures are planned; once
+    // the eyes are open, or it closed, a strike does nothing more
+    function _wakeHole(h) {
+        if (!h || (h.stage !== "rest" && h.stage !== "dust")) return
+        let cfg = Balance.deep.hole
+        h.clean++
+        if (h.stage === "rest" && h.clean >= cfg.dustAt) _holeTo(h, "dust")
+        if (h.stage === "dust" && h.clean >= cfg.eyesAt) {
+            let plan = [], first = Math.max(Balance.enemy.minTelegraph, cfg.telegraph)
+            for (let w = 0; w < cfg.waves; w++)
+                for (let i = 0; i < cfg.perWave; i++)
+                    plan.push({ at: first + w * cfg.waveGap + i * cfg.crawlGap, wave: w + 1 })
+            let c = h.cell.split(",").map(Number)
+            _holeRuns[h.cell] = { t: 0, plan: plan, closeAt: plan[plan.length - 1].at + cfg.closeAfter,
+                                  rand: createRng(levelSeedNow() ^ 0x63726177 ^ (c[1] * gridWidth + c[0])) }
+            _holeTo(h, "eyes")
+        }
+    }
+    // Hole h goes on to stage: its look and its sound, unless quiet (a
+    // level built with a hole woken already); the host tells every node
+    function _holeTo(h, stage, quiet) {
+        if (h.stage === stage) return
+        h.stage = stage
+        _holeEvent(h, stage)
+        console.log("[Game] The spawn hole at", h.cell, "-", stage)
+        if (!quiet) {
+            if (stage === "dust") {
+                _holeDust(h, 10)
+                playHoleSound("rumble", h)
+            } else if (stage === "eyes") {
+                playHoleSound("groan", h)
+            } else if (stage === "closed") {
+                spawnShards(h.mouthXWu, h.mouthYWu + 0.3, 0, -1, 12, "#5E574E", 0.16)
+                _holeDust(h, 8)
+                playHoleSound("crumble", h)
+            }
+        }
+        _publishHoles()
+    }
+    // Wave w of hole h begins
+    function _holeWave(h, w, quiet) {
+        h.wave = w
+        _holeEvent(h, "wave")
+        if (!quiet) _holeDust(h, 6)
+        _publishHoles()
+    }
+    function _holeEvent(h, what) {
+        holeEvents = holeEvents.concat([{ cell: h.cell, what: what, t: _holeClock }])
+    }
+    // Dust puffing from hole h's rim, count specks
+    function _holeDust(h, count) {
+        spawnShards(h.mouthXWu, h.mouthYWu + 0.25, 0, -1, count, Balance.deep.hole.dustColor, 0.09)
+    }
+    // A creature of the depth crawls out of hole h, in wave w: its kind
+    // and tier from the hole's stream, as the dungeon's enemies are
+    // rolled, standing in its mouth
+    function _holeCreature(h, w, rand) {
+        if (w > h.wave) {
+            if (h.stage === "eyes") _holeTo(h, "waves")
+            _holeWave(h, w)
+        }
+        let sb = spawnRolls(danger, partyKnights)
+        let r = rand(), tier = r < sb.weakChance ? 0 : r < sb.normalChance ? 1 : 2
+        let g = tier === 2 ? sb.guardianChanceTough : sb.guardianChance, k = rand()
+        let type = k < g ? "guardian" : k < g + sb.spitterChance ? "spitter" : "grunt"
+        spawnEnemy(h.mouthXWu - 0.4 + (rand() - 0.5) * 0.4, h.mouthYWu - 0.1, tier, type, partyKnights, h.cell)
+        _holeDust(h, 5)
+        playHoleSound("rumble", h)
+    }
+    // Each physics step: an awake hole puffs dust now and then; the node
+    // that runs a hole sends its creatures when they are due, and closes
+    // it after the last
+    function _stepHoles() {
+        if (holes.length === 0) return
+        let dt = world.physics.timeStep, cfg = Balance.deep.hole
+        _holeClock += dt
+        for (let h of holes) {
+            if (h.awake) {
+                let p = (_holePuffs[h.cell] || 0) + dt
+                if (p >= cfg.puffEvery) {
+                    p = 0
+                    _holeDust(h, 3)
+                }
+                _holePuffs[h.cell] = p
+            }
+            let run = _holeRuns[h.cell]
+            if (!run) continue
+            run.t += dt
+            while (run.plan.length > 0 && run.plan[0].at <= run.t + 1e-9)
+                _holeCreature(h, run.plan.shift().wave, run.rand)
+            if (run.plan.length === 0 && run.t >= run.closeAt - 1e-9) {
+                delete _holeRuns[h.cell]
+                _holeTo(h, "closed")
+            }
+        }
+    }
+    // Host: the holes woken in its level, for every node
+    function _publishHoles() {
+        if (!session.connected || !session.isHost || deepRoomActive || levelType !== "dungeon") return
+        let out = {}
+        for (let h of holes)
+            if (h.stage !== "rest") out[h.cell] = { stage: h.stage, wave: h.wave }
+        session.publishHoles({ seed: session.runSeed, level: levelIndex, holes: out })
+    }
+    // The host's holes woken in the level: each goes through the stages
+    // it missed here in order, its waves before it closes; quiet when the
+    // level was just built
+    function _applyHoles(val, quiet) {
+        if (!val || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (val.seed !== session.runSeed || val.level !== levelIndex) return
+        for (let cell in val.holes) {
+            let h = holeAt(cell), s = val.holes[cell]
+            if (!h) continue
+            let to = holeStages.indexOf(s.stage), waves = holeStages.indexOf("waves")
+            for (let i = holeStages.indexOf(h.stage) + 1; i <= Math.min(to, waves); i++)
+                _holeTo(h, holeStages[i], quiet)
+            for (let w = h.wave + 1; w <= s.wave; w++) {
+                _holeWave(h, w, quiet)
+                if (!quiet) playHoleSound("rumble", h)
+            }
+            if (to > waves) _holeTo(h, holeStages[to], quiet)
+        }
+    }
+    readonly property var _sessionHoles: session.holes
+    on_SessionHolesChanged: _applyHoles(_sessionHoles)
+
     // The pouch: a gem into it
     function addGem(gem) {
         if (!player) return
@@ -6842,8 +7155,8 @@ ClayWorld2d {
     }
 
     // The dojo's deep scenario: a walled room with a vein in the middle of
-    // its north wall, the gem of the scenario's depth, and the knight right
-    // below it, in reach
+    // its north wall, the gem of the scenario's depth, the knight right
+    // below it, in reach, and the vein's spawn hole in the same wall
     function enterDeepRoom() {
         console.log("[Game] Entering the deep room")
         clearDungeon()
@@ -6853,6 +7166,14 @@ ClayWorld2d {
         let gx = ox + Math.floor(size / 2), gy = oy + size
         let a = _buildArena(size, [gx + "," + gy])
         placeVein(gx, gy)
+        // Its spawn hole on the nearest free spot gap cells or more off
+        // the vein, in sight of the knight
+        for (let k = Balance.deep.hole.gap; k < size; k++) {
+            let hx = [gx + k, gx - k].find(x => _isFace(x, gy) && !_torchCells[x + "," + gy])
+            if (hx === undefined) continue
+            placeHole(hx, gy, [gx + "," + gy])
+            break
+        }
         spawnPlayer((gx + 0.5) * cellSize - 0.5, gy * cellSize - 0.4)
         _bindKnight()
     }

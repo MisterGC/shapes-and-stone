@@ -85,6 +85,9 @@ Item {
     // Host: a node's knight split the vein on cell ("gx,gy") of that
     // level, clean of its strikes clean (issue #156)
     signal cutReported(string fromId, int level, string cell, int clean)
+    // Host: a node's knight struck the vein on cell ("gx,gy") of that
+    // level clean, which wakes its room's spawn hole (issue #157)
+    signal wakeReported(int level, string cell)
     // The host gave this node's knight the gem of a vein it split
     // (cell, shape, value), or refused it: another knight split it first,
     // or the host is on another level (issue #169)
@@ -170,6 +173,11 @@ Item {
     // "veins" ({seed, level, cells}); null before any (issue #156)
     readonly property var veins: net.connected && net.sessionProperties.veins
                                  ? net.sessionProperties.veins : null
+    // The spawn holes woken in the level the host plays, the session
+    // property "holes" ({seed, level, holes: {cell: {stage, wave}}}); null
+    // before any (issue #157)
+    readonly property var holes: net.connected && net.sessionProperties.holes
+                                 ? net.sessionProperties.holes : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -245,6 +253,8 @@ Item {
                 if (net.isHost) session.secretReported(data.level, data.cell)
             } else if (data.type === "cut") {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
+            } else if (data.type === "wake") {
+                if (net.isHost) session.wakeReported(data.level, data.cell)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
             } else if (data.type === "gemRefuse") {
@@ -562,6 +572,16 @@ Item {
     // Host: the veins split in its level, for every node
     function publishVeins(veins) {
         if (net.isHost) net.setSessionProperty("veins", veins)
+    }
+    // This node's knight struck a vein clean: the host wakes its room's
+    // spawn hole for every node. The host's own is taken at once
+    function reportWake(level, cell) {
+        if (net.isHost) wakeReported(level, cell)
+        else net.sendTo(net.hostId, {type: "wake", level: level, cell: cell})
+    }
+    // Host: the spawn holes woken in its level, for every node
+    function publishHoles(holes) {
+        if (net.isHost) net.setSessionProperty("holes", holes)
     }
     // Host: the gem goes to that node's knight
     function grantGem(nodeId, gem) {
