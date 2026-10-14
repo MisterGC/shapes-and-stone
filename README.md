@@ -519,6 +519,31 @@ drawn from its own stream (the level's seed ^ its own salt) like
 `_placeCat`. A creature of a few shapes can be QML items, as the cat is;
 a swarm (bats, a shoal of fish) is one shader pass, as the moths are.
 
+One to three travellers rest at the camp, other adventurers on their
+way: a Wanderer, a Pilgrim, a Minstrel, a Prospector or a Hermit, each a
+shape in its own colour. Each sits at the fire, wanders to a prop of the
+look - the grotto's pond, the hall's cart, the ember camp's coals or
+cracks - and back. Now and then two of them exchange a pair of lines in
+speech bubbles ("Heard the slits on four fire in threes." / "Then dash on
+the third."), and a dog, a creature like the cat, follows one of them.
+E at a traveller gives two lines of hearsay about the depths; they sell
+nothing, and the knights walk through them. Who comes, where each sits
+and wanders, its hearsay and the order of the exchanges come from the
+level's seed (`camp.travellerSalt`), so every screen of a session sees
+and hears the same; when each exchange comes is each screen's own. A
+traveller's `objectName` is `"traveller"`, not `"npc"`, so the benches
+that look for the innkeeper, the smith and the witch never find one. The
+kinds, the lines, the hearsay and the numbers are `camp.travellers`: a
+new line or kind is a row there. The travellers bench checks on 20 seeds
+in each look who comes, where they sit, their hearsay and the dog, that
+another screen picks the same, that two travellers exchange a pair of
+lines within a minute of a knight standing by the fire, that E gives the
+hearsay and no wares, and that the dog follows its traveller:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/travellers/travellers.qml
+```
+
 A descent gauge under the minimap shows how deep the knight is: a shaft of
 rock layers, one per depth, darker and hotter the deeper, with the
 knight's marker in its layer and "Depth N" beside it; a village counts as
