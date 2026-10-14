@@ -1251,8 +1251,10 @@ sit huddled in colour on a ring round the fire (`Balance.deep.camp`),
 off the camp's travellers and its cat, so the figures round the fire are
 the run's count of the freed; a new run's camps start without them.
 Rarely a petrified traveller is special (`Balance.dungeon.petrified
-.specialShare`): one of the few of `Balance.deep.specials`, not yet with
-the camps, a faint gold edge to its shimmer. Freed, it says its own line
+.specialShare`): one of the few of `Balance.deep.specials`, a faint
+gold edge to its shimmer. Which one, and of which kind, comes from the
+level's seed alone, whatever the record holds; one already with the
+camps stands there as an ordinary traveller of its kind. Freed, it says its own line
 and leaves, and joins the camps for good: it sits by every camp's fire
 after that, across runs, says its camp line to a knight near it, and
 gives the fire a comfort, never fight power - Maren the healer heals
@@ -1267,7 +1269,9 @@ with its own record too. The title and the fallen screen show who was
 freed tonight ("Freed tonight: 2 lost travellers, a miner, Maren") and
 the specials with the camps ("With the camps: Maren the healer"); tonight
 is since the game started, in a session since it was hosted or joined.
-The camp side lives in `src/CampFreed.qml`. The freed bench frees every
+The camp side lives in `src/CampFreed.qml`. The freed bench checks that a seed holds the same travellers with an
+empty and a full record, its special an ordinary one with the full; it
+frees every
 traveller of a dungeon at depth 2 and checks that those that left sit at
 the camps after depth 2 and 3 and are gone in a new run; then frees the
 deep scenario's special and checks it is kept with the record, sits in
