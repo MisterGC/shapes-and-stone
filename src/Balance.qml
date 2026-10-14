@@ -475,7 +475,11 @@ QtObject {
     // plate, more often the higher the danger, and an arrow "slit" in a
     // room's wall, the more and the faster the higher the danger; last a
     // "vein" of gems (Balance.deep, issue #156) in the face of the wall
-    // north of its cell, a room's cell with that wall beside it
+    // north of its cell, a room's cell with that wall beside it.
+    // petrified: a room but the start room that holds a vein holds a
+    // petrified traveller (Balance.deep.stone, issue #158) with chance at
+    // low, middle and high danger, in its vein's rock face beside the
+    // vein, a miner with minerShare's chance, else a lost one
     readonly property var dungeon: ({
         // Loops: the rooms are joined in a chain, and extraCorridors more
         // corridors at low, middle and high danger (as danger.looks) join
@@ -507,6 +511,7 @@ QtObject {
         doorPathCost: 6,
         clearOfEntrance: 8,
         clearOfExit: 8,
+        petrified: { chance: [0.35, 0.45, 0.55], minerShare: 0.5 },
         kinds: {
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
@@ -676,7 +681,28 @@ QtObject {
     // creature crawlGap after the one before it, each with the rumble.
     // closeAfter seconds after the last one its rim crumbles shut and it
     // never wakes again. A sound of the hole plays at its volume down to
-    // quietest of it at hearReach wu from the knight
+    // quietest of it at hearReach wu from the knight.
+    // stone: a petrified traveller (issue #158) stands in a vein's rock
+    // face, a miner or a lost one, and the same strikes free it, gentler:
+    // its ring closes every ringTime seconds, a strike within window of a
+    // close is clean, and strikes clean strikes in all (a whole number
+    // from the range, by its cell) free it. An off-beat strike does it no
+    // harm and takes none of them back: the ring only starts over. A clean
+    // strike throws sparks of shimmer, the edge it shows in lantern light
+    // (glintReach, as a vein), and plays the chink and the tink of the
+    // phrase; it never wakes the room's spawn hole. On the last one its
+    // shell cracks in a ring of shards, the crumble plays and chordDelay
+    // later the chord at chordVolume; colour flows back from its middle
+    // out over colourTime seconds. Then a miner whose room's hole sent no
+    // creature yet nods, says a line of minerLines for say seconds and
+    // walks to the vein of its room nearest to it at walkSpeed wu/s, to
+    // work there: it strikes every workEvery seconds, the tink workPitch
+    // semitones off at workVolume, quieter down to nothing at hearReach wu
+    // from the knight. A lost one, or a miner once the hole sent creatures,
+    // says a line of lostLines (fleeLines for a miner) and walks off
+    // toward the room's way to the exit at leaveSpeed, fading out over
+    // fade seconds after fadeAfter. A working miner flees too when the
+    // hole's first wave comes
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -731,6 +757,32 @@ QtObject {
             groanVolume: 0.8,
             hearReach: 22,
             quietest: 0.2
+        },
+        stone: {
+            ringTime: 1.05,
+            window: 0.16,
+            strikes: [3, 4],
+            shimmer: "#A8D4FF",
+            sparks: 6,
+            shards: 16,
+            shardColor: "#8E8C88",
+            chordDelay: 0.25,
+            chordVolume: 0.75,
+            colourTime: 1.2,
+            say: 2.6,
+            walkSpeed: 1.2,
+            leaveSpeed: 1.5,
+            fadeAfter: 0.8,
+            fade: 1.6,
+            workEvery: 1.4,
+            workPitch: -7,
+            workVolume: 0.22,
+            hearReach: 14,
+            minerLines: ["Thanks - now where was I...", "Ha! Still got my pick. Back to it.",
+                         "Stone, was I? Then I've rested enough."],
+            fleeLines: ["Those things again - I'm off!", "Not worth it with them about. Thanks!"],
+            lostLines: ["...how long was I down here?", "Thank you - I'll find the way up now.",
+                        "Light! I thought I'd never see it again."]
         },
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
