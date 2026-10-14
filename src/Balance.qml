@@ -719,9 +719,9 @@ QtObject {
     // specialEdge, talked to it leaves toward the exit and joins the camps
     // for good: kept with this machine's record (key "specials"), in a
     // session the host's.
-    // camp: the travellers of this run that left toward the exit
-    // (issue #159) and the specials with the camps sit in every later camp
-    // of the run, round the fire: at one of angles spots ring wu from the
+    // camp: the travellers of this run that left toward the exit sit in
+    // the next camp of the run only, the one after their dungeon (issue
+    // #159, #177), the specials with the camps in every camp, round the fire: at one of angles spots ring wu from the
     // fire's centre, on the floor, at least clear wu off the camp's
     // travellers, its cat and each other, the specials first, most of
     // them in all; their spots start at an angle from the level's seed ^

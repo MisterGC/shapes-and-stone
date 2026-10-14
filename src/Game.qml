@@ -5949,8 +5949,9 @@ ClayWorld2d {
                 if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
         return true
     }
-    // The travellers freed this run and the specials with the camps sit
-    // by the fire (CampFreed, issue #159), clear of the camp's travellers
+    // The travellers freed in the dungeon just before this camp and the
+    // specials with the camps sit by the fire (CampFreed, issue #159,
+    // #177), clear of the camp's travellers
     // and its cat, from their own stream of the level's seed
     CampFreed {
         id: campFreed
@@ -5966,7 +5967,8 @@ ClayWorld2d {
         let avoid = campTravellers.map(t => ({ x: t.xWu + 0.4, y: t.yWu - 0.4 }))
         if (campCat) avoid.push({ x: campCat.xWu, y: campCat.yWu })
         for (let f of campFreed.seat(fire, createRng(levelSeed ^ Balance.deep.camp.salt),
-                                     (x, y) => _campFloorAt(x, y, 0.4), avoid))
+                                     (x, y) => _campFloorAt(x, y, 0.4), avoid,
+                                     levelIndexOf(depth, "dungeon")))
             dungeonObjects.push(f)
     }
 

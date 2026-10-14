@@ -1,5 +1,6 @@
-// Freed bench - the travellers sent off in a run sit by the next camps'
-// fire, and a special one joins the camps for good (issue #159, #176).
+// Freed bench - the travellers sent off in a run sit by the next camp's
+// fire only, and a special one joins the camps for good (issue #159, #176,
+// #177).
 //
 // The game keeps its specials in a store of the bench's own, emptied at
 // the start. A level's special comes from its seed alone: the same seed
@@ -7,9 +8,9 @@
 // record, the special an ordinary traveller once it is with the camps.
 // On the first seed whose dungeon at depth 2 holds a lost
 // traveller, the knight talks to every traveller in it, and each leaves:
-// they sit round the fire of the camp after depth 2 and of the camp after
-// depth 3 of that run, seated, on the camp's floor and clear of its
-// travellers; a new run's first camp has none of them. Then in the dojo's
+// they sit round the fire of the camp after depth 2, seated, on the camp's
+// floor and clear of its travellers, and not by the fire of the camp after
+// depth 3 of that run; a new run's first camp has none of them. Then in the dojo's
 // deep scenario the knight talks to the special: it says its own line,
 // leaves, and joins the camps for good, kept in the store. Every camp of
 // the next run has it by the fire, with its gold edge and its line to a
@@ -217,20 +218,19 @@ Window {
             let broken = sittingBroken()
             check(broken.length === 0, "each seated on the ring round the fire, on the floor, clear of the "
                   + game.campTravellers.length + " travellers" + (broken.length ? ": " + broken.join("; ") : ""))
-            goTo(game.levelIndexOf(3, "dungeon"))
+            nearFire()
         }],
+        [800, () => { capture("camp") }],
+        [() => saved, () => { goTo(game.levelIndexOf(3, "dungeon")) }],
         [() => game.levelType === "dungeon" && game.player !== null, () => {
             goTo(game.levelIndexOf(3, "village"))
         }],
         [() => game.levelType === "village" && game.campfire !== null && game.player !== null, () => {
-            let want = freedAt2.filter(k => k.indexOf(":") < 0)
-            check(game.depth === 3 && JSON.stringify(sitting()) === JSON.stringify(want) && sittingBroken().length === 0,
-                  "the camp after depth 3 of the same run: the same " + want.length + " by its fire ("
-                  + sitting().join(", ") + ")")
-            nearFire()
+            check(game.depth === 3 && sitting().length === 0 && camp().run.length === freedAt2.length,
+                  "the camp after depth 3 of the same run: none of the " + freedAt2.length
+                  + " sent off at depth 2 by its fire (" + sitting().join(", ") + "), the run still keeps them")
+            game.newRun()
         }],
-        [800, () => { capture("camp") }],
-        [() => saved, () => { game.newRun() }],
         [() => game.levelType === "dungeon" && game.player !== null && game.depth === 0, () => {
             check(camp().run.length === 0, "a new run has freed none yet (" + camp().run.length + ")")
             goTo(game.levelIndexOf(0, "village"))
