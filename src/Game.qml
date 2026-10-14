@@ -252,8 +252,10 @@ ClayWorld2d {
     }
     // A vein (Balance.deep): the pickaxe's chink on the stone, a clean
     // strike's tink, the stone's crumble as it splits and the gem's chime,
-    // the tink once for each of its notes. veinSounds lists them as they
-    // play, "chink", "tink+4" or "crumble", muted too, for the benches
+    // the tink once for each of its notes. veinSounds lists the last
+    // veinSoundsKept of them as they play, "chink", "tink+4" or
+    // "crumble", muted too, and veinSoundCount counts them all, for the
+    // benches; a new level starts the list over
     Sound {
         id: chinkSound
         source: "assets/deep_chink.wav"
@@ -270,7 +272,12 @@ ClayWorld2d {
         volume: muted ? 0 : Balance.deep.crumbleVolume * soundVolume
     }
     property var veinSounds: []
-    function _heard(name) { veinSounds = veinSounds.concat([name]) }
+    property int veinSoundCount: 0
+    readonly property int veinSoundsKept: 12
+    function _heard(name) {
+        veinSounds = veinSounds.slice(1 - veinSoundsKept).concat([name])
+        veinSoundCount++
+    }
     function playChink(pitch) {
         chinkSound.triggerNote(chinkSound.rootNote + pitch, 1)
         _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
@@ -5246,6 +5253,7 @@ ClayWorld2d {
         if (player) player.digging = false
         dig = null
         veins = []
+        veinSounds = []
         deepRoomActive = false
 
         // Destroy player
@@ -6167,13 +6175,15 @@ ClayWorld2d {
                     v.clean, "of", v.strikes, "strikes clean")
     }
     // Each physics step: a vein in the lantern's reach glints, the brighter
-    // the nearer, and shimmers once as the knight comes close
+    // the nearer in litLevels steps, so its gems redraw only as it passes
+    // one, and shimmers once as the knight comes close
     function _stepVeins() {
         if (veins.length === 0 || !player) return
         let cfg = Balance.deep, c = _knightCentre()
         for (let v of veins) {
             let d = Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y)
-            v.lit = Math.max(0, Math.min(1, 2 * (cfg.glintReach - d) / cfg.glintReach))
+            let lit = Math.max(0, Math.min(1, 2 * (cfg.glintReach - d) / cfg.glintReach))
+            v.lit = Math.ceil(lit * cfg.litLevels) / cfg.litLevels
             let near = d <= cfg.shimmerReach && !v.split
             if (near && !v.knightNear) playTink(cfg.shimmerPitch, cfg.shimmerVolume)
             v.knightNear = near
@@ -6187,7 +6197,6 @@ ClayWorld2d {
         console.log("[Game] Entering the deep room")
         clearDungeon()
         deepRoomActive = true
-        veinSounds = []
         let a = _buildArena(11)
         let gx = a.ox + Math.floor(a.size / 2), gy = a.oy + a.size
         placeVein(gx, gy)

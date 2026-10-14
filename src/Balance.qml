@@ -637,7 +637,7 @@ QtObject {
     // chink alone, chipPitch semitones down. The gem coming free plays the
     // tink at each of chime, chimeGap seconds apart, and the crumble.
     // Within glintReach wu of the knight a vein glints, brighter the
-    // nearer; coming within shimmerReach it shimmers once, the tink at
+    // nearer in litLevels steps; coming within shimmerReach it shimmers once, the tink at
     // shimmerPitch and shimmerVolume times its volume. shapes: the gem by depth, the last
     // whose from is at most the depth: the five Platonic solids
     readonly property var deep: ({
@@ -661,6 +661,7 @@ QtObject {
         chimeGap: 0.12,
         crumbleVolume: 0.5,
         glintReach: 5.5,
+        litLevels: 4,
         shimmerReach: 3.5,
         shimmerPitch: 19,
         shimmerVolume: 0.12,

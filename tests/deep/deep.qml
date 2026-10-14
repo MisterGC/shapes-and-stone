@@ -95,7 +95,11 @@ Window {
         }
         return game.lastGem
     }
-    function heardSince(n) { return game.veinSounds.slice(n) }
+    // The vein sounds heard since n of them had played
+    function heardSince(n) {
+        let k = game.veinSoundCount - n
+        return k > 0 ? game.veinSounds.slice(-k) : []
+    }
 
     property var steps: [
         [() => game.screen === "title", () => {
@@ -135,7 +139,7 @@ Window {
             freshDig()
             let v = vein()
             stepTo(beat)
-            let n = game.veinSounds.length
+            let n = game.veinSoundCount
             pressE()
             let s1 = game.lastStrike
             check(s1.clean && v.clean === 1 && Math.abs(s1.off) < 1e-6,
@@ -143,14 +147,14 @@ Window {
             check(heardSince(n).join() === "chink,tink+" + cfg.phrase[0],
                   "a clean strike plays the chink and the tink: " + heardSince(n).join())
             stepTo(beat + 2)
-            n = game.veinSounds.length
+            n = game.veinSoundCount
             pressE()
             check(!game.lastStrike.clean && v.chips === 1,
                   "a second E on the same close chips")
             check(heardSince(n).join() === "chink" + cfg.chipPitch,
                   "a chip plays the chink alone: " + heardSince(n).join())
             stepTo(2 * beat - win)
-            n = game.veinSounds.length
+            n = game.veinSoundCount
             pressE()
             check(game.lastStrike.clean && v.clean === 2,
                   "E " + win + " steps (" + (win * dt).toFixed(3) + " s) before a close strikes clean")
