@@ -147,16 +147,19 @@ Window {
         p.xWu = v.faceXWu + (dx || 0) - p.widthWu / 2
         p.yWu = v.cyWu - v.sizeWu / 2 - 0.6 + p.heightWu / 2
     }
-    // Cuts vein v with its knight: clean strikes on the closes, or each
-    // half a beat off them; the dig started and judged at once
+    // Cuts vein v with its knight: aimed at it, clean strikes of the left
+    // button on the closes, or each half a beat off them; the dig started
+    // and judged at once
     function cutVein(game, v, clean) {
         game.endDig()
         standAtVein(game, v)
-        if (!game.pressDig() || !game.dig || game.dig.vein !== v) return false
+        game.aimOverride = { x: v.faceXWu, y: v.faceYWu }
+        if (!game.pressPick() || !game.dig || game.dig.vein !== v) return false
         for (let i = 0; i < v.strikes; i++) {
             game.dig.t = (i + (clean ? 1 : 0.5)) * cfg.ringTime
-            game.strikeVein()
+            game.pressPick()
         }
+        game.aimOverride = null
         return v.split
     }
     function centreOf(game) { return game._knightCentre() }

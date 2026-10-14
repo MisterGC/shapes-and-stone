@@ -1629,21 +1629,31 @@ ClayWorld2d {
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            // The left button swings on release, or charges while held
-            if (mouse.button === Qt.LeftButton) player.pressSwing(mouse)
+            // The left button strikes with the pickaxe while it aims at a
+            // vein in reach (pressPick), else swings on release, or
+            // charges while held
+            if (mouse.button === Qt.LeftButton) {
+                _picking = pressPick()
+                if (!_picking) player.pressSwing(mouse)
+            }
             if (mouse.button === Qt.RightButton) player.raiseShield()
         }
 
         onReleased: (mouse) => {
             if (!player) return
-            if (mouse.button === Qt.LeftButton) player.releaseSwing(mouse)
+            if (mouse.button === Qt.LeftButton && !_picking) player.releaseSwing(mouse)
             if (mouse.button === Qt.RightButton) player.lowerShield()
         }
         onCanceled: if (player) {
+            _picking = false
             player.dropSwing()
             player.lowerShield()
         }
     }
+
+    // The left button's press struck with the pickaxe: its release swings
+    // nothing
+    property bool _picking: false
 
     // Player center in screen coords (for aiming) - map from player's parent to mouseInput coords
     property var playerScreenPos: player ? player.parent.mapToItem(mouseInput, player.x + player.width * 0.5, player.y + player.height * 0.5) : Qt.point(width/2, height/2)
@@ -1704,7 +1714,8 @@ ClayWorld2d {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
             } else if (player) {
-                // Find nearby NPC to interact with, else a door
+                // Find nearby NPC to interact with, else a door; a vein
+                // is the left button's (issue #169)
                 let items = world.room.children
                 let talked = false
                 for (let i = 0; i < items.length; i++) {
@@ -1715,8 +1726,7 @@ ClayWorld2d {
                         break
                     }
                 }
-                // A held E repeating strikes nothing: a strike is a press
-                if (!talked && !fallen && !(event.isAutoRepeat ? dig !== null : pressDig()))
+                if (!talked && !fallen)
                     useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
                                         Balance.dungeon.doorReach))
             }
@@ -6020,11 +6030,12 @@ ClayWorld2d {
     // --- Veins (issue #155) ---
     // A vein of gems on a wall cell's face (Vein.qml, Balance.deep): its
     // gem's shape and colour by the depth, its strikes from the level's
-    // seed and its cell, a stream of its own. E within reach of one starts
-    // the dig: the knight's sword turns into the pickaxe, and a ring closes
-    // on the vein every ringTime seconds of physics steps, so a pause or a
-    // hit stop holds it. E within window of a close strikes clean, once a
-    // close, any other E chips; the last of its strikes splits the stone
+    // seed and its cell, a stream of its own. The mouse aiming at one in
+    // reach starts the dig (issue #169): the knight's sword turns into the
+    // pickaxe, and a ring closes on the vein every ringTime seconds of
+    // physics steps, so a pause or a hit stop holds it. The left button
+    // strikes then instead of swinging: within window of a close clean,
+    // once a close, any other press chips; the last of its strikes splits the stone
     // and the gem pops out, the bigger the more of them were clean, spins
     // once and drifts to the knight. Each node digs with its own knight;
     // a dungeon's veins are its features (issue #156, below), the dojo's
@@ -6134,39 +6145,60 @@ ClayWorld2d {
     function _knightCentre() {
         return { x: player.xWu + player.widthWu / 2, y: player.yWu - player.heightWu / 2 }
     }
-    // The whole vein whose face is nearest to (x, y) within reach wu, or null
-    function veinNear(x, y, reach) {
-        let best = null, bestD = reach
-        for (let v of veins) {
-            if (v.split) continue
-            let d = Math.hypot(v.faceXWu - x, v.faceYWu - y)
-            if (d <= bestD) { best = v; bestD = d }
-        }
-        return best
-    }
     // Whether knight p is free to dig: no shield up or wanted (also one
     // out of mana), no swing, no charge and no dash
     function _canDig(p) {
         return !p.isBlocking && !p.shieldWanted && !p.isAttacking && !p.isCharging && !p.isDashing
     }
-    // E: a strike on the vein dug, or the dig of the vein in reach begins;
-    // false when there is none, or the knight is not free to dig (_canDig)
-    function pressDig() {
-        if (!player || fallen) return false
-        if (dig) {
-            if (dig.endAt < 0) strikeVein()
-            return true
-        }
-        if (!_canDig(player)) return false
+    // Where the mouse aims, in wu: the point under it in the world, or a
+    // bench's aimOverride ({x, y})
+    property var aimOverride: null
+    function aimWu() {
+        if (aimOverride) return aimOverride
+        let p = mouseInput.mapToItem(world.room, mouseInput.mouseX, mouseInput.mouseY)
+        return { x: p.x / world.pixelPerUnit, y: (world.room.height - p.y) / world.pixelPerUnit }
+    }
+    // Whether the aim is on v's cell or within pad wu of it
+    function _aimOn(v, pad) {
+        let a = aimWu()
+        return Math.abs(a.x - v.cxWu) <= v.sizeWu / 2 + pad && Math.abs(a.y - v.cyWu) <= v.sizeWu / 2 + pad
+    }
+    // The whole vein the mouse aims at (aimPad) with its face within reach
+    // of the knight, or null
+    function veinAimed() {
+        if (!player) return null
         let c = _knightCentre()
-        let v = veinNear(c.x, c.y, Balance.deep.reach)
-        if (!v) return false
+        for (let v of veins)
+            if (!v.split && _aimOn(v, Balance.deep.aimPad)
+                    && Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) <= Balance.deep.reach)
+                return v
+        return null
+    }
+    // The dig of the vein aimed at begins, while the knight is free to dig
+    // (_canDig) and not in a dialogue; the vein dug or null
+    function _beginDig() {
+        if (!player || fallen || talking || !_canDig(player)) return null
+        let v = veinAimed()
+        if (!v) return null
         dig = { vein: v, t: 0, used: 0, endAt: -1 }
         player.digging = true
         _aimPick()
         _showRing()
         console.log("[Game] Digging the vein at", v.cell, "-", v.strikes, "strikes")
-        return true
+        return v
+    }
+    // The left button: aimed at a vein in reach it strikes with the
+    // pickaxe, a dig not yet begun (no physics step since the aim came on
+    // the vein) begins with it; false when it aims at none, or the knight
+    // is not free to dig, and the sword swings
+    function pressPick() {
+        if (!player || fallen) return false
+        if (dig && dig.endAt < 0 && _aimOn(dig.vein, Balance.deep.aimHold)) {
+            strikeVein()
+            return true
+        }
+        if (dig) return false
+        return _beginDig() !== null
     }
     function endDig() {
         if (!dig) return
@@ -6192,11 +6224,14 @@ ClayWorld2d {
             v.ringOpen = cfg.ringTime - since <= cfg.window + 1e-6
         }
     }
-    // Each physics step: the dig's clock, and its end when the knight walks
-    // off, raises the shield, swings or dashes, or the stone split a moment
-    // ago
+    // Each physics step: the dig of a vein aimed at begins; the dig's
+    // clock, and its end when the aim or the knight moves off, it raises
+    // the shield, swings or dashes, or the stone split a moment ago
     function _stepDig() {
-        if (!dig) return
+        if (!dig) {
+            if (veins.length > 0) _beginDig()
+            return
+        }
         let p = player
         if (!p || fallen || !dig.vein) {
             endDig()
@@ -6205,7 +6240,8 @@ ClayWorld2d {
         dig.t += world.physics.timeStep
         let c = _knightCentre(), v = dig.vein
         if ((dig.endAt >= 0 && dig.t >= dig.endAt - 1e-6)
-                || !_canDig(p)
+                || !_canDig(p) || talking
+                || (dig.endAt < 0 && !_aimOn(v, Balance.deep.aimHold))
                 || Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) > Balance.deep.leave) {
             endDig()
             return

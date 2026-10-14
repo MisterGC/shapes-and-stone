@@ -75,19 +75,21 @@ Item {
     function pouch() { return game.player ? game.player.pouch : [] }
 
     // This knight cuts the vein on cell, every strike clean on its close:
-    // it stands in front of its face, E starts the dig, and the strikes
-    // are judged at once on the dig's clock
+    // it stands in front of its face, aims at it and the left button
+    // starts the dig, and its strikes are judged at once on the dig's clock
     function cut(cell) {
         let v = game.veinAt(cell), p = game.player
         if (!v || v.split) return false
         game.endDig()
         p.xWu = v.faceXWu - p.widthWu / 2
         p.yWu = v.cyWu - v.sizeWu / 2 - 0.6 + p.heightWu / 2
-        if (!game.pressDig() || !game.dig || game.dig.vein !== v) return false
+        game.aimOverride = { x: v.faceXWu, y: v.faceYWu }
+        if (!game.pressPick() || !game.dig || game.dig.vein !== v) return false
         for (let i = 0; i < v.strikes; i++) {
             game.dig.t = (i + 1) * Balance.deep.ringTime
-            game.strikeVein()
+            game.pressPick()
         }
+        game.aimOverride = null
         return v.split
     }
 }

@@ -623,14 +623,16 @@ QtObject {
 
     // Greed in the deep (issue #154): a vein of gems in a wall's face, cut
     // with the pickaxe the sword turns into while digging (issue #155).
-    // E with the knight's centre within reach wu of the vein's face starts
-    // the dig, the sword folding into the pickaxe in morph seconds; walking
-    // further than leave wu off, raising the shield, swinging or dashing
-    // ends it, and the pickaxe folds back. While it digs a ring closes on
-    // the vein from ringFrom times ringSize wu to ringSize, once every
-    // ringTime seconds, counted on the physics steps: E within window
-    // seconds of a close, before or after it, is a clean strike, once a
-    // close; any other E chips. A vein takes strikes[0] to strikes[1]
+    // The mouse aiming at a vein's cell, or within aimPad wu of it, with
+    // the knight's centre within reach wu of its face starts the dig, the
+    // sword folding into the pickaxe in morph seconds (issue #169); the
+    // aim moving further than aimHold wu off the cell, walking further
+    // than leave wu off, raising the shield, swinging or dashing ends it,
+    // and the pickaxe folds back. While it digs a ring closes on the vein
+    // from ringFrom times ringSize wu to ringSize, once every ringTime
+    // seconds, counted on the physics steps, and the left button strikes
+    // instead of swinging the sword: within window seconds of a close,
+    // before or after it, a clean strike, once a close; any other chips. A vein takes strikes[0] to strikes[1]
     // strikes, clean or chipped, by its seed; the last one splits the
     // stone and the gem pops out, its size in wu from gemSize[0] with no
     // clean strike to gemSize[1] with all of them clean, by their share.
@@ -655,6 +657,8 @@ QtObject {
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
+        aimPad: 0.3,
+        aimHold: 0.9,
         morph: 0.16,
         ringTime: 0.75,
         ringSize: 1.1,

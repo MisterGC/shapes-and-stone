@@ -3,17 +3,19 @@
 //
 // applyScenario("deep") lands the knight in reach of a vein, its gem a
 // tetrahedron at depth 0 and each shape of Balance.deep.shapes at its
-// depth. E starts the dig: the pickaxe shows once the sword has folded
-// into it. Then, the game paused (Clayground.paused) and single-stepped
-// (Clayground.physicsStep): E on a close of the ring, and up to window
+// depth. The mouse aiming at the vein starts the dig (issue #169): the
+// pickaxe shows once the sword has folded into it. Then, the game paused
+// (Clayground.paused) and single-stepped (Clayground.physicsStep): the
+// left button aimed at the vein on a close of the ring, and up to window
 // seconds before or after it, strikes clean, with the chink and a tink a
-// pentatonic step higher each; E a step outside the window, or a second E
-// on the same close, chips, with the chink alone. The window counts the
+// pentatonic step higher each; a click a step outside the window, or a
+// second one on the same close, chips, with the chink alone. The window counts the
 // physics steps: a strike held a while on the wall clock between two
 // steps is judged by the steps alone. The vein's last strike splits it,
 // and the gem's size follows its clean strikes, 0 to all of them. Raising
 // the shield or walking off ends the dig, and the pickaxe folds back into
-// the sword; a swing or a dash ends it too, and E mid-swing starts none.
+// the sword; a swing or a dash ends it too, and aimed at the vein
+// mid-swing none begins.
 // Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
@@ -47,6 +49,20 @@ Window {
 
     TestEvent { id: keys }
     function pressE() { keys.keyClick(Qt.Key_E, Qt.NoModifier, -1) }
+    // The vein's face on the game's screen, where the mouse aims at it
+    function veinPoint() {
+        let v = vein()
+        return v.mapToItem(game, v.width / 2, v.height * (1 - v.faceWu / v.sizeWu / 2))
+    }
+    // The mouse moves onto the vein, and the left button clicks there
+    function aimVein() {
+        let p = veinPoint()
+        keys.mouseMove(game, p.x, p.y, -1, Qt.NoButton, Qt.NoModifier)
+    }
+    function strike() {
+        let p = veinPoint()
+        keys.mouseClick(game, p.x, p.y, Qt.LeftButton, Qt.NoModifier, -1)
+    }
 
     Component.onCompleted: {
         let c = Qt.createComponent(Qt.resolvedUrl("../../src/Game.qml"))
@@ -77,12 +93,14 @@ Window {
         let k = 0
         while (game.dig && game.dig.t < n * dt - 1e-6 && k++ < 2000) Clayground.physicsStep(1)
     }
-    // A fresh deep room, the dig begun, paused
+    // A fresh deep room, the mouse on the vein and the dig begun on a
+    // step, paused
     function freshDig() {
         Clayground.paused = true
         game.applyScenario("deep")
         game.forceActiveFocus()
-        pressE()
+        aimVein()
+        step(1)
     }
     // Cuts the vein with clean strikes on the first closes, then chips
     // half way through the next beats; the gem it gives
@@ -92,7 +110,7 @@ Window {
         for (let i = 0; i < v.strikes; i++) {
             at += beat
             stepTo(i < clean ? at : at - Math.round(beat / 2))
-            pressE()
+            strike()
         }
         return game.lastGem
     }
@@ -117,11 +135,12 @@ Window {
             check(v.strikes >= cfg.strikes[0] && v.strikes <= cfg.strikes[1],
                   "the vein takes " + v.strikes + " strikes, " + cfg.strikes[0] + " to " + cfg.strikes[1])
             check(!game.player.digging && pickaxeItem() && !pickaxeItem().visible,
-                  "before E the knight holds no pickaxe")
+                  "before the mouse aims at the vein the knight holds no pickaxe")
             Clayground.paused = true
-            pressE()
+            aimVein()
+            step(1)
             check(game.player.digging && game.dig && game.dig.vein === v,
-                  "E at the vein starts the dig")
+                  "the mouse aiming at the vein starts the dig")
             step(Math.ceil(cfg.morph / dt) + 1)
             check(game.player.pickMorph === 1 && pickaxeItem().visible && v.ringShows,
                   "after " + cfg.morph + " s of steps the sword has turned into the pickaxe ("
@@ -141,24 +160,24 @@ Window {
             let v = vein()
             stepTo(beat)
             let n = game.veinSoundCount
-            pressE()
+            strike()
             let s1 = game.lastStrike
             check(s1.clean && v.clean === 1 && Math.abs(s1.off) < 1e-6,
-                  "E on the close strikes clean (" + s1.off.toFixed(3) + " s off)")
+                  "a click on the close strikes clean (" + s1.off.toFixed(3) + " s off)")
             check(heardSince(n).join() === "chink,tink+" + cfg.phrase[0],
                   "a clean strike plays the chink and the tink: " + heardSince(n).join())
             stepTo(beat + 2)
             n = game.veinSoundCount
-            pressE()
+            strike()
             check(!game.lastStrike.clean && v.chips === 1,
-                  "a second E on the same close chips")
+                  "a second click on the same close chips")
             check(heardSince(n).join() === "chink" + cfg.chipPitch,
                   "a chip plays the chink alone: " + heardSince(n).join())
             stepTo(2 * beat - win)
             n = game.veinSoundCount
-            pressE()
+            strike()
             check(game.lastStrike.clean && v.clean === 2,
-                  "E " + win + " steps (" + (win * dt).toFixed(3) + " s) before a close strikes clean")
+                  "a click " + win + " steps (" + (win * dt).toFixed(3) + " s) before a close strikes clean")
             check(heardSince(n).slice(0, 2).join() === "chink,tink+" + cfg.phrase[1],
                   "the second clean strike's tink is a pentatonic step higher: " + heardSince(n).join())
         }],
@@ -166,17 +185,17 @@ Window {
             freshDig()
             let v = vein()
             stepTo(beat + win)
-            pressE()
-            check(game.lastStrike.clean, "E " + win + " steps after a close strikes clean")
+            strike()
+            check(game.lastStrike.clean, "a click " + win + " steps after a close strikes clean")
             stepTo(2 * beat + win + 1)
-            pressE()
+            strike()
             check(!game.lastStrike.clean,
-                  "E " + (win + 1) + " steps after a close chips")
+                  "a click " + (win + 1) + " steps after a close chips")
             freshDig()
             stepTo(beat - win - 1)
-            pressE()
+            strike()
             check(!game.lastStrike.clean,
-                  "E " + (win + 1) + " steps before a close chips")
+                  "a click " + (win + 1) + " steps before a close chips")
         }],
         // The window counts physics time: held between two steps on the
         // wall clock longer than a beat, a strike is judged by the steps
@@ -185,14 +204,14 @@ Window {
             stepTo(beat - 2)
         }],
         [Math.round(cfg.ringTime * 1500), () => {
-            pressE()
+            strike()
             check(game.lastStrike.clean && Math.abs(game.dig.t - (beat - 2) * dt) < 1e-6,
                   "2 steps before the close and " + Math.round(cfg.ringTime * 1500)
                   + " ms of wall clock later, still 2 steps before it: clean")
             stepTo(2 * beat - Math.round(beat / 2))
         }],
         [Math.round(cfg.ringTime * 500), () => {
-            pressE()
+            strike()
             check(!game.lastStrike.clean,
                   "half a beat before a close and half a beat of wall clock later: a chip")
         }],
@@ -241,8 +260,8 @@ Window {
             game.player.attack()
             step(1)
             check(game.player.isAttacking && !game.player.digging && !game.dig, "a swing ends the dig")
-            pressE()
-            check(!game.player.digging && !game.dig, "E mid-swing starts no dig")
+            step(1)
+            check(!game.player.digging && !game.dig, "aimed at the vein mid-swing, no dig begins")
             freshDig()
             step(2)
             game.player.dash()
