@@ -1,6 +1,6 @@
 // Freed bench - the travellers sent off in a run sit by the next camp's
-// fire only, and a special one joins the camps for good (issue #159, #176,
-// #177).
+// fire only, and a special one joins the camps for good and sits by every
+// camp's fire (issue #159, #176, #177).
 //
 // The game keeps its specials in a store of the bench's own, emptied at
 // the start. A level's special comes from its seed alone: the same seed
@@ -15,7 +15,9 @@
 // leaves, and joins the camps for good, kept in the store. Every camp of
 // the next run has it by the fire, with its gold edge and its line to a
 // knight near it, and the fire heals by its comfort, Balance.deep.specials'
-// heal times faster. The fall screen and the title show the freed of
+// heal times faster. In that run the knight sends the travellers of the
+// same dungeon at depth 2 off again: the camp after depth 2 has them and
+// the special, the camp after depth 3 the special alone. The fall screen and the title show the freed of
 // tonight and the specials with the camps; with an out dir and a window
 // it saves camp.png (the run's freed by the fire), special.png (the
 // special by it), fallen.png and title.png. Prints one PASS or FAIL line per check and
@@ -299,16 +301,37 @@ Window {
             let healed = game.player.hp - 10, sp = Balance.deep.specials[0]
             check(healedAtBase > 0 && healed >= healedAtBase * sp.heal * 0.75,
                   "by the fire a knight heals " + healed + " HP in a second, without a special " + healedAtBase)
-            goTo(game.levelIndexOf(1, "dungeon"))
-        }],
-        [() => game.levelType === "dungeon" && game.player !== null, () => {
-            goTo(game.levelIndexOf(1, "village"))
+            // The same dungeon at depth 2 in this run, its travellers sent off again
+            Clayground.paused = true
+            game.applyScenario("dungeon", 2, seed2)
+            game.player.hp = 100000
+            step(1)
+            let all = game.deepTravellers.slice(), ok = true
+            for (let s of all) ok = talkTo(s) && ok
+            check(ok && all.every(s => s.special === "") && all.length === freedAt2.length,
+                  "this run the knight sends the " + all.length + " travellers of depth 2 off again")
+            seconds(tc.say + tc.fadeAfter + tc.fade + 1)
+            Clayground.paused = false
+            goTo(game.levelIndexOf(2, "village"))
         }],
         [() => game.levelType === "village" && game.campfire !== null && game.player !== null, () => {
             let sp = Balance.deep.specials[0]
-            check(sitting().join() === sp.kind + ":" + sp.id
+            let want = freedAt2.concat([sp.kind + ":" + sp.id]).sort()
+            check(game.depth === 2 && JSON.stringify(sitting()) === JSON.stringify(want) && sittingBroken().length === 0
                   && Math.abs(game.campfire.healRate - Balance.campfire.healPerSecond * sp.heal) < 1e-6,
-                  "the next run's second camp has " + sp.name + " too (" + sitting().join(", ") + ")")
+                  "the camp after depth 2: " + sp.name + " and the " + freedAt2.length + " sent off there ("
+                  + sitting().join(", ") + ")")
+            goTo(game.levelIndexOf(3, "dungeon"))
+        }],
+        [() => game.levelType === "dungeon" && game.player !== null, () => {
+            goTo(game.levelIndexOf(3, "village"))
+        }],
+        [() => game.levelType === "village" && game.campfire !== null && game.player !== null, () => {
+            let sp = Balance.deep.specials[0]
+            check(game.depth === 3 && sitting().join() === sp.kind + ":" + sp.id && sittingBroken().length === 0
+                  && Math.abs(game.campfire.healRate - Balance.campfire.healPerSecond * sp.heal) < 1e-6,
+                  "the camp after depth 3: " + sp.name + " alone, those of depth 2 not (" + sitting().join(", ") + ")")
+            game.player.hp = game.player.maxHp
             nearFire()
         }],
         [800, () => { capture("special") }],
