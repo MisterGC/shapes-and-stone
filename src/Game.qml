@@ -750,6 +750,7 @@ ClayWorld2d {
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
+        onPouchDropAnswered: (ok) => _pouchDropAnswered(ok)
         onPouchSpawned: (objectId, props) => _makePouchDrop(props, objectId)
         onPouchDespawned: (objectId) => _removePouchDrop(objectId)
         onPouchClaimed: (fromId, objectId) => _givePouch(fromId, objectId)
@@ -6689,20 +6690,43 @@ ClayWorld2d {
     Component { id: pouchDropComponent; PouchDrop {} }
     property var pouchDrops: []
     property var _pouchById: ({})
-    // This node's knight fell: its pouch drops where it lies
+    // This node's knight fell: its pouch drops where it lies. In a session
+    // it leaves the knight once the host laid it on the floor; the gems
+    // asked for, until it answers (_pouchDropAnswered)
+    property int _pouchDropAsked: 0
+    property int pouchDropsRefused: 0
     function _dropPouch() {
-        if (!player || player.pouch.length === 0) return
+        if (!player || player.pouch.length === 0 || (_pouchDropAsked > 0 && session.connected)) return
+        _pouchDropAsked = 0
         let c = _knightCentre()
         let props = { xWu: c.x, yWu: c.y, gems: pouchText(player.pouch) }
         console.log("[Game] The pouch drops with", player.pouch.length, "gems at", c.x.toFixed(2), c.y.toFixed(2))
+        if (session.connected) {
+            _pouchDropAsked = player.pouch.length
+            session.dropPouch(Object.assign({ level: levelIndex }, props))
+            return
+        }
         player.pouch = []
-        if (session.connected) session.dropPouch(props)
-        else _makePouchDrop(props)
+        _makePouchDrop(props)
     }
-    // Host: a node's knight dropped its pouch
+    function _pouchDropAnswered(ok) {
+        let n = _pouchDropAsked
+        _pouchDropAsked = 0
+        if (!player || n === 0) return
+        if (ok) {
+            player.pouch = player.pouch.slice(n)
+            return
+        }
+        pouchDropsRefused++
+        console.log("[Game] The host is on another level: the pouch stays with the knight")
+    }
+    // Host: a node's knight dropped its pouch on that level; on another
+    // level than the host's it stays with the knight
     function _hostDropPouch(fromId, props) {
-        if (screen !== "game" || levelType !== "dungeon") return
-        session.spawnPouch({ xWu: props.xWu, yWu: props.yWu, gems: props.gems, owner: fromId })
+        let ok = screen === "game" && levelType === "dungeon" && props.level === levelIndex
+        if (ok) session.spawnPouch({ xWu: props.xWu, yWu: props.yWu, gems: props.gems, owner: fromId })
+        else console.log("[Game] A pouch dropped on level", props.level, "by", fromId, "- refused")
+        session.answerPouchDrop(fromId, ok)
     }
     function _makePouchDrop(props, objectId) {
         objectId = objectId || ""
