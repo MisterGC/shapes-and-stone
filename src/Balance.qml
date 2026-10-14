@@ -618,6 +618,61 @@ QtObject {
         }
     })
 
+    // Greed in the deep (issue #154): a vein of gems in a wall's face, cut
+    // with the pickaxe the sword turns into while digging (issue #155).
+    // E with the knight's centre within reach wu of the vein's face starts
+    // the dig, the sword folding into the pickaxe in morph seconds; walking
+    // further than leave wu off, raising the shield, swinging or dashing
+    // ends it, and the pickaxe folds back. While it digs a ring closes on
+    // the vein from ringFrom times ringSize wu to ringSize, once every
+    // ringTime seconds, counted on the physics steps: E within window
+    // seconds of a close, before or after it, is a clean strike, once a
+    // close; any other E chips. A vein takes strikes[0] to strikes[1]
+    // strikes, clean or chipped, by its seed; the last one splits the
+    // stone and the gem pops out, its size in wu from gemSize[0] with no
+    // clean strike to gemSize[1] with all of them clean, by their share.
+    // A clean strike throws sparks in the gem's colour and plays the tink
+    // a step of phrase higher (semitones above the sample) for each clean
+    // strike before it; a chip throws chips grey chips and plays the
+    // chink alone, chipPitch semitones down. The gem coming free plays the
+    // tink at each of chime, chimeGap seconds apart, and the crumble.
+    // Within glintReach wu of the knight a vein glints, brighter the
+    // nearer; coming within shimmerReach it shimmers once, the tink at
+    // shimmerPitch and shimmerVolume times its volume. shapes: the gem by depth, the last
+    // whose from is at most the depth: the five Platonic solids
+    readonly property var deep: ({
+        reach: 1.6,
+        leave: 2.4,
+        morph: 0.16,
+        ringTime: 0.75,
+        ringSize: 1.1,
+        ringFrom: 2.4,
+        window: 0.12,
+        strikes: [3, 5],
+        gemSize: [0.34, 0.74],
+        sparks: 8,
+        chips: 7,
+        chipColor: "#8C8A86",
+        chinkVolume: 0.8,
+        chipPitch: -3,
+        tinkVolume: 0.5,
+        phrase: [0, 2, 4, 7, 9, 12],
+        chime: [12, 19, 24],
+        chimeGap: 0.12,
+        crumbleVolume: 0.5,
+        glintReach: 5.5,
+        shimmerReach: 3.5,
+        shimmerPitch: 19,
+        shimmerVolume: 0.12,
+        shapes: [
+            { from: 0, shape: "tetrahedron", color: "#F2B33D" },
+            { from: 2, shape: "cube", color: "#4FC48A" },
+            { from: 4, shape: "octahedron", color: "#4A86F0" },
+            { from: 6, shape: "dodecahedron", color: "#B072E8" },
+            { from: 8, shape: "icosahedron", color: "#FF4A2A" }
+        ]
+    })
+
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
     readonly property var loot: ({
         // By tier: weak, normal, tough. The fight room drops none

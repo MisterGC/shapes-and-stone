@@ -60,6 +60,8 @@ clay_app(shapes_and_stone
         src/Arrow.qml
         src/Door.qml
         src/SecretWall.qml
+        src/Vein.qml
+        src/Gem.qml
         src/GoldDrop.qml
         src/BodyShade.qml
         src/ExitStairs.qml

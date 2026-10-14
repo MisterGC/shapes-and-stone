@@ -293,6 +293,7 @@ PhysicsItem {
                 _breakThings(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
             }
             _countStill(dt)
+            _stepPick(dt)
         }
     }
 
@@ -304,6 +305,22 @@ PhysicsItem {
 
     // Healing state (set by Campfire)
     property bool isHealing: false
+
+    // Digging a vein (Balance.deep, issue #155), set by the game: the
+    // sword shows as a pickaxe held towards the vein at digAngle (as
+    // facingAngle). pickMorph runs to 1 while digging and back to 0
+    // after, over Balance.deep.morph seconds of physics steps
+    property bool digging: false
+    property real digAngle: 0
+    property real pickMorph: 0
+    function _stepPick(dt) {
+        let to = digging ? 1 : 0
+        if (pickMorph === to) return
+        let step = dt / Balance.deep.morph
+        pickMorph = to > pickMorph ? Math.min(1, pickMorph + step) : Math.max(0, pickMorph - step)
+    }
+    // A strike of the pickaxe: it swings down on the stone
+    function pickStrike() { view.pickStrike() }
 
     // Sitting by the fire (Balance.camp.sitAfter, issue #148): a knight
     // that stands still sitAfter seconds in the campfire's warmth sits
@@ -361,6 +378,8 @@ PhysicsItem {
         reviveProgress: player.reviveRing
         swordLevel: player.swordLevel
         shieldLevel: player.shieldLevel
+        pickMorph: player.pickMorph
+        pickAngle: player.digAngle
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)

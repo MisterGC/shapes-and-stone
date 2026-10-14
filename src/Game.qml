@@ -250,6 +250,55 @@ ClayWorld2d {
     function playSpikesRise() {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
     }
+    // A vein (Balance.deep): the pickaxe's chink on the stone, a clean
+    // strike's tink, the stone's crumble as it splits and the gem's chime,
+    // the tink once for each of its notes. veinSounds lists them as they
+    // play, "chink", "tink+4" or "crumble", muted too, for the benches
+    Sound {
+        id: chinkSound
+        source: "assets/deep_chink.wav"
+        volume: muted ? 0 : Balance.deep.chinkVolume * soundVolume
+    }
+    Sound {
+        id: tinkSound
+        source: "assets/deep_tink.wav"
+        volume: muted ? 0 : Balance.deep.tinkVolume * soundVolume
+    }
+    Sound {
+        id: crumbleSound
+        source: "assets/deep_crumble.wav"
+        volume: muted ? 0 : Balance.deep.crumbleVolume * soundVolume
+    }
+    property var veinSounds: []
+    function _heard(name) { veinSounds = veinSounds.concat([name]) }
+    function playChink(pitch) {
+        chinkSound.triggerNote(chinkSound.rootNote + pitch, 1)
+        _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
+    }
+    function playTink(pitch, gain) {
+        tinkSound.triggerNote(tinkSound.rootNote + pitch, gain === undefined ? 1 : gain)
+        _heard("tink+" + pitch)
+    }
+    function playCrumble() {
+        crumbleSound.triggerOneShot(1)
+        _heard("crumble")
+    }
+    property var _chimeLeft: []
+    function playChime() {
+        _chimeLeft = Balance.deep.chime.slice()
+        _chimeNext()
+        chimeTimer.restart()
+    }
+    function _chimeNext() {
+        if (_chimeLeft.length === 0) chimeTimer.stop()
+        else playTink(_chimeLeft.shift())
+    }
+    Timer {
+        id: chimeTimer
+        interval: Balance.deep.chimeGap * 1000
+        repeat: true
+        onTriggered: world._chimeNext()
+    }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
     // knight, and fading to silence about a screen away from you
@@ -1651,7 +1700,7 @@ ClayWorld2d {
                         break
                     }
                 }
-                if (!talked && !fallen)
+                if (!talked && !fallen && !pressDig())
                     useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
                                         Balance.dungeon.doorReach))
             }
@@ -2437,6 +2486,8 @@ ClayWorld2d {
             world._stepSlits()
             world._stepDoors()
             world._stepSecrets()
+            world._stepVeins()
+            world._stepDig()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -2449,7 +2500,8 @@ ClayWorld2d {
     // were the party to leave now: the exit stairs show it. Once the run
     // has ended nextPosition is the next run's
     function _forecastDanger() {
-        if (levelType !== "dungeon" || fightRoomActive || !player || _physicsSteps % 10 !== 0) return
+        if (levelType !== "dungeon" || fightRoomActive || deepRoomActive || !player
+            || _physicsSteps % 10 !== 0) return
         if (session.connected ? partyFallen : fallen) return
         nextPosition = settleDanger(dangerPosition, partyRecords())
     }
@@ -5189,6 +5241,12 @@ ClayWorld2d {
         // Destroy remote players
         session.clearRemotePlayers()
 
+        // The dig ends with its vein, which goes with the level's objects
+        if (player) player.digging = false
+        dig = null
+        veins = []
+        deepRoomActive = false
+
         // Destroy player
         if (player) {
             try { player.destroy() } catch(err) {}
@@ -5860,6 +5918,277 @@ ClayWorld2d {
         dungeonObjects.push(anvil)
     }
 
+    // --- Veins (issue #155) ---
+    // A vein of gems on a wall cell's face (Vein.qml, Balance.deep): its
+    // gem's shape and colour by the depth, its strikes from the level's
+    // seed and its cell, a stream of its own. E within reach of one starts
+    // the dig: the knight's sword turns into the pickaxe, and a ring closes
+    // on the vein every ringTime seconds of physics steps, so a pause or a
+    // hit stop holds it. E within window of a close strikes clean, once a
+    // close, any other E chips; the last of its strikes splits the stone
+    // and the gem pops out, the bigger the more of them were clean, spins
+    // once and drifts to the knight. This node's knight alone, in the
+    // dojo's deep scenario for now (enterDeepRoom)
+    Component { id: veinComponent; Vein {} }
+    // The gem coming free: it rises off the face spinning once, catches
+    // the light, then drifts into the knight and is gone
+    Component {
+        id: gemPopComponent
+        Item {
+            id: pop
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real sizeWu: 0.5
+            property string shape: "tetrahedron"
+            property color color: "#F2B33D"
+            property var knight: null
+            property real rise: 0
+            property real spin: 0
+            property real drift: 0
+            readonly property real kx: knight ? knight.xWu + knight.widthWu / 2 : xWu
+            readonly property real ky: knight ? knight.yWu - knight.heightWu / 2 : yWu
+            readonly property real upWu: yWu + 0.8 * rise
+            readonly property real atX: xWu + (kx - xWu) * drift
+            readonly property real atY: upWu + (ky - upWu) * drift
+            width: sizeWu * pixelPerUnit
+            height: width
+            x: atX * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - atY * pixelPerUnit - height / 2
+            z: 6
+            scale: 1 - 0.6 * drift
+            opacity: 1 - drift * drift
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 2.2
+                height: width
+                radius: width / 2
+                color: pop.color
+                opacity: 0.12 + 0.3 * Math.sin(Math.PI * pop.spin)
+            }
+            Gem {
+                anchors.fill: parent
+                shape: pop.shape
+                color: pop.color
+                rotation: 360 * pop.spin
+            }
+            SequentialAnimation {
+                running: true
+                ParallelAnimation {
+                    NumberAnimation { target: pop; property: "rise"; to: 1; duration: 550; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: pop; property: "spin"; to: 1; duration: 550; easing.type: Easing.InOutQuad }
+                }
+                NumberAnimation { target: pop; property: "drift"; to: 1; duration: 450; easing.type: Easing.InQuad }
+                ScriptAction { script: pop.destroy() }
+            }
+        }
+    }
+    property var veins: []
+    // The dig under way, null when there is none: {vein, t, used, endAt},
+    // t its seconds of physics steps, used the last close a clean strike
+    // took (counted from 1), endAt the t it ends at once the stone split
+    property var dig: null
+    // The last strike, {clean, t, off, struck}, off its seconds from the
+    // nearest close, and the last gem cut, {shape, color, sizeWu, clean,
+    // chips, strikes}, for the benches
+    property var lastStrike: null
+    property var lastGem: null
+    // The dojo's deep room is up
+    property bool deepRoomActive: false
+
+    // The gem at depth d: the last of Balance.deep.shapes from at most d
+    function gemOf(d) {
+        let out = Balance.deep.shapes[0]
+        for (let g of Balance.deep.shapes) if (g.from <= d) out = g
+        return out
+    }
+    // The strikes the vein on cell "gx,gy" takes, from the level's seed and
+    // the cell alone
+    function veinStrikes(cell) {
+        let c = cell.split(",").map(Number)
+        let rand = createRng(levelSeedNow() ^ 0x7665696e ^ (c[1] * gridWidth + c[0]))
+        let r = Balance.deep.strikes
+        return r[0] + Math.floor(rand() * (r[1] - r[0] + 1))
+    }
+    // A gem's size in wu, by the share of its strikes that were clean
+    function gemSize(clean, strikes) {
+        let g = Balance.deep.gemSize
+        return g[0] + (g[1] - g[0]) * Math.max(0, Math.min(1, clean / Math.max(1, strikes)))
+    }
+    // A vein on the wall cell (gx, gy), whose face looks onto the floor
+    // south of it
+    function placeVein(gx, gy) {
+        let g = gemOf(dangerDepth)
+        let cell = gx + "," + gy
+        let v = veinComponent.createObject(world.room, {
+            cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
+            faceWu: wallFaceWu, cell: cell, shape: g.shape, gemColor: g.color,
+            strikes: veinStrikes(cell), seed: createRng(gx * 7349 + gy * 3571)(),
+            glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!v) return null
+        veins.push(v)
+        dungeonObjects.push(v)
+        return v
+    }
+    function _knightCentre() {
+        return { x: player.xWu + player.widthWu / 2, y: player.yWu - player.heightWu / 2 }
+    }
+    // The whole vein whose face is nearest to (x, y) within reach wu, or null
+    function veinNear(x, y, reach) {
+        let best = null, bestD = reach
+        for (let v of veins) {
+            if (v.split) continue
+            let d = Math.hypot(v.faceXWu - x, v.faceYWu - y)
+            if (d <= bestD) { best = v; bestD = d }
+        }
+        return best
+    }
+    // E: a strike on the vein dug, or the dig of the vein in reach begins;
+    // false when there is none, or the shield is up or the knight dashes
+    function pressDig() {
+        if (!player || fallen) return false
+        if (dig) {
+            if (dig.endAt < 0) strikeVein()
+            return true
+        }
+        if (player.isBlocking || player.isDashing) return false
+        let c = _knightCentre()
+        let v = veinNear(c.x, c.y, Balance.deep.reach)
+        if (!v) return false
+        dig = { vein: v, t: 0, used: 0, endAt: -1 }
+        player.digging = true
+        _aimPick()
+        _showRing()
+        console.log("[Game] Digging the vein at", v.cell, "-", v.strikes, "strikes")
+        return true
+    }
+    function endDig() {
+        if (!dig) return
+        dig.vein.ringShows = false
+        dig = null
+        if (player) player.digging = false
+    }
+    function _aimPick() {
+        let c = _knightCentre(), v = dig.vein
+        player.digAngle = Math.atan2(v.faceYWu - c.y, v.faceXWu - c.x) * 180 / Math.PI
+    }
+    // The ring of the dig: closing over each ringTime, closed and white for
+    // window after a close, white for window before one
+    function _showRing() {
+        let cfg = Balance.deep, v = dig.vein, t = dig.t
+        let k = Math.floor(t / cfg.ringTime + 1e-6), since = Math.max(0, t - k * cfg.ringTime)
+        v.ringShows = dig.endAt < 0
+        if (k >= 1 && since <= cfg.window + 1e-6) {
+            v.ringProgress = 1
+            v.ringOpen = true
+        } else {
+            v.ringProgress = since / cfg.ringTime
+            v.ringOpen = cfg.ringTime - since <= cfg.window + 1e-6
+        }
+    }
+    // Each physics step: the dig's clock, and its end when the knight walks
+    // off, raises the shield, swings or dashes, or the stone split a moment
+    // ago
+    function _stepDig() {
+        if (!dig) return
+        let p = player
+        if (!p || fallen || !dig.vein) {
+            endDig()
+            return
+        }
+        dig.t += world.physics.timeStep
+        let c = _knightCentre(), v = dig.vein
+        if ((dig.endAt >= 0 && dig.t >= dig.endAt - 1e-6)
+                || p.isBlocking || p._shieldWanted || p.isAttacking || p.isCharging || p.isDashing
+                || Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) > Balance.deep.leave) {
+            endDig()
+            return
+        }
+        _aimPick()
+        _showRing()
+    }
+    // A strike of the pickaxe on the vein dug: clean on a close's window,
+    // else a chip
+    function strikeVein() {
+        let cfg = Balance.deep, v = dig.vein
+        if (v.split) return
+        let k = Math.round(dig.t / cfg.ringTime)
+        let off = dig.t - k * cfg.ringTime
+        let clean = k >= 1 && k !== dig.used && Math.abs(off) <= cfg.window + 1e-6
+        let before = v.clean
+        if (clean) {
+            dig.used = k
+            v.clean++
+        } else {
+            v.chips++
+        }
+        lastStrike = { clean: clean, t: dig.t, off: off, struck: v.struck }
+        player.pickStrike()
+        // From the face towards the knight
+        let c = _knightCentre()
+        let len = Math.max(0.01, Math.hypot(c.x - v.faceXWu, c.y - v.faceYWu))
+        let nx = (c.x - v.faceXWu) / len, ny = (c.y - v.faceYWu) / len
+        if (clean) {
+            spawnSparks(v.faceXWu, v.faceYWu, nx, ny, cfg.sparks, v.gemColor)
+            _trauma(0.06)
+            playChink(0)
+            playTink(cfg.phrase[Math.min(before, cfg.phrase.length - 1)])
+        } else {
+            spawnShards(v.faceXWu, v.faceYWu, nx, ny, cfg.chips, cfg.chipColor, 0.1)
+            playChink(cfg.chipPitch)
+        }
+        console.log("[Game] Vein", v.cell, clean ? "clean" : "chipped", "strike", v.struck, "of", v.strikes,
+                    "off the close by", off.toFixed(3), "s")
+        if (v.split) _splitVein(v, nx, ny)
+    }
+    // The last strike split the stone: the gem pops out, its size by the
+    // clean strikes, and the dig ends a moment later
+    function _splitVein(v, nx, ny) {
+        let size = gemSize(v.clean, v.strikes)
+        lastGem = { shape: v.shape, color: String(v.gemColor), sizeWu: size,
+                    clean: v.clean, chips: v.chips, strikes: v.strikes }
+        gemPopComponent.createObject(glowParent(), {
+            xWu: v.faceXWu, yWu: v.faceYWu, sizeWu: size, shape: v.shape, color: v.gemColor,
+            knight: player, pixelPerUnit: world.pixelPerUnit
+        })
+        spawnShards(v.faceXWu, v.faceYWu, nx, ny, 10, "#4E525A", 0.16)
+        playCrumble()
+        playChime()
+        dig.endAt = dig.t + 0.4
+        v.ringShows = false
+        console.log("[Game] The vein at", v.cell, "split: a", v.shape, "of", size.toFixed(2), "wu,",
+                    v.clean, "of", v.strikes, "strikes clean")
+    }
+    // Each physics step: a vein in the lantern's reach glints, the brighter
+    // the nearer, and shimmers once as the knight comes close
+    function _stepVeins() {
+        if (veins.length === 0 || !player) return
+        let cfg = Balance.deep, c = _knightCentre()
+        for (let v of veins) {
+            let d = Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y)
+            v.lit = Math.max(0, Math.min(1, 2 * (cfg.glintReach - d) / cfg.glintReach))
+            let near = d <= cfg.shimmerReach && !v.split
+            if (near && !v.knightNear) playTink(cfg.shimmerPitch, cfg.shimmerVolume)
+            v.knightNear = near
+        }
+    }
+
+    // The dojo's deep scenario: a walled room with a vein in the middle of
+    // its north wall, the gem of the scenario's depth, and the knight right
+    // below it, in reach
+    function enterDeepRoom() {
+        console.log("[Game] Entering the deep room")
+        clearDungeon()
+        deepRoomActive = true
+        veinSounds = []
+        let a = _buildArena(11)
+        let gx = a.ox + Math.floor(a.size / 2), gy = a.oy + a.size
+        placeVein(gx, gy)
+        spawnPlayer((gx + 0.5) * cellSize - 0.5, gy * cellSize - 0.4)
+        _bindKnight()
+    }
+
     // --- Fight Room ---
     function enterFightRoom() {
         console.log("[Game] Entering fight room")
@@ -5963,7 +6292,9 @@ ClayWorld2d {
     readonly property int scenarioSeed: 424242
     // "features" is the dungeon with every feature kind at its showcase
     // count (Balance.dungeon), to try a kind right after a reload
-    function scenarios() { return ["dungeon", "village", "fight", "features"] }
+    // "deep" is a walled room with a vein in its north wall and the knight
+    // in reach of it, its gem the depth's (Balance.deep.shapes)
+    function scenarios() { return ["dungeon", "village", "fight", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -5991,6 +6322,8 @@ ClayWorld2d {
         _startRunRecord()
         if (name === "fight")
             enterFightRoom()
+        else if (name === "deep")
+            enterDeepRoom()
         else if (name === "village")
             generateVillage()
         else

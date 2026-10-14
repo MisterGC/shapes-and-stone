@@ -809,6 +809,87 @@ Item {
         }
     }
 
+    // Digging a vein (Balance.deep): the sword folds into a pickaxe, its
+    // blade narrowing into the haft as the tip folds out sideways into
+    // the pick's head, held towards the vein at pickAngle (as facingAngle).
+    // pickMorph runs 0 for the sword to 1 for the pickaxe and back, bound
+    // by the driver; pickStrike() swings it down onto the stone and back
+    property real pickMorph: 0
+    property real pickAngle: 0
+    property real _chop: 0
+    readonly property color _haftColor: "#6B4A2E"
+    function pickStrike() { pickChop.restart() }
+    SequentialAnimation {
+        id: pickChop
+        NumberAnimation { target: view; property: "_chop"; to: 1; duration: 60; easing.type: Easing.InQuad }
+        NumberAnimation { target: view; property: "_chop"; to: 0; duration: 260; easing.type: Easing.OutQuad }
+    }
+    Canvas {
+        id: pickaxe
+        objectName: "pickaxe"
+        parent: view.host.parent
+        x: view.host.x + view.host.width/2 - width/2
+        y: view.host.y + view.host.height/2 - height/2
+        width: view.host.width * 4
+        height: view.host.height * 4
+        visible: view.pickMorph > 0 && !view.downed
+        rotation: -view.pickAngle
+        readonly property real morph: view.pickMorph
+        readonly property real chop: view._chop
+        onMorphChanged: requestPaint()
+        onChopChanged: requestPaint()
+        onVisibleChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var m = Math.max(0, Math.min(1, morph))
+            var cx = width / 2, cy = height / 2
+            // Raised back while held, down on the stone at the chop
+            var a = (-0.55 + 0.7 * chop) * m
+            var inner = view.host.width * 0.35, outer = view.host.width * (1.35 + 0.1 * m)
+            var dx = Math.cos(a), dy = Math.sin(a), px = -dy, py = dx
+            var bx = cx + inner * dx, by = cy + inner * dy
+            var tx = cx + outer * dx, ty = cy + outer * dy
+            // The blade narrows into the haft and takes the wood's colour
+            var w = (outer - inner) * (0.1 - 0.04 * m)
+            var tipLen = (outer - inner) * 0.35 * (1 - m)
+            var blade = view.bladeColor, wood = view._haftColor
+            ctx.beginPath()
+            ctx.moveTo(tx + dx * tipLen, ty + dy * tipLen)
+            ctx.lineTo(tx + px * w, ty + py * w)
+            ctx.lineTo(bx + px * w, by + py * w)
+            ctx.lineTo(bx - px * w, by - py * w)
+            ctx.lineTo(tx - px * w, ty - py * w)
+            ctx.closePath()
+            ctx.fillStyle = "rgba(" + Math.round((blade.r + (wood.r - blade.r) * m) * 255) + ", "
+                    + Math.round((blade.g + (wood.g - blade.g) * m) * 255) + ", "
+                    + Math.round((blade.b + (wood.b - blade.b) * m) * 255) + ", 1)"
+            ctx.fill()
+            ctx.strokeStyle = view._rgba(view.accentColor, 0.9 * (1 - m))
+            ctx.lineWidth = 1
+            ctx.stroke()
+            // The head: the tip folded out to both sides into a crescent
+            // across the haft's end, its two points bent back
+            if (m <= 0.02) return
+            var half = (outer - inner) * 0.5 * m
+            var bulge = (outer - inner) * 0.2
+            var back = (outer - inner) * 0.22 * m
+            ctx.beginPath()
+            ctx.moveTo(tx + px * half - dx * back, ty + py * half - dy * back)
+            ctx.quadraticCurveTo(tx + dx * bulge * 1.6, ty + dy * bulge * 1.6,
+                                 tx - px * half - dx * back, ty - py * half - dy * back)
+            ctx.quadraticCurveTo(tx + dx * bulge * 0.2, ty + dy * bulge * 0.2,
+                                 tx + px * half - dx * back, ty + py * half - dy * back)
+            ctx.closePath()
+            ctx.fillStyle = view._rgba(view.bladeColor, 1)
+            ctx.fill()
+            ctx.strokeStyle = view._rgba(Qt.lighter(view.accentColor, 1.4), 0.95)
+            ctx.lineWidth = 1.5
+            ctx.lineJoin = "round"
+            ctx.stroke()
+        }
+    }
+
     // The charge is full: a ring flashes out from the knight
     Rectangle {
         id: chargeRing
