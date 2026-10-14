@@ -19,6 +19,7 @@ ArrowSlit 1.0 ArrowSlit.qml
 Arrow 1.0 Arrow.qml
 GoldDrop 1.0 GoldDrop.qml
 PouchDrop 1.0 PouchDrop.qml
+FloorClaims 1.0 FloorClaims.qml
 BodyShade 1.0 BodyShade.qml
 ExitStairs 1.0 ExitStairs.qml
 Floor 1.0 Floor.qml
@@ -46,5 +47,6 @@ Door 1.0 Door.qml
 SecretWall 1.0 SecretWall.qml
 Vein 1.0 Vein.qml
 Hole 1.0 Hole.qml
+Petrified 1.0 Petrified.qml
 Gem 1.0 Gem.qml
 DungeonMasterPanel 1.0 DungeonMasterPanel.qml

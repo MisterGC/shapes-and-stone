@@ -9,6 +9,8 @@ again writes the same files:
   deep_crumble.wav  the stone's crumble as the vein splits: grit falling off it
   deep_rumble.wav   a spawn hole waking (issue #157): a low rumble in the rock
   deep_groan.wav    a spawn hole's eyes opening: a drawn-out groan from inside
+  deep_freed.wav    a petrified traveller freed (issue #158): a warm low
+                    major chord, the only one in the dungeon's sounds
 
 The game plays the tink a pentatonic step higher with each clean strike,
 and three times, a fifth and an octave apart, as the gem's chime
@@ -101,8 +103,30 @@ def groan(rng):
     return fade_out(shaped, 0.35)
 
 
+def freed(rng):
+    seconds = 2.2
+    buf = silence(seconds)
+    # A warm low major chord, C3 E3 G3 C4, its notes a few milliseconds
+    # apart like a soft strum: few soft partials, a slow swell and a long
+    # fade, slightly detuned pairs for warmth
+    for k, f0 in enumerate([130.81, 164.81, 196.0, 261.63]):
+        at = 0.018 * k
+        n = len(buf) - int(at * RATE)
+        note = []
+        for i in range(n):
+            t = i / RATE
+            env = min(1, t / 0.12) * math.exp(-t / 0.9)
+            v = 0.0
+            for ratio, gain in [(1.0, 1.0), (2.0, 0.32), (3.0, 0.12)]:
+                v += gain * (math.sin(2 * math.pi * f0 * ratio * t)
+                             + math.sin(2 * math.pi * f0 * ratio * 1.003 * t + 0.7)) / 2
+            note.append(v * env)
+        add(buf, at, note, 0.6 if k < 3 else 0.4)
+    return fade_out(lowpass(buf, 1800), 0.5)
+
+
 if __name__ == "__main__":
     for name, make, peak in [("deep_chink.wav", chink, 0.8), ("deep_tink.wav", tink, 0.6),
                              ("deep_crumble.wav", crumble, 0.6), ("deep_rumble.wav", rumble, 0.8),
-                             ("deep_groan.wav", groan, 0.6)]:
+                             ("deep_groan.wav", groan, 0.6), ("deep_freed.wav", freed, 0.7)]:
         write(name, make(random.Random(name)), peak)

@@ -1172,6 +1172,66 @@ failed checks:
 python3 tests/holeparty/run_holeparty.py --mode local
 ```
 
+**Petrified travellers:** the deep turns what it takes into stone (#158).
+A room that holds a vein holds, with `Balance.dungeon.petrified.chance`
+at its danger, a stone-grey figure half in its vein's rock face, faintly
+cracked, its edge shimmering pale blue where a lantern's light reaches
+it: a miner caught mid-swing, a small pick raised and a lamp on its cap,
+or a lost traveller caught huddled, arms round its knees. It stands
+beside the vein over a room's cell, off a vein, the hole, a torch, a
+slit and a secret, laid out after the holes from its own stream of the
+level's seed, so nothing moves for it. The same pickaxe frees it, aimed
+at it in reach with the left button, on a slower ring (`ringTime`): a
+strike on the close is clean and counts, an off-beat one does it no
+harm, takes none back and only starts the ring over; `strikes` clean
+ones free it. A strike on a traveller never wakes the room's spawn
+hole - the hole answers greed, and freeing someone is patience under the
+pressure the vein's digging made. On the last strike the shell cracks
+in a ring of grey shards with the crumble, a warm low major chord plays
+- the only one in the dungeon's sounds - and colour flows back into the
+figure from its middle out over `colourTime`. A freed miner says its
+thanks, walks to its room's vein and works there, its quiet tink every
+`workEvery` seconds part of the room's sound; once the room's hole has
+sent creatures it flees instead, and a miner at work flees too when the
+hole's first wave comes. A freed lost traveller thanks the knight in a
+bubble and walks off toward the room's way to the exit, fading out of
+sight. Every number and line is `Balance.deep.stone`; the chord is
+synthesised by `tools/deep_sounds.py`. In a session the node whose
+knight freed one shows the moment at once and tells the host; the host
+decides how it goes on and publishes every traveller freed with its
+outcome (the session property `stones`), which every screen shows, a
+node that joins later too. The dojo's deep scenario has a miner and a
+lost one either side of its vein. The stones bench builds 20 seeds at a
+low, a middle and a high danger twice and checks the same travellers on
+the same cells, at most one in a room with a vein and none elsewhere,
+each in its vein's rock face off the veins, the hole, torches, slits and
+secrets, both kinds among them, none in the camp or the fight room;
+then in the deep scenario that off-beat strikes never harm a traveller
+and only start the ring over, that clean ones free it with the crumble,
+the chord and the colour and never wake the hole, that a freed miner
+works beside the vein with its tink and is still there seconds later,
+that a freed lost one walks off and is gone, that a miner freed after
+the hole's creatures came flees, and that one at work flees when the
+first wave comes:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/stones/stones.qml
+```
+
+The stone party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on seed 424244, whose
+first dungeon holds a lost traveller and a miner. Both show the same
+travellers of the same kind and strikes; the joiner's knight frees one,
+every strike clean, and both screens show it freed, its colour back, the
+chord, and the outcome the host decided - the lost one gone on both;
+then the host's knight frees the miner, and both show it at work at the
+same spot beside its vein. It needs the live loader and exits with the
+number of failed checks:
+
+```
+python3 tests/stoneparty/run_stoneparty.py --mode local
+```
+
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
 over, kept for the next visit) shows a panel before each dungeon to a solo
 player or the host, never to a joiner. Its rows are the settings of

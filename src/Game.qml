@@ -768,9 +768,9 @@ ClayWorld2d {
             playDeathBurst()
             countFight("kill")
         }
-        onGoldSpawned: (objectId, props) => _makeGoldDrop(props, objectId)
-        onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
-        onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
+        onGoldSpawned: (objectId, props) => goldClaims.make(props, objectId)
+        onGoldDespawned: (objectId) => goldClaims.remove(objectId)
+        onGoldClaimed: (fromId, objectId) => goldClaims.give(fromId, objectId)
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
         onBreakReported: (level, cell) => _hostBreak(level, cell)
         onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
@@ -778,13 +778,14 @@ ClayWorld2d {
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
         onWakeReported: (level, cell) => _hostWake(level, cell)
+        onFreedReported: (fromId, level, cell) => _hostFreed(fromId, level, cell)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
         onPouchDropAnswered: (ok) => _pouchDropAnswered(ok)
-        onPouchSpawned: (objectId, props) => _makePouchDrop(props, objectId)
-        onPouchDespawned: (objectId) => _removePouchDrop(objectId)
-        onPouchClaimed: (fromId, objectId) => _givePouch(fromId, objectId)
+        onPouchSpawned: (objectId, props) => pouchClaims.make(props, objectId)
+        onPouchDespawned: (objectId) => pouchClaims.remove(objectId)
+        onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
         onShotReceived: (shot) => {
             if (screen !== "game") return
@@ -963,8 +964,19 @@ ClayWorld2d {
     // host gives a drop to the first claim it gets and despawns it, so a
     // drop is picked up once, by one knight. Each knight's gold is its own
     // node's.
-    property var goldDrops: []
-    property var _goldById: ({})
+    FloorClaims {
+        id: goldClaims
+        component: goldDropComponent
+        room: world.room
+        link: session
+        extra: props => ({ pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+        grantOf: drop => ({ amount: drop.amount, x: drop.xWu, y: drop.yWu })
+        take: grant => _collectGold(grant.amount, grant.x, grant.y)
+        claimOf: objectId => session.claimGold(objectId)
+        despawnOf: objectId => session.despawnGold(objectId)
+        grantTo: (nodeId, grant) => session.grantGold(nodeId, grant)
+    }
+    readonly property var goldDrops: goldClaims.drops
     // Where an enemy died: gold for its tier, none in the fight room
     function dropGold(x, y, tier) {
         if (fightRoomActive) return
@@ -975,59 +987,15 @@ ClayWorld2d {
         if (amount <= 0) return
         let props = {xWu: x, yWu: y, amount: amount}
         if (!session.connected)
-            _makeGoldDrop(props)
+            goldClaims.make(props)
         else if (session.isHost)
             session.spawnGold(props)
-    }
-    function _makeGoldDrop(props, objectId) {
-        objectId = objectId || ""
-        if (objectId !== "" && _goldById[objectId]) return _goldById[objectId]
-        let drop = goldDropComponent.createObject(world.room, Object.assign({}, props, {
-            objectId: objectId,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
-        }))
-        if (!drop) return null
-        goldDrops.push(drop)
-        if (objectId !== "") _goldById[objectId] = drop
-        return drop
-    }
-    function _removeGoldDrop(objectId) {
-        let drop = _goldById[objectId]
-        if (!drop) return
-        delete _goldById[objectId]
-        _forgetGoldDrop(drop)
-    }
-    function _forgetGoldDrop(drop) {
-        goldDrops = goldDrops.filter(d => d !== drop)
-        try { drop.destroy() } catch (err) {}
     }
     // Each step: the drops this node's knight stands on are its, or
     // claimed from the host in a session
     function _pickUpGold() {
         if (!player || player.fallen || goldDrops.length === 0) return
-        let range = Balance.loot.pickupRange
-        for (let drop of goldDrops.slice()) {
-            if (!drop || drop.claimed) continue
-            let dx = drop.xWu - player.xWu, dy = drop.yWu - player.yWu
-            if (dx * dx + dy * dy > range * range) continue
-            if (drop.objectId === "") {
-                _collectGold(drop.amount, drop.xWu, drop.yWu)
-                _forgetGoldDrop(drop)
-            } else if (session.connected) {
-                drop.claimed = true
-                session.claimGold(drop.objectId)
-            }
-        }
-    }
-    // Host: a node's knight reached a drop; the first claim takes it, a
-    // later one finds it gone
-    function _giveGold(nodeId, objectId) {
-        let drop = _goldById[objectId]
-        if (!drop || !session.isHost) return
-        let grant = {id: objectId, amount: drop.amount, x: drop.xWu, y: drop.yWu}
-        session.despawnGold(objectId)
-        if (nodeId === session.nodeId) _collectGold(grant.amount, grant.x, grant.y)
-        else session.grantGold(nodeId, grant)
+        goldClaims.claimNear(player.xWu, player.yWu, Balance.loot.pickupRange)
     }
     function _collectGold(amount, x, y) {
         if (!player) return
@@ -2629,6 +2597,7 @@ ClayWorld2d {
             world._stepVeins()
             world._stepDig()
             world._stepHoles()
+            world._stepStones()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -3214,7 +3183,9 @@ ClayWorld2d {
         placeFeatures(featureList)
         placeDoors(doorList)
         placeSecrets()
-        placeHoles(planHoles(levelSeed, featureList))
+        let holeList = planHoles(levelSeed, featureList)
+        placeHoles(holeList)
+        placeStones(planStones(levelSeed, featureList, holeList))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -3257,6 +3228,7 @@ ClayWorld2d {
         _applyDoors(_sessionDoors)
         _applyVeins(_sessionVeins)
         _applyHoles(_sessionHoles, true)
+        _applyStones(_sessionStones, true)
 
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
@@ -5406,28 +5378,10 @@ ClayWorld2d {
         _enemyById = kept
 
         // Gold drops go as the enemies do: the host's on every node with
-        // their despawn, a joiner's when that arrives
-        for (let d of goldDrops.slice()) {
-            if (!d) continue
-            if (d.objectId !== "" && session.connected) {
-                if (session.isHost) session.despawnGold(d.objectId)
-                continue
-            }
-            try { d.destroy() } catch(err) {}
-        }
-        goldDrops = goldDrops.filter(d => d && d.objectId !== "" && session.connected
-                                     && _goldById[d.objectId] === d)
-        // And so do the pouches: one left on the floor is lost
-        for (let d of pouchDrops.slice()) {
-            if (!d) continue
-            if (d.objectId !== "" && session.connected) {
-                if (session.isHost) session.despawnPouch(d.objectId)
-                continue
-            }
-            try { d.destroy() } catch(err) {}
-        }
-        pouchDrops = pouchDrops.filter(d => d && d.objectId !== "" && session.connected
-                                       && _pouchById[d.objectId] === d)
+        // their despawn, a joiner's when that arrives; and so do the
+        // pouches: one left on the floor is lost
+        goldClaims.clear()
+        pouchClaims.clear()
 
         // Destroy remote players
         session.clearRemotePlayers()
@@ -5448,6 +5402,10 @@ ClayWorld2d {
         _holePuffs = ({})
         holeEvents = []
         holeSounds = []
+        stones = []
+        _stoneRuns = ({})
+        stoneEvents = []
+        stoneSounds = []
         deepRoomActive = false
 
         // Destroy player
@@ -6323,9 +6281,11 @@ ClayWorld2d {
         }
     }
     property var veins: []
-    // The dig under way, null when there is none: {vein, t, used, endAt},
-    // t its seconds of physics steps, used the last close a clean strike
-    // took (counted from 1), endAt the t it ends at once the stone split
+    // The dig under way, null when there is none: {vein, stone, target,
+    // t, used, endAt}, target what is dug, the vein or the petrified
+    // traveller (stone, issue #158), the other null; t its seconds of
+    // physics steps, used the last close a clean strike took (counted
+    // from 1), endAt the t it ends at once the stone split
     property var dig: null
     // The last strike, {clean, t, off, struck}, off its seconds from the
     // nearest close, and the last gem cut, {shape, color, sizeWu, clean,
@@ -6446,26 +6406,43 @@ ClayWorld2d {
     // The whole vein the mouse aims at (aimPad) with its face within reach
     // of the knight, or null
     function veinAimed() {
-        if (!player) return null
-        let c = _knightCentre()
-        for (let v of veins)
-            if (!v.split && _aimOn(v, Balance.deep.aimPad)
-                    && Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) <= Balance.deep.reach)
-                return v
-        return null
+        return _aimedOf(veins.filter(v => !v.split))
     }
-    // The dig of the vein aimed at begins, while the knight is free to dig
-    // (_canDig) and not in a dialogue; the vein dug or null
+    // The one of targets the mouse aims at (aimPad), nearest to the aim,
+    // with its face within reach of the knight, or null
+    function _aimedOf(targets) {
+        if (!player) return null
+        let c = _knightCentre(), a = aimWu(), out = null, best = Infinity
+        for (let v of targets) {
+            if (!_aimOn(v, Balance.deep.aimPad)
+                    || Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) > Balance.deep.reach) continue
+            let d = Math.hypot(a.x - v.cxWu, a.y - v.cyWu)
+            if (d < best) {
+                best = d
+                out = v
+            }
+        }
+        return out
+    }
+    // The petrified traveller the mouse aims at, still stone, or null
+    function stoneAimed() {
+        return _aimedOf(stones.filter(s => !s.freed))
+    }
+    // The dig of the vein or the petrified traveller aimed at begins,
+    // while the knight is free to dig (_canDig) and not in a dialogue;
+    // what is dug or null
     function _beginDig() {
         if (!player || fallen || talking || !_canDig(player)) return null
-        let v = veinAimed()
-        if (!v) return null
-        dig = { vein: v, t: 0, used: 0, endAt: -1 }
+        let t = _aimedOf(veins.filter(v => !v.split).concat(stones.filter(s => !s.freed)))
+        if (!t) return null
+        let isStone = stones.indexOf(t) >= 0
+        dig = { vein: isStone ? null : t, stone: isStone ? t : null, target: t, t: 0, used: 0, endAt: -1 }
         player.digging = true
         _aimPick()
         _showRing()
-        console.log("[Game] Digging the vein at", v.cell, "-", v.strikes, "strikes")
-        return v
+        if (isStone) console.log("[Game] Freeing the", t.kind, "at", t.cell, "-", t.strikes, "strikes")
+        else console.log("[Game] Digging the vein at", t.cell, "-", t.strikes, "strikes")
+        return t
     }
     // The left button: aimed at a vein in reach it strikes with the
     // pickaxe, a dig not yet begun (no physics step since the aim came on
@@ -6473,8 +6450,9 @@ ClayWorld2d {
     // is not free to dig, and the sword swings
     function pressPick() {
         if (!player || fallen) return false
-        if (dig && dig.endAt < 0 && _aimOn(dig.vein, Balance.deep.aimHold)) {
-            strikeVein()
+        if (dig && dig.endAt < 0 && _aimOn(dig.target, Balance.deep.aimHold)) {
+            if (dig.stone) strikeStone()
+            else strikeVein()
             return true
         }
         if (dig) return false
@@ -6482,18 +6460,19 @@ ClayWorld2d {
     }
     function endDig() {
         if (!dig) return
-        dig.vein.ringShows = false
+        dig.target.ringShows = false
         dig = null
         if (player) player.digging = false
     }
     function _aimPick() {
-        let c = _knightCentre(), v = dig.vein
+        let c = _knightCentre(), v = dig.target
         player.digAngle = Math.atan2(v.faceYWu - c.y, v.faceXWu - c.x) * 180 / Math.PI
     }
     // The ring of the dig: closing over each ringTime, closed and white for
-    // window after a close, white for window before one
+    // window after a close, white for window before one; a petrified
+    // traveller's at its own, slower rhythm (Balance.deep.stone)
     function _showRing() {
-        let cfg = Balance.deep, v = dig.vein, t = dig.t
+        let cfg = dig.stone ? Balance.deep.stone : Balance.deep, v = dig.target, t = dig.t
         let k = Math.floor(t / cfg.ringTime + 1e-6), since = Math.max(0, t - k * cfg.ringTime)
         v.ringShows = dig.endAt < 0
         if (k >= 1 && since <= cfg.window + 1e-6) {
@@ -6509,16 +6488,16 @@ ClayWorld2d {
     // the shield, swings or dashes, or the stone split a moment ago
     function _stepDig() {
         if (!dig) {
-            if (veins.length > 0) _beginDig()
+            if (veins.length > 0 || stones.length > 0) _beginDig()
             return
         }
         let p = player
-        if (!p || fallen || !dig.vein) {
+        if (!p || fallen || !dig.target) {
             endDig()
             return
         }
         dig.t += world.physics.timeStep
-        let c = _knightCentre(), v = dig.vein
+        let c = _knightCentre(), v = dig.target
         if ((dig.endAt >= 0 && dig.t >= dig.endAt - 1e-6)
                 || !_canDig(p) || talking
                 || (dig.endAt < 0 && !_aimOn(v, Balance.deep.aimHold))
@@ -6913,6 +6892,7 @@ ClayWorld2d {
         _holeEvent(h, "wave")
         if (!quiet) _holeDust(h, 6)
         _publishHoles()
+        if (w === 1) _minersFlee(h)
     }
     function _holeEvent(h, what) {
         holeEvents = holeEvents.concat([{ cell: h.cell, what: what, t: _holeClock }])
@@ -6994,6 +6974,420 @@ ClayWorld2d {
     readonly property var _sessionHoles: session.holes
     on_SessionHolesChanged: _applyHoles(_sessionHoles)
 
+    // --- Petrified travellers (issue #158) ---
+    // A room that holds a vein may hold a petrified traveller in its
+    // vein's rock face (Petrified.qml, Balance.dungeon.petrified,
+    // Balance.deep.stone), a miner or a lost one, laid out after the
+    // holes from its own stream of the level's seed, so nothing moves for
+    // it. The same pickaxe frees it, at its own slower ring: a clean
+    // strike counts, an off-beat one does it no harm and only starts the
+    // ring over. A strike on it never wakes the room's spawn hole: the
+    // hole answers greed, and freeing is patience under the pressure the
+    // vein's digging made. Freed, its shell cracks, the chord plays and
+    // its colour comes back; then a miner goes back to work at its room's
+    // vein, unless the room's hole sent creatures already, and a lost one
+    // walks off toward the exit and fades. A working miner flees once its
+    // hole's first wave comes. Alone the game decides how it goes on. In
+    // a session the node whose knight freed it shows the moment at once
+    // and tells the host; the host decides and publishes every traveller
+    // freed and how it goes on (session property "stones"), which every
+    // screen shows, a node that joins later too. stoneEvents lists what
+    // they did on this screen, for the benches: {cell, what, t}, what
+    // "freed", "working", "leaving", "fleeing" or "gone", t the stones'
+    // physics clock, seconds; stoneSounds the last veinSoundsKept of their
+    // sounds, "chord" or "work", muted too, stoneSoundCount all of them
+    Component { id: stoneComponent; Petrified {} }
+    Sound {
+        id: freedSound
+        source: "assets/deep_freed.wav"
+        volume: muted ? 0 : Balance.deep.stone.chordVolume * soundVolume
+    }
+    property var stones: []
+    property var stoneEvents: []
+    property var stoneSounds: []
+    property int stoneSoundCount: 0
+    property real _stoneClock: 0
+    // A freed traveller's run on this screen, by cell: {t, chord, doing,
+    // path, speed, say, work, swing, leave}, t its seconds since freed,
+    // doing the outcome it acts on, path the points it walks to [{x, y}]
+    property var _stoneRuns: ({})
+
+    // The petrified travellers of the carved dungeon with its features
+    // (list) and its holes (holeList, planHoles): one with chance in each
+    // room but the first that holds a vein, [{gx, gy, kind, veins, hole,
+    // room}], gx, gy its wall cell in the rock face beside one of the
+    // room's veins, over a room's cell, off a vein, a hole, a torch, a
+    // slit and a secret; kind "miner" or "lost". Each room draws from its
+    // own stream of the level's seed
+    function planStones(levelSeed, list, holeList) {
+        let cfg = Balance.dungeon.petrified, band = dangerBand(dangerPosition)
+        let out = [], off = {}
+        for (let f of list) {
+            if (f.kind === "vein") off[f.wgx + "," + f.wgy] = true
+            if (f.kind === "slit") off[(f.gx - f.dx) + "," + (f.gy - f.dy)] = true
+        }
+        for (let h of holeList) off[h.gx + "," + h.gy] = true
+        rooms.forEach((room, ri) => {
+            if (ri === 0) return
+            let veins = list.filter(f => f.kind === "vein" && f.gx >= room.x && f.gx < room.x + room.w
+                                         && f.gy >= room.y && f.gy < room.y + room.h)
+            if (veins.length === 0) return
+            let rand = createRng(levelSeed ^ 0x73746f6e ^ ri)
+            if (rand() >= cfg.chance[band]) return
+            let spots = []
+            for (let v of veins)
+                for (let k = 1; k <= Balance.deep.rockCells; k++)
+                    for (let dir of [-1, 1]) {
+                        let gx = v.wgx + dir * k, gy = v.wgy, key = gx + "," + gy
+                        if (!_isFace(gx, gy) || off[key] || _torchCells[key] || _secretOf(gx, gy) >= 0
+                                || grid[gy - 1][gx] !== cellRoom || spots.some(s => s.key === key)) continue
+                        spots.push({ gx: gx, gy: gy, key: key })
+                    }
+            if (spots.length === 0) return
+            let spot = spots[Math.floor(rand() * spots.length)]
+            let cells = veins.map(v => v.wgx + "," + v.wgy)
+            let hole = holeList.find(h => h.veins.some(c => cells.indexOf(c) >= 0))
+            out.push({ gx: spot.gx, gy: spot.gy, kind: rand() < cfg.minerShare ? "miner" : "lost",
+                       veins: cells, hole: hole ? hole.gx + "," + hole.gy : "", room: ri })
+        })
+        return out
+    }
+    function placeStones(list) {
+        for (let s of list) placeStone(s.gx, s.gy, s.kind, s.veins, s.hole, s.room)
+    }
+    // The strikes that free the traveller on cell "gx,gy", from the
+    // level's seed and the cell alone
+    function stoneStrikes(cell) {
+        let c = cell.split(",").map(Number)
+        let rand = createRng(levelSeedNow() ^ 0x73747273 ^ (c[1] * gridWidth + c[0]))
+        let r = Balance.deep.stone.strikes
+        return r[0] + Math.floor(rand() * (r[1] - r[0] + 1))
+    }
+    // A petrified traveller of kind in the face of the wall cell (gx, gy),
+    // of the room roomIndex with the veins on veinCells and the spawn hole
+    // on holeCell ("" none)
+    function placeStone(gx, gy, kind, veinCells, holeCell, roomIndex) {
+        let cell = gx + "," + gy
+        let s = stoneComponent.createObject(world.room, {
+            cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
+            faceWu: wallFaceWu, cell: cell, kind: kind, strikes: stoneStrikes(cell),
+            veinCells: veinCells, holeCell: holeCell || "", roomIndex: roomIndex,
+            seed: createRng(gx * 7349 + gy * 3571 + 29)(),
+            glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!s) return null
+        stones.push(s)
+        dungeonObjects.push(s)
+        console.log("[Game] A petrified", kind, "at", cell, "-", s.strikes, "strikes, its hole", holeCell || "none")
+        return s
+    }
+    function stoneAt(cell) {
+        return stones.find(s => s.cell === cell) || null
+    }
+    // Whether this screen decides how a freed traveller goes on: alone,
+    // in the dojo's deep room, or the host
+    function _decidesStones() {
+        return !session.connected || deepRoomActive || session.isHost
+    }
+
+    // A strike of the pickaxe on the traveller freed: clean on a close's
+    // window, else the ring starts over, and nothing else
+    function strikeStone() {
+        let cfg = Balance.deep.stone, s = dig.stone
+        if (s.freed) return
+        let k = Math.round(dig.t / cfg.ringTime)
+        let off = dig.t - k * cfg.ringTime
+        let clean = k >= 1 && k !== dig.used && Math.abs(off) <= cfg.window + 1e-6
+        let before = s.clean, t = dig.t
+        if (clean) {
+            dig.used = k
+            s.clean++
+        } else {
+            s.misses++
+            dig.t = 0
+            dig.used = 0
+        }
+        lastStrike = { clean: clean, t: t, off: off, struck: s.clean, stone: true }
+        player.pickStrike()
+        let c = _knightCentre()
+        let len = Math.max(0.01, Math.hypot(c.x - s.faceXWu, c.y - s.faceYWu))
+        let nx = (c.x - s.faceXWu) / len, ny = (c.y - s.faceYWu) / len
+        if (clean) {
+            spawnSparks(s.faceXWu, s.faceYWu, nx, ny, cfg.sparks, cfg.shimmer)
+            _trauma(0.04)
+            playChink(0)
+            playTink(Balance.deep.phrase[Math.min(before, Balance.deep.phrase.length - 1)])
+        } else {
+            spawnShards(s.faceXWu, s.faceYWu, nx, ny, 3, Balance.deep.hole.dustColor, 0.07)
+            playChink(Balance.deep.chipPitch)
+        }
+        console.log("[Game] The", s.kind, "at", s.cell, clean ? "struck clean" : "struck off the beat, the ring starts over",
+                    "-", s.clean, "of", s.strikes, "off the close by", off.toFixed(3), "s")
+        if (s.clean >= s.strikes) {
+            _freeMoment(s)
+            dig.endAt = dig.t + 0.4
+            if (session.connected && !deepRoomActive) session.reportFreed(levelIndex, s.cell)
+            else _decideStone(s)
+        }
+    }
+    // Traveller s is freed on this screen: its shell cracks in a ring of
+    // shards with the crumble, and its run begins (the chord, the colour);
+    // quiet, a level built with it freed already, it is freed at once
+    function _freeMoment(s, quiet) {
+        if (s.freed) return
+        let cfg = Balance.deep.stone
+        s.freed = true
+        s.ringShows = false
+        if (dig && dig.stone === s && dig.endAt < 0) dig.endAt = dig.t + 0.4
+        _stoneEvent(s, "freed")
+        console.log("[Game] The", s.kind, "at", s.cell, "is freed")
+        _stoneRuns[s.cell] = { t: quiet ? cfg.colourTime : 0, chord: !!quiet, doing: "", path: [], speed: 0,
+                               say: 0, work: 0, swing: -1, leave: 0 }
+        if (quiet) {
+            s.colour = 1
+            return
+        }
+        for (let i = 0; i < 8; i++) {
+            let a = Math.PI * 2 * i / 8
+            spawnShards(s.faceXWu, s.faceYWu, Math.cos(a), Math.sin(a), Math.ceil(cfg.shards / 8), cfg.shardColor, 0.14)
+        }
+        playCrumble()
+    }
+    // Alone or the host: how the freed traveller s goes on - a miner works
+    // on unless its room's hole sent creatures, a lost one leaves
+    function _decideStone(s) {
+        let h = s.holeCell !== "" ? holeAt(s.holeCell) : null
+        let came = h !== null && (h.wave > 0 || h.closed)
+        _stoneOutcome(s, s.kind !== "miner" ? "leaving" : came ? "fleeing" : "working")
+    }
+    // Host: a node's knight freed the traveller on cell of that level; one
+    // decided already, or on another level than the host's, is let be
+    function _hostFreed(fromId, level, cell) {
+        let s = level === levelIndex && levelType === "dungeon" ? stoneAt(cell) : null
+        if (!s || s.outcome !== "") {
+            console.log("[Game] The traveller at", cell, "of level", level, "was freed by", fromId, "- let be")
+            return
+        }
+        _freeMoment(s)
+        _decideStone(s)
+    }
+    // Traveller s goes on as outcome: its run takes it up once the colour
+    // is back; quiet, it is there at once, at work or gone. The host
+    // tells every node
+    function _stoneOutcome(s, outcome, quiet) {
+        if (s.outcome === outcome) return
+        s.outcome = outcome
+        _stoneEvent(s, outcome)
+        console.log("[Game] The", s.kind, "at", s.cell, "-", outcome)
+        let run = _stoneRuns[s.cell]
+        if (quiet && run) {
+            run.doing = outcome
+            if (outcome === "working") {
+                let w = _workSpot(s)
+                s.footXWu = w.x
+                s.footYWu = w.y
+                s.facing = w.facing
+                run.facing = w.facing
+            } else {
+                s.gone = true
+                delete _stoneRuns[s.cell]
+            }
+        }
+        _publishStones()
+    }
+    // Hole h sent its first wave: the miners at work in its room flee
+    function _minersFlee(h) {
+        if (!_decidesStones()) return
+        for (let s of stones)
+            if (s.holeCell === h.cell && s.outcome === "working") _stoneOutcome(s, "fleeing")
+    }
+    function _stoneEvent(s, what) {
+        stoneEvents = stoneEvents.concat([{ cell: s.cell, what: what, t: _stoneClock }])
+    }
+    function _stoneSound(name) {
+        stoneSounds = stoneSounds.slice(1 - veinSoundsKept).concat([name])
+        stoneSoundCount++
+    }
+    // How loud traveller s is to this knight: gain at its side, down to
+    // nothing at reach wu
+    function _stoneGain(s, gain, reach) {
+        if (!player) return gain
+        let c = _knightCentre()
+        return gain * Math.max(0, 1 - Math.hypot(s.footXWu - c.x, s.footYWu + 0.6 - c.y) / reach)
+    }
+    // Where miner s works: beside the vein of its room nearest to it, at
+    // the wall's foot, facing it
+    function _workSpot(s) {
+        let best = null
+        for (let cell of s.veinCells) {
+            let c = cell.split(",").map(Number)
+            let x = (c[0] + 0.5) * cellSize, y = c[1] * cellSize
+            let d = Math.abs(x - s.cxWu) + Math.abs(y - (s.cyWu - s.sizeWu / 2))
+            if (!best || d < best.d) best = { x: x, y: y, d: d }
+        }
+        if (!best) return { x: s.cxWu, y: s.footYWu, facing: 1 }
+        let side = s.cxWu >= best.x ? 1 : -1
+        return { x: best.x + side * 0.6, y: best.y + 0.05, facing: -side }
+    }
+    // The way out of room ri toward the exit: a corridor's cell beside it,
+    // the northmost, then the nearest to the exit's column, as the points
+    // to walk [{x, y}] from inside the room out into it; from a room with
+    // none (the dojo's deep room), straight down from (x, y)
+    function _wayOut(ri, x, y) {
+        let room = rooms[ri], best = null
+        if (room) {
+            let edge = []
+            for (let gx = room.x; gx < room.x + room.w; gx++) {
+                edge.push([gx, room.y + room.h, gx, room.y + room.h - 1])
+                edge.push([gx, room.y - 1, gx, room.y])
+            }
+            for (let gy = room.y; gy < room.y + room.h; gy++) {
+                edge.push([room.x - 1, gy, room.x, gy])
+                edge.push([room.x + room.w, gy, room.x + room.w - 1, gy])
+            }
+            for (let e of edge) {
+                if (!grid[e[1]] || grid[e[1]][e[0]] !== cellHallway) continue
+                if (!best || e[1] > best[1] || (e[1] === best[1] && Math.abs(e[0] - exitGridX) < Math.abs(best[0] - exitGridX)))
+                    best = e
+            }
+        }
+        let at = (gx, gy) => ({ x: (gx + 0.5) * cellSize, y: (gy + 0.5) * cellSize })
+        if (!best) return [{ x: x, y: y - 3 * cellSize }]
+        let inside = at(best[2], best[3]), out = at(best[0], best[1])
+        return [inside, out, { x: out.x + (out.x - inside.x) * 2, y: out.y + (out.y - inside.y) * 2 }]
+    }
+    // Run's traveller s takes up its outcome: it says its line, from its
+    // own stream of the level's seed, and walks to its work or away
+    function _takeUp(s, run) {
+        let cfg = Balance.deep.stone
+        run.doing = s.outcome
+        let c = s.cell.split(",").map(Number)
+        let rand = createRng(levelSeedNow() ^ 0x6c696e65 ^ (c[1] * gridWidth + c[0]) ^ s.outcome.length)
+        let lines = s.outcome === "working" ? cfg.minerLines : s.outcome === "fleeing" ? cfg.fleeLines : cfg.lostLines
+        s.saying = lines[Math.floor(rand() * lines.length)]
+        run.say = cfg.say
+        let start = []
+        if (run.path.length === 0 && s.footYWu > s.cyWu - s.sizeWu / 2 - 0.3)
+            start = [{ x: s.footXWu, y: s.cyWu - s.sizeWu / 2 - 0.55 }]
+        if (s.outcome === "working") {
+            let w = _workSpot(s)
+            run.path = start.concat([{ x: w.x, y: w.y - 0.5 }, { x: w.x, y: w.y }])
+            run.facing = w.facing
+            run.speed = cfg.walkSpeed
+        } else {
+            let from = start.length ? start[0] : { x: s.footXWu, y: s.footYWu }
+            run.path = start.concat(_wayOut(s.roomIndex, from.x, from.y))
+            run.speed = cfg.leaveSpeed
+            run.leave = 0
+        }
+    }
+    // Each physics step: a traveller still stone shimmers in the lantern's
+    // light; a freed one's colour comes back, its chord plays, and it goes
+    // on as decided: walks, works, or walks off fading
+    function _stepStones() {
+        if (stones.length === 0) return
+        let cfg = Balance.deep.stone, dt = world.physics.timeStep
+        _stoneClock += dt
+        let lanterns = knightsHere(), c = player ? _knightCentre() : null
+        for (let s of stones) {
+            if (!s.freed && c) {
+                let nearest = Infinity
+                for (let k of lanterns) nearest = Math.min(nearest, Math.hypot(s.faceXWu - k.x, s.faceYWu - k.y))
+                let lit = Math.max(0, Math.min(1, 2 * (Balance.deep.glintReach - nearest) / Balance.deep.glintReach))
+                s.lit = Math.ceil(lit * Balance.deep.litLevels) / Balance.deep.litLevels
+                s.knightNear = Math.hypot(s.faceXWu - c.x, s.faceYWu - c.y) <= Balance.deep.shimmerReach && !player.fallen
+            }
+            let run = _stoneRuns[s.cell]
+            if (!run) continue
+            run.t += dt
+            if (!run.chord && run.t >= cfg.chordDelay) {
+                run.chord = true
+                freedSound.triggerOneShot(Math.max(Balance.deep.hole.quietest,
+                                                   _stoneGain(s, 1, Balance.deep.hole.hearReach)))
+                _stoneSound("chord")
+            }
+            s.colour = Math.min(1, run.t / cfg.colourTime)
+            if (run.say > 0) {
+                run.say -= dt
+                if (run.say <= 0) s.saying = ""
+            }
+            if (s.colour < 1 || s.outcome === "") continue
+            if (run.doing !== s.outcome) _takeUp(s, run)
+            // Walking
+            if (run.path.length > 0) {
+                let p = run.path[0], dx = p.x - s.footXWu, dy = p.y - s.footYWu
+                let d = Math.hypot(dx, dy), stepWu = run.speed * dt
+                s.walking = true
+                if (Math.abs(dx) > 0.02) s.facing = dx > 0 ? 1 : -1
+                if (d <= stepWu) {
+                    s.footXWu = p.x
+                    s.footYWu = p.y
+                    run.path.shift()
+                } else {
+                    s.footXWu += dx / d * stepWu
+                    s.footYWu += dy / d * stepWu
+                }
+            } else {
+                s.walking = false
+            }
+            if (s.outcome === "working") {
+                if (run.path.length > 0) continue
+                s.facing = run.facing
+                run.work += dt
+                if (run.work >= cfg.workEvery) {
+                    run.work = 0
+                    run.swing = 0
+                    let gain = _stoneGain(s, cfg.workVolume, cfg.hearReach)
+                    if (gain > 0.005) {
+                        tinkSound.triggerNote(tinkSound.rootNote + cfg.workPitch, gain / Balance.deep.tinkVolume)
+                        _stoneSound("work")
+                    }
+                }
+                if (run.swing >= 0) {
+                    run.swing += dt
+                    s.swing = run.swing < 0.1 ? run.swing / 0.1 : Math.max(0, 1 - (run.swing - 0.1) / 0.3)
+                    if (run.swing > 0.4) run.swing = -1
+                }
+            } else {
+                s.swing = 0
+                run.leave += dt
+                if (run.leave > cfg.fadeAfter) s.fade = Math.max(0, 1 - (run.leave - cfg.fadeAfter) / cfg.fade)
+                if (s.fade <= 0) {
+                    s.gone = true
+                    s.walking = false
+                    s.saying = ""
+                    delete _stoneRuns[s.cell]
+                    _stoneEvent(s, "gone")
+                    console.log("[Game] The", s.kind, "from", s.cell, "is gone toward the exit")
+                }
+            }
+        }
+    }
+    // Host: the travellers freed in its level and how they go on, for
+    // every node
+    function _publishStones() {
+        if (!session.connected || !session.isHost || deepRoomActive || levelType !== "dungeon") return
+        let out = {}
+        for (let s of stones)
+            if (s.outcome !== "") out[s.cell] = s.outcome
+        session.publishStones({ seed: session.runSeed, level: levelIndex, stones: out })
+    }
+    // The host's travellers freed in the level: each not freed here is
+    // freed, and goes on as the host decided; quiet when the level was
+    // just built
+    function _applyStones(val, quiet) {
+        if (!val || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (val.seed !== session.runSeed || val.level !== levelIndex) return
+        for (let cell in val.stones) {
+            let s = stoneAt(cell)
+            if (!s) continue
+            _freeMoment(s, quiet)
+            _stoneOutcome(s, val.stones[cell], quiet)
+        }
+    }
+    readonly property var _sessionStones: session.stones
+    on_SessionStonesChanged: _applyStones(_sessionStones)
+
     // The pouch: a gem into it
     function addGem(gem) {
         if (!player) return
@@ -7050,8 +7444,23 @@ ClayWorld2d {
     // session the host owns it as it owns the gold: a replicated object
     // every node claims for its own knight, given to the first claim
     Component { id: pouchDropComponent; PouchDrop {} }
-    property var pouchDrops: []
-    property var _pouchById: ({})
+    FloorClaims {
+        id: pouchClaims
+        component: pouchDropComponent
+        room: world.room
+        link: session
+        extra: props => {
+            let best = pouchOf(props.gems).reduce((a, g) => !a || g.value > a.value ? g : a, null)
+            return { gemColor: best ? gemColorOf(best.shape) : "#F2B33D",
+                     pixelPerUnit: Qt.binding(() => world.pixelPerUnit) }
+        }
+        grantOf: drop => ({ gems: drop.gems })
+        take: grant => _takePouch(grant.gems)
+        claimOf: objectId => session.claimPouch(objectId)
+        despawnOf: objectId => session.despawnPouch(objectId)
+        grantTo: (nodeId, grant) => session.grantPouch(nodeId, grant)
+    }
+    readonly property var pouchDrops: pouchClaims.drops
     // This node's knight fell: its pouch drops where it lies. In a session
     // it leaves the knight once the host laid it on the floor; the gems
     // asked for, until it answers (_pouchDropAnswered)
@@ -7069,7 +7478,7 @@ ClayWorld2d {
             return
         }
         player.pouch = []
-        _makePouchDrop(props)
+        pouchClaims.make(props)
     }
     function _pouchDropAnswered(ok) {
         let n = _pouchDropAsked
@@ -7089,61 +7498,17 @@ ClayWorld2d {
         else console.log("[Game] A pouch dropped on level", props.level, "by", fromId, "- refused")
         session.answerPouchDrop(fromId, ok)
     }
-    function _makePouchDrop(props, objectId) {
-        objectId = objectId || ""
-        if (objectId !== "" && _pouchById[objectId]) return _pouchById[objectId]
-        let gems = pouchOf(props.gems)
-        let best = gems.reduce((a, g) => !a || g.value > a.value ? g : a, null)
-        let drop = pouchDropComponent.createObject(world.room, Object.assign({}, props, {
-            objectId: objectId, gemColor: best ? gemColorOf(best.shape) : "#F2B33D",
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
-        }))
-        if (!drop) return null
-        pouchDrops.push(drop)
-        if (objectId !== "") _pouchById[objectId] = drop
-        return drop
-    }
-    function _removePouchDrop(objectId) {
-        let drop = _pouchById[objectId]
-        if (!drop) return
-        delete _pouchById[objectId]
-        _forgetPouchDrop(drop)
-    }
-    function _forgetPouchDrop(drop) {
-        pouchDrops = pouchDrops.filter(d => d !== drop)
-        try { drop.destroy() } catch (err) {}
-    }
     // Each step: a pouch this node's knight stands on is its, or claimed
     // from the host in a session
     function _pickUpPouches() {
         if (!player || player.fallen || pouchDrops.length === 0) return
-        let c = _knightCentre(), reach = Balance.deep.pouchReach
-        for (let drop of pouchDrops.slice())
-            if (drop && Math.hypot(drop.xWu - c.x, drop.yWu - c.y) <= reach) _claimPouch(drop)
+        let c = _knightCentre()
+        pouchClaims.claimNear(c.x, c.y, Balance.deep.pouchReach)
     }
     // This node's knight lifted that node's knight up: its pouch too
     function _claimPouchesOf(nodeId) {
         for (let drop of pouchDrops.slice())
-            if (drop && drop.owner === nodeId) _claimPouch(drop)
-    }
-    function _claimPouch(drop) {
-        if (drop.claimed) return
-        if (drop.objectId === "") {
-            _takePouch(drop.gems)
-            _forgetPouchDrop(drop)
-        } else if (session.connected) {
-            drop.claimed = true
-            session.claimPouch(drop.objectId)
-        }
-    }
-    // Host: a node's knight reached a pouch; the first claim takes it
-    function _givePouch(nodeId, objectId) {
-        let drop = _pouchById[objectId]
-        if (!drop || !session.isHost) return
-        let grant = { id: objectId, gems: drop.gems }
-        session.despawnPouch(objectId)
-        if (nodeId === session.nodeId) _takePouch(grant.gems)
-        else session.grantPouch(nodeId, grant)
+            if (drop && drop.owner === nodeId) pouchClaims.claim(drop)
     }
     function _takePouch(gems) {
         if (!player) return
@@ -7156,7 +7521,8 @@ ClayWorld2d {
 
     // The dojo's deep scenario: a walled room with a vein in the middle of
     // its north wall, the gem of the scenario's depth, the knight right
-    // below it, in reach, and the vein's spawn hole in the same wall
+    // below it, in reach, the vein's spawn hole in the same wall, and a
+    // petrified miner and lost traveller in its rock face
     function enterDeepRoom() {
         console.log("[Game] Entering the deep room")
         clearDungeon()
@@ -7174,6 +7540,11 @@ ClayWorld2d {
             placeHole(hx, gy, [gx + "," + gy])
             break
         }
+        // A petrified miner and a lost traveller in the vein's rock face,
+        // one each side of it
+        let hole = holes.length > 0 ? holes[0].cell : ""
+        placeStone(gx - 1, gy, "miner", [gx + "," + gy], hole, 0)
+        placeStone(gx + 1, gy, "lost", [gx + "," + gy], hole, 0)
         spawnPlayer((gx + 0.5) * cellSize - 0.5, gy * cellSize - 0.4)
         _bindKnight()
     }
@@ -7283,7 +7654,8 @@ ClayWorld2d {
     // "features" is the dungeon with every feature kind at its showcase
     // count (Balance.dungeon), to try a kind right after a reload
     // "deep" is a walled room with a vein in its north wall and the knight
-    // in reach of it, its gem the depth's (Balance.deep.shapes)
+    // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
+    // hole and a petrified miner and lost traveller beside it
     function scenarios() { return ["dungeon", "village", "fight", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
