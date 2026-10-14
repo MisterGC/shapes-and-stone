@@ -132,7 +132,7 @@ Window {
         p.yWu = v.cyWu - v.sizeWu / 2 - 0.6 + p.heightWu / 2
         game.aimOverride = { x: v.faceXWu, y: v.faceYWu }
         step(1)
-        return game.dig !== null && game.dig.target === v
+        return game.dig !== null && game.dig.vein === v
     }
     // Every strike of the vein clean, each on its close
     function cutClean() {

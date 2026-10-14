@@ -6316,10 +6316,10 @@ ClayWorld2d {
         }
     }
     property var veins: []
-    // The dig under way, null when there is none: {vein, target, t, used,
-    // endAt}, target the vein dug; t its seconds of physics steps, used
-    // the last close a clean strike took (counted from 1), endAt the t it
-    // ends at once the stone split
+    // The dig under way, null when there is none: {vein, t, used, endAt},
+    // vein the vein dug; t its seconds of physics steps, used the last
+    // close a clean strike took (counted from 1), endAt the t it ends at
+    // once the stone split
     property var dig: null
     // The last strike, {clean, t, off, struck}, off its seconds from the
     // nearest close, and the last gem cut, {shape, color, sizeWu, clean,
@@ -6464,7 +6464,7 @@ ClayWorld2d {
         if (!player || fallen || talking || !_canDig(player)) return null
         let t = veinAimed()
         if (!t) return null
-        dig = { vein: t, target: t, t: 0, used: 0, endAt: -1 }
+        dig = { vein: t, t: 0, used: 0, endAt: -1 }
         player.digging = true
         _aimPick()
         _showRing()
@@ -6477,7 +6477,7 @@ ClayWorld2d {
     // is not free to dig, and the sword swings
     function pressPick() {
         if (!player || fallen) return false
-        if (dig && dig.endAt < 0 && _aimOn(dig.target, Balance.deep.aimHold)) {
+        if (dig && dig.endAt < 0 && _aimOn(dig.vein, Balance.deep.aimHold)) {
             strikeVein()
             return true
         }
@@ -6486,18 +6486,18 @@ ClayWorld2d {
     }
     function endDig() {
         if (!dig) return
-        dig.target.ringShows = false
+        dig.vein.ringShows = false
         dig = null
         if (player) player.digging = false
     }
     function _aimPick() {
-        let c = _knightCentre(), v = dig.target
+        let c = _knightCentre(), v = dig.vein
         player.digAngle = Math.atan2(v.faceYWu - c.y, v.faceXWu - c.x) * 180 / Math.PI
     }
     // The ring of the dig: closing over each ringTime, closed and white for
     // window after a close, white for window before one
     function _showRing() {
-        let cfg = Balance.deep, v = dig.target, t = dig.t
+        let cfg = Balance.deep, v = dig.vein, t = dig.t
         let k = Math.floor(t / cfg.ringTime + 1e-6), since = Math.max(0, t - k * cfg.ringTime)
         v.ringShows = dig.endAt < 0
         if (k >= 1 && since <= cfg.window + 1e-6) {
@@ -6517,12 +6517,12 @@ ClayWorld2d {
             return
         }
         let p = player
-        if (!p || fallen || !dig.target) {
+        if (!p || fallen || !dig.vein) {
             endDig()
             return
         }
         dig.t += world.physics.timeStep
-        let c = _knightCentre(), v = dig.target
+        let c = _knightCentre(), v = dig.vein
         if ((dig.endAt >= 0 && dig.t >= dig.endAt - 1e-6)
                 || !_canDig(p) || talking
                 || (dig.endAt < 0 && !_aimOn(v, Balance.deep.aimHold))
