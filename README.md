@@ -169,8 +169,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, 2
-draught, M mute and Esc menu.
+LMB strike (hold to charge), RMB shield, Space dash, E talk / dig, 1
+potion, 2 draught, M mute and Esc menu.
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -721,8 +721,10 @@ doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
 from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
 cell. How many of a kind each room but the start room holds is the
 table's `dungeon.kinds`, per danger band as the looks have it. The kinds
-are the breakables, the spike plates and the arrow slits below; a slit stands
-only on a cell on the room's edge with a wall beside it. In
+are the breakables, the spike plates and the arrow slits below, and last
+the veins; a slit stands only on a cell on the room's edge with a wall
+beside it, a vein only on one with a wall north of it, in whose face it
+sits. In
 the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
@@ -1024,9 +1026,9 @@ colour come with the depth (`shapes`): an amber tetrahedron from depth 0,
 a jade cube from 2, a sapphire octahedron from 4, an amethyst
 dodecahedron from 6 and an ember icosahedron from 8. Every number is
 `Balance.deep`; the samples are synthesised by `tools/deep_sounds.py`.
-For now a vein stands only in the dojo: `applyScenario("deep")` lands
-the knight in front of one in a walled room, and `applyScenario("deep",
-4)` shows depth 4's gem. The deep bench checks that the scenario lands in
+The dojo's `applyScenario("deep")` lands the knight in front of one in a
+walled room, and `applyScenario("deep", 4)` shows depth 4's gem. The deep
+bench checks that the scenario lands in
 reach of the vein and shows each shape at its depth, that E brings out
 the pickaxe and the ring, that on single physics steps E on a close and
 up to the window before or after it strikes clean with the chink and the
@@ -1034,19 +1036,74 @@ rising tink while a step outside it, or a second E on the same close,
 chips with the chink alone, that a strike held a beat on the wall clock
 between two steps is judged by the steps, that the gem's size grows with
 each clean strike from `gemSize[0]` to `gemSize[1]` and the split
-crumbles and chimes, and that the shield or walking off ends the dig:
+crumbles and chimes, and that the shield, walking off, a swing or a dash
+ends the dig:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/deep/deep.qml
+```
+
+In a dungeon the veins are features (`dungeon.kinds.vein`, the last kind,
+so no other kind moves for them): each room but the start room holds
+`perRoom` of them at its danger band, each in the face of the wall north
+of its cell, and a torch whose spot a vein takes stands on the nearest
+spot of its wall without one. A vein is nearly invisible in the dark;
+the lantern of any knight within `glintReach` makes it glint, brighter
+the nearer in `litLevels` steps, and while this screen's knight is within
+`shimmerReach` a faint shimmer of its colour breathes round it. The
+deepest gem, the icosahedron, glows on its own (`selfLit`). A gem cut
+goes into the knight's pouch, worth `value[0]` gold with no clean strike
+up to `value[1]` with all of them clean (`Balance.deep.shapes`); the HUD
+shows a gem of each shape the pouch holds and how many, beside the gold.
+The pouch goes with the knight from level to level, and the smith buys
+it: talking to him, his first ware is the gems, 1 sells them all for
+their worth (the keys 1 to 5 pick his wares now). A knight that falls
+drops its pouch where it fell: another knight whose centre comes within
+`pouchReach` of it, or who lifts the fallen one up, takes it; one left on
+the floor is lost with the level. In a session each screen judges its
+own knight's strikes, and the host decides the rest, as it does the
+gold: a node tells it a vein split and how many strikes were clean, the
+host splits it on every screen (the session property `veins`, a node
+that joins later too) and gives the gem of its own vein to the first
+knight that split it; a second claim gets nothing. A fallen knight's
+pouch is the host's replicated object, given to the first knight that
+claims it. The dungeon master has a row for the veins per room. The
+veins bench builds 20 seeds at a low, a middle and a high danger twice
+and checks the same veins, gems and strikes on the same cells, each by
+the rules, none in the camp or the fight room; that a vein is dark out
+of every lantern and glints in one, the icosahedron glowing; that two
+cubes cut clean and chipped go into the pouch at the table's values, the
+HUD counts them, the camp keeps them and the smith buys them; that a
+knight falling alone drops its pouch; then a host and a joiner in one
+process: the same veins, a vein cut on either screen split on both with
+the gem the cutter's, a second claim given nothing, a fallen host's
+pouch on both screens taken by the joiner lifting it up, and a fallen
+joiner's taken by the host walking over it:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/veins/veins.qml
+```
+
+The vein party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on seed 424242. Both show
+the same veins with the same gems and strikes; a vein the joiner cuts is
+split on both screens and its gem is in the joiner's pouch, one the host
+cuts is split on the joiner's screen too, and both show the same veins
+split. It needs the live loader and exits with the number of failed
+checks:
+
+```
+python3 tests/veinparty/run_veinparty.py --mode local
 ```
 
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
 over, kept for the next visit) shows a panel before each dungeon to a solo
 player or the host, never to a joiner. Its rows are the settings of
 `Balance.dungeonMaster` - enemies, spike plates, arrow slits and
-breakables per room, rooms, base depth and relative difficulty (the
-danger's position in its depth's range) - at the values the game would
-use. W/S picks a row, A/D or the arrows turn it a step and set it (gold),
+breakables per room, rooms, base depth, relative difficulty (the
+danger's position in its depth's range) and veins per room - at the
+values the game would use. W/S picks a row, A/D or the arrows turn it a
+step and set it (gold),
 Backspace or a double click gives it back to the game. G shows the
 dungeon Enter then enters, with its enemies by tier, breakables, spike
 plates, arrow slits, doors and secret rooms; G again rolls a new seed for

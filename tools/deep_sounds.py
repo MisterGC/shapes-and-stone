@@ -6,7 +6,7 @@ again writes the same files:
 
   deep_chink.wav    the pickaxe on stone: a heavy thud under an iron click
   deep_tink.wav     a clean strike's bright tink on the gem, a glassy bell
-  deep_crumble.wav  an off-beat strike's crumble: grit falling off the stone
+  deep_crumble.wav  the stone's crumble as the vein splits: grit falling off it
 
 The game plays the tink a pentatonic step higher with each clean strike,
 and three times, a fifth and an octave apart, as the gem's chime

@@ -13,7 +13,8 @@
 // steps is judged by the steps alone. The vein's last strike splits it,
 // and the gem's size follows its clean strikes, 0 to all of them. Raising
 // the shield or walking off ends the dig, and the pickaxe folds back into
-// the sword. Prints one PASS or FAIL line per check and exits with the
+// the sword; a swing or a dash ends it too, and E mid-swing starts none.
+// Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/deep/deep.qml
@@ -95,7 +96,11 @@ Window {
         }
         return game.lastGem
     }
-    function heardSince(n) { return game.veinSounds.slice(n) }
+    // The vein sounds heard since n of them had played
+    function heardSince(n) {
+        let k = game.veinSoundCount - n
+        return k > 0 ? game.veinSounds.slice(-k) : []
+    }
 
     property var steps: [
         [() => game.screen === "title", () => {
@@ -135,7 +140,7 @@ Window {
             freshDig()
             let v = vein()
             stepTo(beat)
-            let n = game.veinSounds.length
+            let n = game.veinSoundCount
             pressE()
             let s1 = game.lastStrike
             check(s1.clean && v.clean === 1 && Math.abs(s1.off) < 1e-6,
@@ -143,14 +148,14 @@ Window {
             check(heardSince(n).join() === "chink,tink+" + cfg.phrase[0],
                   "a clean strike plays the chink and the tink: " + heardSince(n).join())
             stepTo(beat + 2)
-            n = game.veinSounds.length
+            n = game.veinSoundCount
             pressE()
             check(!game.lastStrike.clean && v.chips === 1,
                   "a second E on the same close chips")
             check(heardSince(n).join() === "chink" + cfg.chipPitch,
                   "a chip plays the chink alone: " + heardSince(n).join())
             stepTo(2 * beat - win)
-            n = game.veinSounds.length
+            n = game.veinSoundCount
             pressE()
             check(game.lastStrike.clean && v.clean === 2,
                   "E " + win + " steps (" + (win * dt).toFixed(3) + " s) before a close strikes clean")
@@ -212,7 +217,7 @@ Window {
                   && heard[2] === "tink+" + cfg.chime[0],
                   "the split crumbles and the chime begins: " + heard.join())
         }],
-        // The dig ends with the shield, or walking off
+        // The dig ends with the shield, walking off, a swing or a dash
         [1500, () => {
             check(game.veinSounds.slice(-cfg.chime.length).join()
                   === cfg.chime.map(p => "tink+" + p).join(),
@@ -231,6 +236,18 @@ Window {
             game.player.xWu -= cfg.leave + 0.5
             step(1)
             check(!game.player.digging && !game.dig, "walking off ends the dig")
+            freshDig()
+            step(2)
+            game.player.attack()
+            step(1)
+            check(game.player.isAttacking && !game.player.digging && !game.dig, "a swing ends the dig")
+            pressE()
+            check(!game.player.digging && !game.dig, "E mid-swing starts no dig")
+            freshDig()
+            step(2)
+            game.player.dash()
+            step(1)
+            check(game.player.isDashing && !game.player.digging && !game.dig, "a dash ends the dig")
             Clayground.paused = false
             console.log("[Deep] done,", failures, "failed")
             game.destroy()

@@ -52,6 +52,9 @@ PhysicsItem {
     property int maxMana: Balance.knight.mana
     // Gold picked up this run, for the village's wares
     property int gold: 0
+    // The gems cut and not yet sold, [{shape, value}] (Balance.deep,
+    // issue #156): kept across levels as the gold is, dropped on a fall
+    property var pouch: []
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0
     // Mana draughts bought from the innkeeper, drunk with key 2
@@ -107,6 +110,7 @@ PhysicsItem {
     // The right button is held: the shield rises again once a crushing
     // blow's lockout is over
     property bool _shieldWanted: false
+    readonly property bool shieldWanted: _shieldWanted
     // No mana, no shield: it cannot be raised, and drops when it runs dry
     onIsBlockingChanged: {
         if (isBlocking && (mana <= 0 || shieldLock > 0)) {

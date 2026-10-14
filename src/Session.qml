@@ -82,6 +82,23 @@ Item {
     // Host: a node's knight opened the secret door on that cell of that
     // level (issue #128)
     signal secretReported(int level, string cell)
+    // Host: a node's knight split the vein on cell ("gx,gy") of that
+    // level, clean of its strikes clean (issue #156)
+    signal cutReported(string fromId, int level, string cell, int clean)
+    // The host gave this node's knight the gem of a vein it split
+    // (shape, value)
+    signal gemGranted(var gem)
+    // The host owns every fallen knight's pouch as a replicated object of
+    // type "pouch", as it owns the gold; it came to life or went on this
+    // node
+    signal pouchSpawned(string objectId, var props)
+    signal pouchDespawned(string objectId)
+    // Host: a node's knight dropped its pouch (x, y, gems); a node's
+    // knight reached one or lifted its owner up and asks for it
+    signal pouchDropped(string fromId, var props)
+    signal pouchClaimed(string fromId, string objectId)
+    // The host gave this node's knight a pouch (id, gems)
+    signal pouchGranted(var grant)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -144,6 +161,10 @@ Item {
     // property "secrets" ({seed, level, cells}); null before any
     readonly property var secrets: net.connected && net.sessionProperties.secrets
                                    ? net.sessionProperties.secrets : null
+    // The veins split in the level the host plays, the session property
+    // "veins" ({seed, level, cells}); null before any (issue #156)
+    readonly property var veins: net.connected && net.sessionProperties.veins
+                                 ? net.sessionProperties.veins : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -217,6 +238,16 @@ Item {
                 if (net.isHost) session.doorReported(data.level, data.cell, data.open === true)
             } else if (data.type === "secret") {
                 if (net.isHost) session.secretReported(data.level, data.cell)
+            } else if (data.type === "cut") {
+                if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
+            } else if (data.type === "gemGrant") {
+                session.gemGranted(data)
+            } else if (data.type === "pouchDrop") {
+                if (net.isHost) session.pouchDropped(fromId, data)
+            } else if (data.type === "pouchClaim") {
+                if (net.isHost) session.pouchClaimed(fromId, data.id)
+            } else if (data.type === "pouchGrant") {
+                session.pouchGranted(data)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -247,10 +278,12 @@ Item {
         onObjectSpawned: (id, type, owner, props) => {
             if (type === "enemy") session.enemySpawned(id, props)
             else if (type === "gold") session.goldSpawned(id, props)
+            else if (type === "pouch") session.pouchSpawned(id, props)
         }
         onObjectDespawned: (id, type) => {
             if (type === "enemy") session.enemyDespawned(id)
             else if (type === "gold") session.goldDespawned(id)
+            else if (type === "pouch") session.pouchDespawned(id)
         }
 
         // A node that joins a run under way gets its knight here; the
@@ -509,6 +542,45 @@ Item {
     // Host: the secret doors opened in its level, for every node
     function publishSecrets(secrets) {
         if (net.isHost) net.setSessionProperty("secrets", secrets)
+    }
+    // This node's knight split a vein, clean of its strikes clean: the
+    // host splits it for every node and gives the gem to the first knight
+    // that split it. The host's own is taken at once
+    function reportCut(level, cell, clean) {
+        if (net.isHost) cutReported(net.nodeId, level, cell, clean)
+        else net.sendTo(net.hostId, {type: "cut", level: level, cell: cell, clean: clean})
+    }
+    // Host: the veins split in its level, for every node
+    function publishVeins(veins) {
+        if (net.isHost) net.setSessionProperty("veins", veins)
+    }
+    // Host: the gem goes to that node's knight
+    function grantGem(nodeId, gem) {
+        net.sendTo(nodeId, Object.assign({type: "gemGrant"}, gem))
+    }
+    // This node's knight fell with gems in its pouch: the host lays the
+    // pouch where it fell, for every node. The host's own is taken at once
+    function dropPouch(props) {
+        if (net.isHost) pouchDropped(net.nodeId, props)
+        else net.sendTo(net.hostId, Object.assign({type: "pouchDrop"}, props))
+    }
+    // Host: a pouch on the floor, for every node, and gone again
+    function spawnPouch(props) {
+        return net.spawn("pouch", props)
+    }
+    function despawnPouch(objectId) {
+        net.despawn(objectId)
+    }
+    // This node's knight reached a pouch or lifted its owner up: the host
+    // gives it to the first node that claims it. The host's own claim is
+    // answered at once
+    function claimPouch(objectId) {
+        if (net.isHost) pouchClaimed(net.nodeId, objectId)
+        else net.sendTo(net.hostId, {type: "pouchClaim", id: objectId})
+    }
+    // Host: the pouch goes to that node's knight
+    function grantPouch(nodeId, grant) {
+        net.sendTo(nodeId, Object.assign({type: "pouchGrant"}, grant))
     }
     // Host: the drop goes to that node's knight
     function grantGold(nodeId, grant) {

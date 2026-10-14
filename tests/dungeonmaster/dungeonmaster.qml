@@ -97,9 +97,10 @@ Window {
     function roomOf(rooms, gx, gy) {
         return rooms.findIndex(r => gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h)
     }
-    // Per room but the start room: [{enemies, spikes, slits, breakables}]
+    // Per room but the start room: [{enemies, spikes, slits, breakables,
+    // veins}]; the veins row is left to the game (issue #156)
     function perRoom(rooms, enemies, features) {
-        let out = rooms.map(() => ({ enemies: 0, spikes: 0, slits: 0, breakables: 0 }))
+        let out = rooms.map(() => ({ enemies: 0, spikes: 0, slits: 0, breakables: 0, veins: 0 }))
         for (let e of enemies) {
             let i = roomOf(rooms, Math.floor(e.x / game.cellSize), Math.floor(e.y / game.cellSize))
             if (i >= 0) out[i].enemies++
@@ -109,6 +110,7 @@ Window {
             if (i < 0) continue
             if (f.kind === "spike") out[i].spikes++
             else if (f.kind === "slit") out[i].slits++
+            else if (f.kind === "vein") out[i].veins++
             else out[i].breakables++
         }
         return out.slice(1)
