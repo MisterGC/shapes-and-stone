@@ -2,7 +2,10 @@
 // and a special one joins the camps for good (issue #159).
 //
 // The game keeps its specials in a store of the bench's own, emptied at
-// the start. On the first seed whose dungeon at depth 2 holds a lost
+// the start. A level's special comes from its seed alone: the same seed
+// holds the same travellers of the same kinds with an empty and a full
+// record, the special an ordinary traveller once it is with the camps.
+// On the first seed whose dungeon at depth 2 holds a lost
 // traveller, the knight frees every traveller in it, every strike clean:
 // those that left toward the exit sit round the fire of the camp after
 // depth 2 and of the camp after depth 3 of that run, in colour, seated, on
@@ -163,6 +166,33 @@ Window {
         [() => game.screen === "title", () => {
             check(camp().joined.length === 0 && shown("titleFreed") === "" && shown("titleJoined") === "",
                   "a fresh store: no specials with the camps, the title shows no freed and no specials")
+        }],
+        [50, () => {
+            // A level's special comes from its seed alone: the same seed
+            // holds the same traveller of the same kind with an empty and
+            // a full record, a special only while it is not with the camps
+            let line = () => game.stones.map(s => s.cell + ":" + s.kind).sort().join()
+            let found = null
+            for (let i = 0; i < 120 && !found; i++) {
+                let seed = 9000 + i * 7919
+                game.applyScenario("dungeon", 2, seed)
+                let sp = game.stones.find(s => s.special !== "")
+                if (sp) found = { seed: seed, cell: sp.cell, kind: sp.kind, special: sp.special, all: line() }
+            }
+            check(found !== null, "seed " + (found ? found.seed : "none") + " holds a special at depth 2: "
+                  + (found ? found.special + " (" + found.kind + ") on " + found.cell : "none"))
+            if (!found) return
+            camp().joined = Balance.deep.specials.map(sp => sp.id)
+            game.applyScenario("dungeon", 2, found.seed)
+            let again = game.stones.find(s => s.cell === found.cell)
+            check(line() === found.all && again && again.kind === found.kind && again.special === "",
+                  "with every special in the record the same seed holds the same travellers ("
+                  + line() + "), " + found.cell + " an ordinary " + (again ? again.kind : "none"))
+            camp().joined = []
+            game.applyScenario("dungeon", 2, found.seed)
+            again = game.stones.find(s => s.cell === found.cell)
+            check(again && again.special === found.special, "with the record empty again it is " + found.special
+                  + " again (" + (again ? again.special : "none") + ")")
         }],
         [50, () => {
             // A dungeon at depth 2 with a lost traveller
