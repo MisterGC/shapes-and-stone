@@ -135,7 +135,7 @@ Item {
     Rectangle {
         id: glow
         parent: vein.glowParent || vein
-        readonly property real sizePx: vein.width * 1.1
+        readonly property real sizePx: vein.width * 0.9
         width: sizePx
         height: sizePx
         radius: sizePx / 2
@@ -143,7 +143,20 @@ Item {
         y: (parent === vein ? 0 : vein.y) + vein.height * 0.76 - height / 2
         visible: vein.selfLit && !vein.split
         color: vein.gemColor
-        opacity: 0.2
+        opacity: 0.07
+    }
+    Rectangle {
+        id: glowCore
+        parent: vein.glowParent || vein
+        readonly property real sizePx: vein.width * 0.5
+        width: sizePx
+        height: sizePx
+        radius: sizePx / 2
+        x: (parent === vein ? 0 : vein.x) + vein.width / 2 - width / 2
+        y: (parent === vein ? 0 : vein.y) + vein.height * 0.76 - height / 2
+        visible: vein.selfLit && !vein.split
+        color: vein.gemColor
+        opacity: 0.12
     }
     Rectangle {
         id: shimmer
