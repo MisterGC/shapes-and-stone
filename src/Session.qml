@@ -91,6 +91,10 @@ Item {
     // Host: a node's knight freed the petrified traveller on cell
     // ("gx,gy") of that level (issue #158)
     signal freedReported(string fromId, int level, string cell)
+    // The host refused this node's freeing of the traveller on cell: it
+    // is on another level, or its outcome was decided already (#173
+    // review)
+    signal freedRefused(string cell)
     // The host gave this node's knight the gem of a vein it split
     // (cell, shape, value), or refused it: another knight split it first,
     // or the host is on another level (issue #169)
@@ -268,6 +272,8 @@ Item {
                 if (net.isHost) session.freedReported(fromId, data.level, data.cell)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
+            } else if (data.type === "freeRefuse") {
+                session.freedRefused(data.cell)
             } else if (data.type === "gemRefuse") {
                 session.gemRefused(data.cell)
             } else if (data.type === "pouchDrop") {
@@ -603,6 +609,11 @@ Item {
     // Host: the travellers freed in its level, for every node
     function publishStones(stones) {
         if (net.isHost) net.setSessionProperty("stones", stones)
+    }
+    // Host: that node's knight's freeing of the traveller on cell stands
+    // not
+    function refuseFreed(nodeId, cell) {
+        net.sendTo(nodeId, {type: "freeRefuse", cell: cell})
     }
     // Host: the gem goes to that node's knight
     function grantGem(nodeId, gem) {

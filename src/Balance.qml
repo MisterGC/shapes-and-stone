@@ -702,7 +702,8 @@ QtObject {
     // says a line of lostLines (fleeLines for a miner) and walks off
     // toward the room's way to the exit at leaveSpeed, fading out over
     // fade seconds after fadeAfter. A working miner flees too when the
-    // hole's first wave comes
+    // hole's first wave comes. A freed miner nods for nod seconds before
+    // it walks to its work
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -782,7 +783,8 @@ QtObject {
                          "Stone, was I? Then I've rested enough."],
             fleeLines: ["Those things again - I'm off!", "Not worth it with them about. Thanks!"],
             lostLines: ["...how long was I down here?", "Thank you - I'll find the way up now.",
-                        "Light! I thought I'd never see it again."]
+                        "Light! I thought I'd never see it again."],
+            nod: 0.7
         },
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },

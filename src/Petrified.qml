@@ -9,8 +9,9 @@ import QtQuick
 // parry ring's language, white while a strike would be clean; each clean
 // strike runs one more crack through the shell. Freed, colour flows back
 // into it from its middle out (colour 0..1), and then the game walks it:
-// to work at a vein, swinging its pick (swing), or off toward the exit,
-// fading out (fade). Visual only - the cell stays a wall
+// to work at a vein, after a nod to the knight (nod), swinging its pick
+// (swing), or off toward the exit, fading out (fade). Visual only - the
+// cell stays a wall
 Item {
     id: stone
     objectName: "petrified"
@@ -57,6 +58,8 @@ Item {
     property bool walking: false
     property int facing: 1
     property real swing: 0
+    // A miner's nod to the knight once freed, 0..1, its head bowed
+    property real nod: 0
     // The lantern's light on it, 0..1, and whether a knight is near
     property real lit: 0
     property bool knightNear: false
@@ -141,12 +144,14 @@ Item {
             readonly property int cracks: stone.clean
             readonly property real lit: stone.lit
             readonly property real swing: stone.swing
+            readonly property real nod: stone.nod
             readonly property int facing: stone.facing
             readonly property bool upright: stone.outcome !== ""
             onColourChanged: requestPaint()
             onCracksChanged: requestPaint()
             onLitChanged: requestPaint()
             onSwingChanged: requestPaint()
+            onNodChanged: requestPaint()
             onFacingChanged: requestPaint()
             onUprightChanged: requestPaint()
             onWidthChanged: requestPaint()
@@ -185,14 +190,16 @@ Item {
                     oval(w * 0.6, h * 0.88, w * 0.1, h * 0.09)
                     ctx.fillStyle = pal.cloth
                     oval(w * 0.5, h * 0.62, w * 0.25, h * 0.22)
+                    // The head bows forward by its nod
+                    let nx = f * w * 0.04 * nod, ny = h * 0.07 * nod
                     ctx.fillStyle = pal.skin
-                    disc(w * 0.5, h * 0.29, w * 0.17)
+                    disc(w * 0.5 + nx, h * 0.29 + ny, w * 0.17)
                     ctx.fillStyle = pal.cap
                     ctx.beginPath()
-                    ctx.arc(w * 0.5, h * 0.26, w * 0.18, Math.PI, Math.PI * 2)
+                    ctx.arc(w * 0.5 + nx, h * 0.26 + ny, w * 0.18, Math.PI, Math.PI * 2)
                     ctx.fill()
                     ctx.fillStyle = pal.lamp
-                    disc(w * 0.5, h * 0.17, w * 0.06)
+                    disc(w * 0.5 + nx, h * 0.17 + ny, w * 0.06)
                     // The arm and the pick: raised high over its head
                     // petrified, swung down onto the stone by swing while
                     // it works

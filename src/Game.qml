@@ -286,8 +286,11 @@ ClayWorld2d {
         tinkSound.triggerNote(tinkSound.rootNote + pitch, gain === undefined ? 1 : gain)
         _heard("tink+" + pitch)
     }
-    function playCrumble() {
-        crumbleSound.triggerOneShot(1)
+    // gain 1 when left out; the last one played is crumbleGain
+    property real crumbleGain: 0
+    function playCrumble(gain) {
+        crumbleGain = gain === undefined ? 1 : gain
+        crumbleSound.triggerOneShot(crumbleGain)
         _heard("crumble")
     }
     property var _chimeLeft: []
@@ -779,6 +782,7 @@ ClayWorld2d {
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
         onWakeReported: (level, cell) => _hostWake(level, cell)
         onFreedReported: (fromId, level, cell) => _hostFreed(fromId, level, cell)
+        onFreedRefused: (cell) => _stoneRefused(cell)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
@@ -6991,10 +6995,11 @@ ClayWorld2d {
     // a session the node whose knight freed it shows the moment at once
     // and tells the host; the host decides and publishes every traveller
     // freed and how it goes on (session property "stones"), which every
-    // screen shows, a node that joins later too. stoneEvents lists what
-    // they did on this screen, for the benches: {cell, what, t}, what
-    // "freed", "working", "leaving", "fleeing" or "gone", t the stones'
-    // physics clock, seconds; stoneSounds the last veinSoundsKept of their
+    // screen shows, a node that joins later too; a freeing it refuses
+    // turns back to stone. stoneEvents lists what they did on this
+    // screen, for the benches: {cell, what, t}, what "freed", "working",
+    // "leaving", "fleeing", "gone" or "refused", t the stones' physics
+    // clock, seconds; stoneSounds the last veinSoundsKept of their
     // sounds, "chord" or "work", muted too, stoneSoundCount all of them
     Component { id: stoneComponent; Petrified {} }
     Sound {
@@ -7008,8 +7013,9 @@ ClayWorld2d {
     property int stoneSoundCount: 0
     property real _stoneClock: 0
     // A freed traveller's run on this screen, by cell: {t, chord, doing,
-    // path, speed, say, work, swing, leave}, t its seconds since freed,
-    // doing the outcome it acts on, path the points it walks to [{x, y}]
+    // path, speed, say, work, swing, leave, nod}, t its seconds since
+    // freed, doing the outcome it acts on, path the points it walks to
+    // [{x, y}], nod its seconds nodding (-1 not)
     property var _stoneRuns: ({})
 
     // The petrified travellers of the carved dungeon with its features
@@ -7142,7 +7148,7 @@ ClayWorld2d {
         _stoneEvent(s, "freed")
         console.log("[Game] The", s.kind, "at", s.cell, "is freed")
         _stoneRuns[s.cell] = { t: quiet ? cfg.colourTime : 0, chord: !!quiet, doing: "", path: [], speed: 0,
-                               say: 0, work: 0, swing: -1, leave: 0 }
+                               say: 0, work: 0, swing: -1, leave: 0, nod: -1 }
         if (quiet) {
             s.colour = 1
             return
@@ -7151,7 +7157,9 @@ ClayWorld2d {
             let a = Math.PI * 2 * i / 8
             spawnShards(s.faceXWu, s.faceYWu, Math.cos(a), Math.sin(a), Math.ceil(cfg.shards / 8), cfg.shardColor, 0.14)
         }
-        playCrumble()
+        // As loud as the chord: one freed on another screen, far off, is
+        // quieter
+        playCrumble(Math.max(Balance.deep.hole.quietest, _stoneGain(s, 1, Balance.deep.hole.hearReach)))
     }
     // Alone or the host: how the freed traveller s goes on - a miner works
     // on unless its room's hole sent creatures, a lost one leaves
@@ -7161,15 +7169,43 @@ ClayWorld2d {
         _stoneOutcome(s, s.kind !== "miner" ? "leaving" : came ? "fleeing" : "working")
     }
     // Host: a node's knight freed the traveller on cell of that level; one
-    // decided already, or on another level than the host's, is let be
+    // decided already, or on another level than the host's, is refused,
+    // as a gem is
     function _hostFreed(fromId, level, cell) {
         let s = level === levelIndex && levelType === "dungeon" ? stoneAt(cell) : null
         if (!s || s.outcome !== "") {
-            console.log("[Game] The traveller at", cell, "of level", level, "was freed by", fromId, "- let be")
+            console.log("[Game] The traveller at", cell, "of level", level, "was freed by", fromId, "- refused")
+            if (fromId === session.nodeId) _stoneRefused(cell)
+            else session.refuseFreed(fromId, cell)
             return
         }
         _freeMoment(s)
         _decideStone(s)
+    }
+    // The host refused this node's freeing of the traveller on cell: one
+    // the host decided already goes on as it decided, any other turns
+    // back to stone, its strikes to be made again
+    property int stonesRefused: 0
+    function _stoneRefused(cell) {
+        let s = stoneAt(cell)
+        if (!s || !s.freed || s.outcome !== "") return
+        let val = session.stones
+        if (val && val.seed === session.runSeed && val.level === levelIndex && val.stones[cell]) {
+            _stoneOutcome(s, val.stones[cell])
+            return
+        }
+        stonesRefused++
+        delete _stoneRuns[cell]
+        s.freed = false
+        s.clean = 0
+        s.colour = 0
+        s.saying = ""
+        s.walking = false
+        s.footXWu = s.cxWu
+        s.footYWu = s.cyWu - s.sizeWu / 2 + 0.05
+        _stoneEvent(s, "refused")
+        spawnShards(s.faceXWu, s.faceYWu, 0, 1, 5, Balance.deep.hole.dustColor, 0.07)
+        console.log("[Game] The", s.kind, "at", s.cell, "is stone again: the host refused its freeing")
     }
     // Traveller s goes on as outcome: its run takes it up once the colour
     // is back; quiet, it is there at once, at work or gone. The host
@@ -7271,6 +7307,8 @@ ClayWorld2d {
             start = [{ x: s.footXWu, y: s.cyWu - s.sizeWu / 2 - 0.55 }]
         if (s.outcome === "working") {
             let w = _workSpot(s)
+            // It nods to the knight before it walks to its work
+            run.nod = 0
             run.path = start.concat([{ x: w.x, y: w.y - 0.5 }, { x: w.x, y: w.y }])
             run.facing = w.facing
             run.speed = cfg.walkSpeed
@@ -7313,6 +7351,12 @@ ClayWorld2d {
             }
             if (s.colour < 1 || s.outcome === "") continue
             if (run.doing !== s.outcome) _takeUp(s, run)
+            if (run.nod >= 0) {
+                run.nod += dt
+                s.nod = run.nod < cfg.nod ? Math.sin(Math.PI * run.nod / cfg.nod) : 0
+                if (run.nod < cfg.nod) continue
+                run.nod = -1
+            }
             // Walking
             if (run.path.length > 0) {
                 let p = run.path[0], dx = p.x - s.footXWu, dy = p.y - s.footYWu
