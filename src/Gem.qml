@@ -3,7 +3,9 @@ import QtQuick
 // A gem as the deep keeps it (issue #155, Balance.deep.shapes): one of the
 // five Platonic solids drawn flat, as the knight is, its faces in light,
 // middle and dark tones of its colour with lit edges. Drawing only - a
-// vein's cluster and the gem popping out of it are made of these.
+// vein's cluster and the gem popping out of it are made of these. A gem
+// cut with chipped strikes shows notches broken out of its rim (issue
+// #169), so a clean one and a chipped one read apart at a glance.
 Canvas {
     id: gem
 
@@ -12,8 +14,11 @@ Canvas {
     property color color: "#F2B33D"
     // Below 1 the faces are darkened by it, for a gem still in the stone
     property real light: 1
+    // Notches broken out of its rim, 0 for a clean one
+    property int notches: 0
 
     onShapeChanged: requestPaint()
+    onNotchesChanged: requestPaint()
     onColorChanged: requestPaint()
     onLightChanged: requestPaint()
     onWidthChanged: requestPaint()
@@ -80,6 +85,32 @@ Canvas {
             ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.55 * light)
             ctx.lineWidth = Math.max(1, s * 0.05)
             ctx.lineJoin = "round"
+            ctx.stroke()
+        }
+        // Each notch a wedge broken out of the rim, its broken faces dark,
+        // a crack running on into the gem
+        for (let i = 0; i < notches; i++) {
+            let a = (-20 + 137.5 * i) * Math.PI / 180, w = 0.3
+            let o1 = [Math.cos(a - w) * s * 1.1, Math.sin(a - w) * s * 1.1]
+            let o2 = [Math.cos(a + w) * s * 1.1, Math.sin(a + w) * s * 1.1]
+            let tip = [Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55]
+            let end = [Math.cos(a + 0.5) * s * 0.18, Math.sin(a + 0.5) * s * 0.18]
+            ctx.globalCompositeOperation = "destination-out"
+            ctx.beginPath()
+            ctx.moveTo(cx + o1[0], cy + o1[1])
+            ctx.lineTo(cx + tip[0], cy + tip[1])
+            ctx.lineTo(cx + o2[0], cy + o2[1])
+            ctx.closePath()
+            ctx.fill()
+            ctx.globalCompositeOperation = "source-over"
+            ctx.strokeStyle = Qt.darker(color, 2.6)
+            ctx.lineWidth = Math.max(1, s * 0.07)
+            ctx.beginPath()
+            ctx.moveTo(cx + o1[0] * 0.86, cy + o1[1] * 0.86)
+            ctx.lineTo(cx + tip[0], cy + tip[1])
+            ctx.lineTo(cx + o2[0] * 0.86, cy + o2[1] * 0.86)
+            ctx.moveTo(cx + tip[0], cy + tip[1])
+            ctx.lineTo(cx + end[0], cy + end[1])
             ctx.stroke()
         }
     }

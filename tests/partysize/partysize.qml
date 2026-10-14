@@ -8,8 +8,8 @@
 // hpPerKnight more of its HP. The rooms and everything laid on the floor
 // stay the same. For 1 knight the dungeon is today's: its fingerprint is
 // the one recorded below, from the game with 9 to 12 rooms, and without
-// its veins the one recorded before there were any (issue #156), but for
-// a torch stepped aside for a vein. A knight
+// its veins and their rock faces the one recorded before there were any
+// (issue #156), but for a torch stepped aside for a vein. A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -56,20 +56,23 @@ Window {
     // Today's dungeon for one knight (9 to 12 rooms, 10 to 15 enemies at
     // depth 0, its breakables, spike plates, arrow slits and doors): the
     // fingerprint hash and enemy count at each danger, on the scenario
-    // seed, and the hash without its veins (noVeins): as before them at
-    // 1.5 (a1c350e8), at 0.5 with one torch a spot aside for a vein (it
-    // was 63976147, the torch at x 27 then, 29 now)
+    // seed, and the hash without its veins and their rock faces (noVeins):
+    // as before them at 1.5 (a1c350e8), at 0.5 with one torch a spot aside
+    // for a vein (it was 63976147, the torch at x 27 then, 29 now). The
+    // rock faces round the veins (issue #169) changed the hash from
+    // fc4fbc6d at 0.5 and 8684d4a2 at 1.5
     readonly property var today: ({
-        "0.5": { hash: "fc4fbc6d", noVeins: "b084ab49", enemies: 15 },
-        "1.5": { hash: "8684d4a2", noVeins: "a1c350e8", enemies: 18 }
+        "0.5": { hash: "8ae03641", noVeins: "b084ab49", enemies: 15 },
+        "1.5": { hash: "c7390a81", noVeins: "a1c350e8", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
-    // rooms and every object laid in it
-    function layout() {
+    // rooms and every object laid in it, without the veins' rock faces
+    // when noRock
+    function layout(noRock) {
         let out = [JSON.stringify(game.rooms)]
         for (let o of game.dungeonObjects) {
-            if (!o) continue
+            if (!o || (noRock && o.objectName === "rockFace")) continue
             // The type without the number QML gives it, or an inline
             // type of Game.qml, in load order: a new type shifts it
             let parts = [String(o).split("(")[0].replace(/_QML(TYPE)?_\d+$/, "")]
@@ -92,7 +95,7 @@ Window {
     // The fingerprint of today's dungeon: layout and enemies, without the
     // HP an enemy has left (all of it)
     function todayLines(noVeins) {
-        let lines = layout().filter(l => !noVeins || l.indexOf("Vein ") !== 0)
+        let lines = layout(noVeins).filter(l => !noVeins || l.indexOf("Vein ") !== 0)
         return lines.concat(foes().map(f => f.split(":").slice(0, 6).join(":")))
     }
 

@@ -623,14 +623,16 @@ QtObject {
 
     // Greed in the deep (issue #154): a vein of gems in a wall's face, cut
     // with the pickaxe the sword turns into while digging (issue #155).
-    // E with the knight's centre within reach wu of the vein's face starts
-    // the dig, the sword folding into the pickaxe in morph seconds; walking
-    // further than leave wu off, raising the shield, swinging or dashing
-    // ends it, and the pickaxe folds back. While it digs a ring closes on
-    // the vein from ringFrom times ringSize wu to ringSize, once every
-    // ringTime seconds, counted on the physics steps: E within window
-    // seconds of a close, before or after it, is a clean strike, once a
-    // close; any other E chips. A vein takes strikes[0] to strikes[1]
+    // The mouse aiming at a vein's cell, or within aimPad wu of it, with
+    // the knight's centre within reach wu of its face starts the dig, the
+    // sword folding into the pickaxe in morph seconds (issue #169); the
+    // aim moving further than aimHold wu off the cell, walking further
+    // than leave wu off, raising the shield, swinging or dashing ends it,
+    // and the pickaxe folds back. While it digs a ring closes on the vein
+    // from ringFrom times ringSize wu to ringSize, once every ringTime
+    // seconds, counted on the physics steps, and the left button strikes
+    // instead of swinging the sword: within window seconds of a close,
+    // before or after it, a clean strike, once a close; any other chips. A vein takes strikes[0] to strikes[1]
     // strikes, clean or chipped, by its seed; the last one splits the
     // stone and the gem pops out, its size in wu from gemSize[0] with no
     // clean strike to gemSize[1] with all of them clean, by their share.
@@ -651,10 +653,19 @@ QtObject {
     // rounded; the smith buys every gem in the pouch at once for that.
     // A knight that falls drops its pouch where it fell: any other knight
     // whose centre comes within pouchReach wu of it, or that lifts the
-    // fallen one up, takes it
+    // fallen one up, takes it. A gem won (issue #169) rises off the face
+    // in wonRise seconds, flies up to wonAbove wu above the knight's
+    // centre in wonFly, growing to wonScale times its size and at least
+    // wonMin wu across, holds there
+    // wonHold seconds and drops into the pouch in wonDrop. The wall face
+    // round a vein is rough rock in rockColor, rockCells cells to each
+    // side as far as the face runs, its ends breaking off over up to
+    // rockRagged wu where the bricks go on
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
+        aimPad: 0.3,
+        aimHold: 0.9,
         morph: 0.16,
         ringTime: 0.75,
         ringSize: 1.1,
@@ -678,6 +689,16 @@ QtObject {
         shimmerPitch: 19,
         shimmerVolume: 0.12,
         pouchReach: 0.9,
+        wonRise: 0.45,
+        wonFly: 0.35,
+        wonHold: 0.9,
+        wonDrop: 0.25,
+        wonScale: 1.8,
+        wonMin: 1.1,
+        wonAbove: 1.3,
+        rockCells: 1,
+        rockRagged: 0.45,
+        rockColor: "#5E564C",
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
             { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },

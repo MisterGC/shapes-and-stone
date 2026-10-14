@@ -6,7 +6,8 @@
 // cells with the same gems and strikes, each in the face of a wall cell
 // north of a room's cell, not in the start room, its gem the depth's,
 // and no torch on a vein's cell or on another torch's (also on the two
-// seeds where a torch stepped aside onto the other one); none in the camp
+// seeds where a torch stepped aside onto the other one), each vein's cell
+// in a rough rock face (issue #169); none in the camp
 // nor in the fight room. A vein far from the knight's
 // lantern is dark, one in it glints; the deepest gem glows on its own.
 // Then in the dojo's deep scenario two veins are cut, one with every
@@ -17,10 +18,15 @@
 // and a joiner in one process, joined over LAN: both build the same
 // veins; a vein the joiner cuts is split on the host's screen too and
 // its gem is the joiner's, one the host cuts is split on the joiner's; a
-// second claim for a vein split gives nothing; the host's knight falls
+// second claim for a vein split gives nothing and shows the joiner LOST;
+// both knights cut the same vein, the host's claim first: the joiner's
+// split shows no gem until the host answers, and then LOST, the gem the
+// host's (#168 review); a pouch dropped on another level than the host's
+// is refused and stays with the knight (#168 review); the host's knight falls
 // and its pouch lies on both screens where it fell, the joiner lifts it
 // up and takes the pouch; the joiner's knight falls and the host walks
-// over its pouch and takes it. Prints one PASS or FAIL line per check and
+// over its pouch and takes it, the joiner's pouch leaving it only once the
+// host laid it down. Prints one PASS or FAIL line per check and
 // exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/veins/veins.qml
@@ -141,22 +147,35 @@ Window {
         }
         return out
     }
+    // The veins of a game whose cell no rough rock face covers: ["x,y"]
+    function veinsBare(game) {
+        let cs = game.cellSize
+        return game.veins.filter(v => {
+            let c = v.cell.split(",").map(Number)
+            return !game.rockFaces.some(f => f.faceStyle === "rock"
+                                         && Math.abs(f.yWu - (c[1] * cs + game.wallFaceWu)) < 1e-6
+                                         && f.xWu <= c[0] * cs + 1e-6 && f.xWu + f.widthWu >= (c[0] + 1) * cs - 1e-6)
+        }).map(v => v.cell)
+    }
     // The knight's centre in front of vein v's face, off by dx
     function standAtVein(game, v, dx) {
         let p = game.player
         p.xWu = v.faceXWu + (dx || 0) - p.widthWu / 2
         p.yWu = v.cyWu - v.sizeWu / 2 - 0.6 + p.heightWu / 2
     }
-    // Cuts vein v with its knight: clean strikes on the closes, or each
-    // half a beat off them; the dig started and judged at once
+    // Cuts vein v with its knight: aimed at it, clean strikes of the left
+    // button on the closes, or each half a beat off them; the dig started
+    // and judged at once
     function cutVein(game, v, clean) {
         game.endDig()
         standAtVein(game, v)
-        if (!game.pressDig() || !game.dig || game.dig.vein !== v) return false
+        game.aimOverride = { x: v.faceXWu, y: v.faceYWu }
+        if (!game.pressPick() || !game.dig || game.dig.vein !== v) return false
         for (let i = 0; i < v.strikes; i++) {
             game.dig.t = (i + (clean ? 1 : 0.5)) * cfg.ringTime
-            game.strikeVein()
+            game.pressPick()
         }
+        game.aimOverride = null
         return v.split
     }
     function centreOf(game) { return game._knightCentre() }
@@ -175,7 +194,7 @@ Window {
     ]
     // The same seed and danger twice: the same veins, by the rules
     property var placed: ({ lines: 0, same: 0, builds: 0, broken: [], least: 1e9, empty: 0, perBand: [0, 0, 0],
-                            clashes: [] })
+                            clashes: [], bare: [] })
     function placementSteps() {
         let out = []
         for (let i = 0; i < seeds; i++) {
@@ -189,6 +208,7 @@ Window {
                         if (why !== "") placed.broken.push("seed " + seed + " danger " + dg + " " + v.cell + " " + why)
                     }
                     for (let c of torchesClashing(solo)) placed.clashes.push("seed " + seed + " danger " + dg + " " + c)
+                    for (let c of veinsBare(solo)) placed.bare.push("seed " + seed + " danger " + dg + " " + c)
                     solo.applyScenario("dungeon", dg, seed)
                     let b = veinLines(solo)
                     placed.builds++
@@ -224,6 +244,8 @@ Window {
             check(placed.clashes.length === 0 && bench.torchSeeds === 2,
                   "no torch stands on a vein or on another torch, on these dungeons and seeds 81190 and 492978"
                   + (placed.clashes.length ? ": " + placed.clashes.length + ", e.g. " + placed.clashes.slice(0, 3).join("; ") : ""))
+            check(placed.bare.length === 0, "every vein sits in a rough rock face"
+                  + (placed.bare.length ? ": " + placed.bare.length + " not, e.g. " + placed.bare.slice(0, 3).join("; ") : ""))
             let camps = 0
             for (let i = 0; i < 5; i++) {
                 solo.applyScenario("village", i * 2, 2000 + i * 7919)
@@ -272,6 +294,9 @@ Window {
                   && solo.player.pouch.map(g => g.value).join() === want.join(),
                   "two cubes cut, one clean and one chipped all through, go into the pouch worth the table's "
                   + want.join(" and ") + " gold: " + JSON.stringify(solo.player.pouch))
+        }],
+        // The gems won land in the pouch and the HUD counts them
+        [() => solo.wonGems.length === 0, () => {
             let h = find(solo, "hudPouch")
             check(h.visible && h.summary === "cube 2", "the HUD shows the pouch's count per shape (" + h.summary + ")")
             pouchWorth = solo.pouchWorth(solo.player.pouch)
@@ -338,6 +363,7 @@ Window {
     }
     property string cutJ: ""
     property string cutH: ""
+    property string cutR: ""
     property var hostFall: null
     property var joinFall: null
     property var coopSteps: [
@@ -383,10 +409,30 @@ Window {
             // A second claim for the vein already split
             session(joiner).reportCut(joiner.levelIndex, cutJ, 3)
         }],
-        [400, () => {
+        [() => joiner.gemsLost === 1, () => {
             check(joiner.player.pouch.length === 1 && host.player.pouch.length === 1,
-                  "a second claim for a vein split gives no gem (joiner " + joiner.player.pouch.length
-                  + ", host " + host.player.pouch.length + ")")
+                  "a second claim for a vein split gives no gem, the joiner is shown LOST (joiner "
+                  + joiner.player.pouch.length + ", host " + host.player.pouch.length + ")")
+            // Both knights at the same vein, the host's claim first
+            cutR = host.veins.find(v => !v.split).cell
+            let won = joiner.gemsWon
+            check(cutVein(joiner, joiner.veinAt(cutR), true) && joiner.gemsWon === won
+                  && joiner._cutsAsked[cutR] !== undefined,
+                  "the joiner's knight splits the vein on " + cutR + ": no gem shows until the host answers")
+            check(cutVein(host, host.veinAt(cutR), true) && host.player.pouch.length === 2,
+                  "the host's knight splits it too, its claim first: the gem is the host's")
+        }],
+        [() => joiner.gemsLost === 2, () => {
+            check(joiner.player.pouch.length === 1 && joiner.gemsWon === 1 && joiner._cutsAsked[cutR] === undefined
+                  && host.player.pouch.length === 2,
+                  "the joiner's claim is refused: it is shown LOST, no gem won and its pouch still holds 1")
+            // A pouch dropped on another level than the host's
+            host._hostDropPouch(joinNet.nodeId, { xWu: 1, yWu: 1, gems: "cube:9", level: host.levelIndex + 1 })
+        }],
+        [() => joiner.pouchDropsRefused === 1, () => {
+            check(host.pouchDrops.length === 0 && joiner.pouchDrops.length === 0 && joiner.player.pouch.length === 1,
+                  "a pouch dropped on another level than the host's is refused: none lies on either screen, "
+                  + "the joiner's stays with it")
             // The host's knight falls; the joiner stands beside it, out of
             // the pouch's reach, and lifts it up
             hostFall = centreOf(host)
@@ -399,32 +445,35 @@ Window {
             let a = dropsOf(host, hostNet.nodeId)[0], b = dropsOf(joiner, hostNet.nodeId)[0]
             check(host.player.pouch.length === 0 && a.objectId !== "" && a.objectId === b.objectId
                   && Math.abs(b.xWu - hostFall.x) < 1e-3 && Math.abs(b.yWu - hostFall.y) < 1e-3
-                  && host.pouchOf(b.gems).length === 1,
+                  && host.pouchOf(b.gems).length === 2,
                   "the host's knight fell: its pouch lies on both screens where it fell (" + b.gems + ")")
         }],
         [() => !host.fallen, () => {
             check(true, "the joiner lifted the host's knight up")
         }],
         [() => dropsOf(host, hostNet.nodeId).length === 0 && dropsOf(joiner, hostNet.nodeId).length === 0
-               && joiner.player.pouch.length === 2, () => {
+               && joiner.player.pouch.length === 3, () => {
             check(host.player.pouch.length === 0,
-                  "lifting it up the joiner took its pouch: 2 gems now, the host none, the pouch gone on both screens")
+                  "lifting it up the joiner took its pouch: 3 gems now, the host none, the pouch gone on both screens")
             joinFall = centreOf(joiner)
             host.player.xWu = joiner.player.xWu + 6
             host.player.yWu = joiner.player.yWu
             joiner.player.hp = 0
+            check(joiner.fallen && joiner.player.pouch.length === 3 && joiner._pouchDropAsked === 3,
+                  "the joiner's knight fell: its pouch stays with it until the host answers")
         }],
-        [() => joiner.fallen && dropsOf(host, joinNet.nodeId).length === 1, () => {
+        [() => joiner.fallen && dropsOf(host, joinNet.nodeId).length === 1 && joiner.player.pouch.length === 0, () => {
             let d = dropsOf(host, joinNet.nodeId)[0]
-            check(joiner.player.pouch.length === 0 && host.pouchOf(d.gems).length === 2,
-                  "the joiner's knight fell: its pouch of 2 gems lies on the host's screen (" + d.gems + ")")
+            check(host.pouchOf(d.gems).length === 3,
+                  "the host laid it down: its pouch of 3 gems lies on the host's screen, the joiner's is empty ("
+                  + d.gems + ")")
             host.player.xWu = d.xWu - host.player.widthWu / 2
             host.player.yWu = d.yWu + host.player.heightWu / 2
         }],
         [() => dropsOf(host, joinNet.nodeId).length === 0 && dropsOf(joiner, joinNet.nodeId).length === 0
-               && host.player.pouch.length === 2, () => {
+               && host.player.pouch.length === 3, () => {
             check(joiner.player.pouch.length === 0,
-                  "the host's knight walked over it and took it: 2 gems, the pouch gone on both screens")
+                  "the host's knight walked over it and took it: 3 gems, the pouch gone on both screens")
             console.log("[Veins] done,", failures, "failed")
             joinNet.leave()
             hostNet.leave()

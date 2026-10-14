@@ -86,8 +86,10 @@ Item {
     // level, clean of its strikes clean (issue #156)
     signal cutReported(string fromId, int level, string cell, int clean)
     // The host gave this node's knight the gem of a vein it split
-    // (shape, value)
+    // (cell, shape, value), or refused it: another knight split it first,
+    // or the host is on another level (issue #169)
     signal gemGranted(var gem)
+    signal gemRefused(string cell)
     // The host owns every fallen knight's pouch as a replicated object of
     // type "pouch", as it owns the gold; it came to life or went on this
     // node
@@ -99,6 +101,9 @@ Item {
     signal pouchClaimed(string fromId, string objectId)
     // The host gave this node's knight a pouch (id, gems)
     signal pouchGranted(var grant)
+    // The host laid this node's dropped pouch on the floor (ok), or not:
+    // it is on another level (issue #169)
+    signal pouchDropAnswered(bool ok)
     // Another node judged an attack on its own knight: report.source is
     // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
     // what became of it (Game.knightStruck)
@@ -242,12 +247,16 @@ Item {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
+            } else if (data.type === "gemRefuse") {
+                session.gemRefused(data.cell)
             } else if (data.type === "pouchDrop") {
                 if (net.isHost) session.pouchDropped(fromId, data)
             } else if (data.type === "pouchClaim") {
                 if (net.isHost) session.pouchClaimed(fromId, data.id)
             } else if (data.type === "pouchGrant") {
                 session.pouchGranted(data)
+            } else if (data.type === "pouchDropAnswer") {
+                session.pouchDropAnswered(data.ok === true)
             } else if (data.type === "goldGrant") {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
@@ -558,8 +567,13 @@ Item {
     function grantGem(nodeId, gem) {
         net.sendTo(nodeId, Object.assign({type: "gemGrant"}, gem))
     }
-    // This node's knight fell with gems in its pouch: the host lays the
-    // pouch where it fell, for every node. The host's own is taken at once
+    // Host: that node's knight gets no gem for the vein on cell
+    function refuseGem(nodeId, cell) {
+        net.sendTo(nodeId, {type: "gemRefuse", cell: cell})
+    }
+    // This node's knight fell with gems in its pouch on its level (x, y,
+    // gems, level): the host lays the pouch where it fell, for every node,
+    // and answers whether it did. The host's own is taken at once
     function dropPouch(props) {
         if (net.isHost) pouchDropped(net.nodeId, props)
         else net.sendTo(net.hostId, Object.assign({type: "pouchDrop"}, props))
@@ -579,6 +593,11 @@ Item {
         else net.sendTo(net.hostId, {type: "pouchClaim", id: objectId})
     }
     // Host: the pouch goes to that node's knight
+    // Host: whether that node's pouch lies on the floor now
+    function answerPouchDrop(nodeId, ok) {
+        if (nodeId === net.nodeId) pouchDropAnswered(ok)
+        else net.sendTo(nodeId, {type: "pouchDropAnswer", ok: ok})
+    }
     function grantPouch(nodeId, grant) {
         net.sendTo(nodeId, Object.assign({type: "pouchGrant"}, grant))
     }

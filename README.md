@@ -169,7 +169,7 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge), RMB shield, Space dash, E talk / dig, 1
+LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
 potion, 2 draught, M mute and Esc menu.
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
@@ -1007,20 +1007,32 @@ python3 tests/secretparty/run_secretparty.py --mode local
 **Veins:** the deep keeps gems in its walls (#154). A vein is a cluster of
 small faceted gems half sunk into a wall's face, dim in the stone; where
 the lantern's light reaches it one facet winks a glint, and coming close
-it shimmers once. E with the knight in reach of it starts the dig: the
-sword folds into a pickaxe, held towards the vein, and a ring closes on
-the vein once every `ringTime` seconds, in the parry ring's look and
-white while a strike would be clean. E within `window` seconds of a
-close, before or after it, strikes clean: sparks in the gem's colour, a
-crack through the stone, the pickaxe's chink and a tink a pentatonic step
-higher with each clean strike, so a well-cut gem plays a rising phrase.
-Any other E, or a second one on the same close, chips: grey chips and the
-chink alone. A vein takes three to five strikes (`strikes`, by the
-level's seed and its cell); the last splits the stone with a crumble, and
-the gem pops out with a three-note chime, spins once and drifts into the
-knight, the bigger the more of the strikes were clean (`gemSize`).
-Walking off, raising the shield, swinging or dashing ends the dig, and
-the pickaxe folds back into the sword. The ring and the window count the
+it shimmers once. The wall face round it is rough rock, a miners' face
+of angular chunks in flat facets, a cell to each side of the vein
+(`rockCells`) as far as the face runs, breaking off raggedly where the
+bricks go on. The mouse aiming at a vein with the knight in reach of it
+starts the dig (#169): the sword folds into a pickaxe, held towards the
+vein, and a ring closes on the vein once every `ringTime` seconds, in
+the parry ring's look and white while a strike would be clean. The left
+button aimed at the vein strikes with the pickaxe instead of swinging the
+sword; aimed anywhere else it swings, and E only talks and opens doors.
+A click within `window` seconds of a close, before or after it, strikes
+clean: sparks in the gem's colour, a crack through the stone, the
+pickaxe's chink and a tink a pentatonic step higher with each clean
+strike, so a well-cut gem plays a rising phrase. Any other click, or a
+second one on the same close, chips: grey chips and the chink alone. A
+vein takes three to five strikes (`strikes`, by the level's seed and its
+cell); the last splits the stone with a crumble, and the gem is won: it
+rises off the face spinning once, flies up above the knight with a
+three-note chime and holds there a moment, bigger and lit (`wonAbove`,
+`wonScale`, `wonHold`), the bigger the more of the strikes were clean
+(`gemSize`). A clean cut, every strike clean, holds in a white ring with
+a star turning on it under CLEAN CUT; any chipped strike breaks notches
+out of it, it sheds grey flakes, and says CHIPPED. Then it drops into
+the pouch, and the HUD's count of its shape bumps, bigger and white a
+moment. The aim moving off the vein, walking off, raising the shield,
+swinging or dashing ends the dig, and the pickaxe folds back into the
+sword. The ring and the window count the
 physics steps, so a pause or a hit stop holds them. The gem's shape and
 colour come with the depth (`shapes`): an amber tetrahedron from depth 0,
 a jade cube from 2, a sapphire octahedron from 4, an amethyst
@@ -1028,16 +1040,21 @@ dodecahedron from 6 and an ember icosahedron from 8. Every number is
 `Balance.deep`; the samples are synthesised by `tools/deep_sounds.py`.
 The dojo's `applyScenario("deep")` lands the knight in front of one in a
 walled room, and `applyScenario("deep", 4)` shows depth 4's gem. The deep
-bench checks that the scenario lands in
-reach of the vein and shows each shape at its depth, that E brings out
-the pickaxe and the ring, that on single physics steps E on a close and
-up to the window before or after it strikes clean with the chink and the
-rising tink while a step outside it, or a second E on the same close,
-chips with the chink alone, that a strike held a beat on the wall clock
-between two steps is judged by the steps, that the gem's size grows with
-each clean strike from `gemSize[0]` to `gemSize[1]` and the split
-crumbles and chimes, and that the shield, walking off, a swing or a dash
-ends the dig:
+bench checks, with the real mouse, that the scenario lands in reach of
+the vein and shows each shape at its depth, that aiming at the vein
+brings out the pickaxe and the ring, that on single physics steps a
+click on the vein on a close and up to the window before or after it
+strikes clean with the chink and the rising tink while a step outside
+it, or a second click on the same close, chips with the chink alone,
+that a strike held a beat on the wall clock between two steps is judged
+by the steps, that the gem's size grows with each clean strike from
+`gemSize[0]` to `gemSize[1]` and the split crumbles and chimes, that the
+shield, walking off, a swing or a dash ends the dig, that E at the vein
+starts no dig and strikes nothing, that the mouse moving off the vein
+ends the dig and the left button aimed away swings the sword, that a
+clean cut is won ringed and a chipped one notched, held `wonAbove` above
+the knight and grown, then counted on the HUD with a bump, and that the
+vein sits in a rough rock face:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/deep/deep.qml
@@ -1065,9 +1082,13 @@ own knight's strikes, and the host decides the rest, as it does the
 gold: a node tells it a vein split and how many strikes were clean, the
 host splits it on every screen (the session property `veins`, a node
 that joins later too) and gives the gem of its own vein to the first
-knight that split it; a second claim gets nothing. A fallen knight's
-pouch is the host's replicated object, given to the first knight that
-claims it. The dungeon master has a row for the veins per room. The
+knight that split it. A joiner's knight shows its gem won only once the
+host gave it; a claim the host refuses - another knight split the vein
+first, or the host is on another level - shows a grey gem that rises,
+shakes and crumbles under LOST. A fallen knight's pouch is the host's
+replicated object, given to the first knight that claims it; a joiner's
+pouch leaves its knight once the host laid it down, and one dropped on
+another level than the host's stays with the knight. The dungeon master has a row for the veins per room. The
 veins bench builds 20 seeds at a low, a middle and a high danger twice
 and checks the same veins, gems and strikes on the same cells, each by
 the rules, none in the camp or the fight room; that a vein is dark out
@@ -1076,9 +1097,13 @@ cubes cut clean and chipped go into the pouch at the table's values, the
 HUD counts them, the camp keeps them and the smith buys them; that a
 knight falling alone drops its pouch; then a host and a joiner in one
 process: the same veins, a vein cut on either screen split on both with
-the gem the cutter's, a second claim given nothing, a fallen host's
-pouch on both screens taken by the joiner lifting it up, and a fallen
-joiner's taken by the host walking over it:
+the gem the cutter's, a second claim given nothing and shown LOST, both
+knights cutting the same vein with the host's claim first - the joiner's
+gem not shown until the host answered, then LOST, the gem the host's -
+a pouch dropped on another level refused, a fallen host's pouch on both
+screens taken by the joiner lifting it up, and a fallen joiner's, still
+with it until the host answered, taken by the host walking over it. Every
+vein of the 60 dungeons sits in a rough rock face:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/veins/veins.qml
