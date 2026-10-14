@@ -15,7 +15,13 @@
 // and the gem's size follows its clean strikes, 0 to all of them. Raising
 // the shield or walking off ends the dig, and the pickaxe folds back into
 // the sword; a swing or a dash ends it too, and aimed at the vein
-// mid-swing none begins.
+// mid-swing none begins. E at the vein starts no dig and strikes nothing,
+// the mouse moving off the vein ends the dig, and the left button aimed
+// away from it swings the sword. A gem cut with every strike clean is won
+// as a clean cut, one cut with none notched: it holds wonAbove above the
+// knight, grown, and drops into the pouch, where the HUD counts it and
+// its count bumps. The vein sits in a rough rock face rockCells cells to
+// each side of it.
 // Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
@@ -63,6 +69,29 @@ Window {
         let p = veinPoint()
         keys.mouseClick(game, p.x, p.y, Qt.LeftButton, Qt.NoModifier, -1)
     }
+    // A point on the floor three knights south of the knight
+    function awayPoint() {
+        let p = game.player
+        return p.mapToItem(game, p.width / 2, p.height * 3.5)
+    }
+    function aimAway() {
+        let p = awayPoint()
+        keys.mouseMove(game, p.x, p.y, -1, Qt.NoButton, Qt.NoModifier)
+    }
+    function clickAway() {
+        let p = awayPoint()
+        keys.mouseClick(game, p.x, p.y, Qt.LeftButton, Qt.NoModifier, -1)
+    }
+    function find(root, name) {
+        if (root.objectName === name) return root
+        let kids = root.data || []
+        for (let i = 0; i < kids.length; i++) {
+            let f = find(kids[i], name)
+            if (f) return f
+        }
+        return null
+    }
+    property int bumpsBefore: 0
 
     Component.onCompleted: {
         let c = Qt.createComponent(Qt.resolvedUrl("../../src/Game.qml"))
@@ -267,6 +296,74 @@ Window {
             game.player.dash()
             step(1)
             check(game.player.isDashing && !game.player.digging && !game.dig, "a dash ends the dig")
+        }],
+        // E at a vein starts nothing and strikes nothing; the left button
+        // aimed away from it swings the sword (issue #169)
+        [100, () => {
+            Clayground.paused = true
+            game.applyScenario("deep")
+            game.forceActiveFocus()
+            aimAway()
+            step(1)
+            pressE()
+            step(1)
+            check(!game.dig && !game.player.digging && vein().struck === 0,
+                  "E at the vein, the mouse aimed away from it, starts no dig")
+            aimVein()
+            step(1)
+            stepTo(beat)
+            pressE()
+            check(game.dig && vein().struck === 0, "E while the dig runs strikes nothing (struck " + vein().struck + ")")
+            strike()
+            check(game.lastStrike.clean && vein().struck === 1 && !game.player.isAttacking,
+                  "the left button aimed at the vein on the close strikes clean with the pickaxe, the sword does not swing")
+            aimAway()
+            step(1)
+            check(!game.dig && !game.player.digging, "the mouse moving off the vein ends the dig")
+            clickAway()
+            step(1)
+            check(game.player.isAttacking && !game.dig && vein().struck === 1,
+                  "the left button aimed away from the vein swings the sword")
+        }],
+        // The gem won: clean, held above the knight, then into the pouch
+        [100, () => {
+            bumpsBefore = game.pouchBumps
+            let g = cut(99)
+            let w = game.wonGems[0], h = find(game, "hudPouch")
+            check(game.wonGems.length === 1 && w.clean && w.notches === 0 && g.chips === 0
+                  && game.player.pouch.length === 1 && h.summary === "",
+                  "a gem cut with every strike clean is won as a clean cut, in the pouch but not yet on the HUD ("
+                  + (h.summary || "nothing") + ")")
+        }],
+        [() => game.wonGems.length > 0 && game.wonGems[0].phase === "hold", () => {
+            let w = game.wonGems[0], k = knight()
+            let across = w.width * w.scale / game.pixelPerUnit
+            check(Math.abs(w.atX - k.x) < 1e-6 && Math.abs(w.atY - (k.y + cfg.wonAbove)) < 1e-6
+                  && Math.abs(w.grow - 1) < 1e-6 && across >= Math.max(cfg.wonMin, w.sizeWu * cfg.wonScale) - 1e-6,
+                  "it holds " + cfg.wonAbove + " wu above the knight, " + across.toFixed(2) + " wu across, "
+                  + cfg.wonScale + " times its " + w.sizeWu.toFixed(2) + " wu")
+        }],
+        [() => game.wonGems.length === 0, () => {
+            let h = find(game, "hudPouch")
+            check(game.pouchBumps === bumpsBefore + 1 && game._bumpShape === "tetrahedron"
+                  && h.summary === "tetrahedron 1",
+                  "it drops into the pouch: the HUD counts it (" + h.summary + ") and its count bumps")
+            let g = cut(0)
+            let w = game.wonGems[0]
+            check(w && !w.clean && w.notches === Math.min(3, g.chips) && w.notches > 0,
+                  "a gem cut with no strike clean is won chipped, " + (w ? w.notches : 0) + " notches broken out of it")
+        }],
+        // The vein's rough rock face
+        [() => game.wonGems.length === 0, () => {
+            game.applyScenario("deep")
+            let v = vein(), f = game.rockFaces, cs = game.cellSize
+            let c = v.cell.split(",").map(Number)
+            check(f.length === 1 && f[0].faceStyle === "rock"
+                  && f[0].xWu <= (c[0] - cfg.rockCells) * cs + 1e-6
+                  && f[0].xWu + f[0].widthWu >= (c[0] + 1 + cfg.rockCells) * cs - 1e-6
+                  && Math.abs(f[0].yWu - (c[1] * cs + game.wallFaceWu)) < 1e-6,
+                  "the deep room's vein sits in a rough rock face, " + cfg.rockCells + " cell(s) to each side of it ("
+                  + (f[0] ? f[0].xWu.toFixed(2) + " to " + (f[0].xWu + f[0].widthWu).toFixed(2) + " wu" : "none") + ")")
             Clayground.paused = false
             console.log("[Deep] done,", failures, "failed")
             game.destroy()
