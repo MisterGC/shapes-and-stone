@@ -16,7 +16,11 @@ still. Then:
   plays the chord, and both saw the same events
 - the host's knight frees another, when the dungeon has one, and both
   screens show the same again
-- before that (#173 review): a freeing of the joiner's the host refuses -
+- then the party goes on to the camp (issue #159): each machine's record
+  has a special of its own, and both screens seat the host's special and
+  the travellers that left by the fire, both fires give its comfort alone,
+  and the joiner's own record keeps its own special
+- before the freeings (#173 review): a freeing of the joiner's the host refuses -
   reported for another level - shows freed on the joiner's screen, then
   turns back to stone there, and the host's stays stone
 
@@ -118,6 +122,9 @@ def run(args, loader, tmp, procs, check):
         for i in (H, J):
             if i.eval1(f"configure({local})") is not True:
                 return abort("no Network in the game's session")
+        # Each machine's record with a special of its own (issue #159)
+        H.eval(["setSpecials(['healer'])"])
+        J.eval(["setSpecials(['cook'])"])
         H.eval(["hostUp()"])
         if not wait_for(lambda: H.eval1("netId") not in (None, ""), 30):
             return abort("the host got no network code")
@@ -133,7 +140,9 @@ def run(args, loader, tmp, procs, check):
         H.eval1("halt()")
         for i in (H, J):
             i.eval(["standUp()"])
-        return free_on_both(H, J, check)
+        if free_on_both(H, J, check) == 100:
+            return 100
+        return camp_on_both(H, J, check)
     except TimeoutError as e:
         return abort(str(e))
 
@@ -209,6 +218,28 @@ def free_on_both(H, J, check):
             je = je[2:]
         check(he == je and he[:2] == ["freed", want],
               f"both screens saw the same: {', '.join(he)} (joiner {', '.join(je)})")
+    return 0
+
+
+def camp_on_both(H, J, check):
+    """The camp after the dungeon: the host's record decides which specials
+    sit by the fire, on both screens, with the travellers that left"""
+    left = sorted(s["kind"] for s in H.json("stones()") if s["outcome"] in ("leaving", "fleeing"))
+    H.eval(["onward()"])
+    if not check(wait_for(lambda: H.json("camp()")["inCamp"] and J.json("camp()")["inCamp"], 30),
+                 "the party goes on to the camp on both screens"):
+        return 100
+    hc, jc = H.json("camp()"), J.json("camp()")
+    want = sorted(["lost:healer"] + left)
+    check(hc["sitting"] == want and jc["sitting"] == want,
+          f"the host's special and the travellers that left sit by the fire on both screens: host "
+          f"{', '.join(hc['sitting'])}; joiner {', '.join(jc['sitting'])} (wanted {', '.join(want)})")
+    check(hc["shown"] == ["healer"] and jc["shown"] == ["healer"] and jc["own"] == ["cook"],
+          f"the host's record decides the specials on every screen: host shows {hc['shown']}, joiner "
+          f"{jc['shown']}; the joiner's own record keeps {jc['own']}")
+    check(hc["heal"] == jc["heal"] == 10 and hc["mana"] == jc["mana"] == 5 and hc["light"] == jc["light"],
+          f"both fires give the host's special's comfort alone: heal {hc['heal']}/{jc['heal']} HP/s, "
+          f"mana {hc['mana']}/{jc['mana']}, light {hc['light']}/{jc['light']} wu")
     return 0
 
 
