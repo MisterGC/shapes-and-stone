@@ -8,8 +8,9 @@
 // hpPerKnight more of its HP. The rooms and everything laid on the floor
 // stay the same. For 1 knight the dungeon is today's: its fingerprint is
 // the one recorded below, from the game with 9 to 12 rooms, and without
-// its veins and their rock faces the one recorded before there were any
-// (issue #156), but for a torch stepped aside for a vein. A knight
+// its veins, their rock faces and their rooms' spawn holes (issue #157)
+// the one recorded before there were any (issue #156), but for a torch
+// stepped aside for a vein. A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -60,10 +61,12 @@ Window {
     // as before them at 1.5 (a1c350e8), at 0.5 with one torch a spot aside
     // for a vein (it was 63976147, the torch at x 27 then, 29 now). The
     // rock faces round the veins (issue #169) changed the hash from
-    // fc4fbc6d at 0.5 and 8684d4a2 at 1.5
+    // fc4fbc6d at 0.5 and 8684d4a2 at 1.5; the spawn holes in the veins'
+    // rooms (issue #157), left out with the veins, from 8ae03641 and
+    // c7390a81
     readonly property var today: ({
-        "0.5": { hash: "8ae03641", noVeins: "b084ab49", enemies: 15 },
-        "1.5": { hash: "c7390a81", noVeins: "a1c350e8", enemies: 18 }
+        "0.5": { hash: "162bb47b", noVeins: "b084ab49", enemies: 15 },
+        "1.5": { hash: "888308f2", noVeins: "a1c350e8", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
@@ -95,7 +98,7 @@ Window {
     // The fingerprint of today's dungeon: layout and enemies, without the
     // HP an enemy has left (all of it)
     function todayLines(noVeins) {
-        let lines = layout(noVeins).filter(l => !noVeins || l.indexOf("Vein ") !== 0)
+        let lines = layout(noVeins).filter(l => !noVeins || (l.indexOf("Vein ") !== 0 && l.indexOf("Hole ") !== 0))
         return lines.concat(foes().map(f => f.split(":").slice(0, 6).join(":")))
     }
 

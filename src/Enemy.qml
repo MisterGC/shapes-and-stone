@@ -75,6 +75,9 @@ PhysicsItem {
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
+    // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
+    // was built with (issue #157)
+    property string fromHole: ""
     property real facingAngle: 0          // Guardian tracks player direction
     readonly property real shieldArc: Balance.enemy.shieldArc
     readonly property real shieldRotSpeed: Balance.enemy.shieldTurnSpeed

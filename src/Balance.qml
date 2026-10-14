@@ -660,7 +660,23 @@ QtObject {
     // wonHold seconds and drops into the pouch in wonDrop. The wall face
     // round a vein is rough rock in rockColor, rockCells cells to each
     // side as far as the face runs, its ends breaking off over up to
-    // rockRagged wu where the bricks go on
+    // rockRagged wu where the bricks go on.
+    // hole: a room that holds a vein has one spawn hole (issue #157), low
+    // in the face of its north wall, at least gap cells from each of its
+    // veins where the wall allows, off the veins' rock face, a torch, a
+    // slit, a secret, a feature's cell and a doorway; a small room whose
+    // wall leaves no such cell lets go of the rock face, then the
+    // feature, then the doorway. Clean strikes on any vein of its room
+    // wake it: at dustAt of them dust puffs from its rim every puffEvery
+    // seconds and the rumble plays at rumbleVolume, at eyesAt two eyes
+    // open in its dark and the groan plays at groanVolume. telegraph
+    // seconds after the eyes opened (never less than enemy.minTelegraph)
+    // the first creature crawls out of its mouth, then waves waves of
+    // perWave creatures of the depth's kinds, waveGap seconds apart, each
+    // creature crawlGap after the one before it, each with the rumble.
+    // closeAfter seconds after the last one its rim crumbles shut and it
+    // never wakes again. A sound of the hole plays at its volume down to
+    // quietest of it at hearReach wu from the knight
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -699,6 +715,23 @@ QtObject {
         rockCells: 1,
         rockRagged: 0.45,
         rockColor: "#5E564C",
+        hole: {
+            gap: 3,
+            dustAt: 1,
+            eyesAt: 3,
+            puffEvery: 0.45,
+            telegraph: 1.5,
+            waves: 2,
+            perWave: 2,
+            waveGap: 4,
+            crawlGap: 0.4,
+            closeAfter: 1.2,
+            dustColor: "#8A8070",
+            rumbleVolume: 0.9,
+            groanVolume: 0.8,
+            hearReach: 22,
+            quietest: 0.2
+        },
         shapes: [
             { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
             { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },

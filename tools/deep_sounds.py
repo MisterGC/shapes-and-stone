@@ -7,6 +7,8 @@ again writes the same files:
   deep_chink.wav    the pickaxe on stone: a heavy thud under an iron click
   deep_tink.wav     a clean strike's bright tink on the gem, a glassy bell
   deep_crumble.wav  the stone's crumble as the vein splits: grit falling off it
+  deep_rumble.wav   a spawn hole waking (issue #157): a low rumble in the rock
+  deep_groan.wav    a spawn hole's eyes opening: a drawn-out groan from inside
 
 The game plays the tink a pentatonic step higher with each clean strike,
 and three times, a fifth and an octave apart, as the gem's chime
@@ -63,7 +65,44 @@ def crumble(rng):
     return fade_out(bandpass(buf, 1400, 1.2), 0.06)
 
 
+def rumble(rng):
+    seconds = 1.1
+    buf = silence(seconds)
+    # The rock's rumble: low noise swelling and dying away
+    n = len(buf)
+    low = lowpass(lowpass([rng.uniform(-1, 1) for _ in range(n)], 140), 140)
+    for i in range(n):
+        t = i / RATE
+        buf[i] += 4.0 * low[i] * min(1, t / 0.18) * math.exp(-max(0, t - 0.25) / 0.35)
+    # A few stones knocking loose in it
+    for at in (0.06, 0.21, 0.38):
+        m = int(0.05 * RATE)
+        knock = lowpass([rng.uniform(-1, 1) * math.exp(-i / (0.012 * RATE)) for i in range(m)], 380)
+        add(buf, at + rng.uniform(0, 0.03), knock, 1.5)
+    return fade_out(buf, 0.2)
+
+
+def groan(rng):
+    seconds = 1.4
+    n = int(seconds * RATE)
+    # A throat: a buzzing tone sliding down from 96 to 68 Hz, wavering
+    voice, phase = [], 0.0
+    for i in range(n):
+        t = i / RATE
+        f = 96 - 28 * (t / seconds) + 2.5 * math.sin(2 * math.pi * 5.5 * t)
+        phase += f / RATE
+        saw = 2 * (phase % 1) - 1
+        voice.append(saw + 0.3 * rng.uniform(-1, 1))
+    # Through the mouth of the hole: two dark formants
+    shaped = [a + 0.6 * b for a, b in zip(bandpass(voice, 420, 3.0), bandpass(voice, 880, 4.0))]
+    for i in range(n):
+        t = i / RATE
+        shaped[i] *= min(1, t / 0.2) * (1 - 0.4 * t / seconds)
+    return fade_out(shaped, 0.35)
+
+
 if __name__ == "__main__":
     for name, make, peak in [("deep_chink.wav", chink, 0.8), ("deep_tink.wav", tink, 0.6),
-                             ("deep_crumble.wav", crumble, 0.6)]:
+                             ("deep_crumble.wav", crumble, 0.6), ("deep_rumble.wav", rumble, 0.8),
+                             ("deep_groan.wav", groan, 0.6)]:
         write(name, make(random.Random(name)), peak)
