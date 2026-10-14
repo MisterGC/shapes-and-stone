@@ -768,9 +768,9 @@ ClayWorld2d {
             playDeathBurst()
             countFight("kill")
         }
-        onGoldSpawned: (objectId, props) => _makeGoldDrop(props, objectId)
-        onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
-        onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
+        onGoldSpawned: (objectId, props) => goldClaims.make(props, objectId)
+        onGoldDespawned: (objectId) => goldClaims.remove(objectId)
+        onGoldClaimed: (fromId, objectId) => goldClaims.give(fromId, objectId)
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
         onBreakReported: (level, cell) => _hostBreak(level, cell)
         onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
@@ -782,9 +782,9 @@ ClayWorld2d {
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
         onPouchDropAnswered: (ok) => _pouchDropAnswered(ok)
-        onPouchSpawned: (objectId, props) => _makePouchDrop(props, objectId)
-        onPouchDespawned: (objectId) => _removePouchDrop(objectId)
-        onPouchClaimed: (fromId, objectId) => _givePouch(fromId, objectId)
+        onPouchSpawned: (objectId, props) => pouchClaims.make(props, objectId)
+        onPouchDespawned: (objectId) => pouchClaims.remove(objectId)
+        onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
         onShotReceived: (shot) => {
             if (screen !== "game") return
@@ -963,8 +963,19 @@ ClayWorld2d {
     // host gives a drop to the first claim it gets and despawns it, so a
     // drop is picked up once, by one knight. Each knight's gold is its own
     // node's.
-    property var goldDrops: []
-    property var _goldById: ({})
+    FloorClaims {
+        id: goldClaims
+        component: goldDropComponent
+        room: world.room
+        link: session
+        extra: props => ({ pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+        grantOf: drop => ({ amount: drop.amount, x: drop.xWu, y: drop.yWu })
+        take: grant => _collectGold(grant.amount, grant.x, grant.y)
+        claimOf: objectId => session.claimGold(objectId)
+        despawnOf: objectId => session.despawnGold(objectId)
+        grantTo: (nodeId, grant) => session.grantGold(nodeId, grant)
+    }
+    readonly property var goldDrops: goldClaims.drops
     // Where an enemy died: gold for its tier, none in the fight room
     function dropGold(x, y, tier) {
         if (fightRoomActive) return
@@ -975,59 +986,15 @@ ClayWorld2d {
         if (amount <= 0) return
         let props = {xWu: x, yWu: y, amount: amount}
         if (!session.connected)
-            _makeGoldDrop(props)
+            goldClaims.make(props)
         else if (session.isHost)
             session.spawnGold(props)
-    }
-    function _makeGoldDrop(props, objectId) {
-        objectId = objectId || ""
-        if (objectId !== "" && _goldById[objectId]) return _goldById[objectId]
-        let drop = goldDropComponent.createObject(world.room, Object.assign({}, props, {
-            objectId: objectId,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
-        }))
-        if (!drop) return null
-        goldDrops.push(drop)
-        if (objectId !== "") _goldById[objectId] = drop
-        return drop
-    }
-    function _removeGoldDrop(objectId) {
-        let drop = _goldById[objectId]
-        if (!drop) return
-        delete _goldById[objectId]
-        _forgetGoldDrop(drop)
-    }
-    function _forgetGoldDrop(drop) {
-        goldDrops = goldDrops.filter(d => d !== drop)
-        try { drop.destroy() } catch (err) {}
     }
     // Each step: the drops this node's knight stands on are its, or
     // claimed from the host in a session
     function _pickUpGold() {
         if (!player || player.fallen || goldDrops.length === 0) return
-        let range = Balance.loot.pickupRange
-        for (let drop of goldDrops.slice()) {
-            if (!drop || drop.claimed) continue
-            let dx = drop.xWu - player.xWu, dy = drop.yWu - player.yWu
-            if (dx * dx + dy * dy > range * range) continue
-            if (drop.objectId === "") {
-                _collectGold(drop.amount, drop.xWu, drop.yWu)
-                _forgetGoldDrop(drop)
-            } else if (session.connected) {
-                drop.claimed = true
-                session.claimGold(drop.objectId)
-            }
-        }
-    }
-    // Host: a node's knight reached a drop; the first claim takes it, a
-    // later one finds it gone
-    function _giveGold(nodeId, objectId) {
-        let drop = _goldById[objectId]
-        if (!drop || !session.isHost) return
-        let grant = {id: objectId, amount: drop.amount, x: drop.xWu, y: drop.yWu}
-        session.despawnGold(objectId)
-        if (nodeId === session.nodeId) _collectGold(grant.amount, grant.x, grant.y)
-        else session.grantGold(nodeId, grant)
+        goldClaims.claimNear(player.xWu, player.yWu, Balance.loot.pickupRange)
     }
     function _collectGold(amount, x, y) {
         if (!player) return
@@ -5406,28 +5373,10 @@ ClayWorld2d {
         _enemyById = kept
 
         // Gold drops go as the enemies do: the host's on every node with
-        // their despawn, a joiner's when that arrives
-        for (let d of goldDrops.slice()) {
-            if (!d) continue
-            if (d.objectId !== "" && session.connected) {
-                if (session.isHost) session.despawnGold(d.objectId)
-                continue
-            }
-            try { d.destroy() } catch(err) {}
-        }
-        goldDrops = goldDrops.filter(d => d && d.objectId !== "" && session.connected
-                                     && _goldById[d.objectId] === d)
-        // And so do the pouches: one left on the floor is lost
-        for (let d of pouchDrops.slice()) {
-            if (!d) continue
-            if (d.objectId !== "" && session.connected) {
-                if (session.isHost) session.despawnPouch(d.objectId)
-                continue
-            }
-            try { d.destroy() } catch(err) {}
-        }
-        pouchDrops = pouchDrops.filter(d => d && d.objectId !== "" && session.connected
-                                       && _pouchById[d.objectId] === d)
+        // their despawn, a joiner's when that arrives; and so do the
+        // pouches: one left on the floor is lost
+        goldClaims.clear()
+        pouchClaims.clear()
 
         // Destroy remote players
         session.clearRemotePlayers()
@@ -7050,8 +6999,23 @@ ClayWorld2d {
     // session the host owns it as it owns the gold: a replicated object
     // every node claims for its own knight, given to the first claim
     Component { id: pouchDropComponent; PouchDrop {} }
-    property var pouchDrops: []
-    property var _pouchById: ({})
+    FloorClaims {
+        id: pouchClaims
+        component: pouchDropComponent
+        room: world.room
+        link: session
+        extra: props => {
+            let best = pouchOf(props.gems).reduce((a, g) => !a || g.value > a.value ? g : a, null)
+            return { gemColor: best ? gemColorOf(best.shape) : "#F2B33D",
+                     pixelPerUnit: Qt.binding(() => world.pixelPerUnit) }
+        }
+        grantOf: drop => ({ gems: drop.gems })
+        take: grant => _takePouch(grant.gems)
+        claimOf: objectId => session.claimPouch(objectId)
+        despawnOf: objectId => session.despawnPouch(objectId)
+        grantTo: (nodeId, grant) => session.grantPouch(nodeId, grant)
+    }
+    readonly property var pouchDrops: pouchClaims.drops
     // This node's knight fell: its pouch drops where it lies. In a session
     // it leaves the knight once the host laid it on the floor; the gems
     // asked for, until it answers (_pouchDropAnswered)
@@ -7069,7 +7033,7 @@ ClayWorld2d {
             return
         }
         player.pouch = []
-        _makePouchDrop(props)
+        pouchClaims.make(props)
     }
     function _pouchDropAnswered(ok) {
         let n = _pouchDropAsked
@@ -7089,61 +7053,17 @@ ClayWorld2d {
         else console.log("[Game] A pouch dropped on level", props.level, "by", fromId, "- refused")
         session.answerPouchDrop(fromId, ok)
     }
-    function _makePouchDrop(props, objectId) {
-        objectId = objectId || ""
-        if (objectId !== "" && _pouchById[objectId]) return _pouchById[objectId]
-        let gems = pouchOf(props.gems)
-        let best = gems.reduce((a, g) => !a || g.value > a.value ? g : a, null)
-        let drop = pouchDropComponent.createObject(world.room, Object.assign({}, props, {
-            objectId: objectId, gemColor: best ? gemColorOf(best.shape) : "#F2B33D",
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
-        }))
-        if (!drop) return null
-        pouchDrops.push(drop)
-        if (objectId !== "") _pouchById[objectId] = drop
-        return drop
-    }
-    function _removePouchDrop(objectId) {
-        let drop = _pouchById[objectId]
-        if (!drop) return
-        delete _pouchById[objectId]
-        _forgetPouchDrop(drop)
-    }
-    function _forgetPouchDrop(drop) {
-        pouchDrops = pouchDrops.filter(d => d !== drop)
-        try { drop.destroy() } catch (err) {}
-    }
     // Each step: a pouch this node's knight stands on is its, or claimed
     // from the host in a session
     function _pickUpPouches() {
         if (!player || player.fallen || pouchDrops.length === 0) return
-        let c = _knightCentre(), reach = Balance.deep.pouchReach
-        for (let drop of pouchDrops.slice())
-            if (drop && Math.hypot(drop.xWu - c.x, drop.yWu - c.y) <= reach) _claimPouch(drop)
+        let c = _knightCentre()
+        pouchClaims.claimNear(c.x, c.y, Balance.deep.pouchReach)
     }
     // This node's knight lifted that node's knight up: its pouch too
     function _claimPouchesOf(nodeId) {
         for (let drop of pouchDrops.slice())
-            if (drop && drop.owner === nodeId) _claimPouch(drop)
-    }
-    function _claimPouch(drop) {
-        if (drop.claimed) return
-        if (drop.objectId === "") {
-            _takePouch(drop.gems)
-            _forgetPouchDrop(drop)
-        } else if (session.connected) {
-            drop.claimed = true
-            session.claimPouch(drop.objectId)
-        }
-    }
-    // Host: a node's knight reached a pouch; the first claim takes it
-    function _givePouch(nodeId, objectId) {
-        let drop = _pouchById[objectId]
-        if (!drop || !session.isHost) return
-        let grant = { id: objectId, gems: drop.gems }
-        session.despawnPouch(objectId)
-        if (nodeId === session.nodeId) _takePouch(grant.gems)
-        else session.grantPouch(nodeId, grant)
+            if (drop && drop.owner === nodeId) pouchClaims.claim(drop)
     }
     function _takePouch(gems) {
         if (!player) return
