@@ -746,6 +746,8 @@ ClayWorld2d {
         onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
         onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
         onSecretReported: (level, cell) => _hostSecret(level, cell)
+        onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
+        onGemGranted: (gem) => addGem(gem)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -1676,9 +1678,10 @@ ClayWorld2d {
             event.accepted = true
             return
         }
-        // 1 to 4 buy what the dialogue panel offers; without wares 1
-        // drinks a potion and 2 a mana draught
-        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
+        // 1 to 5 buy what the dialogue panel offers (the smith's gems and
+        // four upgrades); without wares 1 drinks a potion and 2 a mana
+        // draught
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5) {
             let i = event.key - Qt.Key_1
             if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
                 if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
@@ -1990,6 +1993,45 @@ ClayWorld2d {
         font.pixelSize: 14
         font.bold: true
         font.letterSpacing: 1
+    }
+
+    // The knight's pouch beside its gold: a gem of each shape it holds
+    // and how many (issue #156)
+    Row {
+        id: hudPouch
+        objectName: "hudPouch"
+        anchors.left: hudGold.right
+        anchors.leftMargin: 12
+        anchors.verticalCenter: hudGold.verticalCenter
+        z: 1000
+        spacing: 8
+        visible: player !== null && player.pouch.length > 0
+        readonly property var counts: player ? pouchCounts(player.pouch) : []
+        // "cube 2, tetrahedron 1", for the benches
+        readonly property string summary: counts.map(c => c.shape + " " + c.count).join(", ")
+        Repeater {
+            model: hudPouch.counts
+            Row {
+                required property var modelData
+                spacing: 3
+                Gem {
+                    width: 16
+                    height: 16
+                    shape: modelData.shape
+                    color: modelData.color
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: modelData.count
+                    color: "#E8E0D0"
+                    style: Text.Outline
+                    styleColor: "#000000"
+                    font.pixelSize: 14
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
     }
 
     // The knight's potions, and the key that drinks one
@@ -2791,13 +2833,13 @@ ClayWorld2d {
     // overrides, the dungeon master's
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
-        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
+        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
                                  potions: player.potions, draughts: player.draughts,
                                  momentum: player.momentum, levels: smithLevels(player) }
-                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
+                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0, pouch: [],
                                  potions: 0, draughts: 0, momentum: 0, levels: smithLevels(null) }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
-                    "gold:", carried.gold, "potions:", carried.potions, "draughts:", carried.draughts,
+                    "gold:", carried.gold, "gems:", carried.pouch.length, "potions:", carried.potions, "draughts:", carried.draughts,
                     "smith:", JSON.stringify(carried.levels))
         clearDungeon()
         levelIndex = newIndex
@@ -2814,6 +2856,7 @@ ClayWorld2d {
             player.hp = carried.hp
             player.mana = carried.mana
             player.gold = carried.gold
+            player.pouch = carried.pouch
             player.potions = carried.potions
             player.draughts = carried.draughts
             player.momentum = carried.momentum
@@ -2892,11 +2935,13 @@ ClayWorld2d {
         dialoguePanel.open(name, color, lines, _offered(wares || []))
     }
     // The innkeeper's wares are always offered; the smith's are made as he
-    // is talked to (smithWare), the next level of each upgrade he may sell
+    // is talked to (smithWare), the next level of each upgrade he may sell,
+    // and first, while the pouch holds gems, his offer for them (gemWare)
     function _offered(wares) {
         let out = []
         for (let w of wares) {
-            let offer = w.id === "potion" || w.id === "draught" ? w : smithWare(w.id)
+            let offer = w.id === "potion" || w.id === "draught" ? w
+                : w.id === "gems" ? gemWare() : smithWare(w.id)
             if (offer) out.push(offer)
         }
         return out
@@ -2949,6 +2994,7 @@ ClayWorld2d {
     // a draught for key 2; a smith's level lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
+        if (ware.id === "gems") return sellGems()
         let inn = ware.id === "potion" || ware.id === "draught"
         // The smith sells only what he offers now: a ware from before the
         // knight bought here, or above the camp's limit, is refused
@@ -3116,6 +3162,7 @@ ClayWorld2d {
         _applyBroken(_sessionBroken)
         _applySprung(_sessionSprung)
         _applyDoors(_sessionDoors)
+        _applyVeins(_sessionVeins)
 
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
@@ -5272,6 +5319,7 @@ ClayWorld2d {
         if (player) player.digging = false
         dig = null
         veins = []
+        _cutVeins = []
         veinSounds = []
         deepRoomActive = false
 
@@ -5452,8 +5500,9 @@ ClayWorld2d {
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
             "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
-            "The deeper you've been, the finer I can make it. Bring gold from below."
-        ], "assets/blacksmith_greeting.wav", smithLines.map(line => ({ id: line })))
+            "The deeper you've been, the finer I can make it. Bring gold from below.",
+            "Cut stones from the veins down there? I'll buy every one."
+        ], "assets/blacksmith_greeting.wav", [{ id: "gems" }].concat(smithLines.map(line => ({ id: line }))))
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {
@@ -5955,9 +6004,9 @@ ClayWorld2d {
     // hit stop holds it. E within window of a close strikes clean, once a
     // close, any other E chips; the last of its strikes splits the stone
     // and the gem pops out, the bigger the more of them were clean, spins
-    // once and drifts to the knight. This node's knight alone; a
-    // dungeon's veins are its features (issue #156), the dojo's deep
-    // scenario has one (enterDeepRoom)
+    // once and drifts to the knight. Each node digs with its own knight;
+    // a dungeon's veins are its features (issue #156, below), the dojo's
+    // deep scenario has one (enterDeepRoom)
     Component { id: veinComponent; Vein {} }
     // The gem coming free: it rises off the face spinning once, catches
     // the light, then drifts into the knight and is gone
@@ -6189,6 +6238,7 @@ ClayWorld2d {
         spawnShards(v.faceXWu, v.faceYWu, nx, ny, 10, "#4E525A", 0.16)
         playCrumble()
         playChime()
+        _veinCut(v)
         dig.endAt = dig.t + 0.4
         v.ringShows = false
         console.log("[Game] The vein at", v.cell, "split: a", v.shape, "of", size.toFixed(2), "wu,",
@@ -6210,6 +6260,120 @@ ClayWorld2d {
             if (near && !v.knightNear) playTink(cfg.shimmerPitch, cfg.shimmerVolume)
             v.knightNear = near
         }
+    }
+
+    // --- Veins in the dungeon, the pouch and the smith (issue #156) ---
+    // A dungeon's veins are features (Balance.dungeon.kinds.vein), each in
+    // the face of the wall north of its cell, its gem the depth's. A gem
+    // cut goes into the knight's pouch (Player.pouch, [{shape, value}]),
+    // worth by its shape and its clean strikes (gemValue); the HUD shows
+    // a count per shape, and the smith buys them all for their worth.
+    // Alone the game splits a vein for good on its last strike. In a
+    // session each node judges its own knight's strikes and the host
+    // decides the rest: the node tells it the vein split and how many of
+    // its strikes were clean, the host splits it on every screen (session
+    // property "veins", a node that joins later too) and gives the gem of
+    // its own vein to the first knight that split it
+    property var _cutVeins: []
+    function veinAt(cell) {
+        return veins.find(v => v.cell === cell) || null
+    }
+    // The gold a gem of shape is worth, clean of its strikes clean
+    function gemValue(shape, clean, strikes) {
+        let g = Balance.deep.shapes.find(x => x.shape === shape) || Balance.deep.shapes[0]
+        let share = Math.max(0, Math.min(1, clean / Math.max(1, strikes)))
+        return Math.round(g.value[0] + (g.value[1] - g.value[0]) * share)
+    }
+    function gemColorOf(shape) {
+        let g = Balance.deep.shapes.find(x => x.shape === shape)
+        return g ? g.color : Balance.deep.shapes[0].color
+    }
+    // This node's knight split v: alone its gem goes into the pouch, in a
+    // session the host is asked for it
+    function _veinCut(v) {
+        if (session.connected && !deepRoomActive) {
+            session.reportCut(levelIndex, v.cell, v.clean)
+            return
+        }
+        if (_cutVeins.indexOf(v.cell) < 0) _cutVeins.push(v.cell)
+        addGem({ shape: v.shape, value: gemValue(v.shape, v.clean, v.strikes) })
+    }
+    // Host: a node's knight split the vein on that cell of that level, the
+    // first one gets its gem; one split already gives nothing
+    function _hostCut(fromId, level, cell, clean) {
+        if (level !== levelIndex || levelType !== "dungeon" || _cutVeins.indexOf(cell) >= 0) return
+        let v = veinAt(cell)
+        if (!v) return
+        _cutVeins.push(cell)
+        session.publishVeins({ seed: session.runSeed, level: levelIndex, cells: _cutVeins.slice() })
+        let gem = { shape: v.shape, value: gemValue(v.shape, clean, v.strikes) }
+        console.log("[Game] The vein at", cell, "was split by", fromId, "- a", gem.shape, "worth", gem.value)
+        if (fromId === session.nodeId) {
+            addGem(gem)
+            return
+        }
+        _veinGone(v)
+        session.grantGem(fromId, gem)
+    }
+    // The host's veins split in the level: those still whole here split
+    function _applyVeins(val) {
+        if (!val || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (val.seed !== session.runSeed || val.level !== levelIndex) return
+        for (let cell of val.cells) {
+            let v = veinAt(cell)
+            if (v && !v.split) _veinGone(v)
+        }
+    }
+    readonly property var _sessionVeins: session.veins
+    on_SessionVeinsChanged: _applyVeins(_sessionVeins)
+    // A knight of another screen split v: its stone breaks here too, and
+    // a dig of it ends
+    function _veinGone(v) {
+        v.cut = true
+        v.ringShows = false
+        spawnShards(v.faceXWu, v.faceYWu, 0, -1, 10, "#4E525A", 0.16)
+        if (dig && dig.vein === v) endDig()
+    }
+
+    // The pouch: a gem into it, shown over the knight in its colour
+    function addGem(gem) {
+        if (!player) return
+        player.pouch = player.pouch.concat([{ shape: gem.shape, value: gem.value }])
+        spawnDamageNumber(player.xWu, player.yWu, "+1 " + gem.shape, gemColorOf(gem.shape))
+        console.log("[Game] A", gem.shape, "worth", gem.value, "into the pouch,", player.pouch.length, "gems in it")
+    }
+    // The gems of a pouch per shape, in the table's order and only those
+    // it holds: [{shape, color, count}]
+    function pouchCounts(pouch) {
+        let out = []
+        for (let g of Balance.deep.shapes) {
+            let n = (pouch || []).filter(x => x.shape === g.shape).length
+            if (n > 0) out.push({ shape: g.shape, color: g.color, count: n })
+        }
+        return out
+    }
+    function pouchWorth(pouch) {
+        return (pouch || []).reduce((a, g) => a + g.value, 0)
+    }
+
+    // The smith buys the gems: his ware while the pouch holds any, the
+    // whole pouch for its worth
+    function gemWare() {
+        if (!player || player.pouch.length === 0) return null
+        let n = player.pouch.length
+        return { id: "gems", sell: true, price: pouchWorth(player.pouch),
+                 label: "Sell your " + (n === 1 ? "gem" : n + " gems") }
+    }
+    function sellGems() {
+        let offer = gemWare()
+        if (!offer || player.fallen) return false
+        player.gold += offer.price
+        player.pouch = []
+        dialoguePanel.note = "Fine stones, cut clean. " + offer.price + " gold, and fair."
+        dialoguePanel.wares = _offered(dialoguePanel.wares)
+        Qt.callLater(_clink)
+        console.log("[Game] Sold the gems for", offer.price, "gold,", player.gold, "now")
+        return true
     }
 
     // The dojo's deep scenario: a walled room with a vein in the middle of

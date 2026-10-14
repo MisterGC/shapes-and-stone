@@ -645,7 +645,10 @@ QtObject {
     // shimmer of its colour shows round it while the knight is that near.
     // The lantern of any knight lights it, the nearest one. shapes: the
     // gem by depth, the last whose from is at most the depth: the five
-    // Platonic solids, a selfLit one glowing in the dark on its own
+    // Platonic solids, a selfLit one glowing in the dark on its own. A
+    // gem cut goes into the knight's pouch, worth value[0] gold with no
+    // clean strike to value[1] with all of them clean, by their share,
+    // rounded; the smith buys every gem in the pouch at once for that
     readonly property var deep: ({
         reach: 1.6,
         leave: 2.4,
@@ -672,11 +675,11 @@ QtObject {
         shimmerPitch: 19,
         shimmerVolume: 0.12,
         shapes: [
-            { from: 0, shape: "tetrahedron", color: "#F2B33D" },
-            { from: 2, shape: "cube", color: "#4FC48A" },
-            { from: 4, shape: "octahedron", color: "#4A86F0" },
-            { from: 6, shape: "dodecahedron", color: "#B072E8" },
-            { from: 8, shape: "icosahedron", color: "#FF4A2A", selfLit: true }
+            { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
+            { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },
+            { from: 4, shape: "octahedron", color: "#4A86F0", value: [12, 26] },
+            { from: 6, shape: "dodecahedron", color: "#B072E8", value: [17, 36] },
+            { from: 8, shape: "icosahedron", color: "#FF4A2A", value: [24, 50], selfLit: true }
         ]
     })
 

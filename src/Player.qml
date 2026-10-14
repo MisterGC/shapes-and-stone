@@ -52,6 +52,9 @@ PhysicsItem {
     property int maxMana: Balance.knight.mana
     // Gold picked up this run, for the village's wares
     property int gold: 0
+    // The gems cut and not yet sold, [{shape, value}] (Balance.deep,
+    // issue #156): kept across levels as the gold is
+    property var pouch: []
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0
     // Mana draughts bought from the innkeeper, drunk with key 2
