@@ -91,6 +91,10 @@ Item {
     // Host: a node's knight freed the petrified traveller on cell
     // ("gx,gy") of that level (issue #158)
     signal freedReported(string fromId, int level, string cell)
+    // The host refused this node's freeing of the traveller on cell: it
+    // is on another level, or its outcome was decided already (#173
+    // review)
+    signal freedRefused(string cell)
     // The host gave this node's knight the gem of a vein it split
     // (cell, shape, value), or refused it: another knight split it first,
     // or the host is on another level (issue #169)
@@ -187,6 +191,15 @@ Item {
     // (issue #158)
     readonly property var stones: net.connected && net.sessionProperties.stones
                                   ? net.sessionProperties.stones : null
+    // The travellers the host's party freed this run and how each went
+    // on, the session property "freed" ({seed, run: [{key, kind, outcome,
+    // special}]}); null before any (issue #159)
+    readonly property var freedRun: net.connected && net.sessionProperties.freed
+                                    ? net.sessionProperties.freed : null
+    // The specials with the host's camps, its record's (ids), the session
+    // property "specials"; null before the host has set it (issue #159)
+    readonly property var hostSpecials: net.connected && net.sessionProperties.specials
+                                        ? net.sessionProperties.specials : null
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -268,6 +281,8 @@ Item {
                 if (net.isHost) session.freedReported(fromId, data.level, data.cell)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
+            } else if (data.type === "freeRefuse") {
+                session.freedRefused(data.cell)
             } else if (data.type === "gemRefuse") {
                 session.gemRefused(data.cell)
             } else if (data.type === "pouchDrop") {
@@ -603,6 +618,19 @@ Item {
     // Host: the travellers freed in its level, for every node
     function publishStones(stones) {
         if (net.isHost) net.setSessionProperty("stones", stones)
+    }
+    // Host: that node's knight's freeing of the traveller on cell stands
+    // not
+    function refuseFreed(nodeId, cell) {
+        net.sendTo(nodeId, {type: "freeRefuse", cell: cell})
+    }
+    // Host: the travellers its party freed this run, for every camp
+    function publishFreed(freed) {
+        if (net.isHost) net.setSessionProperty("freed", freed)
+    }
+    // Host: the specials with its camps, for every camp
+    function publishSpecials(ids) {
+        if (net.isHost) net.setSessionProperty("specials", ids)
     }
     // Host: the gem goes to that node's knight
     function grantGem(nodeId, gem) {

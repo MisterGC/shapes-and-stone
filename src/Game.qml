@@ -286,8 +286,11 @@ ClayWorld2d {
         tinkSound.triggerNote(tinkSound.rootNote + pitch, gain === undefined ? 1 : gain)
         _heard("tink+" + pitch)
     }
-    function playCrumble() {
-        crumbleSound.triggerOneShot(1)
+    // gain 1 when left out; the last one played is crumbleGain
+    property real crumbleGain: 0
+    function playCrumble(gain) {
+        crumbleGain = gain === undefined ? 1 : gain
+        crumbleSound.triggerOneShot(crumbleGain)
         _heard("crumble")
     }
     property var _chimeLeft: []
@@ -779,6 +782,7 @@ ClayWorld2d {
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
         onWakeReported: (level, cell) => _hostWake(level, cell)
         onFreedReported: (fromId, level, cell) => _hostFreed(fromId, level, cell)
+        onFreedRefused: (cell) => _stoneRefused(cell)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
@@ -1482,6 +1486,7 @@ ClayWorld2d {
     property string recordStoreName: "ShapesAndStone"
     KeyValueStore { id: records; name: world.recordStoreName }
     function _startRunRecord() {
+        campFreed.startRun()
         runKills = 0
         runSeconds = 0
         runSecrets = 0
@@ -1546,10 +1551,13 @@ ClayWorld2d {
         target: session
         function onConnectedChanged() {
             world.ownRuns = []
+            campFreed.startEvening()
             // Later: a host can set no session property before its
             // connectedChanged is over
             if (session.connected) Qt.callLater(() => {
-                if (session.connected && session.isHost) session.publishRecord(world.ownRecord)
+                if (!session.connected || !session.isHost) return
+                session.publishRecord(world.ownRecord)
+                campFreed.publish()
             })
         }
     }
@@ -1565,6 +1573,7 @@ ClayWorld2d {
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         _loadRecord()
+        campFreed.load()
         _loadVolumes()
         _loadMaster()
         runStartRecord = ownRecord.depth
@@ -5424,6 +5433,7 @@ ClayWorld2d {
         campTravellers = []
         campDog = null
         campTalk = null
+        campFreed.clear()
         campSounds.clear()
         features = []
         featureShowcase = false
@@ -5613,6 +5623,7 @@ ClayWorld2d {
         _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
         _placeCat(camp, levelSeed, cf, spots)
         _placeTravellers(camp, levelSeed, cf)
+        _seatFreed(levelSeed, cf)
         campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
                          anvilAt, campLook, campProps)
 
@@ -5837,12 +5848,7 @@ ClayWorld2d {
         campTalk = null
         let pick = (range) => range[0] + rand() * (range[1] - range[0])
         let half = 0.4
-        let onFloor = (x, y) => {
-            for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
-                for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
-                    if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
-            return true
-        }
+        let onFloor = (x, y) => _campFloorAt(x, y, half)
         let count = n.count[0] + Math.floor(rand() * (n.count[1] - n.count[0] + 1))
         // The seats: on a ring round the fire, on the floor, off the cat
         let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
@@ -5934,6 +5940,35 @@ ClayWorld2d {
         })
         dungeonObjects.push(campTalk)
     }
+    // Whether a square half wu to each side of (x, y) lies whole on the
+    // camp's floor, off its buildings
+    function _campFloorAt(x, y, half) {
+        for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+            for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+        return true
+    }
+    // The travellers freed this run and the specials with the camps sit
+    // by the fire (CampFreed, issue #159), clear of the camp's travellers
+    // and its cat, from their own stream of the level's seed
+    CampFreed {
+        id: campFreed
+        figure: stoneComponent
+        room: world.room
+        link: session
+        store: records
+        knight: world.player
+        extra: props => ({ glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+    }
+    readonly property var freedCamp: campFreed
+    function _seatFreed(levelSeed, fire) {
+        let avoid = campTravellers.map(t => ({ x: t.xWu + 0.4, y: t.yWu - 0.4 }))
+        if (campCat) avoid.push({ x: campCat.xWu, y: campCat.yWu })
+        for (let f of campFreed.seat(fire, createRng(levelSeed ^ Balance.deep.camp.salt),
+                                     (x, y) => _campFloorAt(x, y, 0.4), avoid))
+            dungeonObjects.push(f)
+    }
+
     // Lanterns flanking a building's open front
     function _lightBuilding(r) {
         let y0 = r.gy * cellSize + 0.35
@@ -6991,10 +7026,11 @@ ClayWorld2d {
     // a session the node whose knight freed it shows the moment at once
     // and tells the host; the host decides and publishes every traveller
     // freed and how it goes on (session property "stones"), which every
-    // screen shows, a node that joins later too. stoneEvents lists what
-    // they did on this screen, for the benches: {cell, what, t}, what
-    // "freed", "working", "leaving", "fleeing" or "gone", t the stones'
-    // physics clock, seconds; stoneSounds the last veinSoundsKept of their
+    // screen shows, a node that joins later too; a freeing it refuses
+    // turns back to stone. stoneEvents lists what they did on this
+    // screen, for the benches: {cell, what, t}, what "freed", "working",
+    // "leaving", "fleeing", "gone" or "refused", t the stones' physics
+    // clock, seconds; stoneSounds the last veinSoundsKept of their
     // sounds, "chord" or "work", muted too, stoneSoundCount all of them
     Component { id: stoneComponent; Petrified {} }
     Sound {
@@ -7008,17 +7044,19 @@ ClayWorld2d {
     property int stoneSoundCount: 0
     property real _stoneClock: 0
     // A freed traveller's run on this screen, by cell: {t, chord, doing,
-    // path, speed, say, work, swing, leave}, t its seconds since freed,
-    // doing the outcome it acts on, path the points it walks to [{x, y}]
+    // path, speed, say, work, swing, leave, nod}, t its seconds since
+    // freed, doing the outcome it acts on, path the points it walks to
+    // [{x, y}], nod its seconds nodding (-1 not)
     property var _stoneRuns: ({})
 
     // The petrified travellers of the carved dungeon with its features
     // (list) and its holes (holeList, planHoles): one with chance in each
-    // room but the first that holds a vein, [{gx, gy, kind, veins, hole,
-    // room}], gx, gy its wall cell in the rock face beside one of the
-    // room's veins, over a room's cell, off a vein, a hole, a torch, a
-    // slit and a secret; kind "miner" or "lost". Each room draws from its
-    // own stream of the level's seed
+    // room but the first that holds a vein, [{gx, gy, kind, special,
+    // veins, hole, room}], gx, gy its wall cell in the rock face beside one
+    // of the room's veins, over a room's cell, off a vein, a hole, a torch,
+    // a slit and a secret; kind "miner" or "lost", special the id of the
+    // special it is ("" none). Each room draws from its own streams of the
+    // level's seed
     function planStones(levelSeed, list, holeList) {
         let cfg = Balance.dungeon.petrified, band = dangerBand(dangerPosition)
         let out = [], off = {}
@@ -7047,13 +7085,25 @@ ClayWorld2d {
             let spot = spots[Math.floor(rand() * spots.length)]
             let cells = veins.map(v => v.wgx + "," + v.wgy)
             let hole = holeList.find(h => h.veins.some(c => cells.indexOf(c) >= 0))
-            out.push({ gx: spot.gx, gy: spot.gy, kind: rand() < cfg.minerShare ? "miner" : "lost",
+            let kind = rand() < cfg.minerShare ? "miner" : "lost", special = ""
+            // Rarely one of the specials (issue #159), from a stream of its
+            // own and the whole table, so the level is the same whatever
+            // the record holds; one already with the camps stands there as
+            // an ordinary traveller of its kind
+            let rare = createRng(levelSeed ^ 0x73706563 ^ ri)
+            if (rare() < cfg.specialShare) {
+                let table = Balance.deep.specials
+                let sp = table[Math.floor(rare() * table.length)]
+                kind = sp.kind
+                if (campFreed.candidates().some(c => c.id === sp.id)) special = sp.id
+            }
+            out.push({ gx: spot.gx, gy: spot.gy, kind: kind, special: special,
                        veins: cells, hole: hole ? hole.gx + "," + hole.gy : "", room: ri })
         })
         return out
     }
     function placeStones(list) {
-        for (let s of list) placeStone(s.gx, s.gy, s.kind, s.veins, s.hole, s.room)
+        for (let s of list) placeStone(s.gx, s.gy, s.kind, s.veins, s.hole, s.room, s.special)
     }
     // The strikes that free the traveller on cell "gx,gy", from the
     // level's seed and the cell alone
@@ -7065,20 +7115,21 @@ ClayWorld2d {
     }
     // A petrified traveller of kind in the face of the wall cell (gx, gy),
     // of the room roomIndex with the veins on veinCells and the spawn hole
-    // on holeCell ("" none)
-    function placeStone(gx, gy, kind, veinCells, holeCell, roomIndex) {
+    // on holeCell ("" none), the special of that id ("" or left out none)
+    function placeStone(gx, gy, kind, veinCells, holeCell, roomIndex, special) {
         let cell = gx + "," + gy
         let s = stoneComponent.createObject(world.room, {
             cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
             faceWu: wallFaceWu, cell: cell, kind: kind, strikes: stoneStrikes(cell),
-            veinCells: veinCells, holeCell: holeCell || "", roomIndex: roomIndex,
+            veinCells: veinCells, holeCell: holeCell || "", roomIndex: roomIndex, special: special || "",
             seed: createRng(gx * 7349 + gy * 3571 + 29)(),
             glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
         })
         if (!s) return null
         stones.push(s)
         dungeonObjects.push(s)
-        console.log("[Game] A petrified", kind, "at", cell, "-", s.strikes, "strikes, its hole", holeCell || "none")
+        console.log("[Game] A petrified", kind, special ? "(the special " + special + ")" : "", "at", cell, "-",
+                    s.strikes, "strikes, its hole", holeCell || "none")
         return s
     }
     function stoneAt(cell) {
@@ -7142,7 +7193,7 @@ ClayWorld2d {
         _stoneEvent(s, "freed")
         console.log("[Game] The", s.kind, "at", s.cell, "is freed")
         _stoneRuns[s.cell] = { t: quiet ? cfg.colourTime : 0, chord: !!quiet, doing: "", path: [], speed: 0,
-                               say: 0, work: 0, swing: -1, leave: 0 }
+                               say: 0, work: 0, swing: -1, leave: 0, nod: -1 }
         if (quiet) {
             s.colour = 1
             return
@@ -7151,34 +7202,66 @@ ClayWorld2d {
             let a = Math.PI * 2 * i / 8
             spawnShards(s.faceXWu, s.faceYWu, Math.cos(a), Math.sin(a), Math.ceil(cfg.shards / 8), cfg.shardColor, 0.14)
         }
-        playCrumble()
+        // As loud as the chord: one freed on another screen, far off, is
+        // quieter
+        playCrumble(Math.max(Balance.deep.hole.quietest, _stoneGain(s, 1, Balance.deep.hole.hearReach)))
     }
     // Alone or the host: how the freed traveller s goes on - a miner works
-    // on unless its room's hole sent creatures, a lost one leaves
+    // on unless its room's hole sent creatures, a lost one leaves, and so
+    // does a special, to join the camps
     function _decideStone(s) {
         let h = s.holeCell !== "" ? holeAt(s.holeCell) : null
         let came = h !== null && (h.wave > 0 || h.closed)
-        _stoneOutcome(s, s.kind !== "miner" ? "leaving" : came ? "fleeing" : "working")
+        _stoneOutcome(s, s.kind !== "miner" || s.special !== "" ? "leaving" : came ? "fleeing" : "working")
     }
     // Host: a node's knight freed the traveller on cell of that level; one
-    // decided already, or on another level than the host's, is let be
+    // decided already, or on another level than the host's, is refused,
+    // as a gem is
     function _hostFreed(fromId, level, cell) {
         let s = level === levelIndex && levelType === "dungeon" ? stoneAt(cell) : null
         if (!s || s.outcome !== "") {
-            console.log("[Game] The traveller at", cell, "of level", level, "was freed by", fromId, "- let be")
+            console.log("[Game] The traveller at", cell, "of level", level, "was freed by", fromId, "- refused")
+            if (fromId === session.nodeId) _stoneRefused(cell)
+            else session.refuseFreed(fromId, cell)
             return
         }
         _freeMoment(s)
         _decideStone(s)
     }
+    // The host refused this node's freeing of the traveller on cell: one
+    // the host decided already goes on as it decided, any other turns
+    // back to stone, its strikes to be made again
+    property int stonesRefused: 0
+    function _stoneRefused(cell) {
+        let s = stoneAt(cell)
+        if (!s || !s.freed || s.outcome !== "") return
+        let val = session.stones
+        if (val && val.seed === session.runSeed && val.level === levelIndex && val.stones[cell]) {
+            _stoneOutcome(s, val.stones[cell])
+            return
+        }
+        stonesRefused++
+        delete _stoneRuns[cell]
+        s.freed = false
+        s.clean = 0
+        s.colour = 0
+        s.saying = ""
+        s.walking = false
+        s.footXWu = s.cxWu
+        s.footYWu = s.cyWu - s.sizeWu / 2 + 0.05
+        _stoneEvent(s, "refused")
+        spawnShards(s.faceXWu, s.faceYWu, 0, 1, 5, Balance.deep.hole.dustColor, 0.07)
+        console.log("[Game] The", s.kind, "at", s.cell, "is stone again: the host refused its freeing")
+    }
     // Traveller s goes on as outcome: its run takes it up once the colour
     // is back; quiet, it is there at once, at work or gone. The host
-    // tells every node
+    // tells every node. The camps take it in (CampFreed)
     function _stoneOutcome(s, outcome, quiet) {
         if (s.outcome === outcome) return
         s.outcome = outcome
         _stoneEvent(s, outcome)
         console.log("[Game] The", s.kind, "at", s.cell, "-", outcome)
+        campFreed.goneOn(levelIndex + ":" + s.cell, s.kind, outcome, s.special, _decidesStones())
         let run = _stoneRuns[s.cell]
         if (quiet && run) {
             run.doing = outcome
@@ -7263,7 +7346,8 @@ ClayWorld2d {
         run.doing = s.outcome
         let c = s.cell.split(",").map(Number)
         let rand = createRng(levelSeedNow() ^ 0x6c696e65 ^ (c[1] * gridWidth + c[0]) ^ s.outcome.length)
-        let lines = s.outcome === "working" ? cfg.minerLines : s.outcome === "fleeing" ? cfg.fleeLines : cfg.lostLines
+        let lines = s.special !== "" ? [campFreed.specialOf(s.special).line]
+            : s.outcome === "working" ? cfg.minerLines : s.outcome === "fleeing" ? cfg.fleeLines : cfg.lostLines
         s.saying = lines[Math.floor(rand() * lines.length)]
         run.say = cfg.say
         let start = []
@@ -7271,6 +7355,8 @@ ClayWorld2d {
             start = [{ x: s.footXWu, y: s.cyWu - s.sizeWu / 2 - 0.55 }]
         if (s.outcome === "working") {
             let w = _workSpot(s)
+            // It nods to the knight before it walks to its work
+            run.nod = 0
             run.path = start.concat([{ x: w.x, y: w.y - 0.5 }, { x: w.x, y: w.y }])
             run.facing = w.facing
             run.speed = cfg.walkSpeed
@@ -7313,6 +7399,12 @@ ClayWorld2d {
             }
             if (s.colour < 1 || s.outcome === "") continue
             if (run.doing !== s.outcome) _takeUp(s, run)
+            if (run.nod >= 0) {
+                run.nod += dt
+                s.nod = run.nod < cfg.nod ? Math.sin(Math.PI * run.nod / cfg.nod) : 0
+                if (run.nod < cfg.nod) continue
+                run.nod = -1
+            }
             // Walking
             if (run.path.length > 0) {
                 let p = run.path[0], dx = p.x - s.footXWu, dy = p.y - s.footYWu
@@ -7521,8 +7613,9 @@ ClayWorld2d {
 
     // The dojo's deep scenario: a walled room with a vein in the middle of
     // its north wall, the gem of the scenario's depth, the knight right
-    // below it, in reach, the vein's spawn hole in the same wall, and a
-    // petrified miner and lost traveller in its rock face
+    // below it, in reach, the vein's spawn hole in the same wall, a
+    // petrified miner and lost traveller in its rock face, and a special
+    // beside them
     function enterDeepRoom() {
         console.log("[Game] Entering the deep room")
         clearDungeon()
@@ -7545,6 +7638,10 @@ ClayWorld2d {
         let hole = holes.length > 0 ? holes[0].cell : ""
         placeStone(gx - 1, gy, "miner", [gx + "," + gy], hole, 0)
         placeStone(gx + 1, gy, "lost", [gx + "," + gy], hole, 0)
+        // And a special beside the lost one: the first not yet with the
+        // camps, else the first (issue #159)
+        let sp = campFreed.candidates()[0] || Balance.deep.specials[0]
+        placeStone(gx + 2, gy, sp.kind, [gx + "," + gy], hole, 0, sp.id)
         spawnPlayer((gx + 0.5) * cellSize - 0.5, gy * cellSize - 0.4)
         _bindKnight()
     }
@@ -7655,7 +7752,7 @@ ClayWorld2d {
     // count (Balance.dungeon), to try a kind right after a reload
     // "deep" is a walled room with a vein in its north wall and the knight
     // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
-    // hole and a petrified miner and lost traveller beside it
+    // hole, a petrified miner and lost traveller beside it and a special
     function scenarios() { return ["dungeon", "village", "fight", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
@@ -7872,6 +7969,8 @@ ClayWorld2d {
                 secrets: world.runSecrets
                 seconds: world.runSeconds
                 recordLine: world.recordLine
+                freedLine: campFreed.tonightLine
+                joinedLine: campFreed.joinedLine
                 newRecord: world.recordPassed
                 runs: world.sessionRuns
                 canGoAgain: !session.connected || (world.partyFallen && session.isHost)
@@ -7896,6 +7995,8 @@ ClayWorld2d {
                 soundVolume: world.soundVolume
                 message: world.titleMessage
                 recordLine: world.recordLine
+                freedLine: campFreed.tonightLine
+                joinedLine: campFreed.joinedLine
                 dungeonMaster: world.dungeonMaster
                 onDungeonMasterToggled: world.setDungeonMaster(!world.dungeonMaster)
                 onSinglePlayerSelected: screen = "game"

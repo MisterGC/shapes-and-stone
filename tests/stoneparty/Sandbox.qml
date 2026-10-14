@@ -102,6 +102,39 @@ Item {
         return s ? game._workSpot(s) : null
     }
 
+    // The specials with this machine's camps, kept with its record, as if
+    // it had freed them (issue #159)
+    function setSpecials(ids) {
+        game.freedCamp.store.set("specials", JSON.stringify(ids))
+        game.freedCamp.load()
+        return game.freedCamp.joined
+    }
+    // Host: the party goes on to the next level, as at the exit
+    function onward() { game._hostAdvanceLevel() }
+    // This screen's camp: whether it is in one, the freed by its fire
+    // ([kind or kind:special], sorted), the fire's rates and light, the
+    // specials it shows and those kept with this machine's record
+    function camp() {
+        let cf = game.campfire, fc = game.freedCamp
+        return { inCamp: game.levelType === "village" && cf !== null && game.player !== null,
+                 sitting: fc.figures.map(f => f.kind + (f.special ? ":" + f.special : "")).sort(),
+                 heal: cf ? cf.healRate : 0, mana: cf ? cf.manaRate : 0, light: cf ? cf.lightRadius : 0,
+                 shown: fc.joinedShown, own: fc.joined }
+    }
+
+    // This knight's freeing of the traveller on cell reaches the host for
+    // another level than the host's, as one made just before the party
+    // went on would: it shows freed here at once, and the host refuses it
+    // (#173 review)
+    function freeStale(cell) {
+        let s = game.stoneAt(cell)
+        if (!s || s.freed) return false
+        game._freeMoment(s)
+        session.reportFreed(game.levelIndex + 7, cell)
+        return s.freed
+    }
+    function refused() { return game.stonesRefused }
+
     // This knight frees the traveller on cell, every strike clean on its
     // close: it stands in front of it, aims at it and the left button
     // starts the dig, and its strikes are judged at once on the dig's

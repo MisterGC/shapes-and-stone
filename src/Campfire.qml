@@ -19,6 +19,8 @@ RectBoxBody {
     property real healRate: Balance.campfire.healPerSecond  // HP per second
     property real manaRate: Balance.campfire.manaPerSecond  // mana per second
     property real healRadius: Balance.campfire.healRadius
+    // How far its light reaches, in wu
+    property real lightRadius: Balance.camp.fireLight
     property bool _isHealing: false
 
     // A knight whose body has its top-left corner at xWu, yWu stands in
@@ -42,7 +44,7 @@ RectBoxBody {
         // xWu/yWu of a body are its top-left corner
         offsetXWu: campfire.widthWu / 2
         offsetYWu: -campfire.heightWu / 2
-        radius: Balance.camp.fireLight
+        radius: campfire.lightRadius
         color: "#FF9440"
         intensity: 1.1 * campfire.breathing
         flicker: 0.6

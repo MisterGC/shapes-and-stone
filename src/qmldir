@@ -20,6 +20,7 @@ Arrow 1.0 Arrow.qml
 GoldDrop 1.0 GoldDrop.qml
 PouchDrop 1.0 PouchDrop.qml
 FloorClaims 1.0 FloorClaims.qml
+CampFreed 1.0 CampFreed.qml
 BodyShade 1.0 BodyShade.qml
 ExitStairs 1.0 ExitStairs.qml
 Floor 1.0 Floor.qml

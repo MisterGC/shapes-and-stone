@@ -9,8 +9,11 @@ import QtQuick
 // parry ring's language, white while a strike would be clean; each clean
 // strike runs one more crack through the shell. Freed, colour flows back
 // into it from its middle out (colour 0..1), and then the game walks it:
-// to work at a vein, swinging its pick (swing), or off toward the exit,
-// fading out (fade). Visual only - the cell stays a wall
+// to work at a vein, after a nod to the knight (nod), swinging its pick
+// (swing), or off toward the exit, fading out (fade). Visual only - the
+// cell stays a wall. A rare one is special (issue #159): a faint gold edge
+// to its shimmer. Seated, it is one freed sitting by a camp's fire, in
+// colour, huddled with its arms round its knees, no niche behind it
 Item {
     id: stone
     objectName: "petrified"
@@ -32,6 +35,10 @@ Item {
     property string holeCell: ""
     property int roomIndex: -1
     property int strikes: 3
+    // The id of Balance.deep.specials it is, "" none
+    property string special: ""
+    // Sitting by a camp's fire, freed: no niche, huddled in either kind
+    property bool seated: false
     // 0..1 from its cell, for the cracks and the niche
     property real seed: 0
     // Where the darkness is drawn over: the ring and the shimmer go there
@@ -57,6 +64,8 @@ Item {
     property bool walking: false
     property int facing: 1
     property real swing: 0
+    // A miner's nod to the knight once freed, 0..1, its head bowed
+    property real nod: 0
     // The lantern's light on it, 0..1, and whether a knight is near
     property real lit: 0
     property bool knightNear: false
@@ -72,7 +81,7 @@ Item {
     readonly property real faceXWu: cxWu
     readonly property real faceYWu: cyWu - sizeWu / 2 + faceWu / 2 + 0.1
 
-    readonly property color shimmerColor: Balance.deep.stone.shimmer
+    readonly property color shimmerColor: special !== "" ? Balance.deep.specialEdge : Balance.deep.stone.shimmer
 
     x: (cxWu - sizeWu / 2) * pixelPerUnit
     y: (parent ? parent.height : 0) - (cyWu + sizeWu / 2) * pixelPerUnit
@@ -85,6 +94,7 @@ Item {
     Canvas {
         id: niche
         anchors.fill: parent
+        visible: !stone.seated
         onWidthChanged: requestPaint()
         onPaint: {
             let ctx = getContext("2d")
@@ -141,14 +151,18 @@ Item {
             readonly property int cracks: stone.clean
             readonly property real lit: stone.lit
             readonly property real swing: stone.swing
+            readonly property real nod: stone.nod
             readonly property int facing: stone.facing
             readonly property bool upright: stone.outcome !== ""
+            readonly property bool seated: stone.seated
             onColourChanged: requestPaint()
             onCracksChanged: requestPaint()
             onLitChanged: requestPaint()
             onSwingChanged: requestPaint()
+            onNodChanged: requestPaint()
             onFacingChanged: requestPaint()
             onUprightChanged: requestPaint()
+            onSeatedChanged: requestPaint()
             onWidthChanged: requestPaint()
 
             readonly property var grey: ({ skin: "#94928D", cloth: "#77756F", dark: "#5C5A56", cap: "#6C6A65",
@@ -167,9 +181,10 @@ Item {
                     ctx.ellipse(x - rx, y - ry, rx * 2, ry * 2)
                     ctx.fill()
                 }
+                let huddled = stone.seated || (stone.kind !== "miner" && !upright)
                 if (edge) {
                     ctx.fillStyle = edge
-                    if (stone.kind === "miner" || upright) {
+                    if (!huddled) {
                         oval(w * 0.5, h * 0.62, w * 0.3, h * 0.27)
                         disc(w * 0.5, h * 0.27, w * 0.21)
                     } else {
@@ -177,7 +192,7 @@ Item {
                         disc(w * 0.5, h * 0.47, w * 0.21)
                     }
                 }
-                if (stone.kind === "miner") {
+                if (stone.kind === "miner" && !stone.seated) {
                     let f = facing
                     // Legs and boots, the body, the head with its cap and lamp
                     ctx.fillStyle = pal.dark
@@ -185,14 +200,16 @@ Item {
                     oval(w * 0.6, h * 0.88, w * 0.1, h * 0.09)
                     ctx.fillStyle = pal.cloth
                     oval(w * 0.5, h * 0.62, w * 0.25, h * 0.22)
+                    // The head bows forward by its nod
+                    let nx = f * w * 0.04 * nod, ny = h * 0.07 * nod
                     ctx.fillStyle = pal.skin
-                    disc(w * 0.5, h * 0.29, w * 0.17)
+                    disc(w * 0.5 + nx, h * 0.29 + ny, w * 0.17)
                     ctx.fillStyle = pal.cap
                     ctx.beginPath()
-                    ctx.arc(w * 0.5, h * 0.26, w * 0.18, Math.PI, Math.PI * 2)
+                    ctx.arc(w * 0.5 + nx, h * 0.26 + ny, w * 0.18, Math.PI, Math.PI * 2)
                     ctx.fill()
                     ctx.fillStyle = pal.lamp
-                    disc(w * 0.5, h * 0.17, w * 0.06)
+                    disc(w * 0.5 + nx, h * 0.17 + ny, w * 0.06)
                     // The arm and the pick: raised high over its head
                     // petrified, swung down onto the stone by swing while
                     // it works
@@ -218,7 +235,7 @@ Item {
                     ctx.quadraticCurveTo(hx + ux * w * 0.05, hy + uy * w * 0.05,
                                          hx + px * w * 0.2 - ux * w * 0.06, hy + py * w * 0.2 - uy * w * 0.06)
                     ctx.stroke()
-                } else if (upright) {
+                } else if (!huddled) {
                     // Freed, standing: a cloak, the pack on its back
                     ctx.fillStyle = pal.pack
                     oval(w * 0.5, h * 0.55, w * 0.22, h * 0.17)
@@ -256,6 +273,15 @@ Item {
                     ctx.moveTo(w * 0.24, h * 0.7)
                     ctx.quadraticCurveTo(w * 0.5, h * 0.92, w * 0.76, h * 0.7)
                     ctx.stroke()
+                    // A miner sitting keeps its cap and lamp on
+                    if (stone.kind === "miner") {
+                        ctx.fillStyle = pal.cap
+                        ctx.beginPath()
+                        ctx.arc(w * 0.5, h * 0.47, w * 0.18, Math.PI, Math.PI * 2)
+                        ctx.fill()
+                        ctx.fillStyle = pal.lamp
+                        disc(w * 0.5, h * 0.38, w * 0.06)
+                    }
                 }
             }
 
@@ -269,14 +295,16 @@ Item {
                                 colour < 1 ? 0.25 + 0.6 * lit : 0)
                 // Grey stone, the edge shimmering in the lantern's light
                 if (colour < 1) drawFigure(ctx, grey, e)
-                // The colour back, from the middle out
+                // The colour back, from the middle out; a special keeps a
+                // faint gold edge
                 if (colour > 0) {
                     ctx.save()
                     ctx.beginPath()
                     ctx.arc(w * 0.5, h * 0.6, Math.hypot(w, h) * 0.6 * colour, 0, Math.PI * 2)
                     ctx.clip()
                     ctx.clearRect(-w, -h, 3 * w, 3 * h)
-                    drawFigure(ctx, pal, null)
+                    drawFigure(ctx, pal, stone.special !== ""
+                               ? Qt.rgba(stone.shimmerColor.r, stone.shimmerColor.g, stone.shimmerColor.b, 0.55) : null)
                     ctx.restore()
                 }
                 if (colour >= 1) return
@@ -347,7 +375,7 @@ Item {
         height: sizePx
         radius: sizePx / 2
         x: (parent === stone ? 0 : stone.x) + figure.x + figure.width / 2 - width / 2
-        y: (parent === stone ? 0 : stone.y) + figure.y + figure.height * 0.17 - height / 2
+        y: (parent === stone ? 0 : stone.y) + figure.y + figure.height * (stone.seated ? 0.38 : 0.17) - height / 2
         visible: stone.kind === "miner" && stone.colour >= 1 && !stone.gone
         color: "#FFD877"
         opacity: 0.14 * stone.fade

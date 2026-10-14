@@ -1189,8 +1189,8 @@ hole - the hole answers greed, and freeing someone is patience under the
 pressure the vein's digging made. On the last strike the shell cracks
 in a ring of grey shards with the crumble, a warm low major chord plays
 - the only one in the dungeon's sounds - and colour flows back into the
-figure from its middle out over `colourTime`. A freed miner says its
-thanks, walks to its room's vein and works there, its quiet tink every
+figure from its middle out over `colourTime`. A freed miner nods to the
+knight, says its thanks, walks to its room's vein and works there, its quiet tink every
 `workEvery` seconds part of the room's sound; once the room's hole has
 sent creatures it flees instead, and a miner at work flees too when the
 hole's first wave comes. A freed lost traveller thanks the knight in a
@@ -1200,19 +1200,26 @@ synthesised by `tools/deep_sounds.py`. In a session the node whose
 knight freed one shows the moment at once and tells the host; the host
 decides how it goes on and publishes every traveller freed with its
 outcome (the session property `stones`), which every screen shows, a
-node that joins later too. The dojo's deep scenario has a miner and a
-lost one either side of its vein. The stones bench builds 20 seeds at a
+node that joins later too. A freeing the host refuses - reported for
+another level than the host's - turns back to stone on the screen that
+showed it, unless the host decided that traveller already; the crumble
+of one freed on another screen is as quiet as its chord, by the
+distance. The dojo's deep scenario has a miner and a lost one either
+side of its vein, and a special beside them. The stones bench builds 20 seeds at a
 low, a middle and a high danger twice and checks the same travellers on
 the same cells, at most one in a room with a vein and none elsewhere,
 each in its vein's rock face off the veins, the hole, torches, slits and
 secrets, both kinds among them, none in the camp or the fight room;
-then in the deep scenario that off-beat strikes never harm a traveller
+then in the deep scenario that the scenario shows the miner, the lost one
+and a special, that off-beat strikes never harm a traveller
 and only start the ring over, that clean ones free it with the crumble,
 the chord and the colour and never wake the hole, that a freed miner
 works beside the vein with its tink and is still there seconds later,
 that a freed lost one walks off and is gone, that a miner freed after
 the hole's creatures came flees, and that one at work flees when the
-first wave comes:
+first wave comes; and that a freed miner nods before it walks, that one
+freed far from the knight crumbles quieter, and that a refused freeing
+turns the figure back to stone:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/stones/stones.qml
@@ -1225,11 +1232,57 @@ travellers of the same kind and strikes; the joiner's knight frees one,
 every strike clean, and both screens show it freed, its colour back, the
 chord, and the outcome the host decided - the lost one gone on both;
 then the host's knight frees the miner, and both show it at work at the
-same spot beside its vein. It needs the live loader and exits with the
-number of failed checks:
+same spot beside its vein. Before the freeings the joiner reports one
+for another level, and the host's refusal turns it back to stone on the
+joiner's screen. Each process keeps a special of its own with its record;
+in the camp after the dungeon both screens seat the host's special and
+the lost one that left by the fire, both fires heal by the host's
+special alone, and the joiner's own record keeps its own special. It
+needs the live loader and exits with the number of failed checks:
 
 ```
 python3 tests/stoneparty/run_stoneparty.py --mode local
+```
+
+**Freed at the camps:** the travellers freed in a run sit by the fire of
+every later camp of that run (#159) - those that left toward the exit,
+lost ones and miners that fled; a miner at work stays in its room. They
+sit huddled in colour on a ring round the fire (`Balance.deep.camp`),
+off the camp's travellers and its cat, so the figures round the fire are
+the run's count of the freed; a new run's camps start without them.
+Rarely a petrified traveller is special (`Balance.dungeon.petrified
+.specialShare`): one of the few of `Balance.deep.specials`, a faint
+gold edge to its shimmer. Which one, and of which kind, comes from the
+level's seed alone, whatever the record holds; one already with the
+camps stands there as an ordinary traveller of its kind. Freed, it says its own line
+and leaves, and joins the camps for good: it sits by every camp's fire
+after that, across runs, says its camp line to a knight near it, and
+gives the fire a comfort, never fight power - Maren the healer heals
+twice as fast there, Brannoc the cook refills mana twice as fast, Tamsin
+the lamplighter makes the fire's light reach further. The specials with
+the camps are kept with this machine's record (`KeyValueStore`
+"ShapesAndStone", key `specials`). In a session the host's record decides
+which specials sit at the camps, on every screen (the session property
+`specials`), and the host's run decides who of the run sits there (the
+session property `freed`); a joiner keeps a special freed in the party
+with its own record too. The title and the fallen screen show who was
+freed tonight ("Freed tonight: 2 lost travellers, a miner, Maren") and
+the specials with the camps ("With the camps: Maren the healer"); tonight
+is since the game started, in a session since it was hosted or joined.
+The camp side lives in `src/CampFreed.qml`. The freed bench checks that a seed holds the same travellers with an
+empty and a full record, its special an ordinary one with the full; it
+frees every
+traveller of a dungeon at depth 2 and checks that those that left sit at
+the camps after depth 2 and 3 and are gone in a new run; then frees the
+deep scenario's special and checks it is kept with the record, sits in
+two camps of the next run with its line, and the fire heals by its
+comfort; then the fallen screen and the title. With an out dir it saves
+`fallen.png` and `title.png` (and `camp.png`, `special.png`, which need a
+window that draws the world):
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/freed/freed.qml
+qml -I build/bin/qml tests/freed/freed.qml -- <out dir>
 ```
 
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it

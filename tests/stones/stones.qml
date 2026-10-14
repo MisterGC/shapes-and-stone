@@ -17,7 +17,10 @@
 // its tink part of the room's sound, and is still there seconds later;
 // the freed lost one says a line, walks off and fades out of sight. In a
 // fresh room a miner freed after the hole's creatures came flees, and in
-// another a miner at work flees once the hole's first wave comes. Prints
+// another a miner at work flees once the hole's first wave comes. From
+// the #173 review: a freed miner nods before it walks to its work, one
+// freed far from the knight crumbles quieter, and a freeing the host
+// refuses turns the figure back to stone. Prints
 // one PASS or FAIL line per check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/stones/stones.qml
@@ -74,7 +77,7 @@ Window {
         let k = 0
         while (game.dig && game.dig.t < n * dt - 1e-6 && k++ < 4000) step(1)
     }
-    function stone(kind) { return game.stones.find(s => s.kind === kind) }
+    function stone(kind) { return game.stones.find(s => s.kind === kind && s.special === "") }
     function vein() { return game.veins[0] }
     function hole() { return game.holes[0] }
     // A fresh deep room, paused, the knight out of reach of harm
@@ -203,9 +206,12 @@ Window {
         [100, () => {
             freshRoom()
             let m = stone("miner"), l = stone("lost")
-            check(game.stones.length === 2 && m && l && !m.freed && !l.freed && m.colour === 0 && l.colour === 0,
+            let sp = game.stones.find(s => s.special !== "")
+            check(game.stones.length === 3 && m && l && sp && m.special === "" && l.special === ""
+                  && !m.freed && !l.freed && m.colour === 0 && l.colour === 0,
                   "the dojo's deep scenario shows a petrified miner (" + (m ? m.cell : "none") + ") and a lost one ("
-                  + (l ? l.cell : "none") + ") in the vein's rock face, stone")
+                  + (l ? l.cell : "none") + ") in the vein's rock face, stone, and a special beside them ("
+                  + (sp ? sp.special + " " + sp.cell : "none") + ")")
 
             // Off-beat strikes never harm it: the ring starts over
             check(aimAt(m) && game.dig.stone === m && !game.dig.vein,
@@ -243,6 +249,15 @@ Window {
             check(m.colour === 1 && m.outcome === "working" && sc.minerLines.indexOf(m.saying) >= 0,
                   "after colourTime its colour is back (" + m.colour + ") and it goes back to work: " + m.outcome
                   + ", \"" + m.saying + "\"")
+            // It nods to the knight where it stood, then walks (#173 review)
+            let nodded = 0, stood = true, fx = m.footXWu, fy = m.footYWu
+            for (let i = 0; i < Math.round(sc.nod / dt) + 2; i++) {
+                step(1)
+                nodded = Math.max(nodded, m.nod)
+                if (m.nod > 0 && Math.hypot(m.footXWu - fx, m.footYWu - fy) > 1e-6) stood = false
+            }
+            check(nodded > 0.9 && stood && m.nod === 0,
+                  "it nods to the knight (" + nodded.toFixed(2) + ") over " + sc.nod + " s where it stood, then walks")
             seconds(5)
             let w = game._workSpot(m), workSounds = 0
             let before = game.stoneSoundCount
@@ -276,6 +291,30 @@ Window {
                   "it walks off (" + moved.toFixed(2) + " wu), fading (" + mid.toFixed(2) + "), and is gone: "
                   + eventsOf(l.cell).join(", "))
             check(hole().stage === "rest", "the strikes on the lost one never woke the hole either")
+            Clayground.paused = false
+        }],
+        [100, () => {
+            // From the #173 review: one freed far from the knight crumbles
+            // quieter, as its chord is; a freeing the host refuses turns
+            // the figure back to stone
+            freshRoom()
+            let l = stone("lost"), p = game.player
+            p.yWu -= 12
+            step(1)
+            let c = game._knightCentre(), d = Math.hypot(l.footXWu - c.x, l.footYWu + 0.6 - c.y)
+            let want = Math.max(hc.quietest, 1 - d / hc.hearReach)
+            game._freeMoment(l)
+            check(l.freed && Math.abs(game.crumbleGain - want) < 1e-6 && want < 0.6,
+                  "a traveller freed " + d.toFixed(1) + " wu off crumbles at " + game.crumbleGain.toFixed(2)
+                  + " (the chord's gain " + want.toFixed(2) + "), not 1")
+            seconds(sc.colourTime)
+            game._stoneRefused(l.cell)
+            check(!l.freed && l.colour === 0 && l.clean === 0 && l.outcome === "" && game.stonesRefused === 1
+                  && eventsOf(l.cell).join() === "freed,refused",
+                  "a freeing the host refuses turns it back to stone: freed " + l.freed + ", colour " + l.colour
+                  + ", " + eventsOf(l.cell).join(", "))
+            seconds(1)
+            check(l.colour === 0 && !l.freed && l.outcome === "", "and it stays stone, to be freed again")
             Clayground.paused = false
         }],
         [100, () => {
