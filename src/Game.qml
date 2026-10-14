@@ -781,6 +781,7 @@ ClayWorld2d {
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
         onTalkReported: (fromId, level, cell) => _hostTalk(fromId, level, cell)
+        onTalkRefused: (cell) => _talkRefused(cell)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
         onGemRefused: (cell) => _gemLost(cell)
         onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
@@ -7046,13 +7047,15 @@ ClayWorld2d {
     // joins the camps for good. A miner still there flees once its hole's
     // first wave comes. Alone the game decides how each goes on. In a
     // session the node whose knight talked to it shows its line at once
-    // and tells the host; the host decides and publishes every traveller
+    // and tells the host, which refuses a talk to one gone already or on
+    // another level; the host decides and publishes every traveller
     // that goes on and how (session property "deepTravellers"), which
     // every screen shows, a node that joins later too, and counts the
     // miners' strikes, as it rolls the holes. deepTravellerEvents lists
     // what they did on this screen, for the benches: {cell, what, t}, what
-    // "talked" (this node's knight talked to it), "leaving", "fleeing" or
-    // "gone", t the travellers' physics clock, seconds;
+    // "talked" (this node's knight talked to it), "refused" (the host
+    // refused that talk), "leaving", "fleeing" or "gone", t the
+    // travellers' physics clock, seconds;
     // deepTravellerSounds the last veinSoundsKept of their sounds, "dig"
     // or "chord", muted too, deepTravellerSoundCount all of them
     Component { id: deepTravellerComponent; DeepTraveller {} }
@@ -7210,15 +7213,35 @@ ClayWorld2d {
     }
     // Host: a node's knight talked to the traveller on cell of that level:
     // it leaves, unless it went on already or is on another level than
-    // the host's
+    // the host's; then the host refuses the talk, as it refuses a gem
     function _hostTalk(fromId, level, cell) {
         let s = level === levelIndex && levelType === "dungeon" ? deepTravellerAt(cell) : null
         if (!s || s.outcome !== "") {
-            console.log("[Game] The talk of", fromId, "to the traveller before", cell, "of level", level,
-                        "comes too late")
+            console.log("[Game] The talk of", fromId, "to the traveller before", cell, "of level", level, "- refused")
+            if (fromId === session.nodeId) _talkRefused(cell)
+            else session.refuseTalk(fromId, cell)
             return
         }
         _deepOutcome(s, "leaving")
+    }
+    // The host refused this node's talk to the traveller on cell: one the
+    // host decided already goes on as it decided, any other stops saying
+    // its line and can be talked to again
+    property int talksRefused: 0
+    function _talkRefused(cell) {
+        let s = deepTravellerAt(cell), run = s ? _deepRuns[cell] : null
+        if (!s || !run || s.outcome !== "") return
+        let val = session.deepTravellers
+        if (val && val.seed === session.runSeed && val.level === levelIndex && val.travellers[cell]) {
+            _deepOutcome(s, val.travellers[cell])
+            return
+        }
+        talksRefused++
+        run.talked = false
+        run.say = 0
+        s.saying = ""
+        _deepEvent(s, "refused")
+        console.log("[Game] The talk to the", s.kind, "before", s.cell, "was refused by the host: it stays")
     }
     // The line traveller s says as it goes on as outcome: a special's own,
     // else one of its kind's table, from its own stream of the level's

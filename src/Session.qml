@@ -88,6 +88,9 @@ Item {
     // Host: a node's knight talked to the traveller of the deep before
     // the rock face on cell ("gx,gy") of that level (issue #176)
     signal talkReported(string fromId, int level, string cell)
+    // The host refused this node's talk to the traveller on cell: it is
+    // on another level, or it went on already
+    signal talkRefused(string cell)
     // The host gave this node's knight the gem of a vein it split
     // (cell, shape, value), or refused it: another knight split it first,
     // or the host is on another level (issue #169)
@@ -270,6 +273,8 @@ Item {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
             } else if (data.type === "talk") {
                 if (net.isHost) session.talkReported(fromId, data.level, data.cell)
+            } else if (data.type === "talkRefuse") {
+                session.talkRefused(data.cell)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
             } else if (data.type === "gemRefuse") {
@@ -598,6 +603,10 @@ Item {
     function reportTalk(level, cell) {
         if (net.isHost) talkReported(net.nodeId, level, cell)
         else net.sendTo(net.hostId, {type: "talk", level: level, cell: cell})
+    }
+    // Host: that node's knight's talk to the traveller on cell stands not
+    function refuseTalk(nodeId, cell) {
+        net.sendTo(nodeId, {type: "talkRefuse", cell: cell})
     }
     // Host: how the travellers of the deep in its level go on, for every
     // node

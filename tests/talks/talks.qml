@@ -22,7 +22,8 @@
 // asleep, and the special joins the camps for good, kept with the
 // record. A miner still there when the hole's first wave comes flees,
 // without the chord. A talk the host gets for one gone already changes
-// nothing. Prints one PASS or FAIL line per check and exits with the
+// nothing, and a talk the host refuses stops the line and leaves the
+// traveller to be talked to again. Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/talks/talks.qml
@@ -399,12 +400,34 @@ Window {
             check(sp.gone, "and walks off, gone")
 
             // A talk the host gets for one gone already changes nothing
-            game._hostTalk("late", game.levelIndex, l.cell)
+            game._hostTalk(game.knightIdOf(game.player), game.levelIndex, l.cell)
             check(eventsOf(l.cell).join() === "talked,leaving,gone" && l.outcome === "leaving",
                   "a talk that comes for one gone already changes nothing: " + eventsOf(l.cell).join(", "))
             pressE()
             check(game.deepTravellerEvents.filter(e => e.what === "talked").length === 3,
                   "E with none left near talks to no one")
+            Clayground.paused = false
+        }],
+        [100, () => {
+            // A talk the host refuses - shown on this screen, as a joiner
+            // shows its own at once - stops the line, and the traveller
+            // stays to be talked to again
+            freshRoom()
+            let l = traveller("lost")
+            standBy(l)
+            game._deepRuns[l.cell].talked = true
+            game._deepSay(l, "leaving")
+            game._deepEvent(l, "talked")
+            let said = l.saying
+            game._talkRefused(l.cell)
+            step(1)
+            check(said !== "" && l.saying === "" && l.outcome === "" && !l.gone && game.talksRefused === 1
+                  && game.deepTravellerToTalk() === l && l.talkable && eventsOf(l.cell).join() === "talked,refused",
+                  "a talk the host refuses stops its line and it stays, to be talked to again: "
+                  + eventsOf(l.cell).join(", ") + ", talkable " + l.talkable)
+            pressE()
+            check(l.outcome === "leaving" && eventsOf(l.cell).join() === "talked,refused,talked,leaving",
+                  "E then talks it into leaving: " + eventsOf(l.cell).join(", "))
             Clayground.paused = false
         }],
         [100, () => {

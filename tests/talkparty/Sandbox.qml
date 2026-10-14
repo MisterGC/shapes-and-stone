@@ -125,12 +125,24 @@ Item {
                  shown: fc.joinedShown, own: fc.joined }
     }
 
-    // This knight's talk to the traveller on cell reaches the host for
-    // another level than the host's, as one made just before the party
-    // went on would: the host lets it be
+    // This knight talks to the traveller on cell, but the talk reaches
+    // the host for another level than the host's, as one made just before
+    // the party went on would: its line shows here at once, and the host
+    // refuses it
     function talkStale(cell) {
+        let s = game.deepTravellerAt(cell), run = s ? game._deepRuns[cell] : null
+        if (!run || run.talked || s.outcome !== "") return ""
+        run.talked = true
+        game._deepSay(s, "leaving")
+        game._deepEvent(s, "talked")
         session.reportTalk(game.levelIndex + 7, cell)
-        return true
+        return s.saying
+    }
+    function refused() { return game.talksRefused }
+    // Whether this knight could talk to the traveller on cell again
+    function talkableAgain(cell) {
+        let s = game.deepTravellerAt(cell), run = s ? game._deepRuns[cell] : null
+        return run !== null && !run.talked && s.outcome === ""
     }
     // This knight stands just below the traveller on cell, near enough to
     // talk to it, and a miner digs while it is there

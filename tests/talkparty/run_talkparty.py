@@ -9,8 +9,9 @@ still. Then:
 
 - both screens show the same travellers on the same spots, of the same
   kind and special, all still there
-- a talk of the joiner's the host gets for another level changes nothing
-  on either screen
+- a talk of the joiner's the host refuses (another level) shows its line
+  on the joiner, then the traveller stays there to be talked to again;
+  the host's stays as it was
 - with the joiner's knight by a miner, the miner digs on both screens,
   and the host counts its strikes toward waking the room's hole
 - the joiner's knight talks to a traveller: its line shows on the
@@ -170,12 +171,18 @@ def talk_on_both(H, J, check):
         return 100
     for K in (H, J):
         K.eval1("noteStart()")
-    # A talk for another level than the host's changes nothing
+    # A talk the host refuses (another level) shows on the joiner, then
+    # the traveller stays there to be talked to again
     cell = hs[0]["cell"]
-    J.eval1(f"talkStale('{cell}')")
-    time.sleep(2)
-    check(all(one(K, cell)["outcome"] == "" and not one(K, cell)["gone"] for K in (H, J)),
-          "a talk of the joiner's the host gets for another level changes nothing on either screen")
+    shown = J.eval1(f"talkStale('{cell}')")
+    back = wait_for(lambda: J.eval1("refused()") == 1, 15)
+    jt, ht = one(J, cell), one(H, cell)
+    check(isinstance(shown, str) and shown != "" and back and jt["saying"] == "" and jt["outcome"] == ""
+          and J.eval1(f"talkableAgain('{cell}')") is True and ht["outcome"] == "" and not ht["gone"]
+          and whats(J.json("events()"), cell) == ["talked", "refused"],
+          f"a talk of the joiner's the host refuses (another level) shows its line on the joiner, then it stays "
+          f"there to be talked to again: joiner {', '.join(whats(J.json('events()'), cell))}, "
+          f"talkable {J.eval1(f'talkableAgain({chr(39)}{cell}{chr(39)})')}; host {ht['outcome'] or 'still there'}")
     # The joiner's knight by a miner: it digs on both screens, the host
     # counts its strikes
     miner = next((t for t in hs if t["kind"] == "miner"), None)
@@ -215,6 +222,9 @@ def talk_on_both(H, J, check):
         gone = wait_for(lambda: all((one(X, cell) or {}).get("gone") is True for X in (H, J)), 15)
         check(chord and gone, f"each screen plays the chord and shows the {kind} walk off and gone")
         he, je = whats(H.json("events()"), cell), whats(J.json("events()"), cell)
+        # The joiner's screen saw the refused talk first
+        if je[:2] == ["talked", "refused"]:
+            je = je[2:]
         talker, other = (je, he) if who == "joiner" else (he, je)
         check(talker == ["talked", "leaving", "gone"] and other == ["leaving", "gone"],
               f"both screens saw the same: the {who}'s {', '.join(talker)}, the other's {', '.join(other)}")
