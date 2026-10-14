@@ -1002,6 +1002,44 @@ number of failed checks:
 python3 tests/secretparty/run_secretparty.py --mode local
 ```
 
+**Veins:** the deep keeps gems in its walls (#154). A vein is a cluster of
+small faceted gems half sunk into a wall's face, dim in the stone; where
+the lantern's light reaches it one facet winks a glint, and coming close
+it shimmers once. E with the knight in reach of it starts the dig: the
+sword folds into a pickaxe, held towards the vein, and a ring closes on
+the vein once every `ringTime` seconds, in the parry ring's look and
+white while a strike would be clean. E within `window` seconds of a
+close, before or after it, strikes clean: sparks in the gem's colour, a
+crack through the stone, the pickaxe's chink and a tink a pentatonic step
+higher with each clean strike, so a well-cut gem plays a rising phrase.
+Any other E, or a second one on the same close, chips: grey chips and the
+chink alone. A vein takes three to five strikes (`strikes`, by the
+level's seed and its cell); the last splits the stone with a crumble, and
+the gem pops out with a three-note chime, spins once and drifts into the
+knight, the bigger the more of the strikes were clean (`gemSize`).
+Walking off, raising the shield, swinging or dashing ends the dig, and
+the pickaxe folds back into the sword. The ring and the window count the
+physics steps, so a pause or a hit stop holds them. The gem's shape and
+colour come with the depth (`shapes`): an amber tetrahedron from depth 0,
+a jade cube from 2, a sapphire octahedron from 4, an amethyst
+dodecahedron from 6 and an ember icosahedron from 8. Every number is
+`Balance.deep`; the samples are synthesised by `tools/deep_sounds.py`.
+For now a vein stands only in the dojo: `applyScenario("deep")` lands
+the knight in front of one in a walled room, and `applyScenario("deep",
+4)` shows depth 4's gem. The deep bench checks that the scenario lands in
+reach of the vein and shows each shape at its depth, that E brings out
+the pickaxe and the ring, that on single physics steps E on a close and
+up to the window before or after it strikes clean with the chink and the
+rising tink while a step outside it, or a second E on the same close,
+chips with the chink alone, that a strike held a beat on the wall clock
+between two steps is judged by the steps, that the gem's size grows with
+each clean strike from `gemSize[0]` to `gemSize[1]` and the split
+crumbles and chimes, and that the shield or walking off ends the dig:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/deep/deep.qml
+```
+
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
 over, kept for the next visit) shows a panel before each dungeon to a solo
 player or the host, never to a joiner. Its rows are the settings of
