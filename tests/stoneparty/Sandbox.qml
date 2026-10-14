@@ -102,6 +102,19 @@ Item {
         return s ? game._workSpot(s) : null
     }
 
+    // This knight's freeing of the traveller on cell reaches the host for
+    // another level than the host's, as one made just before the party
+    // went on would: it shows freed here at once, and the host refuses it
+    // (#173 review)
+    function freeStale(cell) {
+        let s = game.stoneAt(cell)
+        if (!s || s.freed) return false
+        game._freeMoment(s)
+        session.reportFreed(game.levelIndex + 7, cell)
+        return s.freed
+    }
+    function refused() { return game.stonesRefused }
+
     // This knight frees the traveller on cell, every strike clean on its
     // close: it stands in front of it, aims at it and the left button
     // starts the dig, and its strikes are judged at once on the dig's

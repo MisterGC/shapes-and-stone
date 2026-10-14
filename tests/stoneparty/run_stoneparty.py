@@ -16,6 +16,9 @@ still. Then:
   plays the chord, and both saw the same events
 - the host's knight frees another, when the dungeon has one, and both
   screens show the same again
+- before that (#173 review): a freeing of the joiner's the host refuses -
+  reported for another level - shows freed on the joiner's screen, then
+  turns back to stone there, and the host's stays stone
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -153,6 +156,16 @@ def free_on_both(H, J, check):
                  f"both screens show the same {len(hs)} petrified travellers on the same cells, of the same "
                  f"kind and strikes, stone ({', '.join(s['cell'] + ' ' + s['kind'] for s in hs)}; joiner {len(js)})"):
         return 100
+    # From the #173 review: a freeing the host refuses turns back to stone
+    cell = hs[0]["cell"]
+    shown = J.eval1(f"freeStale('{cell}')") is True
+    back = wait_for(lambda: J.eval1("refused()") == 1, 15)
+    jf, hf = one(J, cell), one(H, cell)
+    check(shown and back and not jf["freed"] and jf["colour"] == 0 and jf["outcome"] == ""
+          and not hf["freed"] and whats(J.json("stoneEvents()"), cell) == ["freed", "refused"],
+          f"a freeing the host refuses (another level) shows freed on the joiner, then turns back to stone: "
+          f"joiner freed {jf['freed']}, colour {jf['colour']}, "
+          f"{', '.join(whats(J.json('stoneEvents()'), cell))}; host freed {hf['freed']}")
     for who, K in (("joiner", J), ("host", H)):
         if who == "host" and len(hs) < 2:
             check(True, "the dungeon has one traveller: the host's knight frees none of its own")
@@ -191,6 +204,9 @@ def free_on_both(H, J, check):
             gone = wait_for(lambda: all((one(X, cell) or {}).get("gone") is True for X in (H, J)), 15)
             check(gone, f"the {kind} walks off and is gone on both screens")
         he, je = whats(H.json("stoneEvents()"), cell), whats(J.json("stoneEvents()"), cell)
+        # The joiner's screen saw the refused freeing first
+        if who == "joiner" and je[:2] == ["freed", "refused"]:
+            je = je[2:]
         check(he == je and he[:2] == ["freed", want],
               f"both screens saw the same: {', '.join(he)} (joiner {', '.join(je)})")
     return 0
