@@ -2139,8 +2139,8 @@ ClayWorld2d {
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
-              + "Q whirlwind  •  E talk / dig  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
+        text: "WASD move  •  LMB strike, hold to charge, at a vein dig  •  RMB shield  •  Space dash  •  "
+              + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
