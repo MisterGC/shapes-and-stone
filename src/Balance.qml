@@ -480,8 +480,9 @@ QtObject {
     // petrified traveller (Balance.deep.stone, issue #158) with chance at
     // low, middle and high danger, in its vein's rock face beside the
     // vein, a miner with minerShare's chance, else a lost one. With
-    // specialShare's chance it is one of Balance.deep.specials not yet
-    // with the camps (issue #159), of that special's kind
+    // specialShare's chance it is one of Balance.deep.specials (issue
+    // #159), of that special's kind, rolled from the whole table: one
+    // already with the camps stands there as an ordinary traveller
     readonly property var dungeon: ({
         // Loops: the rooms are joined in a chain, and extraCorridors more
         // corridors at low, middle and high danger (as danger.looks) join

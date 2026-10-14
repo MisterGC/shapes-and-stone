@@ -7086,14 +7086,16 @@ ClayWorld2d {
             let cells = veins.map(v => v.wgx + "," + v.wgy)
             let hole = holeList.find(h => h.veins.some(c => cells.indexOf(c) >= 0))
             let kind = rand() < cfg.minerShare ? "miner" : "lost", special = ""
-            // Rarely one of the specials not yet with the camps (issue
-            // #159), from a stream of its own
+            // Rarely one of the specials (issue #159), from a stream of its
+            // own and the whole table, so the level is the same whatever
+            // the record holds; one already with the camps stands there as
+            // an ordinary traveller of its kind
             let rare = createRng(levelSeed ^ 0x73706563 ^ ri)
-            let left = campFreed.candidates()
-            if (rare() < cfg.specialShare && left.length > 0) {
-                let sp = left[Math.floor(rare() * left.length)]
-                special = sp.id
+            if (rare() < cfg.specialShare) {
+                let table = Balance.deep.specials
+                let sp = table[Math.floor(rare() * table.length)]
                 kind = sp.kind
+                if (campFreed.candidates().some(c => c.id === sp.id)) special = sp.id
             }
             out.push({ gx: spot.gx, gy: spot.gy, kind: kind, special: special,
                        veins: cells, hole: hole ? hole.gx + "," + hole.gy : "", room: ri })
