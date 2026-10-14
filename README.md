@@ -1220,8 +1220,9 @@ knight talked to one shows its line at once and tells the host; the
 host decides how it goes on and publishes every traveller that goes on
 (the session property `deepTravellers`), which every screen shows, a
 node that joins later too, and counts the miners' strikes as it rolls
-the holes; a talk that reaches the host for another level, or for one
-gone already, changes nothing. The dojo's deep scenario has a miner and
+the holes. A talk that reaches the host for another level, or for one
+gone already, it refuses, as it refuses a gem: on the talker's screen
+the line stops and the traveller stays, to be talked to again. The dojo's deep scenario has a miner and
 a lost one either side of its vein, and a special beside them. This
 replaces #158's petrified figures freed with the pickaxe.
 
@@ -1240,7 +1241,9 @@ and the same gem after the miner was talked off does not; that E talks
 to the lost one, the miner and the special, each says its line, the
 chord plays, each walks off and is gone, the miner digs no more, the
 hole stays asleep and the special joins the camps, kept with the
-record; and that a miner still there flees at the hole's first wave:
+record; that a talk the host refuses stops the line and the traveller
+can be talked to again; and that a miner still there flees at the
+hole's first wave:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/talks/talks.qml
@@ -1250,7 +1253,8 @@ The talk party bench checks it over the network: two processes of
 Clayground's live loader, a host and a joiner, on seed 424244, whose
 first dungeon holds a miner and a lost traveller. Both show the same
 travellers on the same spots; a talk of the joiner's for another level
-changes nothing. With the joiner's knight by the miner it digs on both
+shows its line on the joiner, the host refuses it, and the traveller
+stays there to be talked to again. With the joiner's knight by the miner it digs on both
 screens and the host counts its strikes toward the hole. The joiner's
 knight talks to the miner and the host's to the lost one: each time
 both screens show the same line, the leaving the host decided, the
