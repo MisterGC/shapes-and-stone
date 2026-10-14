@@ -4,8 +4,10 @@
 // First one knight alone. The dungeon on 20 seeds, each at a low, a
 // middle and a high danger, built twice: the same veins on the same
 // cells with the same gems and strikes, each in the face of a wall cell
-// north of a room's cell, not in the start room, its gem the depth's;
-// none in the camp nor in the fight room. A vein far from the knight's
+// north of a room's cell, not in the start room, its gem the depth's,
+// and no torch on a vein's cell or on another torch's (also on the two
+// seeds where a torch stepped aside onto the other one); none in the camp
+// nor in the fight room. A vein far from the knight's
 // lantern is dark, one in it glints; the deepest gem glows on its own.
 // Then in the dojo's deep scenario two veins are cut, one with every
 // strike clean and one with none: each gem goes into the pouch worth the
@@ -123,6 +125,22 @@ Window {
         if (v.shape !== game.gemOf(game.dangerDepth).shape) return "not the depth's gem"
         return ""
     }
+    // The torches of a game that stand on a vein's cell or on another
+    // torch's spot: ["x,y ..."]
+    function torchesClashing(game) {
+        let seen = {}, out = []
+        let veinAt = {}
+        for (let v of game.veins) veinAt[v.cell] = true
+        for (let t of game.torches) {
+            if (!t) continue
+            let key = t.xWu.toFixed(3) + "," + t.yWu.toFixed(3)
+            let cell = Math.floor(t.xWu / game.cellSize) + "," + Math.floor(t.yWu / game.cellSize)
+            if (seen[key]) out.push(key + " on another torch")
+            if (veinAt[cell]) out.push(key + " on the vein of " + cell)
+            seen[key] = true
+        }
+        return out
+    }
     // The knight's centre in front of vein v's face, off by dx
     function standAtVein(game, v, dx) {
         let p = game.player
@@ -156,7 +174,8 @@ Window {
         }]
     ]
     // The same seed and danger twice: the same veins, by the rules
-    property var placed: ({ lines: 0, same: 0, builds: 0, broken: [], least: 1e9, empty: 0, perBand: [0, 0, 0] })
+    property var placed: ({ lines: 0, same: 0, builds: 0, broken: [], least: 1e9, empty: 0, perBand: [0, 0, 0],
+                            clashes: [] })
     function placementSteps() {
         let out = []
         for (let i = 0; i < seeds; i++) {
@@ -169,6 +188,7 @@ Window {
                         let why = veinBroken(solo, v)
                         if (why !== "") placed.broken.push("seed " + seed + " danger " + dg + " " + v.cell + " " + why)
                     }
+                    for (let c of torchesClashing(solo)) placed.clashes.push("seed " + seed + " danger " + dg + " " + c)
                     solo.applyScenario("dungeon", dg, seed)
                     let b = veinLines(solo)
                     placed.builds++
@@ -179,6 +199,14 @@ Window {
                     placed.perBand[solo.dangerBand(solo.dangerPosition)] += a.length
                 }])
             }
+        }
+        // The two seeds where a torch stepped aside onto the other one
+        for (let sd of [[81190, 2.8], [492978, 0.3]]) {
+            out.push([40, () => {
+                solo.applyScenario("dungeon", sd[1], sd[0])
+                for (let c of torchesClashing(solo)) placed.clashes.push("seed " + sd[0] + " danger " + sd[1] + " " + c)
+                bench.torchSeeds++
+            }])
         }
         return out
     }
@@ -193,6 +221,9 @@ Window {
             check(placed.broken.length === 0, "every vein sits in the face of a wall cell north of a room's "
                   + "cell, not in the start room, its gem the depth's"
                   + (placed.broken.length ? ": " + placed.broken.length + " not, e.g. " + placed.broken.slice(0, 3).join("; ") : ""))
+            check(placed.clashes.length === 0 && bench.torchSeeds === 2,
+                  "no torch stands on a vein or on another torch, on these dungeons and seeds 81190 and 492978"
+                  + (placed.clashes.length ? ": " + placed.clashes.length + ", e.g. " + placed.clashes.slice(0, 3).join("; ") : ""))
             let camps = 0
             for (let i = 0; i < 5; i++) {
                 solo.applyScenario("village", i * 2, 2000 + i * 7919)
@@ -291,6 +322,7 @@ Window {
         }]
     ]
     property int pouchWorth: 0
+    property int torchSeeds: 0
     property var fallAt: null
 
     // --- A host and a joiner ---
