@@ -9,7 +9,7 @@
 // stay the same. For 1 knight the dungeon is today's: its fingerprint is
 // the one recorded below, from the game with 9 to 12 rooms, and without
 // its veins, their rock faces, their rooms' spawn holes (issue #157) and
-// petrified travellers (issue #158) the one recorded before there were
+// travellers of the deep (issue #158, #176) the one recorded before there were
 // any (issue #156), but for a torch
 // stepped aside for a vein. A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
@@ -65,9 +65,11 @@ Window {
     // fc4fbc6d at 0.5 and 8684d4a2 at 1.5; the spawn holes in the veins'
     // rooms (issue #157), left out with the veins, from 8ae03641 and
     // c7390a81; the petrified travellers in the veins' rock faces (issue
-    // #158), left out with the veins too, from 162bb47b at 0.5 (none at 1.5)
+    // #158), left out with the veins too, from 162bb47b at 0.5 (none at
+    // 1.5); the traveller of the deep on the floor in front of the face
+    // that took their place (issue #176) from e91af29e at 0.5
     readonly property var today: ({
-        "0.5": { hash: "e91af29e", noVeins: "b084ab49", enemies: 15 },
+        "0.5": { hash: "51748fd", noVeins: "b084ab49", enemies: 15 },
         "1.5": { hash: "888308f2", noVeins: "a1c350e8", enemies: 18 }
     })
 
@@ -101,7 +103,7 @@ Window {
     // HP an enemy has left (all of it)
     function todayLines(noVeins) {
         let lines = layout(noVeins).filter(l => !noVeins || (l.indexOf("Vein ") !== 0 && l.indexOf("Hole ") !== 0
-                                                             && l.indexOf("Petrified ") !== 0))
+                                                             && l.indexOf("DeepTraveller ") !== 0))
         return lines.concat(foes().map(f => f.split(":").slice(0, 6).join(":")))
     }
 

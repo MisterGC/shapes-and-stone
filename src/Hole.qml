@@ -29,6 +29,10 @@ Item {
     // waves sent
     property var veinCells: []
     property int wave: 0
+    // The strikes the miners of its room made while it rested, which make
+    // a cut gem likelier to wake it (issue #176), counted by the node that
+    // decides the cuts
+    property int dug: 0
 
     property string stage: "rest"
     readonly property bool awake: stage === "dust" || stage === "eyes" || stage === "waves"

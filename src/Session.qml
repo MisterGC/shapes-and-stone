@@ -85,13 +85,9 @@ Item {
     // Host: a node's knight split the vein on cell ("gx,gy") of that
     // level, clean of its strikes clean (issue #156)
     signal cutReported(string fromId, int level, string cell, int clean)
-    // Host: a node's knight freed the petrified traveller on cell
-    // ("gx,gy") of that level (issue #158)
-    signal freedReported(string fromId, int level, string cell)
-    // The host refused this node's freeing of the traveller on cell: it
-    // is on another level, or its outcome was decided already (#173
-    // review)
-    signal freedRefused(string cell)
+    // Host: a node's knight talked to the traveller of the deep before
+    // the rock face on cell ("gx,gy") of that level (issue #176)
+    signal talkReported(string fromId, int level, string cell)
     // The host gave this node's knight the gem of a vein it split
     // (cell, shape, value), or refused it: another knight split it first,
     // or the host is on another level (issue #169)
@@ -182,12 +178,12 @@ Item {
     // before any (issue #157)
     readonly property var holes: net.connected && net.sessionProperties.holes
                                  ? net.sessionProperties.holes : null
-    // The petrified travellers freed in the level the host plays and how
-    // each goes on, the session property "stones" ({seed, level, stones:
-    // {cell: "working", "leaving" or "fleeing"}}); null before any
-    // (issue #158)
-    readonly property var stones: net.connected && net.sessionProperties.stones
-                                  ? net.sessionProperties.stones : null
+    // The travellers of the deep that go on in the level the host plays
+    // and how, the session property "deepTravellers" ({seed, level,
+    // travellers: {cell: "leaving" or "fleeing"}}); null before any
+    // (issue #176)
+    readonly property var deepTravellers: net.connected && net.sessionProperties.deepTravellers
+                                          ? net.sessionProperties.deepTravellers : null
     // The travellers the host's party freed this run and how each went
     // on, the session property "freed" ({seed, run: [{key, kind, outcome,
     // special}]}); null before any (issue #159)
@@ -272,12 +268,10 @@ Item {
                 if (net.isHost) session.secretReported(data.level, data.cell)
             } else if (data.type === "cut") {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
-            } else if (data.type === "free") {
-                if (net.isHost) session.freedReported(fromId, data.level, data.cell)
+            } else if (data.type === "talk") {
+                if (net.isHost) session.talkReported(fromId, data.level, data.cell)
             } else if (data.type === "gemGrant") {
                 session.gemGranted(data)
-            } else if (data.type === "freeRefuse") {
-                session.freedRefused(data.cell)
             } else if (data.type === "gemRefuse") {
                 session.gemRefused(data.cell)
             } else if (data.type === "pouchDrop") {
@@ -598,20 +592,17 @@ Item {
     function publishHoles(holes) {
         if (net.isHost) net.setSessionProperty("holes", holes)
     }
-    // This node's knight freed a petrified traveller: the host decides
-    // how it goes on, for every node. The host's own is taken at once
-    function reportFreed(level, cell) {
-        if (net.isHost) freedReported(net.nodeId, level, cell)
-        else net.sendTo(net.hostId, {type: "free", level: level, cell: cell})
+    // This node's knight talked to a traveller of the deep: the host
+    // decides how it goes on, for every node. The host's own is taken at
+    // once
+    function reportTalk(level, cell) {
+        if (net.isHost) talkReported(net.nodeId, level, cell)
+        else net.sendTo(net.hostId, {type: "talk", level: level, cell: cell})
     }
-    // Host: the travellers freed in its level, for every node
-    function publishStones(stones) {
-        if (net.isHost) net.setSessionProperty("stones", stones)
-    }
-    // Host: that node's knight's freeing of the traveller on cell stands
-    // not
-    function refuseFreed(nodeId, cell) {
-        net.sendTo(nodeId, {type: "freeRefuse", cell: cell})
+    // Host: how the travellers of the deep in its level go on, for every
+    // node
+    function publishDeepTravellers(travellers) {
+        if (net.isHost) net.setSessionProperty("deepTravellers", travellers)
     }
     // Host: the travellers its party freed this run, for every camp
     function publishFreed(freed) {

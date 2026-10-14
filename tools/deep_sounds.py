@@ -9,7 +9,7 @@ again writes the same files:
   deep_crumble.wav  the stone's crumble as the vein splits: grit falling off it
   deep_rumble.wav   a spawn hole waking (issue #157): a low rumble in the rock
   deep_groan.wav    a spawn hole's eyes opening: a drawn-out groan from inside
-  deep_freed.wav    a petrified traveller freed (issue #158): a warm low
+  deep_freed.wav    a traveller of the deep sent up (issue #158, #176): a warm low
                     major chord, the only one in the dungeon's sounds
 
 The game plays the tink a pentatonic step higher with each clean strike,

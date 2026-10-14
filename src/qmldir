@@ -48,6 +48,6 @@ Door 1.0 Door.qml
 SecretWall 1.0 SecretWall.qml
 Vein 1.0 Vein.qml
 Hole 1.0 Hole.qml
-Petrified 1.0 Petrified.qml
+DeepTraveller 1.0 DeepTraveller.qml
 Gem 1.0 Gem.qml
 DungeonMasterPanel 1.0 DungeonMasterPanel.qml

@@ -1,8 +1,8 @@
 import QtQuick
 
-// The travellers the knights freed from the stone, at the camps (issue
-// #159). A traveller freed in a run that left toward the exit sits by the
-// fire of every later camp of that run; a special one (Balance.deep
+// The travellers the knights sent up out of the deep, at the camps (issue
+// #159, #176). A traveller of the deep that left toward the exit in a run
+// sits by the fire of every later camp of that run; a special one (Balance.deep
 // .specials) joins the camps for good: kept with this machine's record,
 // it sits by every camp's fire after that, across runs, with its comfort
 // at the fire. Alone this node decides; in a session the host's run and
@@ -66,7 +66,7 @@ QtObject {
     function specialOf(id) {
         return Balance.deep.specials.find(sp => sp.id === id) || null
     }
-    // The specials a petrified traveller may still be: none with the
+    // The specials a traveller of the deep may still be: none with the
     // camps nor freed this run
     function candidates() {
         let taken = joinedShown.concat(runShown.filter(f => f.special).map(f => f.special))
@@ -152,7 +152,7 @@ QtObject {
             let f = figure.createObject(room, Object.assign({
                 cxWu: x, cyWu: foot + size / 2 - 0.05, sizeWu: size, footXWu: x, footYWu: foot,
                 cell: "camp" + made.length, kind: who.kind, special: who.special,
-                seated: true, freed: true, colour: 1, seed: (i + 1) / (cfg.angles + 1),
+                seated: true, seed: (i + 1) / (cfg.angles + 1),
                 facing: x < fx ? 1 : -1
             }, extra({})))
             if (f) made.push(f)
