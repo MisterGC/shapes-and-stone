@@ -25,10 +25,9 @@ Item {
     // Where the darkness is drawn over: the eyes go there
     property Item glowParent: null
 
-    // The veins of its room, "gx,gy", whose clean strikes wake it, the
-    // clean strikes so far and the waves sent
+    // The veins of its room, "gx,gy", whose cut gems may wake it, and the
+    // waves sent
     property var veinCells: []
-    property int clean: 0
     property int wave: 0
 
     property string stage: "rest"

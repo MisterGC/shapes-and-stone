@@ -1,7 +1,7 @@
 // Hole party bench - one of two game instances, a host or a joiner, that
 // run_holeparty.py starts as two processes (clayliveloader --instance),
 // connects over Local or Cloud signaling and drives through the inspector
-// protocol (issue #157).
+// protocol (issues #157, #175).
 //
 // The instance runs the real game. The driver has a knight cut a vein,
 // every strike clean, and reads what each screen shows of the spawn
@@ -90,6 +90,13 @@ Item {
         return game.holes.map(h => ({ cell: h.cell, veins: h.veinCells, stage: h.stage, wave: h.wave }))
     }
     function holeTable() { return Balance.deep.hole }
+    // Whether the gem of the vein on cell, cut every strike clean, wakes
+    // its hole by this screen's roll, and the knights it is rolled for
+    function wakes(cell) {
+        let v = game.veinAt(cell)
+        return v ? game.holeWakes(cell, game.gemValue(v.shape, v.strikes, v.strikes)) : false
+    }
+    function knights() { return game.partyKnights }
     function minTelegraph() { return Balance.enemy.minTelegraph }
     // What the holes did on this screen: [{cell, what, t}]
     function holeEvents() { return game.holeEvents }

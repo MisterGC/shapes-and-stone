@@ -16,8 +16,9 @@
 // by them; the freed miner says a line, walks to the vein and works there,
 // its tink part of the room's sound, and is still there seconds later;
 // the freed lost one says a line, walks off and fades out of sight. In a
-// fresh room a miner freed after the hole's creatures came flees, and in
-// another a miner at work flees once the hole's first wave comes. From
+// fresh room on a seed whose cut gem wakes the hole (issue #175) a miner
+// freed after the hole's creatures came flees, and in another a miner at
+// work flees once the hole's first wave comes. From
 // the #173 review: a freed miner nods before it walks to its work, one
 // freed far from the knight crumbles quieter, and a freeing the host
 // refuses turns the figure back to stone. Prints
@@ -81,12 +82,22 @@ Window {
     function vein() { return game.veins[0] }
     function hole() { return game.holes[0] }
     // A fresh deep room, paused, the knight out of reach of harm
-    function freshRoom() {
+    function freshRoom(seed) {
         Clayground.paused = true
-        game.applyScenario("deep", 3)
+        game.applyScenario("deep", 3, seed)
         game.forceActiveFocus()
         game.player.hp = 100000
         step(1)
+    }
+    // The first seed from the scenario's whose deep room's vein, cut all
+    // clean, wakes its hole (issue #175)
+    function wakingSeed() {
+        for (let k = 0; k < 200; k++) {
+            game.applyScenario("deep", 3, game.scenarioSeed + k)
+            let v = vein()
+            if (game.holeWakes(v.cell, game.gemValue(v.shape, v.strikes, v.strikes))) return game.scenarioSeed + k
+        }
+        return game.scenarioSeed
     }
     // The knight stands in front of t's face and the mouse aims at it:
     // the next step begins the dig
@@ -319,13 +330,13 @@ Window {
         }],
         [100, () => {
             // A miner freed after the hole's creatures came flees
-            freshRoom()
+            freshRoom(wakingSeed())
             let m = stone("miner"), v = vein(), h = hole()
             aimAt(v)
             strikeClean(v, Balance.deep.ringTime)
             let k = 0
             while (h.wave < 1 && k++ < 60 * 20) step(1)
-            check(v.split && h.wave >= 1, "the vein cut clean wakes the hole and its first wave comes (wave " + h.wave + ")")
+            check(v.split && h.wave >= 1, "the vein cut clean on a seed that wakes it wakes the hole and its first wave comes (wave " + h.wave + ")")
             aimAt(m)
             strikeClean(m, sc.ringTime)
             seconds(sc.colourTime + 0.1)
@@ -337,7 +348,7 @@ Window {
         }],
         [100, () => {
             // A miner at work flees once the hole's first wave comes
-            freshRoom()
+            freshRoom(wakingSeed())
             let m = stone("miner"), v = vein(), h = hole()
             aimAt(m)
             strikeClean(m, sc.ringTime)

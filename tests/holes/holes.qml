@@ -1,5 +1,5 @@
-// Holes bench - a vein's room has a spawn hole, and digging wakes it
-// (issue #157).
+// Holes bench - a vein's room has a spawn hole, and a gem cut from its
+// vein wakes it by chance (issues #157, #175).
 //
 // The dungeon on 20 seeds, each at a low, a middle and a high danger,
 // built twice: the same holes on the same cells; each room but the start
@@ -9,15 +9,16 @@
 // few in a small room on a vein's rock face; none in the camp nor in
 // the fight room. The dojo's
 // deep scenario shows a hole at rest. Then in the deep scenario, paused
-// and single-stepped, at a depth whose vein takes eyesAt strikes and
-// more: strikes chipped wake nothing; clean ones wake the hole through
-// its stages in order - dust with the rumble at dustAt, eyes with the
-// groan at eyesAt - the first creature crawls out no sooner than
-// enemy.minTelegraph (and telegraph) after the eyes; waves waves of
-// perWave creatures come from the hole's cell, and then it closes with
-// the crumble; a clean strike after that wakes nothing and no creature
-// comes. Prints one PASS or FAIL line per check and exits with the
-// number of failures.
+// and single-stepped, on a seed whose roll leaves the hole asleep and on
+// one whose roll wakes it: the strikes wake nothing before the gem is
+// cut; on the first the cut gem leaves it at rest; on the second the cut
+// wakes it through its stages in order - dust with the rumble at the
+// cut, eyes with the groan eyesAfter later - the first creature crawls
+// out no sooner than enemy.minTelegraph (and telegraph) after the eyes;
+// waves waves of perWave creatures come from the hole's cell, and then
+// it closes with the crumble, and a gem cut after that wakes nothing.
+// Prints one PASS or FAIL line per check and exits with the number of
+// failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/holes/holes.qml
 
@@ -72,6 +73,7 @@ Window {
         game = c.createObject(bench.contentItem, {width: bench.width, height: bench.height, muted: true,
                                                   recordStoreName: "ShapesAndStoneHolesBench"})
         script.steps = [[() => game.screen === "title", () => {}]].concat(placementSteps()).concat(wakeSteps)
+            .concat(endSteps)
         script.start()
     }
 
@@ -90,9 +92,9 @@ Window {
         let k = 0
         while (game.dig && game.dig.t < n * dt - 1e-6 && k++ < 4000) step(1)
     }
-    function freshDig(depth) {
+    function freshDig(depth, seed) {
         Clayground.paused = true
-        game.applyScenario("deep", depth)
+        game.applyScenario("deep", depth, seed)
         game.forceActiveFocus()
         aimVein()
         step(1)
@@ -191,7 +193,31 @@ Window {
     }
 
     // ---- waking ----
-    property int depth: -1
+    readonly property int depth: 3
+    // The first seed from scenarioSeed whose deep room's vein, cut all
+    // clean, wakes its hole (wakes) or leaves it asleep (!wakes)
+    function deepSeed(wakes) {
+        for (let k = 0; k < 200; k++) {
+            let seed = game.scenarioSeed + k
+            game.applyScenario("deep", depth, seed)
+            let v = vein()
+            if (game.holeWakes(v.cell, game.gemValue(v.shape, v.strikes, v.strikes)) === wakes) return seed
+        }
+        return -1
+    }
+    // Cuts the vein dug, every strike clean; the hole's stage before the
+    // last strike
+    function cutClean() {
+        let v = vein(), before = ""
+        for (let i = 1; i <= v.strikes; i++) {
+            stepTo(i * beat)
+            if (i === v.strikes) before = hole().stage
+            strike()
+        }
+        return before
+    }
+    property int sleepSeed: -1
+    property int wakeSeed: -1
     property var wakeSteps: [
         [100, () => {
             game.applyScenario("deep")
@@ -199,45 +225,40 @@ Window {
             check(game.holes.length === 1 && h.stage === "rest" && h.visible && h.veinCells.join() === vein().cell,
                   "the dojo's deep scenario shows a hole at rest, at " + (h ? h.cell : "none")
                   + ", woken by the vein at " + vein().cell)
-            for (let d = 0; d < 12 && depth < 0; d++) {
-                game.applyScenario("deep", d)
-                if (vein().strikes > hc.eyesAt) depth = d
-            }
-            check(depth >= 0, "at depth " + depth + " the deep room's vein takes " + vein().strikes
-                  + " strikes, more than eyesAt " + hc.eyesAt)
-            if (depth < 0) depth = 0
+            sleepSeed = deepSeed(false)
+            wakeSeed = deepSeed(true)
+            check(sleepSeed >= 0 && wakeSeed >= 0, "at depth " + depth + " seed " + sleepSeed
+                  + " rolls the deep room's hole asleep and seed " + wakeSeed + " awake for a gem cut all clean")
 
-            // Chipped strikes wake nothing
-            freshDig(depth)
+            // A cut whose roll fails leaves the hole at rest
+            freshDig(depth, sleepSeed)
             let v = vein()
-            for (let i = 1; i <= v.strikes; i++) {
-                stepTo(i * beat - Math.round(beat / 2))
-                strike()
-            }
-            check(v.split && v.clean === 0 && hole().stage === "rest" && game.holeEvents.length === 0,
-                  "a vein cut with every strike chipped (" + v.chips + ") leaves the hole at rest")
+            let before = cutClean()
+            step(Math.round((hc.eyesAfter + hc.telegraph + hc.waveGap) / dt))
+            check(v.split && v.clean === v.strikes && before === "rest" && hole().stage === "rest"
+                  && game.holeEvents.length === 0 && game.enemies.length === 0,
+                  "on seed " + sleepSeed + " the gem cut all clean (" + v.clean + " of " + v.strikes
+                  + ") leaves the hole at rest: " + hole().stage + ", " + game.holeEvents.length + " events, "
+                  + game.enemies.length + " creatures")
             Clayground.paused = false
         }],
         [100, () => {
-            freshDig(depth)
+            freshDig(depth, wakeSeed)
             let v = vein(), h = hole(), n = game.holeSoundCount
-            let stages = []
-            for (let i = 1; i <= hc.eyesAt; i++) {
-                stepTo(i * beat)
-                strike()
-                stages.push(h.stage + (soundsSince(n).length ? " (" + soundsSince(n).join() + ")" : ""))
-                n = game.holeSoundCount
-            }
-            let want = []
-            for (let i = 1; i <= hc.eyesAt; i++)
-                want.push(i >= hc.eyesAt ? "eyes (groan)" : i === hc.dustAt ? "dust (rumble)" : i > hc.dustAt ? "dust" : "rest")
-            check(v.clean === hc.eyesAt && stages.join("; ") === want.join("; "),
-                  "clean strikes wake the hole stage by stage: " + stages.join("; "))
-            check(h.eyesOpen && bench.findEyes(h).objectName === "holeEyes",
-                  "at eyesAt its two eyes open in the dark")
+            let before = cutClean()
+            let atCut = h.stage + " (" + soundsSince(n).join() + ")"
+            n = game.holeSoundCount
+            check(v.split && before === "rest" && atCut === "dust (rumble)",
+                  "the strikes wake nothing before the cut (" + before + "); the cut gem wakes the hole: " + atCut)
+            let k = 0
+            while (h.stage === "dust" && k++ < 60 * 10) step(1)
+            check(h.stage === "eyes" && soundsSince(n).join() === "groan" && h.eyesOpen
+                  && bench.findEyes(h).objectName === "holeEyes",
+                  "eyesAfter " + hc.eyesAfter + " s later its two eyes open in the dark with the groan ("
+                  + (k * dt).toFixed(3) + " s, " + soundsSince(n).join() + ")")
 
             // The waves, until it closes
-            let k = 0
+            k = 0
             while (h.stage !== "closed" && k++ < 60 * 30) step(1)
             let ev = eventsOf(h.cell)
             let order = []
@@ -252,7 +273,7 @@ Window {
             let at = what => (ev.find(e => e.what === what) || { t: NaN }).t
             let first = at("creature") - at("eyes"), fromDust = at("creature") - at("dust")
             check(first >= Balance.enemy.minTelegraph - 1e-6 && first >= hc.telegraph - dt - 1e-6
-                  && fromDust >= first,
+                  && Math.abs(at("eyes") - at("dust") - hc.eyesAfter) <= dt + 1e-6,
                   "the first creature comes " + first.toFixed(3) + " s after the eyes opened ("
                   + fromDust.toFixed(3) + " s after the dust), no sooner than enemy.minTelegraph "
                   + Balance.enemy.minTelegraph + " and telegraph " + hc.telegraph)
@@ -270,24 +291,21 @@ Window {
                   "closeAfter " + hc.closeAfter + " s after the last creature it closes with the crumble ("
                   + (at("closed") - last.t).toFixed(3) + " s)")
 
-            // Digging on wakes nothing
+            // A gem cut after that wakes nothing
             let events = game.holeEvents.length, sounds = game.holeSoundCount, count = cs.length
-            let close = Math.ceil(game.dig.t / cfg.ringTime) + 1
-            stepTo(close * beat)
-            strike()
-            let clean = game.lastStrike.clean
-            step(Math.round((hc.telegraph + hc.waveGap) / dt))
-            check(clean && h.closed && game.holeEvents.length === events && game.holeSoundCount === sounds
+            game._gemCut(v.cell, 1000)
+            step(Math.round((hc.eyesAfter + hc.telegraph + hc.waveGap) / dt))
+            check(h.closed && game.holeEvents.length === events && game.holeSoundCount === sounds
                   && creatures(h.cell).length === count,
-                  "a clean strike after it closed (" + (clean ? "clean" : "chipped") + ") wakes nothing: "
-                  + h.stage + ", " + (game.holeEvents.length - events) + " events, "
-                  + (creatures(h.cell).length - count) + " creatures more")
+                  "a gem cut after it closed wakes nothing: " + h.stage + ", " + (game.holeEvents.length - events)
+                  + " events, " + (creatures(h.cell).length - count) + " creatures more")
             Clayground.paused = false
             console.log("[Holes] done,", failures, "failed")
             game.destroy()
-        }],
-        [300, () => Qt.exit(failures)]
+        }]
     ]
+
+    property var endSteps: [[300, () => Qt.exit(failures)]]
     function findEyes(h) {
         let kids = h.glowParent ? h.glowParent.children : []
         for (let i = 0; i < kids.length; i++)

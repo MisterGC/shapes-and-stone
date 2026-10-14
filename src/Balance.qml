@@ -674,11 +674,14 @@ QtObject {
     // veins where the wall allows, off the veins' rock face, a torch, a
     // slit, a secret, a feature's cell and a doorway; a small room whose
     // wall leaves no such cell lets go of the rock face, then the
-    // feature, then the doorway. Clean strikes on any vein of its room
-    // wake it: at dustAt of them dust puffs from its rim every puffEvery
-    // seconds and the rumble plays at rumbleVolume, at eyesAt two eyes
-    // open in its dark and the groan plays at groanVolume. telegraph
-    // seconds after the eyes opened (never less than enemy.minTelegraph)
+    // feature, then the doorway. Each gem cut from a vein of its room
+    // wakes it by chance (issue #175): wakeChance and wakePerGold for each
+    // gold the gem is worth, times wakePerKnight more for each knight past
+    // the first the level was built for, at most wakeMost. Woken, dust
+    // puffs from its rim every puffEvery seconds and the rumble plays at
+    // rumbleVolume; eyesAfter seconds later two eyes open in its dark and
+    // the groan plays at groanVolume. telegraph seconds after the eyes
+    // opened (never less than enemy.minTelegraph)
     // the first creature crawls out of its mouth, then waves waves of
     // perWave creatures of the depth's kinds, waveGap seconds apart, each
     // creature crawlGap after the one before it, each with the rumble.
@@ -763,8 +766,11 @@ QtObject {
         rockColor: "#5E564C",
         hole: {
             gap: 3,
-            dustAt: 1,
-            eyesAt: 3,
+            wakeChance: 0.25,
+            wakePerGold: 0.01,
+            wakePerKnight: 0.3,
+            wakeMost: 0.95,
+            eyesAfter: 1.2,
             puffEvery: 0.45,
             telegraph: 1.5,
             waves: 2,

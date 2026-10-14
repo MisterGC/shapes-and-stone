@@ -780,7 +780,6 @@ ClayWorld2d {
         onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
         onSecretReported: (level, cell) => _hostSecret(level, cell)
         onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
-        onWakeReported: (level, cell) => _hostWake(level, cell)
         onFreedReported: (fromId, level, cell) => _hostFreed(fromId, level, cell)
         onFreedRefused: (cell) => _stoneRefused(cell)
         onGemGranted: (gem) => _gemWon(gem.cell, gem)
@@ -6565,7 +6564,6 @@ ClayWorld2d {
         let len = Math.max(0.01, Math.hypot(c.x - v.faceXWu, c.y - v.faceYWu))
         let nx = (c.x - v.faceXWu) / len, ny = (c.y - v.faceYWu) / len
         if (clean) {
-            _holeStruck(v)
             spawnSparks(v.faceXWu, v.faceYWu, nx, ny, cfg.sparks, v.gemColor)
             _trauma(0.06)
             playChink(0)
@@ -6647,7 +6645,9 @@ ClayWorld2d {
             return
         }
         if (_cutVeins.indexOf(v.cell) < 0) _cutVeins.push(v.cell)
-        _gemWon(v.cell, { shape: v.shape, value: gemValue(v.shape, v.clean, v.strikes) })
+        let gem = { shape: v.shape, value: gemValue(v.shape, v.clean, v.strikes) }
+        _gemCut(v.cell, gem.value)
+        _gemWon(v.cell, gem)
     }
     // The gem of the vein on cell is this node's knight's: the chime, and
     // it shows as won (gemWonComponent) on its way into the pouch
@@ -6717,6 +6717,7 @@ ClayWorld2d {
         session.publishVeins({ seed: session.runSeed, level: levelIndex, cells: _cutVeins.slice() })
         let gem = { shape: v.shape, value: gemValue(v.shape, clean, v.strikes) }
         console.log("[Game] The vein at", cell, "was split by", fromId, "- a", gem.shape, "worth", gem.value)
+        _gemCut(cell, gem.value)
         if (fromId === session.nodeId) {
             _gemWon(cell, gem)
             return
@@ -6747,12 +6748,15 @@ ClayWorld2d {
     // --- Spawn holes (issue #157) ---
     // A room that holds a vein has one spawn hole low in its north wall
     // (Hole.qml, Balance.deep.hole), laid out after everything else from
-    // its own stream of the level's seed, so nothing moves for it. Clean
-    // strikes on its room's veins wake it in stages, dust and then eyes;
+    // its own stream of the level's seed, so nothing moves for it. Each
+    // gem cut from one of its room's veins wakes it by chance (issue
+    // #175), likelier the more the gem is worth and the more knights the
+    // level was built for, the roll from the vein's own stream of the
+    // level's seed; woken it goes through its stages, dust and then eyes;
     // telegraph seconds after the eyes creatures of the depth crawl out of
-    // its mouth in waves, and then it closes for good. Alone the game runs
-    // it. In a session each node tells the host of its knight's clean
-    // strikes; the host runs every hole, spawns its creatures as it does
+    // its mouth in waves, and then it closes for good. Alone the game
+    // rolls and runs it. In a session the host, which decides every cut
+    // gem, rolls it, runs every hole, spawns its creatures as it does
     // every enemy, and publishes the holes' stages and waves (session
     // property "holes"), which every screen shows and hears, a node that
     // joins later too. holeEvents lists what the holes did on this screen,
@@ -6763,9 +6767,10 @@ ClayWorld2d {
     property var holes: []
     property var holeEvents: []
     property real _holeClock: 0
-    // A woken hole's run on the node that runs it, by cell: {t, plan,
-    // closeAt, rand}, t its seconds since the eyes, plan the creatures
-    // still to come [{at, wave}], rand its stream of the level's seed
+    // A woken hole's run on the node that runs it, by cell: {t, eyesAt,
+    // plan, closeAt, rand}, t its seconds since it woke, eyesAt when its
+    // eyes open, plan the creatures still to come [{at, wave}], rand its
+    // stream of the level's seed
     property var _holeRuns: ({})
     // The seconds since each awake hole last puffed dust, by cell
     property var _holePuffs: ({})
@@ -6870,35 +6875,54 @@ ClayWorld2d {
     function holeOf(veinCell) {
         return holes.find(h => h.veinCells.indexOf(veinCell) >= 0) || null
     }
-    // This node's knight struck vein v clean: alone its hole wakes, in a
-    // session the host is told
-    function _holeStruck(v) {
-        if (session.connected && !deepRoomActive) session.reportWake(levelIndex, v.cell)
-        else _wakeHole(holeOf(v.cell))
+    // The chance a gem worth value cut from a vein wakes its room's hole:
+    // wakeChance and wakePerGold for each gold it is worth, times
+    // wakePerKnight more for each knight past the first of knights (the
+    // knights the level was built for when left out), at most wakeMost
+    function holeWakeChance(value, knights) {
+        let cfg = Balance.deep.hole, n = knights === undefined ? partyKnights : knights
+        return Math.min(cfg.wakeMost, (cfg.wakeChance + cfg.wakePerGold * value)
+                                      * (1 + cfg.wakePerKnight * (n - 1)))
     }
-    // Host: a knight struck the vein on cell of that level clean
-    function _hostWake(level, cell) {
-        if (level !== levelIndex || levelType !== "dungeon") return
-        _wakeHole(holeOf(cell))
+    // The roll of the vein on cell "gx,gy" against holeWakeChance, 0..1,
+    // from the level's seed and the cell alone: the same seed and party
+    // wake the same holes, and a gem worth more never wakes fewer
+    function holeWakeRoll(cell) {
+        let c = cell.split(",").map(Number)
+        return createRng(levelSeedNow() ^ 0x77616b65 ^ (c[1] * gridWidth + c[0]))()
     }
-    // A clean strike on a vein of hole h's room: at dustAt of them it
-    // wakes, at eyesAt its eyes open and its creatures are planned; once
-    // the eyes are open, or it closed, a strike does nothing more
+    // Whether a gem worth value cut from the vein on cell wakes its hole,
+    // for knights (partyKnights when left out)
+    function holeWakes(cell, value, knights) {
+        return holeWakeRoll(cell) < holeWakeChance(value, knights)
+    }
+    // The node that decides a cut (alone the game, in a session the host):
+    // the gem worth value cut from the vein on cell rolls whether its
+    // room's hole wakes, a hole at rest only
+    function _gemCut(cell, value) {
+        let h = holeOf(cell)
+        if (!h || h.stage !== "rest") return
+        let wakes = holeWakes(cell, value)
+        console.log("[Game] The gem from", cell, "worth", value, "rolls", holeWakeRoll(cell).toFixed(3), "against",
+                    holeWakeChance(value).toFixed(3), "for", partyKnights, partyKnights === 1 ? "knight:" : "knights:",
+                    wakes ? "the hole at " + h.cell + " wakes" : "the hole sleeps on")
+        if (wakes) _wakeHole(h)
+    }
+    // Hole h wakes: dust at once, eyesAfter seconds later its eyes, and
+    // its creatures are planned from then; a hole woken already stays as
+    // it is
     function _wakeHole(h) {
-        if (!h || (h.stage !== "rest" && h.stage !== "dust")) return
+        if (!h || h.stage !== "rest") return
         let cfg = Balance.deep.hole
-        h.clean++
-        if (h.stage === "rest" && h.clean >= cfg.dustAt) _holeTo(h, "dust")
-        if (h.stage === "dust" && h.clean >= cfg.eyesAt) {
-            let plan = [], first = Math.max(Balance.enemy.minTelegraph, cfg.telegraph)
-            for (let w = 0; w < cfg.waves; w++)
-                for (let i = 0; i < cfg.perWave; i++)
-                    plan.push({ at: first + w * cfg.waveGap + i * cfg.crawlGap, wave: w + 1 })
-            let c = h.cell.split(",").map(Number)
-            _holeRuns[h.cell] = { t: 0, plan: plan, closeAt: plan[plan.length - 1].at + cfg.closeAfter,
-                                  rand: createRng(levelSeedNow() ^ 0x63726177 ^ (c[1] * gridWidth + c[0])) }
-            _holeTo(h, "eyes")
-        }
+        let plan = [], first = cfg.eyesAfter + Math.max(Balance.enemy.minTelegraph, cfg.telegraph)
+        for (let w = 0; w < cfg.waves; w++)
+            for (let i = 0; i < cfg.perWave; i++)
+                plan.push({ at: first + w * cfg.waveGap + i * cfg.crawlGap, wave: w + 1 })
+        let c = h.cell.split(",").map(Number)
+        _holeRuns[h.cell] = { t: 0, eyesAt: cfg.eyesAfter, plan: plan,
+                              closeAt: plan[plan.length - 1].at + cfg.closeAfter,
+                              rand: createRng(levelSeedNow() ^ 0x63726177 ^ (c[1] * gridWidth + c[0])) }
+        _holeTo(h, "dust")
     }
     // Hole h goes on to stage: its look and its sound, unless quiet (a
     // level built with a hole woken already); the host tells every node
@@ -6971,6 +6995,7 @@ ClayWorld2d {
             let run = _holeRuns[h.cell]
             if (!run) continue
             run.t += dt
+            if (h.stage === "dust" && run.t >= run.eyesAt - 1e-9) _holeTo(h, "eyes")
             while (run.plan.length > 0 && run.plan[0].at <= run.t + 1e-9)
                 _holeCreature(h, run.plan.shift().wave, run.rand)
             if (run.plan.length === 0 && run.t >= run.closeAt - 1e-9) {

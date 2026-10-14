@@ -85,9 +85,6 @@ Item {
     // Host: a node's knight split the vein on cell ("gx,gy") of that
     // level, clean of its strikes clean (issue #156)
     signal cutReported(string fromId, int level, string cell, int clean)
-    // Host: a node's knight struck the vein on cell ("gx,gy") of that
-    // level clean, which wakes its room's spawn hole (issue #157)
-    signal wakeReported(int level, string cell)
     // Host: a node's knight freed the petrified traveller on cell
     // ("gx,gy") of that level (issue #158)
     signal freedReported(string fromId, int level, string cell)
@@ -275,8 +272,6 @@ Item {
                 if (net.isHost) session.secretReported(data.level, data.cell)
             } else if (data.type === "cut") {
                 if (net.isHost) session.cutReported(fromId, data.level, data.cell, data.clean)
-            } else if (data.type === "wake") {
-                if (net.isHost) session.wakeReported(data.level, data.cell)
             } else if (data.type === "free") {
                 if (net.isHost) session.freedReported(fromId, data.level, data.cell)
             } else if (data.type === "gemGrant") {
@@ -598,12 +593,6 @@ Item {
     // Host: the veins split in its level, for every node
     function publishVeins(veins) {
         if (net.isHost) net.setSessionProperty("veins", veins)
-    }
-    // This node's knight struck a vein clean: the host wakes its room's
-    // spawn hole for every node. The host's own is taken at once
-    function reportWake(level, cell) {
-        if (net.isHost) wakeReported(level, cell)
-        else net.sendTo(net.hostId, {type: "wake", level: level, cell: cell})
     }
     // Host: the spawn holes woken in its level, for every node
     function publishHoles(holes) {
