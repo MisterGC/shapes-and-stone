@@ -1039,7 +1039,8 @@ a jade cube from 2, a sapphire octahedron from 4, an amethyst
 dodecahedron from 6 and an ember icosahedron from 8. Every number is
 `Balance.deep`; the samples are synthesised by `tools/deep_sounds.py`.
 The dojo's `applyScenario("deep")` lands the knight in front of one in a
-walled room, and `applyScenario("deep", 4)` shows depth 4's gem. The deep
+walled room, its spawn hole in the same wall (#157), and
+`applyScenario("deep", 4)` shows depth 4's gem. The deep
 bench checks, with the real mouse, that the scenario lands in reach of
 the vein and shows each shape at its depth, that aiming at the vein
 brings out the pickaxe and the ring, that on single physics steps a
@@ -1119,6 +1120,56 @@ checks:
 
 ```
 python3 tests/veinparty/run_veinparty.py --mode local
+```
+
+**Spawn holes:** digging is a fight you choose (#157). A room that holds
+a vein has one spawn hole low in the face of its north wall: a small dark
+burrow with a ragged rim, at rest just a detail of the wall. It stands
+`gap` cells or more from the room's veins where the wall allows, off
+their rock face, a torch, a slit, a secret, a feature's cell and a
+doorway; a small room whose wall leaves no such cell lets go of those
+one after the other, last putting out a torch to take its place. Holes
+are laid out after everything else, from their own stream of the
+level's seed, so nothing moves for them. Clean strikes on any vein of
+the room wake it: at `dustAt` of them dust puffs from its rim and a low
+rumble plays, at `eyesAt` two eyes open in its dark and a groan comes
+from inside. `telegraph` seconds after the eyes (never less than
+`enemy.minTelegraph`) creatures of the depth's kinds crawl out of its
+mouth, each with the rumble: `waves` waves of `perWave`, `waveGap`
+seconds apart. `closeAfter` seconds after the last one its rim crumbles
+shut, a heap of rubble, and it never wakes again; chipped strikes wake
+nothing. The hole's sounds are quieter the further it is from the
+knight. Every number is `Balance.deep.hole`; the rumble and the groan
+are synthesised by `tools/deep_sounds.py`. In a session each node tells
+the host of its knight's clean strikes; the host runs every hole, sends
+its creatures as it sends every enemy, and publishes the holes' stages
+and waves (the session property `holes`), which every screen shows and
+hears in order, a node that joins later too. The dojo's deep scenario
+has the vein's hole in the same wall. The holes bench builds 20 seeds at
+a low, a middle and a high danger twice and checks the same holes on the
+same cells, one in each room with a vein and none elsewhere, each on its
+wall's face off the veins, torches, slits and secrets, none in the camp
+or the fight room; that the deep scenario shows one; that chipped
+strikes wake nothing, clean ones dust then eyes with the rumble then the
+groan, the first creature `telegraph` after the eyes, the waves from the
+hole's cell, the close with the crumble, and that a clean strike after
+it wakes nothing:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/holes/holes.qml
+```
+
+The hole party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on seed 424242. Both show
+the same holes at rest; the joiner's knight cuts a vein, every strike
+clean, and both screens see its hole go through the same stages and show
+the same creatures at its mouth, the first no sooner than
+`enemy.minTelegraph` after the eyes; then the host's knight does the same
+at another hole. It needs the live loader and exits with the number of
+failed checks:
+
+```
+python3 tests/holeparty/run_holeparty.py --mode local
 ```
 
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
