@@ -3623,7 +3623,8 @@ ClayWorld2d {
     // in its torch colour
     property var torches: []
     // A torch whose spot holds a vein (veinCells, "gx,gy") takes the
-    // nearest spot of its wall without one, the stream drawn the same
+    // nearest spot of its wall without one and without the wall's other
+    // torch, the stream drawn the same
     function placeRoomTorches(decoRng, look, veinCells) {
         let veined = {}
         for (let c of veinCells || []) veined[c] = true
@@ -3637,16 +3638,18 @@ ClayWorld2d {
                     spots.push(gx)
             if (spots.length === 0) continue
             let count = room.w >= 7 && spots.length >= 4 ? 2 : 1
+            let lit = {}
             for (let i = 0; i < count; i++) {
                 // Spread two torches across the wall, one sits near the middle
                 let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
                 t += (decoRng() - 0.5) * 0.15
                 let at = Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))
-                let free = spots.map((x, i) => i).filter(i => !veined[spots[i] + "," + gy])
+                let free = spots.map((x, i) => i).filter(i => !veined[spots[i] + "," + gy] && !lit[spots[i]])
                     .sort((a, b) => Math.abs(a - at) - Math.abs(b - at))
                 let gx = free.length > 0 ? spots[free[0]] : -1
                 if (look && decoRng() >= look.torchShare) continue
                 if (gx < 0) continue
+                lit[gx] = true
                 placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75,
                            look ? look.torch : undefined)
             }
