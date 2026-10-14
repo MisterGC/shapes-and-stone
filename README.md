@@ -1270,11 +1270,11 @@ python3 tests/talkparty/run_talkparty.py --mode local
 ```
 
 **Freed at the camps:** the travellers of the deep that left toward the
-exit in a run, talked off or fled, sit by the fire of every later camp
-of that run (#159). They sit huddled on a ring round the fire
+exit in a run, talked off or fled, sit by the fire of the next camp of
+that run only, the one after the dungeon they left (#159, #177). They sit huddled on a ring round the fire
 (`Balance.deep.camp`), off the camp's travellers and its cat, so the
-figures round the fire are the run's count of those sent up; a new
-run's camps start without them. Rarely a traveller of the deep is
+figures round the fire are the count of those sent up in the dungeon
+just behind; a new run's camps start without them. Rarely a traveller of the deep is
 special (`Balance.dungeon.travellers.specialShare`): one of the few of
 `Balance.deep.specials`, with a faint gold edge and a gold glow. Which
 one, and of which kind, comes from the level's seed alone, whatever the
@@ -1297,11 +1297,13 @@ is since the game started, in a session since it was hosted or joined.
 The camp side lives in `src/CampFreed.qml`. The freed bench checks that a seed holds the same travellers with an
 empty and a full record, its special an ordinary one with the full; it
 talks to every traveller of a dungeon at depth 2 and checks that they
-sit at the camps after depth 2 and 3 and are gone in a new run; then
+sit at the camp after depth 2, not at the one after depth 3, and are
+gone in a new run; then
 talks to the deep scenario's special and checks it is kept with the
-record, sits in
-two camps of the next run with its line, and the fire heals by its
-comfort; then the fallen screen and the title. With an out dir it saves
+record, sits at the next run's first camp with its line and the fire
+heals by its comfort; in that run it sends depth 2's travellers off
+again and checks the special and them at the camp after depth 2, the
+special alone at the one after depth 3; then the fallen screen and the title. With an out dir it saves
 `fallen.png` and `title.png` (and `camp.png`, `special.png`, which need a
 window that draws the world):
 
