@@ -17,6 +17,13 @@
 // out no sooner than enemy.minTelegraph (and telegraph) after the eyes;
 // waves waves of perWave creatures come from the hole's cell, and then
 // it closes with the crumble, and a gem cut after that wakes nothing.
+// Then the share (issue #175): the dungeon on 40 seeds at a shallow and a
+// deep danger, the game's roll for 1 to 4 knights of the first vein of
+// each hole cut all chipped and all clean - the share of woken holes
+// rises with the gem's worth and with the knights (unless every chance
+// stands at wakeMost already) and lies near the mean of holeWakeChance;
+// on 10 of the seeds the game's own cut for 2 knights, built twice,
+// wakes the holes its roll says, the same both times.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -73,7 +80,7 @@ Window {
         game = c.createObject(bench.contentItem, {width: bench.width, height: bench.height, muted: true,
                                                   recordStoreName: "ShapesAndStoneHolesBench"})
         script.steps = [[() => game.screen === "title", () => {}]].concat(placementSteps()).concat(wakeSteps)
-            .concat(endSteps)
+            .concat(shareSteps()).concat(endSteps)
         script.start()
     }
 
@@ -300,11 +307,121 @@ Window {
                   "a gem cut after it closed wakes nothing: " + h.stage + ", " + (game.holeEvents.length - events)
                   + " events, " + (creatures(h.cell).length - count) + " creatures more")
             Clayground.paused = false
-            console.log("[Holes] done,", failures, "failed")
-            game.destroy()
         }]
     ]
 
+    // ---- the share (issue #175) ----
+    readonly property int shareSeeds: 40
+    readonly property int cutSeeds: 10
+    readonly property var shareDangers: [0.5, 8.5]
+    readonly property var parties: [1, 2, 3, 4]
+    // By "danger/knights/chipped|clean": {holes, woken, chance (summed)}
+    property var share: ({})
+    property var cutRuns: ({ runs: 0, woken: 0, notSame: [], notRolled: [] })
+    // The first vein of each hole of the dungeon built, its gem's worth
+    // cut every strike chipped or clean: [{cell, hole, value}]
+    function holeVeins(clean) {
+        return game.holes.map(h => {
+            let v = game.veinAt(h.veinCells[0])
+            return { cell: v.cell, hole: h.cell, value: game.gemValue(v.shape, clean ? v.strikes : 0, v.strikes) }
+        })
+    }
+    // Builds the dungeon on seed at danger dg for knights and cuts the
+    // first vein of each hole, every strike clean, through the game's own
+    // cut; the cells of the holes woken, sorted
+    function cutAll(seed, dg, knights) {
+        game.knightsOverride = knights
+        game.applyScenario("dungeon", dg, seed)
+        let out = []
+        for (let h of game.holes) {
+            let v = game.veinAt(h.veinCells[0])
+            v.clean = v.strikes
+            v.chips = 0
+            game._veinCut(v)
+            if (h.stage !== "rest") out.push(h.cell)
+        }
+        return out.sort()
+    }
+    function shareSteps() {
+        let out = []
+        for (let i = 0; i < shareSeeds; i++) {
+            for (let dg of shareDangers) {
+                out.push([30, () => {
+                    Clayground.paused = true
+                    let seed = 7000 + i * 104729
+                    // The holes stand where they stand for any party: one
+                    // build, the game's roll for each party and worth
+                    game.knightsOverride = 1
+                    game.applyScenario("dungeon", dg, seed)
+                    for (let n of parties)
+                        for (let clean of [false, true]) {
+                            let key = dg + "/" + n + "/" + (clean ? "clean" : "chipped")
+                            let row = share[key] = share[key] || { holes: 0, woken: 0, chance: 0 }
+                            for (let hv of holeVeins(clean)) {
+                                row.holes++
+                                row.chance += game.holeWakeChance(hv.value, n)
+                                if (game.holeWakes(hv.cell, hv.value, n)) row.woken++
+                            }
+                        }
+                    if (i >= cutSeeds) return
+                    // The game's own cut, for 2 knights, built twice: it
+                    // wakes the holes the roll says, the same both times
+                    let a = cutAll(seed, dg, 2)
+                    game.applyScenario("dungeon", dg, seed)
+                    let rolled = holeVeins(true).filter(hv => game.holeWakes(hv.cell, hv.value)).map(hv => hv.hole).sort()
+                    let b = cutAll(seed, dg, 2)
+                    cutRuns.runs++
+                    cutRuns.woken += a.length
+                    if (a.join() !== b.join()) cutRuns.notSame.push(seed + "@" + dg + ": " + a.join(" ") + " / " + b.join(" "))
+                    if (a.join() !== rolled.join()) cutRuns.notRolled.push(seed + "@" + dg + ": " + a.join(" ") + " / " + rolled.join(" "))
+                }])
+            }
+        }
+        out.push([30, () => {
+            game.knightsOverride = 0
+            Clayground.paused = false
+            let s = (dg, n, c) => share[dg + "/" + n + "/" + c]
+            let pct = r => (100 * r.woken / Math.max(1, r.holes)).toFixed(0) + "%"
+            let line = dg => parties.map(n => n + ": " + pct(s(dg, n, "chipped")) + " -> " + pct(s(dg, n, "clean"))).join(", ")
+            let rate = r => r.woken / Math.max(1, r.holes)
+            // Every gem's chance at wakeMost: the share can rise no more
+            let capped = r => r.chance >= r.holes * hc.wakeMost - 1e-6
+            let rises = (hi, lo) => rate(hi) > rate(lo) || (capped(hi) && capped(lo))
+            let byValue = [], byParty = [], near = []
+            for (let dg of shareDangers)
+                for (let n of parties) {
+                    let lo = s(dg, n, "chipped"), hi = s(dg, n, "clean")
+                    if (!rises(hi, lo)) byValue.push(dg + "/" + n)
+                    if (n > 1 && !(rises(s(dg, n, "chipped"), s(dg, n - 1, "chipped"))
+                                   && rises(s(dg, n, "clean"), s(dg, n - 1, "clean")))) byParty.push(dg + "/" + n)
+                    for (let r of [lo, hi])
+                        if (Math.abs(rate(r) - r.chance / Math.max(1, r.holes)) > 0.12) near.push(dg + "/" + n)
+                }
+            for (let dg of shareDangers) console.log("[Holes] danger", dg, "woken by knights, chipped -> clean:", line(dg))
+            let deeper = parties.every(n => rises(s(shareDangers[1], n, "clean"), s(shareDangers[0], n, "clean")))
+            check(byValue.length === 0 && deeper,
+                  "the share of woken holes rises with the gem's worth: all clean over all chipped at each danger and "
+                  + "party, and the deep gems' over the shallow ones'" + (byValue.length ? " - not at " + byValue.join(", ") : ""))
+            check(byParty.length === 0,
+                  "it rises with the knights at each danger, chipped and clean, or every gem's chance stands at "
+                  + "wakeMost " + hc.wakeMost + (byParty.length ? " - not at " + byParty.join(", ") : ""))
+            check(near.length === 0 && s(shareDangers[0], 1, "chipped").holes > 50,
+                  "each share lies within 12 points of the mean holeWakeChance over " + s(shareDangers[0], 1, "chipped").holes
+                  + " holes at danger " + shareDangers[0] + " and " + s(shareDangers[1], 1, "chipped").holes + " at "
+                  + shareDangers[1] + (near.length ? " - not at " + near.join(", ") : ""))
+            check(cutRuns.runs === cutSeeds * shareDangers.length && cutRuns.notRolled.length === 0 && cutRuns.woken > 0,
+                  "the game's cut wakes the holes its roll says on " + (cutRuns.runs - cutRuns.notRolled.length) + " of "
+                  + cutRuns.runs + " dungeons for 2 knights (" + cutRuns.woken + " woken)"
+                  + (cutRuns.notRolled.length ? ": " + cutRuns.notRolled.slice(0, 3).join("; ") : ""))
+            check(cutRuns.notSame.length === 0 && cutRuns.runs > 0,
+                  "the same seed and party wake the same holes on " + (cutRuns.runs - cutRuns.notSame.length) + " of "
+                  + cutRuns.runs + " dungeons built and cut twice"
+                  + (cutRuns.notSame.length ? ": " + cutRuns.notSame.slice(0, 3).join("; ") : ""))
+            console.log("[Holes] done,", failures, "failed")
+            game.destroy()
+        }])
+        return out
+    }
     property var endSteps: [[300, () => Qt.exit(failures)]]
     function findEyes(h) {
         let kids = h.glowParent ? h.glowParent.children : []
