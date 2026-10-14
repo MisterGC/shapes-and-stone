@@ -5865,17 +5865,32 @@ ClayWorld2d {
         console.log("[Game] Entering fight room")
         clearDungeon()
         fightRoomActive = true
+        let a = _buildArena(15)
 
-        // Simple walled room: 15x15 cells centered
-        let roomSize = 15
-        let ox = Math.floor((gridWidth - roomSize) / 2)
-        let oy = Math.floor((gridHeight - roomSize) / 2)
+        // Spawn player at center
+        let cx = (a.ox + a.size / 2) * cellSize
+        let cy = (a.oy + a.size / 2) * cellSize
+        _fightRoomCx = cx
+        _fightRoomCy = cy
+        spawnPlayer(cx, cy)
+        _bindKnight()
+
+        // Spawn the fight room's enemies
+        _spawnFightRoomEnemies()
+    }
+
+    // A walled square room of size cells in the middle of the grid, all of
+    // it explored, with its floor, walls, torches and motes: {ox, oy, size},
+    // its lower left cell and its size
+    function _buildArena(size) {
+        let ox = Math.floor((gridWidth - size) / 2)
+        let oy = Math.floor((gridHeight - size) / 2)
 
         // Initialize grid and carve room
         initializeGrid()
         initExploredCells()
-        for (let y = oy; y < oy + roomSize; y++)
-            for (let x = ox; x < ox + roomSize; x++) {
+        for (let y = oy; y < oy + size; y++)
+            for (let x = ox; x < ox + size; x++) {
                 grid[y][x] = cellRoom
                 exploredCells[y][x] = true
             }
@@ -5895,29 +5910,21 @@ ClayWorld2d {
         createWallRims()
         updateOccluders()
         spawnMotes()
-        rooms = [{x: ox, y: oy, w: roomSize, h: roomSize}]
+        rooms = [{x: ox, y: oy, w: size, h: size}]
         placeRoomTorches(createRng(7))
+        return { ox: ox, oy: oy, size: size }
+    }
 
-        // Spawn player at center
-        let cx = (ox + roomSize / 2) * cellSize
-        let cy = (oy + roomSize / 2) * cellSize
-        _fightRoomCx = cx
-        _fightRoomCy = cy
-        spawnPlayer(cx, cy)
-
-        // Bind controls
-        if (player) {
-            player.moveX = Qt.binding(() => knightMoveX)
-            player.moveY = Qt.binding(() => knightMoveY)
-            player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
-            player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
-            player.playerScreenX = Qt.binding(() => playerScreenX)
-            player.playerScreenY = Qt.binding(() => playerScreenY)
-            gameCamera.target = player
-        }
-
-        // Spawn the fight room's enemies
-        _spawnFightRoomEnemies()
+    // The keys and the mouse steer the knight, and the camera follows it
+    function _bindKnight() {
+        if (!player) return
+        player.moveX = Qt.binding(() => knightMoveX)
+        player.moveY = Qt.binding(() => knightMoveY)
+        player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
+        player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+        player.playerScreenX = Qt.binding(() => playerScreenX)
+        player.playerScreenY = Qt.binding(() => playerScreenY)
+        gameCamera.target = player
     }
 
     // Auto-respawn enemies in fight room when all dead
