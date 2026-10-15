@@ -1633,7 +1633,7 @@ ClayWorld2d {
         id: mouseInput
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
         onPressed: (mouse) => {
             world.forceActiveFocus()
@@ -1646,6 +1646,7 @@ ClayWorld2d {
                 if (!_picking) player.pressSwing(mouse)
             }
             if (mouse.button === Qt.RightButton) player.raiseShield()
+            if (mouse.button === Qt.MiddleButton) toggleLock()
         }
 
         onReleased: (mouse) => {
@@ -1657,6 +1658,52 @@ ClayWorld2d {
             _picking = false
             player.dropSwing()
             player.lowerShield()
+        }
+    }
+
+    // Target lock: F or the middle button locks the knight's facing on
+    // the standing enemy nearest the way the mouse points, within lockReach
+    // wu; again, or that enemy falling or lockBreak wu away, lets go
+    readonly property real lockReach: 10
+    readonly property real lockBreak: 14
+    function toggleLock() {
+        if (!player) return
+        if (player.lockedOn) { player.lockTarget = null; return }
+        player.lockTarget = _pickLockTarget()
+        lockCandidate = null
+    }
+    // The enemy F would lock on now, shown faintly (Enemy.lockPreview)
+    property var lockCandidate: null
+    Timer {
+        interval: 100; repeat: true
+        running: !!player && !player.lockedOn && screen === "game"
+        onTriggered: lockCandidate = _pickLockTarget()
+        onRunningChanged: if (!running) lockCandidate = null
+    }
+    function _pickLockTarget() {
+        let px = player.xWu + player.widthWu / 2, py = player.yWu - player.heightWu / 2
+        let aim = Math.atan2(playerScreenY - mouseInput.mouseY, mouseInput.mouseX - playerScreenX)
+        let best = null, bestScore = Infinity
+        for (let e of enemies) {
+            if (!e || e.destroyed !== false) continue
+            let dx = e.centreXWu - px, dy = e.centreYWu - py
+            let d = Math.sqrt(dx * dx + dy * dy)
+            if (d > lockReach) continue
+            let da = Math.abs(Math.atan2(dy, dx) - aim)
+            if (da > Math.PI) da = 2 * Math.PI - da
+            let score = da * 4 + d / lockReach
+            if (score < bestScore) { bestScore = score; best = e }
+        }
+        return best
+    }
+    Timer {
+        interval: 100; repeat: true
+        running: !!player && player.lockedOn
+        onTriggered: {
+            let e = player.lockTarget
+            let dx = e.centreXWu - (player.xWu + player.widthWu / 2)
+            let dy = e.centreYWu - (player.yWu - player.heightWu / 2)
+            if (dx * dx + dy * dy > lockBreak * lockBreak) player.lockTarget = null
         }
     }
 
@@ -1678,6 +1725,11 @@ ClayWorld2d {
             if (talking) dialoguePanel.close()
             else if (knightPanelOpen) knightPanelOpen = false
             else if (screen === "game" && player && !fallen) openMenu()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_F && player && screen === "game") {
+            toggleLock()
             event.accepted = true
             return
         }
@@ -1764,8 +1816,14 @@ ClayWorld2d {
     // knight stands, so it cannot walk off and leave the panel up, and a
     // key still held moves it again once the panel closes
     readonly property bool talking: dialoguePanel.visible
-    readonly property real knightMoveX: talking ? 0 : gameCtrl.axisX
-    readonly property real knightMoveY: talking ? 0 : -gameCtrl.axisY
+    // Locked on an enemy (toggleLock), the keys turn with it: W and S
+    // walk towards it and away, A and D circle it
+    readonly property real _lockRad: player && player.lockedOn ? player.facingAngle * Math.PI / 180 : 0
+    readonly property bool _lockSteer: !!player && player.lockedOn
+    readonly property real knightMoveX: talking ? 0 : !_lockSteer ? gameCtrl.axisX
+        : gameCtrl.axisY * Math.cos(_lockRad) + gameCtrl.axisX * Math.sin(_lockRad)
+    readonly property real knightMoveY: talking ? 0 : !_lockSteer ? -gameCtrl.axisY
+        : -gameCtrl.axisY * Math.sin(_lockRad) + gameCtrl.axisX * Math.cos(_lockRad)
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -1788,6 +1846,29 @@ ClayWorld2d {
             if (buttonBPressed && player && !world.talking) {
                 player.dash()
             }
+        }
+    }
+
+    // Locked on (toggleLock), the world narrows: the screen's edges darken
+    Canvas {
+        id: lockFocus
+        anchors.fill: parent
+        opacity: player && player.lockedOn ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutQuad } }
+        visible: opacity > 0.01
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var cx = width / 2, cy = height / 2
+            var r = Math.sqrt(cx * cx + cy * cy)
+            var g = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r)
+            g.addColorStop(0, "rgba(0, 0, 0, 0)")
+            g.addColorStop(0.6, "rgba(0, 0, 0, 0.45)")
+            g.addColorStop(1, "rgba(0, 0, 0, 0.85)")
+            ctx.fillStyle = g
+            ctx.fillRect(0, 0, width, height)
         }
     }
 

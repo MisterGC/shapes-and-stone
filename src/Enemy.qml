@@ -54,6 +54,57 @@ PhysicsItem {
 
     widthWu: 0.8
     heightWu: 0.8
+    // A knight's target lock is on it: four arcs round it, each with an arrowhead pointing in, closing
+    // in and out slowly
+    readonly property bool lockedOn: !!gameWorld && !!gameWorld.player
+                                     && gameWorld.player.lockTarget === enemy && !destroyed
+    // The one a lock would pick now: the arcs faint, thin and still
+    readonly property bool lockPreview: !lockedOn && !!gameWorld
+                                        && gameWorld.lockCandidate === enemy && !destroyed
+    Canvas {
+        id: lockMark
+        z: -1
+        opacity: enemy.lockedOn ? 1 : enemy.lockPreview ? 0.35 : 0
+        onOpacityChanged: requestPaint()
+        Behavior on opacity { NumberAnimation { duration: 250 } }
+        visible: opacity > 0.01
+        width: enemy.width * 3.2; height: enemy.height * 3.2
+        anchors.centerIn: parent
+        property real pulse: 0
+        NumberAnimation on pulse { running: enemy.lockedOn; loops: Animation.Infinite; from: 0; to: 1; duration: 1400 }
+        onPulseChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var r = width / 2
+            var live = enemy.lockedOn
+            var breath = live ? Math.sin(pulse * Math.PI * 2) : 0
+            var ring = r * (0.66 - 0.05 * breath)
+            var span = 50 * Math.PI / 180
+            var head = r * 0.13
+            ctx.strokeStyle = "rgba(255, 210, 140, 0.95)"
+            ctx.fillStyle = "rgba(255, 210, 140, 0.95)"
+            ctx.lineWidth = live ? 2.5 : 1.5
+            ctx.lineCap = "round"
+            for (var k = 0; k < 4; k++) {
+                var mid = Math.PI / 4 + k * Math.PI / 2
+                ctx.beginPath()
+                ctx.arc(r, r, ring, mid - span / 2, mid + span / 2)
+                ctx.stroke()
+                if (!live) continue
+                // Arrowhead at the arc's middle, pointing at the enemy
+                var c = Math.cos(mid), sn = Math.sin(mid)
+                var bx = r + c * ring, by = r + sn * ring
+                var tx = r + c * (ring - head), ty = r + sn * (ring - head)
+                ctx.beginPath()
+                ctx.moveTo(tx, ty)
+                ctx.lineTo(bx - sn * head * 0.6, by + c * head * 0.6)
+                ctx.lineTo(bx + sn * head * 0.6, by - c * head * 0.6)
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
+    }
     // Where it stands: the centre of its box. Its top-left corner reaches
     // into a wall it is pushed against, its centre does not (issue #184)
     readonly property real centreXWu: xWu + widthWu / 2

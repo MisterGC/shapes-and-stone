@@ -39,7 +39,14 @@ PhysicsItem {
 
     // Facing direction (calculated in screen space)
     // Screen Y is flipped (down = positive), so we use (playerScreenY - mouseScreenY)
-    property real facingAngle: Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
+    // Locked on (Game.toggleLock), it faces that enemy, centre to centre;
+    // else the mouse
+    property var lockTarget: null
+    readonly property bool lockedOn: !!lockTarget && lockTarget.destroyed === false
+    property real facingAngle: lockedOn
+        ? Math.atan2(lockTarget.centreYWu - (yWu - heightWu / 2),
+                     lockTarget.centreXWu - (xWu + widthWu / 2)) * 180 / Math.PI
+        : Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats, from the balance table
     readonly property real maxSpeed: Balance.knight.moveSpeed
