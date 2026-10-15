@@ -1210,7 +1210,10 @@ QtObject {
             answer: 2.5,
             show: 4,
             // A dog follows one traveller: it trots after it, stays follow
-            // wu beside it, runs at speed wu a second, and is a Creature
+            // wu beside it, runs at speed wu a second, closing gain times
+            // the way left each second, every step seconds; it sets out
+            // once its place is start wu away and rests within rest wu of
+            // it (issue #178). It is a Creature
             // like the cat: it looks up at a standing knight within notice
             // wu and settles once none is within forget wu for settle
             // seconds; at rest it scratches every act.every[0] to [1]
@@ -1219,6 +1222,10 @@ QtObject {
                 size: 0.75,
                 follow: 0.9,
                 speed: 2.4,
+                gain: 4,
+                step: 0.02,
+                start: 0.3,
+                rest: 0.05,
                 breath: 1.6,
                 tick: 0.1,
                 notice: 3,

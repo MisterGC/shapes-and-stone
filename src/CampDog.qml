@@ -24,24 +24,36 @@ Creature {
         let lx = leader.xWu + leader.widthWu / 2, ly = leader.yWu - leader.heightWu / 2
         return Qt.point(lx + keep * numbers.follow, ly - 0.25)
     }
+    // It closes on its spot at gain times the way left a second, at most
+    // speed: no step overshoots it, so it never steps back and forth
+    // (issue #178). It sets out once the spot is start wu away and rests
+    // within rest wu of it; on its way it faces where it goes, at rest
+    // its traveller
+    property real velocityX: 0
+    property real velocityY: 0
     function follow(dt) {
         if (!leader) return
         let to = spot()
         let dx = to.x - xWu, dy = to.y - yWu, d = Math.hypot(dx, dy)
-        moving = d > 0.15
-        if (!moving) {
+        if (moving ? d < numbers.rest : d < numbers.start) {
+            moving = false
+            velocityX = 0
+            velocityY = 0
             // At rest it faces its traveller
             let lx = leader.xWu + leader.widthWu / 2
             if (Math.abs(lx - xWu) > 0.05) facing = lx > xWu ? 1 : -1
             return
         }
-        let step = Math.min(d, numbers.speed * dt)
-        xWu += dx / d * step
-        yWu += dy / d * step
-        if (Math.abs(dx) > 0.05) facing = dx > 0 ? 1 : -1
+        moving = true
+        let v = Math.min(numbers.speed, numbers.gain * d)
+        velocityX = dx / d * v
+        velocityY = dy / d * v
+        xWu += velocityX * dt
+        yWu += velocityY * dt
+        if (Math.abs(velocityX) > 0.05) facing = velocityX > 0 ? 1 : -1
     }
     Timer {
-        interval: dog.numbers.tick * 1000
+        interval: dog.numbers.step * 1000
         running: !!dog.leader
         repeat: true
         onTriggered: dog.follow(interval / 1000)
