@@ -2,8 +2,9 @@ import QtQuick
 
 // One of the camp's props (issue #146): a pond, stones, a rail track and
 // its cart, a heap of coals... of kind, drawn in one pass by
-// shaders/prop.frag over its rectangle. Visual only - the knights walk
-// over it. The glowing kinds go over the darkness (Game.glowParent()).
+// shaders/prop.frag over its rectangle. Drawn only; a solid kind gets
+// a CampSolid (issue #178) the knights bump into, the flat ones they walk
+// over. The glowing kinds go over the darkness (Game.glowParent()).
 ShaderEffect {
     id: prop
 

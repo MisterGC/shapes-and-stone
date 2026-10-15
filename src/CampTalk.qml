@@ -41,7 +41,9 @@ Item {
     function tick(dt) {
         _t += dt
         if (_answer) {
-            if (_t >= _answer.at) {
+            // One talked to by a knight leaves its answer unsaid (issue #178)
+            if (_answer.who.listening) _answer = null
+            else if (_t >= _answer.at) {
                 _say(_answer.who, _answer.line)
                 _answer = null
             }

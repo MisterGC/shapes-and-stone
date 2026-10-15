@@ -476,13 +476,14 @@ QtObject {
     // room's wall, the more and the faster the higher the danger; last a
     // "vein" of gems (Balance.deep, issue #156) in the face of the wall
     // north of its cell, a room's cell with that wall beside it.
-    // petrified: a room but the start room that holds a vein holds a
-    // petrified traveller (Balance.deep.stone, issue #158) with chance at
-    // low, middle and high danger, in its vein's rock face beside the
-    // vein, a miner with minerShare's chance, else a lost one. With
-    // specialShare's chance it is one of Balance.deep.specials (issue
-    // #159), of that special's kind, rolled from the whole table: one
-    // already with the camps stands there as an ordinary traveller
+    // travellers: a room but the start room that holds a vein holds a
+    // traveller of the deep (Balance.deep.traveller, issue #176) with
+    // chance at low, middle and high danger, on the floor in front of its
+    // vein's rock face beside the vein, a miner with minerShare's chance,
+    // else a lost one. With specialShare's chance it is one of
+    // Balance.deep.specials (issue #159), of that special's kind, rolled
+    // from the whole table: one already with the camps is there as an
+    // ordinary traveller
     readonly property var dungeon: ({
         // Loops: the rooms are joined in a chain, and extraCorridors more
         // corridors at low, middle and high danger (as danger.looks) join
@@ -514,7 +515,7 @@ QtObject {
         doorPathCost: 6,
         clearOfEntrance: 8,
         clearOfExit: 8,
-        petrified: { chance: [0.35, 0.45, 0.55], minerShare: 0.5, specialShare: 0.1 },
+        travellers: { chance: [0.35, 0.45, 0.55], minerShare: 0.5, specialShare: 0.1 },
         kinds: {
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
@@ -674,51 +675,53 @@ QtObject {
     // veins where the wall allows, off the veins' rock face, a torch, a
     // slit, a secret, a feature's cell and a doorway; a small room whose
     // wall leaves no such cell lets go of the rock face, then the
-    // feature, then the doorway. Clean strikes on any vein of its room
-    // wake it: at dustAt of them dust puffs from its rim every puffEvery
-    // seconds and the rumble plays at rumbleVolume, at eyesAt two eyes
-    // open in its dark and the groan plays at groanVolume. telegraph
-    // seconds after the eyes opened (never less than enemy.minTelegraph)
+    // feature, then the doorway. Each gem cut from a vein of its room
+    // wakes it by chance (issue #175): wakeChance and wakePerGold for each
+    // gold the gem is worth and wakePerDig for each strike a miner of its
+    // room made while it rested (issue #176), times wakePerKnight more for
+    // each knight past the first the level was built for, at most
+    // wakeMost. Woken, dust
+    // puffs from its rim every puffEvery seconds and the rumble plays at
+    // rumbleVolume; eyesAfter seconds later two eyes open in its dark and
+    // the groan plays at groanVolume. telegraph seconds after the eyes
+    // opened (never less than enemy.minTelegraph)
     // the first creature crawls out of its mouth, then waves waves of
     // perWave creatures of the depth's kinds, waveGap seconds apart, each
     // creature crawlGap after the one before it, each with the rumble.
     // closeAfter seconds after the last one its rim crumbles shut and it
     // never wakes again. A sound of the hole plays at its volume down to
     // quietest of it at hearReach wu from the knight.
-    // stone: a petrified traveller (issue #158) stands in a vein's rock
-    // face, a miner or a lost one, and the same strikes free it, gentler:
-    // its ring closes every ringTime seconds, a strike within window of a
-    // close is clean, and strikes clean strikes in all (a whole number
-    // from the range, by its cell) free it. An off-beat strike does it no
-    // harm and takes none of them back: the ring only starts over. A clean
-    // strike throws sparks of shimmer, the edge it shows in lantern light
-    // (glintReach, as a vein), and plays the chink and the tink of the
-    // phrase; it never wakes the room's spawn hole. On the last one its
-    // shell cracks in a ring of shards, the crumble plays and chordDelay
-    // later the chord at chordVolume; colour flows back from its middle
-    // out over colourTime seconds. Then a miner whose room's hole sent no
-    // creature yet nods, says a line of minerLines for say seconds and
-    // walks to the vein of its room nearest to it at walkSpeed wu/s, to
-    // work there: it strikes every workEvery seconds, the tink workPitch
-    // semitones off at workVolume, quieter down to nothing at hearReach wu
-    // from the knight. A lost one, or a miner once the hole sent creatures,
-    // says a line of lostLines (fleeLines for a miner) and walks off
-    // toward the room's way to the exit at leaveSpeed, fading out over
-    // fade seconds after fadeAfter. A working miner flees too when the
-    // hole's first wave comes. A freed miner nods for nod seconds before
-    // it walks to its work.
+    // traveller: a traveller of the deep (issue #176) is on the floor of
+    // a vein's room, in front of the rock face beside its vein. A lost one
+    // sits huddled there, sit wu out from the face, trembling by tremble
+    // of its width. A miner stands stand wu out from it, toVein wu toward
+    // the vein, facing it, and while a knight is within digReach wu of it
+    // swings its own pick at the rock every digEvery seconds, raising it
+    // over raise seconds: the tink
+    // digPitch semitones off at digVolume, quieter down to nothing at
+    // hearReach wu from the knight, a few chips of Balance.deep.chipColor,
+    // and each strike while its room's spawn hole rests adds to the
+    // chance the next gem cut there wakes it (hole.wakePerDig). E within
+    // talkReach wu of either talks to it: it says a line for say seconds,
+    // a lost one one of lostLines, a miner one of minerLines, talked into
+    // leaving because the deep is too dangerous, and walks off toward its
+    // room's way to the exit at leaveSpeed wu/s, fading out over fade
+    // seconds after fadeAfter; chordDelay after it sets off the warm chord
+    // plays at chordVolume. A miner still there when its hole's first wave
+    // comes says one of fleeLines and flees the same way, without the
+    // chord.
     // specials (issue #159): the few special travellers of the whole
     // game, each its id, name, title, kind ("miner" or "lost"), the line
-    // it says when freed (line) and at the camp to a knight within
+    // it says when talked to (line) and at the camp to a knight within
     // camp.sayReach wu (campLine), and its comfort at the campfire, never
     // fight power: heal times the fire's healing, mana times its mana, light
-    // times its light's reach. One stands in the stone with an edge of
-    // specialEdge, freed it leaves toward the exit and joins the camps for
-    // good: kept with this machine's record (key "specials"), in a
+    // times its light's reach. One waits in the deep with an edge of
+    // specialEdge, talked to it leaves toward the exit and joins the camps
+    // for good: kept with this machine's record (key "specials"), in a
     // session the host's.
-    // camp: the travellers freed this run that left toward the exit
-    // (issue #159) and the specials with the camps sit in every later camp
-    // of the run, round the fire: at one of angles spots ring wu from the
+    // camp: the travellers of this run that left toward the exit sit in
+    // the next camp of the run only, the one after their dungeon (issue
+    // #159, #177), the specials with the camps in every camp, round the fire: at one of angles spots ring wu from the
     // fire's centre, on the floor, at least clear wu off the camp's
     // travellers, its cat and each other, the specials first, most of
     // them in all; their spots start at an angle from the level's seed ^
@@ -763,8 +766,12 @@ QtObject {
         rockColor: "#5E564C",
         hole: {
             gap: 3,
-            dustAt: 1,
-            eyesAt: 3,
+            wakeChance: 0.25,
+            wakePerGold: 0.01,
+            wakePerKnight: 0.3,
+            wakePerDig: 0.02,
+            wakeMost: 0.95,
+            eyesAfter: 1.2,
             puffEvery: 0.45,
             telegraph: 1.5,
             waves: 2,
@@ -778,32 +785,30 @@ QtObject {
             hearReach: 22,
             quietest: 0.2
         },
-        stone: {
-            ringTime: 1.05,
-            window: 0.16,
-            strikes: [3, 4],
-            shimmer: "#A8D4FF",
-            sparks: 6,
-            shards: 16,
-            shardColor: "#8E8C88",
-            chordDelay: 0.25,
-            chordVolume: 0.75,
-            colourTime: 1.2,
+        traveller: {
+            sit: 1.0,
+            stand: 0.55,
+            toVein: 0.15,
+            tremble: 0.035,
+            digReach: 6,
+            digEvery: 1.4,
+            raise: 0.3,
+            digPitch: -7,
+            digVolume: 0.22,
+            hearReach: 14,
+            talkReach: 1.8,
             say: 2.6,
-            walkSpeed: 1.2,
             leaveSpeed: 1.5,
             fadeAfter: 0.8,
             fade: 1.6,
-            workEvery: 1.4,
-            workPitch: -7,
-            workVolume: 0.22,
-            hearReach: 14,
-            minerLines: ["Thanks - now where was I...", "Ha! Still got my pick. Back to it.",
-                         "Stone, was I? Then I've rested enough."],
-            fleeLines: ["Those things again - I'm off!", "Not worth it with them about. Thanks!"],
+            chordDelay: 0.25,
+            chordVolume: 0.75,
             lostLines: ["...how long was I down here?", "Thank you - I'll find the way up now.",
                         "Light! I thought I'd never see it again."],
-            nod: 0.7
+            minerLines: ["Too dangerous, you say? ...Aye, I've pushed my luck.",
+                         "That hole's been stirring. Fine - I'm off.",
+                         "Not worth my neck, is it? I'll go up."],
+            fleeLines: ["Those things again - I'm off!", "Not worth it with them about!"]
         },
         specialEdge: "#E8C35A",
         specials: [
@@ -1024,8 +1029,30 @@ QtObject {
         // centre (east, north), w x h wu.
         // A prop that would not lie whole on the cave's floor, clear of
         // the paths, the fire and the people, is left out. Props are drawn
-        // only: the knights walk over them, nothing blocks or hurts
+        // only, nothing hurts; the knights walk over the flat ones
         propSalt: 0x70726f70,
+        // What stands up from the camp's floor is solid (issue #178): the
+        // knights cannot walk on a prop of one of solid's kinds, inside its
+        // shape ("oval", the ellipse in its rectangle, or "box") at fill
+        // of its size about its middle, nor on the campfire within fire wu
+        // of its middle. The rails, the cracks, the coals and the
+        // mushrooms stay underfoot. The villagers and the travellers walk
+        // round them, clear wu off
+        solid: {
+            kinds: {
+                pond: { shape: "oval", fill: 0.9 },
+                ferns: { shape: "oval", fill: 0.8 },
+                stones: { shape: "oval", fill: 0.85 },
+                ore: { shape: "oval", fill: 0.85 },
+                basalt: { shape: "oval", fill: 0.85 },
+                slag: { shape: "oval", fill: 0.85 },
+                cart: { shape: "box", fill: 1 },
+                crates: { shape: "box", fill: 0.95 },
+                timber: { shape: "box", fill: 0.95 }
+            },
+            fire: 0.6,
+            clear: 0.45
+        },
         // Props stay this far, in wu, off the middle column (the way from
         // the entrance to the stairs), off the campfire's centre, off the
         // fronts of the buildings, and off the innkeeper, the smith, the
@@ -1185,7 +1212,10 @@ QtObject {
             answer: 2.5,
             show: 4,
             // A dog follows one traveller: it trots after it, stays follow
-            // wu beside it, runs at speed wu a second, and is a Creature
+            // wu beside it, runs at speed wu a second, closing gain times
+            // the way left each second, every step seconds; it sets out
+            // once its place is start wu away and rests within rest wu of
+            // it (issue #178). It is a Creature
             // like the cat: it looks up at a standing knight within notice
             // wu and settles once none is within forget wu for settle
             // seconds; at rest it scratches every act.every[0] to [1]
@@ -1194,6 +1224,10 @@ QtObject {
                 size: 0.75,
                 follow: 0.9,
                 speed: 2.4,
+                gain: 4,
+                step: 0.02,
+                start: 0.3,
+                rest: 0.05,
                 breath: 1.6,
                 tick: 0.1,
                 notice: 3,

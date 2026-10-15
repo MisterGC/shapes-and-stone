@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
-"""Stone party bench - proves that in a session both screens show the same
-petrified travellers, the same freeing and the same outcome (issue #158).
+"""Talk party bench - proves that in a session both screens show the same
+travellers of the deep, the same talk and the same leaving (issue #176).
 
-Starts tests/stoneparty/Sandbox.qml twice in Clayground's live loader, as
+Starts tests/talkparty/Sandbox.qml twice in Clayground's live loader, as
 two processes (a host and a joiner), connects them over Local or Cloud
 signaling and starts the game on a fixed seed. The host's enemies stand
 still. Then:
 
-- both screens show the same petrified travellers on the same cells, of
-  the same kind and strikes, still stone
-- the joiner's knight frees one, every strike clean: both screens show it
-  freed, with its colour back, and go on as the host decided - a miner
-  whose room's hole sent no creature works at the same spot beside its
-  vein on both, a lost one walks off and is gone on both - each screen
-  plays the chord, and both saw the same events
-- the host's knight frees another, when the dungeon has one, and both
+- both screens show the same travellers on the same spots, of the same
+  kind and special, all still there
+- a talk of the joiner's the host refuses (another level) shows its line
+  on the joiner, then the traveller stays there to be talked to again;
+  the host's stays as it was
+- with the joiner's knight by a miner, the miner digs on both screens,
+  and the host counts its strikes toward waking the room's hole
+- the joiner's knight talks to a traveller: its line shows on the
+  joiner's screen at once and on the host's, the same; both screens show
+  it leave as the host decided, play the chord, show it gone, and saw the
+  same events
+- the host's knight talks to another, when the dungeon has one, and both
   screens show the same again
 - then the party goes on to the camp (issue #159): each machine's record
   has a special of its own, and both screens seat the host's special and
   the travellers that left by the fire, both fires give its comfort alone,
   and the joiner's own record keeps its own special
-- before the freeings (#173 review): a freeing of the joiner's the host refuses -
-  reported for another level - shows freed on the joiner's screen, then
-  turns back to stone there, and the host's stays stone
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -30,7 +31,7 @@ first clayliveloader on PATH. It should be built from the Clayground commit
 the game's clayground/ submodule pins.
 
 Usage:
-  run_stoneparty.py [--loader <clayliveloader>] [--mode local|cloud] [--seed 424244]
+  run_talkparty.py [--loader <clayliveloader>] [--mode local|cloud] [--seed 424244]
 
 Prints one PASS or FAIL line per check and exits with the number of failed
 checks (100: the bench could not get to its end). The temp dir with both
@@ -58,14 +59,14 @@ def main():
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
     ap.add_argument("--seed", type=int, default=424244,
-                    help="the run's seed (424244: a lost traveller and a miner at depth 0)")
+                    help="the run's seed")
     args = ap.parse_args()
 
     failures = 0
 
     def check(ok, what):
         nonlocal failures
-        print("[StoneParty]", "PASS" if ok else "FAIL", what, flush=True)
+        print("[TalkParty]", "PASS" if ok else "FAIL", what, flush=True)
         if not ok:
             failures += 1
         return ok
@@ -76,7 +77,7 @@ def main():
               "configure the build with -DCLAYGROUND_WITH_TOOLS=ON", file=sys.stderr)
         sys.exit(100)
 
-    tmp = tempfile.mkdtemp(prefix="sas_stoneparty_")
+    tmp = tempfile.mkdtemp(prefix="sas_talkparty_")
     procs = {}
     aborted = True
     try:
@@ -88,7 +89,7 @@ def main():
             print("Logs kept at:", tmp, file=sys.stderr)
         else:
             shutil.rmtree(tmp, ignore_errors=True)
-    print(f"[StoneParty] done, {failures} failed")
+    print(f"[TalkParty] done, {failures} failed")
     sys.exit(min(code, 100))
 
 
@@ -97,7 +98,7 @@ def run(args, loader, tmp, procs, check):
     # The sandbox imports ../../src: copy both, keeping their places
     skip = shutil.ignore_patterns(".clay", "__pycache__", "*.py")
     shutil.copytree(os.path.join(REPO, "src"), os.path.join(tmp, "src"), ignore=skip)
-    sandbox_dir = os.path.join(tmp, "tests", "stoneparty")
+    sandbox_dir = os.path.join(tmp, "tests", "talkparty")
     shutil.copytree(os.path.dirname(os.path.abspath(__file__)), sandbox_dir, ignore=skip)
     sbx = os.path.join(sandbox_dir, "Sandbox.qml")
 
@@ -140,91 +141,101 @@ def run(args, loader, tmp, procs, check):
         H.eval1("halt()")
         for i in (H, J):
             i.eval(["standUp()"])
-        if free_on_both(H, J, check) == 100:
+        if talk_on_both(H, J, check) == 100:
             return 100
         return camp_on_both(H, J, check)
     except TimeoutError as e:
         return abort(str(e))
 
 
-def lines(stones):
-    return sorted((s["cell"], s["kind"], s["strikes"], s["hole"]) for s in stones)
+def lines(travellers):
+    return sorted((t["cell"], t["kind"], t["special"], round(t["x"], 3), round(t["y"], 3), t["hole"])
+                  for t in travellers)
 
 
 def one(K, cell):
-    return next((s for s in K.json("stones()") if s["cell"] == cell), None)
+    return next((t for t in K.json("travellers()") if t["cell"] == cell), None)
 
 
 def whats(events, cell):
     return [e["what"] for e in events if e["cell"] == cell]
 
 
-def free_on_both(H, J, check):
-    hs, js = H.json("stones()"), J.json("stones()")
-    if not check(len(hs) >= 1 and lines(hs) == lines(js) and not any(s["freed"] for s in hs + js),
-                 f"both screens show the same {len(hs)} petrified travellers on the same cells, of the same "
-                 f"kind and strikes, stone ({', '.join(s['cell'] + ' ' + s['kind'] for s in hs)}; joiner {len(js)})"):
+def talk_on_both(H, J, check):
+    hs, js = H.json("travellers()"), J.json("travellers()")
+    if not check(len(hs) >= 1 and lines(hs) == lines(js)
+                 and all(t["outcome"] == "" and not t["gone"] for t in hs + js),
+                 f"both screens show the same {len(hs)} travellers of the deep on the same spots, of the same "
+                 f"kind and special, all there ({', '.join(t['cell'] + ' ' + t['kind'] for t in hs)}; "
+                 f"joiner {len(js)})"):
         return 100
-    # From the #173 review: a freeing the host refuses turns back to stone
+    for K in (H, J):
+        K.eval1("noteStart()")
+    # A talk the host refuses (another level) shows on the joiner, then
+    # the traveller stays there to be talked to again
     cell = hs[0]["cell"]
-    shown = J.eval1(f"freeStale('{cell}')") is True
+    shown = J.eval1(f"talkStale('{cell}')")
     back = wait_for(lambda: J.eval1("refused()") == 1, 15)
-    jf, hf = one(J, cell), one(H, cell)
-    check(shown and back and not jf["freed"] and jf["colour"] == 0 and jf["outcome"] == ""
-          and not hf["freed"] and whats(J.json("stoneEvents()"), cell) == ["freed", "refused"],
-          f"a freeing the host refuses (another level) shows freed on the joiner, then turns back to stone: "
-          f"joiner freed {jf['freed']}, colour {jf['colour']}, "
-          f"{', '.join(whats(J.json('stoneEvents()'), cell))}; host freed {hf['freed']}")
+    jt, ht = one(J, cell), one(H, cell)
+    check(isinstance(shown, str) and shown != "" and back and jt["saying"] == "" and jt["outcome"] == ""
+          and J.eval1(f"talkableAgain('{cell}')") is True and ht["outcome"] == "" and not ht["gone"]
+          and whats(J.json("events()"), cell) == ["talked", "refused"],
+          f"a talk of the joiner's the host refuses (another level) shows its line on the joiner, then it stays "
+          f"there to be talked to again: joiner {', '.join(whats(J.json('events()'), cell))}, "
+          f"talkable {J.eval1(f'talkableAgain({chr(39)}{cell}{chr(39)})')}; host {ht['outcome'] or 'still there'}")
+    # The joiner's knight by a miner: it digs on both screens, the host
+    # counts its strikes
+    miner = next((t for t in hs if t["kind"] == "miner"), None)
+    if miner:
+        mc = miner["cell"]
+        J.eval1(f"standBy('{mc}')")
+        digs = wait_for(lambda: all(one(K, mc)["digging"] and one(K, mc)["digs"] >= 2 for K in (H, J)), 15)
+        hole = next((h for h in H.json("holes()") if h["cell"] == miner["hole"]), None)
+        hm, jm = one(H, mc), one(J, mc)
+        check(digs and hole is not None and hole["dug"] >= 2 and hole["stage"] == "rest",
+              f"with the joiner's knight by the miner on {mc} it digs on both screens (host {hm['digs']} strikes, "
+              f"joiner {jm['digs']}), and the host counts them toward waking its hole "
+              f"({hole['dug'] if hole else '-'} at {miner['hole']})")
+        J.eval1("standAway()")
+    else:
+        check(True, "the dungeon has no miner: no digging to show")
+    # The miner first, if there is one, else the first
+    order = sorted(hs, key=lambda t: t["kind"] != "miner")
     for who, K in (("joiner", J), ("host", H)):
-        if who == "host" and len(hs) < 2:
-            check(True, "the dungeon has one traveller: the host's knight frees none of its own")
+        if who == "host" and len(order) < 2:
+            check(True, "the dungeon has one traveller: the host's knight talks to none of its own")
             break
-        stone = hs[0] if who == "joiner" else hs[1]
-        cell, kind = stone["cell"], stone["kind"]
-        holes = {h["cell"]: h for h in H.json("holes()")}
-        hole = holes.get(stone["hole"])
-        want = "leaving" if kind == "lost" else ("fleeing" if hole and hole["wave"] > 0 else "working")
-        if not check(K.eval1(f"free('{cell}')") is True,
-                     f"the {who}'s knight frees the {kind} on {cell}, every strike clean"):
+        t = order[0] if who == "joiner" else order[1]
+        cell, kind = t["cell"], t["kind"]
+        heard = {X: X.eval1("soundCount()") for X in (H, J)}
+        said = K.eval1(f"talk('{cell}')")
+        if not check(isinstance(said, str) and said != "",
+                     f"the {who}'s knight talks to the {kind} on {cell}: it says \"{said}\" at once"):
             return 100
-        decided = wait_for(lambda: all((one(X, cell) or {}).get("outcome") == want for X in (H, J)), 20)
+        K.eval1("standAway()")
+        decided = wait_for(lambda: all((one(X, cell) or {}).get("outcome") == "leaving" for X in (H, J)), 20)
         hf, jf = one(H, cell), one(J, cell)
-        check(decided and hf["freed"] and jf["freed"],
-              f"both screens show it freed and going on as the host decided: {hf['outcome']} "
-              f"(joiner {jf['outcome']}, wanted {want})")
-        coloured = wait_for(lambda: all((one(X, cell) or {}).get("colour") == 1 for X in (H, J)), 10)
-        sounds = (H.json("stoneSounds()"), J.json("stoneSounds()"))
-        check(coloured and all("chord" in s for s in sounds),
-              f"its colour comes back on both screens and each plays the chord "
-              f"(host {', '.join(sounds[0])}; joiner {', '.join(sounds[1])})")
-        if want == "working":
-            w = H.json(f"workSpot('{cell}')")
-            at = lambda X: (lambda s: s and not s["gone"] and abs(s["x"] - w["x"]) < 0.01
-                            and abs(s["y"] - w["y"]) < 0.01)(one(X, cell))
-            settled = wait_for(lambda: at(H) and at(J), 15)
-            hf, jf = one(H, cell), one(J, cell)
-            check(settled, f"the miner works beside its vein at the same spot on both screens: host "
-                           f"{hf['x']:.2f},{hf['y']:.2f}, joiner {jf['x']:.2f},{jf['y']:.2f} "
-                           f"(the spot {w['x']:.2f},{w['y']:.2f})")
-            time.sleep(3)
-            check(all(not one(X, cell)["gone"] and one(X, cell)["outcome"] == "working" for X in (H, J)),
-                  "3 s later it still works there on both screens")
-        else:
-            gone = wait_for(lambda: all((one(X, cell) or {}).get("gone") is True for X in (H, J)), 15)
-            check(gone, f"the {kind} walks off and is gone on both screens")
-        he, je = whats(H.json("stoneEvents()"), cell), whats(J.json("stoneEvents()"), cell)
-        # The joiner's screen saw the refused freeing first
-        if who == "joiner" and je[:2] == ["freed", "refused"]:
+        check(decided and hf["saying"] == said and jf["saying"] == said,
+              f"both screens show its line and it leaving as the host decided: host \"{hf['saying']}\" "
+              f"{hf['outcome']}, joiner \"{jf['saying']}\" {jf['outcome']}")
+        chord = wait_for(lambda: all(X.eval1(f"chordsSince({heard[X]})") == 1 for X in (H, J)), 10)
+        gone = wait_for(lambda: all((one(X, cell) or {}).get("gone") is True for X in (H, J)), 15)
+        check(chord and gone, f"each screen plays the chord and shows the {kind} walk off and gone")
+        he, je = whats(H.json("events()"), cell), whats(J.json("events()"), cell)
+        # The joiner's screen saw the refused talk first
+        if je[:2] == ["talked", "refused"]:
             je = je[2:]
-        check(he == je and he[:2] == ["freed", want],
-              f"both screens saw the same: {', '.join(he)} (joiner {', '.join(je)})")
+        talker, other = (je, he) if who == "joiner" else (he, je)
+        check(talker == ["talked", "leaving", "gone"] and other == ["leaving", "gone"],
+              f"both screens saw the same: the {who}'s {', '.join(talker)}, the other's {', '.join(other)}")
     return 0
 
 
 def camp_on_both(H, J, check):
     """The camp after the dungeon: the host's record decides which specials
     sit by the fire, on both screens, with the travellers that left"""
-    left = sorted(s["kind"] for s in H.json("stones()") if s["outcome"] in ("leaving", "fleeing"))
+    left = sorted(t["kind"] for t in H.json("travellers()")
+                  if t["outcome"] in ("leaving", "fleeing") and t["special"] == "")
     H.eval(["onward()"])
     if not check(wait_for(lambda: H.json("camp()")["inCamp"] and J.json("camp()")["inCamp"], 30),
                  "the party goes on to the camp on both screens"):

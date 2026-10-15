@@ -1,9 +1,10 @@
 import QtQuick
 
-// The travellers the knights freed from the stone, at the camps (issue
-// #159). A traveller freed in a run that left toward the exit sits by the
-// fire of every later camp of that run; a special one (Balance.deep
-// .specials) joins the camps for good: kept with this machine's record,
+// The travellers the knights sent up out of the deep, at the camps (issue
+// #159, #176, #177). A traveller of the deep that left toward the exit in
+// a run sits by the fire of the next camp of that run only, the one after
+// the dungeon it left; a special one (Balance.deep.specials) joins the
+// camps for good: kept with this machine's record,
 // it sits by every camp's fire after that, across runs, with its comfort
 // at the fire. Alone this node decides; in a session the host's run and
 // specials are the party's (the session properties "freed" and
@@ -38,10 +39,14 @@ QtObject {
         ? (link.freedRun && link.freedRun.seed === link.runSeed ? link.freedRun.run : []) : run
     readonly property var joinedShown: _joiner ? (link.hostSpecials || []) : joined
     readonly property var specials: joinedShown.map(id => specialOf(id)).filter(sp => sp !== null)
-    // The freed of the run sitting at the camps: those that left toward
-    // the exit, not a special (it sits as one of the specials)
+    // The freed of the run that left toward the exit, not a special (it
+    // sits as one of the specials)
     readonly property var campRun: runShown.filter(f => (f.outcome === "leaving" || f.outcome === "fleeing")
                                                         && !f.special)
+    // Those of them that left in level fromLevel, the dungeon before a camp
+    function campRunFrom(fromLevel) {
+        return campRun.filter(f => f.key.split(":")[0] === String(fromLevel))
+    }
     // "Freed tonight: 2 lost travellers, a miner" ("" none), and "With the
     // camps: Maren the healer" ("" none)
     readonly property string tonightLine: {
@@ -66,7 +71,7 @@ QtObject {
     function specialOf(id) {
         return Balance.deep.specials.find(sp => sp.id === id) || null
     }
-    // The specials a petrified traveller may still be: none with the
+    // The specials a traveller of the deep may still be: none with the
     // camps nor freed this run
     function candidates() {
         let taken = joinedShown.concat(runShown.filter(f => f.special).map(f => f.special))
@@ -124,19 +129,20 @@ QtObject {
         if (link && link.connected && link.isHost) link.publishSpecials(joined)
     }
 
-    // The camp is built: the specials and the run's freed sit round fire
+    // The camp is built: the specials and the run's freed that left in
+    // level fromLevel, the dungeon just before it, sit round fire
     // (a Campfire), on spots where onFloor(x, y) is true, clear of the
     // points avoid ([{x, y}]); the spots start at an angle drawn from
     // rand, the level's stream for them. The fire gives the specials'
     // comfort. The figures made
-    function seat(fire, rand, onFloor, avoid) {
-        let cfg = Balance.deep.camp, made = []
+    function seat(fire, rand, onFloor, avoid, fromLevel) {
+        let cfg = Balance.deep.camp, made = [], fromRun = campRunFrom(fromLevel)
         figures = []
         fire.healRate = Balance.campfire.healPerSecond * comfort("heal")
         fire.manaRate = Balance.campfire.manaPerSecond * comfort("mana")
         fire.lightRadius = Balance.camp.fireLight * comfort("light")
         let sitters = specials.map(sp => ({ kind: sp.kind, special: sp.id }))
-            .concat(campRun.map(f => ({ kind: f.kind, special: "" })))
+            .concat(fromRun.map(f => ({ kind: f.kind, special: "" })))
             .slice(0, cfg.most)
         if (sitters.length === 0) return made
         let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
@@ -152,14 +158,14 @@ QtObject {
             let f = figure.createObject(room, Object.assign({
                 cxWu: x, cyWu: foot + size / 2 - 0.05, sizeWu: size, footXWu: x, footYWu: foot,
                 cell: "camp" + made.length, kind: who.kind, special: who.special,
-                seated: true, freed: true, colour: 1, seed: (i + 1) / (cfg.angles + 1),
+                seated: true, seed: (i + 1) / (cfg.angles + 1),
                 facing: x < fx ? 1 : -1
             }, extra({})))
             if (f) made.push(f)
         }
         figures = made
         console.log("[CampFreed]", made.length, "freed by the fire:", specials.length, "specials,",
-                    campRun.length, "of the run")
+                    fromRun.length, "of the run from level", fromLevel)
         return made
     }
     // The camp goes; its figures go with the level's objects

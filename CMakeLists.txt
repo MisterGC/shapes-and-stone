@@ -62,7 +62,7 @@ clay_app(shapes_and_stone
         src/SecretWall.qml
         src/Vein.qml
         src/Hole.qml
-        src/Petrified.qml
+        src/DeepTraveller.qml
         src/Gem.qml
         src/GoldDrop.qml
         src/PouchDrop.qml
@@ -74,6 +74,7 @@ clay_app(shapes_and_stone
         src/Campfire.qml
         src/CaveOverhang.qml
         src/CampProp.qml
+        src/CampSolid.qml
         src/Creature.qml
         src/CaveCat.qml
         src/CampDog.qml

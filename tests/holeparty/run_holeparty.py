@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Hole party bench - proves that in a session both screens see the same
-spawn holes wake through the same stages and the same creatures come out
-of them (issue #157).
+"""Hole party bench - proves that in a session the host's roll decides
+whether a cut gem wakes its spawn hole, and both screens see the same
+holes wake through the same stages and the same creatures come out of
+them (issues #157, #175).
 
 Starts tests/holeparty/Sandbox.qml twice in Clayground's live loader, as
 two processes (a host and a joiner), connects them over Local or Cloud
@@ -10,13 +11,14 @@ still, those the holes send too. Then:
 
 - both screens show the same spawn holes on the same cells, for the same
   veins, at rest
-- the joiner's knight cuts a vein of a hole's room, every strike clean:
-  on both screens the hole goes through the same stages in order - dust,
-  eyes, waves, each wave, closed - the first creature shown no sooner
-  than enemy.minTelegraph after the eyes, and both show the same
-  creatures (id, kind, tier) at the hole's mouth
-- the host's knight does the same at another hole, when the dungeon has
-  one
+- the knights cut a vein of each hole's room in turn, every strike
+  clean, the joiner's first, then the host's: where the host's roll says
+  the gem wakes the hole, on both screens it goes through the same stages
+  in order - dust, eyes, waves, each wave, closed - the first creature
+  shown no sooner than enemy.minTelegraph after the eyes, and both show
+  the same creatures (id, kind, tier) at the hole's mouth; where it says
+  not, the hole stays at rest on both screens and no creature comes
+- the host's roll woke at least one hole
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -51,6 +53,8 @@ def main():
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
     ap.add_argument("--seed", type=int, default=424242, help="the run's seed")
+    ap.add_argument("--quiet", type=float, default=0,
+                    help="seconds to watch a hole the roll leaves asleep (0: the time a woken one takes)")
     args = ap.parse_args()
 
     failures = 0
@@ -129,7 +133,7 @@ def run(args, loader, tmp, procs, check):
         H.eval1("halt()")
         for i in (H, J):
             i.eval(["standUp()"])
-        return wake_on_both(H, J, check)
+        return wake_on_both(H, J, check, args.quiet)
     except TimeoutError as e:
         return abort(str(e))
 
@@ -153,7 +157,7 @@ def at_mouth(rows):
     return all(abs(c["x"] - c["mx"]) <= 1.5 and c["my"] - 1.5 <= c["y"] <= c["my"] + 0.2 for c in rows)
 
 
-def wake_on_both(H, J, check):
+def wake_on_both(H, J, check, quiet):
     hh, jh = H.json("holes()"), J.json("holes()")
     lines = lambda hs: sorted((h["cell"], tuple(sorted(h["veins"])), h["stage"]) for h in hs)
     if not check(len(hh) >= 1 and lines(hh) == lines(jh) and all(h["stage"] == "rest" for h in hh),
@@ -164,14 +168,27 @@ def wake_on_both(H, J, check):
     tele = H.eval1("minTelegraph()")
     want = ["dust", "eyes", "waves"] + ["wave"] * cfg["waves"] + ["closed"]
     count = cfg["waves"] * cfg["perWave"]
-    for who, K in (("joiner", J), ("host", H)):
-        if who == "host" and len(hh) < 2:
-            check(True, "the dungeon has one hole: the host's knight wakes none of its own")
-            break
-        hole = hh[0] if who == "joiner" else hh[1]
+    asleep = quiet or cfg["eyesAfter"] + tele + cfg["telegraph"] + cfg["waveGap"]
+    knights = H.eval1("knights()")
+    woken = 0
+    for i, hole in enumerate(hh):
+        who, K = ("joiner", J) if i % 2 == 0 else ("host", H)
         vein = hole["veins"][0]
+        wakes = H.eval1(f"wakes('{vein}')") is True
+        woken += wakes
         check(K.eval1(f"cut('{vein}')") is True,
-              f"the {who}'s knight cuts the vein on {vein}, every strike clean")
+              f"the {who}'s knight cuts the vein on {vein}, every strike clean; the host's roll for "
+              f"{knights} knights says it {'wakes' if wakes else 'leaves asleep'} the hole on {hole['cell']}")
+        if not wakes:
+            stirred = wait_for(lambda: any(h["stage"] != "rest" for X in (H, J)
+                                           for h in X.json("holes()") if h["cell"] == hole["cell"]), asleep)
+            hs = [h["stage"] for X in (H, J) for h in X.json("holes()") if h["cell"] == hole["cell"]]
+            hc, jc = H.json(f"holeCreatures('{hole['cell']}')"), J.json(f"holeCreatures('{hole['cell']}')")
+            check(not stirred and hs == ["rest", "rest"] and not stages(H.json("holeEvents()"), hole["cell"])
+                  and not stages(J.json("holeEvents()"), hole["cell"]) and not hc and not jc,
+                  f"for {asleep:.1f} s it stays at rest on both screens ({', '.join(hs)}), no creature from it "
+                  f"(host {len(hc)}, joiner {len(jc)})")
+            continue
         closed = wait_for(lambda: all(h["stage"] == "closed" for X in (H, J)
                                       for h in X.json("holes()") if h["cell"] == hole["cell"]), 30)
         he, je = H.json("holeEvents()"), J.json("holeEvents()")
@@ -192,6 +209,7 @@ def wake_on_both(H, J, check):
               + "; ".join(f"{c['x']:.2f},{c['y']:.2f}" for c in hc) + ", joiner "
               + "; ".join(f"{c['x']:.2f},{c['y']:.2f}" for c in jc)
               + (f", mouth {hc[0]['mx']:.2f},{hc[0]['my']:.2f})" if hc else ")"))
+    check(woken >= 1, f"the host's roll woke {woken} of the {len(hh)} holes")
     return 0
 
 

@@ -393,8 +393,11 @@ air). Each look has its own rock, faces, floor, lanterns, air and screen
 grade, and its props are one of two or three layouts, picked from the
 level's seed (`camp.propSalt`), so every screen of a session lays out the
 same. A prop lies whole on the cave's floor, off the way to the stairs,
-the campfire and the people, and is only drawn: the knights walk over
-it. The campfire stays the brightest light, and the campfire, the
+the campfire and the people. What stands up from the floor is solid:
+the knights cannot walk into the pond, the ferns, the stones, the ore,
+the basalt, the slag, the cart, the crates, the timber or the campfire;
+the rails, the cracks, the coals and the mushrooms stay underfoot. The
+campfire stays the brightest light, and the campfire, the
 innkeeper, the smith and the witch keep their places at every depth.
 The looks are a table in `Balance.camp.looks`: a fourth is a row with
 its depth, its colours and its layouts. The camps bench lands at every
@@ -542,6 +545,31 @@ hearsay and no wares, and that the dog follows its traveller:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/travellers/travellers.qml
+```
+
+A solid prop has an invisible static body (`CampSolid.qml`), the ellipse
+in its rectangle or the rectangle, at the share of its size and the
+campfire's core radius in `camp.solid`. The dog closes on its place
+beside its traveller a share of the way each step, so it trots along at
+its traveller's pace instead of stopping and starting, and never steps
+back and forth. A villager talked to - the innkeeper, the smith, the
+witch or a traveller - stops what it is doing and faces the knight until
+the talk ends, then goes on where it left off; a traveller talked to
+leaves its answer in the travellers' talk unsaid. The villagers and the
+travellers walk round the solids: a leg of a routine that would cross
+one passes through points beside it (`camp.solid.clear` wu off). The
+solid camp bench
+walks a knight's middle over the floor of 10 camps of each look with and
+without the solid bodies and checks that nothing but the solids
+themselves is lost and that the stairs, the fire's warmth and the
+people at every spot of their routines stay reachable; it walks a
+knight into the campfire, the pond and the ferns, checks that no
+villager's or traveller's walk crosses a solid, traces the dog as its
+traveller walks there and back, and talks to the smith on its way and
+at its anvil and to a traveller with an answer queued:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsolid/campsolid.qml
 ```
 
 A descent gauge under the minimap shows how deep the knight is: a shaft of
@@ -1130,30 +1158,51 @@ their rock face, a torch, a slit, a secret, a feature's cell and a
 doorway; a small room whose wall leaves no such cell lets go of those
 one after the other, last putting out a torch to take its place. Holes
 are laid out after everything else, from their own stream of the
-level's seed, so nothing moves for them. Clean strikes on any vein of
-the room wake it: at `dustAt` of them dust puffs from its rim and a low
-rumble plays, at `eyesAt` two eyes open in its dark and a groan comes
-from inside. `telegraph` seconds after the eyes (never less than
-`enemy.minTelegraph`) creatures of the depth's kinds crawl out of its
-mouth, each with the rumble: `waves` waves of `perWave`, `waveGap`
-seconds apart. `closeAfter` seconds after the last one its rim crumbles
-shut, a heap of rubble, and it never wakes again; chipped strikes wake
-nothing. The hole's sounds are quieter the further it is from the
-knight. Every number is `Balance.deep.hole`; the rumble and the groan
-are synthesised by `tools/deep_sounds.py`. In a session each node tells
-the host of its knight's clean strikes; the host runs every hole, sends
-its creatures as it sends every enemy, and publishes the holes' stages
-and waves (the session property `holes`), which every screen shows and
-hears in order, a node that joins later too. The dojo's deep scenario
-has the vein's hole in the same wall. The holes bench builds 20 seeds at
+level's seed, so nothing moves for them. Each gem cut from a vein of
+the room wakes it by chance (#175), likelier the more the gem is worth,
+the more its room's miners dug (#176) and the more knights the level
+was built for: `wakeChance` plus `wakePerGold` for each gold of the
+gem's worth and `wakePerDig` for each strike a miner of the room made
+while the hole rested, times `wakePerKnight` more for each knight past
+the first, at most `wakeMost`. With the
+numbers today, on the holes bench's seeds, one knight wakes it for two
+in five of the shallow tetrahedrons cut clean and three in four of the
+deep icosahedrons, two knights for half of the one and nearly all of
+the other. The roll is the vein's
+own, from the level's seed and its cell, so the same seed and party
+wake the same holes, and a gem worth more, or cut after more digging,
+never wakes fewer; the strikes before the cut wake nothing. Woken, dust puffs from its rim and
+a low rumble plays, `eyesAfter` seconds later two eyes open in its dark
+and a groan comes from inside. `telegraph` seconds after the eyes
+(never less than `enemy.minTelegraph`) creatures of the depth's kinds
+crawl out of its mouth, each with the rumble: `waves` waves of
+`perWave`, `waveGap` seconds apart. `closeAfter` seconds after the last
+one its rim crumbles shut, a heap of rubble, and it never wakes again.
+The hole's sounds are quieter the further it is from the knight. Every
+number is `Balance.deep.hole`; the rumble and the groan are synthesised
+by `tools/deep_sounds.py`. In a session the host, which decides every
+cut gem, rolls the wake, runs every hole, sends its creatures as it
+sends every enemy, and publishes the holes' stages and waves (the
+session property `holes`), which every screen shows and hears in order,
+a node that joins later too. The dojo's deep scenario has the vein's
+hole in the same wall; whether its gem wakes it depends on the seed
+(`eval applyScenario("deep", 3, 424243)` wakes it for a gem cut clean,
+the scenario's own 424242 does not). The holes bench builds 20 seeds at
 a low, a middle and a high danger twice and checks the same holes on the
 same cells, one in each room with a vein and none elsewhere, each on its
 wall's face off the veins, torches, slits and secrets, none in the camp
-or the fight room; that the deep scenario shows one; that chipped
-strikes wake nothing, clean ones dust then eyes with the rumble then the
-groan, the first creature `telegraph` after the eyes, the waves from the
-hole's cell, the close with the crumble, and that a clean strike after
-it wakes nothing:
+or the fight room; that the deep scenario shows one; that on a seed
+whose roll fails the cut gem leaves it at rest, and on one whose roll
+wakes it the cut brings dust with the rumble, then eyes with the groan
+`eyesAfter` later, the first creature `telegraph` after the eyes, the
+waves from the hole's cell, the close with the crumble, and that a gem
+cut after it wakes nothing. Then it rolls the first vein of each hole
+on 40 seeds at a shallow and a deep danger for 1 to 4 knights, its gem
+cut all chipped and all clean, and checks that the share of woken holes
+rises with the gem's worth and with the knights (unless every chance is
+at `wakeMost`) and lies near the mean chance; and on 10 of the seeds,
+built and cut twice for two knights through the game's own cut, that it
+wakes the holes the roll says, the same both times:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/holes/holes.qml
@@ -1161,100 +1210,104 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/holes/holes.qml
 
 The hole party bench checks it over the network: two processes of
 Clayground's live loader, a host and a joiner, on seed 424242. Both show
-the same holes at rest; the joiner's knight cuts a vein, every strike
-clean, and both screens see its hole go through the same stages and show
-the same creatures at its mouth, the first no sooner than
-`enemy.minTelegraph` after the eyes; then the host's knight does the same
-at another hole. It needs the live loader and exits with the number of
-failed checks:
+the same holes at rest; the knights cut a vein of each hole's room in
+turn, every strike clean, the joiner's first. Where the host's roll says
+the gem wakes the hole, both screens see it go through the same stages
+and show the same creatures at its mouth, the first no sooner than
+`enemy.minTelegraph` after the eyes; where it says not, the hole stays at
+rest on both screens. On that seed the roll wakes two of its three holes.
+It needs the live loader and exits with the number of failed checks:
 
 ```
 python3 tests/holeparty/run_holeparty.py --mode local
 ```
 
-**Petrified travellers:** the deep turns what it takes into stone (#158).
-A room that holds a vein holds, with `Balance.dungeon.petrified.chance`
-at its danger, a stone-grey figure half in its vein's rock face, faintly
-cracked, its edge shimmering pale blue where a lantern's light reaches
-it: a miner caught mid-swing, a small pick raised and a lamp on its cap,
-or a lost traveller caught huddled, arms round its knees. It stands
-beside the vein over a room's cell, off a vein, the hole, a torch, a
-slit and a secret, laid out after the holes from its own stream of the
-level's seed, so nothing moves for it. The same pickaxe frees it, aimed
-at it in reach with the left button, on a slower ring (`ringTime`): a
-strike on the close is clean and counts, an off-beat one does it no
-harm, takes none back and only starts the ring over; `strikes` clean
-ones free it. A strike on a traveller never wakes the room's spawn
-hole - the hole answers greed, and freeing someone is patience under the
-pressure the vein's digging made. On the last strike the shell cracks
-in a ring of grey shards with the crumble, a warm low major chord plays
-- the only one in the dungeon's sounds - and colour flows back into the
-figure from its middle out over `colourTime`. A freed miner nods to the
-knight, says its thanks, walks to its room's vein and works there, its quiet tink every
-`workEvery` seconds part of the room's sound; once the room's hole has
-sent creatures it flees instead, and a miner at work flees too when the
-hole's first wave comes. A freed lost traveller thanks the knight in a
-bubble and walks off toward the room's way to the exit, fading out of
-sight. Every number and line is `Balance.deep.stone`; the chord is
+**Travellers of the deep:** the deep draws people down (#176). A room
+that holds a vein holds, with `Balance.dungeon.travellers.chance` at its
+danger, a traveller on its floor in front of the rock face beside one of
+its veins, off a vein, the hole, a torch, a slit, a secret and a
+feature's cell, laid out after the holes from its own stream of the
+level's seed, so nothing moves for it; no figure stands in a wall. A
+lost traveller sits there huddled, arms round its knees, a pack on its
+back, trembling with fear. A miner came for the treasure: it stands
+beside the vein, a lamp on its cap, and while a knight is within
+`digReach` it swings its own pick at the rock every `digEvery` seconds,
+a quiet tink and a few chips each time. Each of its strikes while the
+room's spawn hole rests makes a gem cut there likelier to wake it
+(`hole.wakePerDig`), so a miner is pressure. E within `talkReach` of
+either talks to it ("[E] Talk" shows over it): a lost one says its
+thanks, a miner is talked into leaving because the deep is too
+dangerous, and either walks off toward the room's way to the exit,
+fading out of sight, while a warm low major chord plays - the only one
+in the dungeon's sounds. Talking never wakes the hole. A miner still
+there when its hole's first wave comes flees the same way, without the
+chord. The pickaxe is the veins' alone: aimed at a traveller it starts
+no dig. Every number and line is `Balance.deep.traveller`; the chord is
 synthesised by `tools/deep_sounds.py`. In a session the node whose
-knight freed one shows the moment at once and tells the host; the host
-decides how it goes on and publishes every traveller freed with its
-outcome (the session property `stones`), which every screen shows, a
-node that joins later too. A freeing the host refuses - reported for
-another level than the host's - turns back to stone on the screen that
-showed it, unless the host decided that traveller already; the crumble
-of one freed on another screen is as quiet as its chord, by the
-distance. The dojo's deep scenario has a miner and a lost one either
-side of its vein, and a special beside them. The stones bench builds 20 seeds at a
-low, a middle and a high danger twice and checks the same travellers on
-the same cells, at most one in a room with a vein and none elsewhere,
-each in its vein's rock face off the veins, the hole, torches, slits and
-secrets, both kinds among them, none in the camp or the fight room;
-then in the deep scenario that the scenario shows the miner, the lost one
-and a special, that off-beat strikes never harm a traveller
-and only start the ring over, that clean ones free it with the crumble,
-the chord and the colour and never wake the hole, that a freed miner
-works beside the vein with its tink and is still there seconds later,
-that a freed lost one walks off and is gone, that a miner freed after
-the hole's creatures came flees, and that one at work flees when the
-first wave comes; and that a freed miner nods before it walks, that one
-freed far from the knight crumbles quieter, and that a refused freeing
-turns the figure back to stone:
+knight talked to one shows its line at once and tells the host; the
+host decides how it goes on and publishes every traveller that goes on
+(the session property `deepTravellers`), which every screen shows, a
+node that joins later too, and counts the miners' strikes as it rolls
+the holes. A talk that reaches the host for another level, or for one
+gone already, it refuses, as it refuses a gem: on the talker's screen
+the line stops and the traveller stays, to be talked to again. The dojo's deep scenario has a miner and
+a lost one either side of its vein, and a special beside them. This
+replaces #158's petrified figures freed with the pickaxe.
+
+The talks bench builds 20 seeds at a low, a middle and a high danger
+twice and checks the same travellers on the same spots, at most one in
+a room with a vein and none elsewhere, each with its feet on the room's
+floor in front of its vein's rock face, off the veins, the hole,
+torches, slits, secrets and features, both kinds among them, none in
+the camp or the fight room; then in the deep scenario that the miner,
+the lost one and a special stand on the floor, the lost one trembling,
+and the pickaxe aimed at the miner starts no dig; that the miner digs
+only with a knight near, its strikes counted by its hole and raising
+the wake chance by `wakePerDig` each; that on a seed whose clean gem
+alone leaves the hole asleep the gem cut after the miner dug wakes it,
+and the same gem after the miner was talked off does not; that E talks
+to the lost one, the miner and the special, each says its line, the
+chord plays, each walks off and is gone, the miner digs no more, the
+hole stays asleep and the special joins the camps, kept with the
+record; that a talk the host refuses stops the line and the traveller
+can be talked to again; and that a miner still there flees at the
+hole's first wave:
 
 ```
-QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/stones/stones.qml
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/talks/talks.qml
 ```
 
-The stone party bench checks it over the network: two processes of
+The talk party bench checks it over the network: two processes of
 Clayground's live loader, a host and a joiner, on seed 424244, whose
-first dungeon holds a lost traveller and a miner. Both show the same
-travellers of the same kind and strikes; the joiner's knight frees one,
-every strike clean, and both screens show it freed, its colour back, the
-chord, and the outcome the host decided - the lost one gone on both;
-then the host's knight frees the miner, and both show it at work at the
-same spot beside its vein. Before the freeings the joiner reports one
-for another level, and the host's refusal turns it back to stone on the
-joiner's screen. Each process keeps a special of its own with its record;
-in the camp after the dungeon both screens seat the host's special and
-the lost one that left by the fire, both fires heal by the host's
-special alone, and the joiner's own record keeps its own special. It
-needs the live loader and exits with the number of failed checks:
+first dungeon holds a miner and a lost traveller. Both show the same
+travellers on the same spots; a talk of the joiner's for another level
+shows its line on the joiner, the host refuses it, and the traveller
+stays there to be talked to again. With the joiner's knight by the miner it digs on both
+screens and the host counts its strikes toward the hole. The joiner's
+knight talks to the miner and the host's to the lost one: each time
+both screens show the same line, the leaving the host decided, the
+chord, and the traveller gone. Each process keeps a special of its own
+with its record; in the camp after the dungeon both screens seat the
+host's special and the two that left by the fire, both fires heal by
+the host's special alone, and the joiner's own record keeps its own
+special. It needs the live loader and exits with the number of failed
+checks:
 
 ```
-python3 tests/stoneparty/run_stoneparty.py --mode local
+python3 tests/talkparty/run_talkparty.py --mode local
 ```
 
-**Freed at the camps:** the travellers freed in a run sit by the fire of
-every later camp of that run (#159) - those that left toward the exit,
-lost ones and miners that fled; a miner at work stays in its room. They
-sit huddled in colour on a ring round the fire (`Balance.deep.camp`),
-off the camp's travellers and its cat, so the figures round the fire are
-the run's count of the freed; a new run's camps start without them.
-Rarely a petrified traveller is special (`Balance.dungeon.petrified
-.specialShare`): one of the few of `Balance.deep.specials`, a faint
-gold edge to its shimmer. Which one, and of which kind, comes from the
-level's seed alone, whatever the record holds; one already with the
-camps stands there as an ordinary traveller of its kind. Freed, it says its own line
+**Freed at the camps:** the travellers of the deep that left toward the
+exit in a run, talked off or fled, sit by the fire of the next camp of
+that run only, the one after the dungeon they left (#159, #177). They sit huddled on a ring round the fire
+(`Balance.deep.camp`), off the camp's travellers and its cat, so the
+figures round the fire are the count of those sent up in the dungeon
+just behind; a new run's camps start without them. Rarely a traveller of the deep is
+special (`Balance.dungeon.travellers.specialShare`): one of the few of
+`Balance.deep.specials`, with a faint gold edge and a gold glow. Which
+one, and of which kind, comes from the level's seed alone, whatever the
+record holds; one already with the camps is there as an ordinary
+traveller of its kind. Talked to, it says its own line
 and leaves, and joins the camps for good: it sits by every camp's fire
 after that, across runs, says its camp line to a knight near it, and
 gives the fire a comfort, never fight power - Maren the healer heals
@@ -1264,19 +1317,21 @@ the camps are kept with this machine's record (`KeyValueStore`
 "ShapesAndStone", key `specials`). In a session the host's record decides
 which specials sit at the camps, on every screen (the session property
 `specials`), and the host's run decides who of the run sits there (the
-session property `freed`); a joiner keeps a special freed in the party
-with its own record too. The title and the fallen screen show who was
+session property `freed`); a joiner keeps a special talked to in the
+party with its own record too. The title and the fallen screen show who was
 freed tonight ("Freed tonight: 2 lost travellers, a miner, Maren") and
 the specials with the camps ("With the camps: Maren the healer"); tonight
 is since the game started, in a session since it was hosted or joined.
 The camp side lives in `src/CampFreed.qml`. The freed bench checks that a seed holds the same travellers with an
 empty and a full record, its special an ordinary one with the full; it
-frees every
-traveller of a dungeon at depth 2 and checks that those that left sit at
-the camps after depth 2 and 3 and are gone in a new run; then frees the
-deep scenario's special and checks it is kept with the record, sits in
-two camps of the next run with its line, and the fire heals by its
-comfort; then the fallen screen and the title. With an out dir it saves
+talks to every traveller of a dungeon at depth 2 and checks that they
+sit at the camp after depth 2, not at the one after depth 3, and are
+gone in a new run; then
+talks to the deep scenario's special and checks it is kept with the
+record, sits at the next run's first camp with its line and the fire
+heals by its comfort; in that run it sends depth 2's travellers off
+again and checks the special and them at the camp after depth 2, the
+special alone at the one after depth 3; then the fallen screen and the title. With an out dir it saves
 `fallen.png` and `title.png` (and `camp.png`, `special.png`, which need a
 window that draws the world):
 

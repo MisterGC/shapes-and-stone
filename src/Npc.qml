@@ -22,16 +22,31 @@ PhysicsItem {
     property var wares: []
     property string greetingSound: ""
 
-    // Routine: [{x, y, duration, text, sound}, ...]; sound names what
-    // the camp hears while it is at that spot (CampSounds, issue #147)
+    // Routine: [{x, y, duration, text, sound, via}, ...]; sound names
+    // what the camp hears while it is at that spot (CampSounds, issue
+    // #147), via the points [{x, y}] it walks through on its way there
+    // without stopping, round what it must not walk over (issue #178)
     property var routine: []
     property int _routineIndex: 0
+    property int _viaIndex: 0
+    on_RoutineIndexChanged: _viaIndex = 0
     property string _activityText: ""
     property bool _atDestination: false
-    // The routine's step it stands at doing, or null while it walks
-    readonly property var doing: _atDestination && routine.length > 0 ? routine[_routineIndex] : null
+    // The routine's step it stands at doing, or null while it walks or
+    // listens
+    readonly property var doing: _atDestination && routine.length > 0 && !listening ? routine[_routineIndex] : null
     property real _activityTimer: 0
     property real walkSpeed: 1.5
+
+    // Talked to (issue #178): it stops what it is doing and faces the
+    // knight that talks to it while the dialogue it opened is up, then
+    // goes back to it where it left off. listener is that knight, facing
+    // east (1) or west (-1), the way its icon looks
+    readonly property bool listening: _listener !== null && !!gameWorld && gameWorld.talkingTo === npc
+    readonly property var listener: listening ? _listener : null
+    property var _listener: null
+    property real facing: 1
+    onListeningChanged: if (!listening) _listener = null
 
     // Interaction
     property var nearbyPlayer: null
@@ -97,6 +112,7 @@ PhysicsItem {
         Canvas {
             id: icon
             anchors.centerIn: parent
+            transform: Scale { origin.x: icon.width / 2; xScale: npc.facing }
             width: parent.width * 0.6
             height: parent.height * 0.6
             onPaint: {
@@ -178,7 +194,7 @@ PhysicsItem {
         font.italic: true
         style: Text.Outline
         styleColor: "#000000"
-        opacity: _atDestination && _activityText !== "" && saying === "" ? 1.0 : 0
+        opacity: _atDestination && _activityText !== "" && saying === "" && !listening ? 1.0 : 0
         Behavior on opacity { NumberAnimation { duration: 300 } }
     }
 
@@ -279,6 +295,11 @@ PhysicsItem {
 
     function _updateRoutine(dt) {
         if (routine.length === 0) return
+        if (listening) {
+            _faceListener()
+            body.linearVelocity = Qt.point(0, 0)
+            return
+        }
         let act = routine[_routineIndex]
 
         if (_atDestination) {
@@ -292,15 +313,20 @@ PhysicsItem {
             return
         }
 
-        // Walk toward destination
-        let dx = act.x - xWu
-        let dy = act.y - yWu
+        // Walk toward destination, through its via points first
+        let via = act.via || []
+        let to = _viaIndex < via.length ? via[_viaIndex] : act
+        let dx = to.x - xWu
+        let dy = to.y - yWu
         let dist = Math.sqrt(dx * dx + dy * dy)
 
-        if (dist < 0.3) {
+        if (dist < 0.3 && to !== act) {
+            _viaIndex++
+        } else if (dist < 0.3) {
             // Arrived
             body.linearVelocity = Qt.point(0, 0)
             _atDestination = true
+            _viaIndex = 0
             _activityTimer = act.duration || 3
             _activityText = act.text || ""
         } else {
@@ -308,15 +334,27 @@ PhysicsItem {
             let ndy = dy / dist
             body.linearVelocity = Qt.point(
                 ndx * walkSpeed, -ndy * walkSpeed)
+            if (Math.abs(dx) > 0.05) facing = dx > 0 ? 1 : -1
         }
+    }
+    function _faceListener() {
+        let dx = _listener.xWu + _listener.widthWu / 2 - (xWu + widthWu / 2)
+        if (Math.abs(dx) > 0.05) facing = dx > 0 ? 1 : -1
     }
 
     function interact() {
         let lines = speak ? speak() : dialogueLines
         if (gameWorld && lines.length > 0) {
+            _listener = nearbyPlayer
+            if (_listener) {
+                body.linearVelocity = Qt.point(0, 0)
+                _faceListener()
+                // What it was saying to the others it leaves unsaid
+                saying = ""
+            }
             if (greetingSound !== "" && gameWorld.playNpcGreeting)
                 gameWorld.playNpcGreeting(greetingSound)
-            gameWorld.openDialogue(npcName, npcColor, lines, wares)
+            gameWorld.openDialogue(npcName, npcColor, lines, wares, npc)
         }
     }
 }
