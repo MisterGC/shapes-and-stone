@@ -1009,31 +1009,41 @@ PhysicsItem {
         // If no path found, keep current path (or stop)
     }
 
+    // Patrol near its spawn: from the cell there to up to two cells beside
+    // it and back, each a straight walk between cell centres, which its
+    // centre can reach. A cell beside is one it walks to straight: no
+    // wall, no breakable, no shut door between. Pushed away from its spawn
+    // behind a wall, it patrols round the cell it stands in (issue #184)
     function _setupPatrol() {
-        // Patrol near spawn point: 2-3 waypoints in a small area
+        if (!gameWorld) return
+        let cs = gameWorld.cellSize
+        let cellCentre = (x, y) => Qt.point(Math.floor(x / cs) * cs + cs / 2,
+                                            Math.floor(y / cs) * cs + cs / 2)
+        let open = (from, to) => {
+            let gx = Math.floor(to.x / cs), gy = Math.floor(to.y / cs)
+            return gx >= 0 && gx < gameWorld.gridWidth && gy >= 0 && gy < gameWorld.gridHeight
+                && gameWorld.grid[gy][gx] !== gameWorld.cellWall
+                && !(gameWorld.breakableAt && gameWorld.breakableAt(gx + "," + gy))
+                && gameWorld.hasLineOfSight(from.x, from.y, to.x, to.y)
+        }
+        let here = Qt.point(centreXWu, centreYWu)
+        let home = cellCentre(_spawnXWu + widthWu / 2, _spawnYWu - heightWu / 2)
+        if (!open(here, home)) home = cellCentre(here.x, here.y)
         let r = Balance.enemy.patrolRadius
         let offsets = [
-            Qt.point(_spawnXWu - r, _spawnYWu),
-            Qt.point(_spawnXWu + r, _spawnYWu),
-            Qt.point(_spawnXWu, _spawnYWu + r),
-            Qt.point(_spawnXWu, _spawnYWu - r)
+            Qt.point(home.x - r, home.y),
+            Qt.point(home.x + r, home.y),
+            Qt.point(home.x, home.y + r),
+            Qt.point(home.x, home.y - r)
         ]
-        // Pick 2 random reachable offsets
-        let wps = []
+        // Home first, the walk there straight from where it stands
+        let wps = [home]
         for (let p of offsets) {
-            if (gameWorld) {
-                let gx = Math.floor(p.x / gameWorld.cellSize)
-                let gy = Math.floor(p.y / gameWorld.cellSize)
-                if (gx >= 0 && gx < gameWorld.gridWidth &&
-                    gy >= 0 && gy < gameWorld.gridHeight &&
-                    gameWorld.grid[gy][gx] !== gameWorld.cellWall) {
-                    wps.push(p)
-                }
-            }
-            if (wps.length >= 2) break
+            let c = cellCentre(p.x, p.y)
+            if (open(home, c)) wps.push(c, home)
+            if (wps.length >= 5) break
         }
-        if (wps.length >= 2)
-            followPath.wpsWu = wps
+        followPath.wpsWu = wps
     }
 
     function performAttack() {
