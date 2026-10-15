@@ -171,6 +171,11 @@ PhysicsItem {
     // Combat state
     property real attackCooldown: 0
     property real _attackTimer: 0
+    // Circling the knight (Balance.enemy.circle...): the time left, the way
+    // round (1 or -1), and whether it has made up its mind to go in
+    property real _circleT: 0
+    property int _circleDir: 1
+    property bool _committed: false
     property real _dirToTargetX: 0
     property real _dirToTargetY: 0
     property bool parryWindow: false
@@ -296,6 +301,7 @@ PhysicsItem {
             switch (enemy.aiState) {
             case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
             case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
+            case "circle": base = "#B84040"; break
             case "kite": base = "#8EBB5A"; break
             // A spitter winding up its shot turns warm yellow: an attack
             // coming, like the melee telegraph, and far from its kiting green
@@ -934,7 +940,15 @@ PhysicsItem {
                 }
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
+                if (enemyType === "grunt" && !_committed && canSee && dist < Balance.enemy.circleRange) {
+                    let ct = Balance.enemy.circleTime
+                    _circleT = ct[0] + Math.random() * (ct[1] - ct[0])
+                    _circleDir = Math.random() < 0.5 ? 1 : -1
+                    aiState = "circle"
+                    break
+                }
                 if (dist < lungeRange && canSee) {
+                    _committed = false
                     // Capture direction to target for wind-up/lunge
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
@@ -944,6 +958,40 @@ PhysicsItem {
                     _recalcChasePath()
                     _pathRecalcTimer = Balance.enemy.repathInterval
                 }
+            }
+            break
+
+        case "circle":
+            // Grunt: round the knight at circleDist, sizing it up
+            if (!canSee) {
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            _circleT -= dt
+            if (dist < lungeRange * Balance.enemy.circleStrikeIn && attackCooldown <= 0) {
+                let len = Math.max(0.01, dist)
+                _dirToTargetX = dx / len
+                _dirToTargetY = dy / len
+                _committed = false
+                windUp(windUpDuration)
+                break
+            }
+            if (_circleT <= 0) {
+                // Its mind made up: in it goes
+                _committed = true
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            {
+                let len = Math.max(0.01, dist)
+                let ndx = dx / len, ndy = dy / len
+                let s = Balance.enemy.circleSpeed
+                let radial = Math.max(-1, Math.min(1, (dist - Balance.enemy.circleDist) * 1.5))
+                let vx = -ndy * _circleDir * s + ndx * radial * s
+                let vy = ndx * _circleDir * s + ndy * radial * s
+                body.linearVelocity = Qt.point(vx, -vy)
             }
             break
 
