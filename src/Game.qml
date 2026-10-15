@@ -5467,6 +5467,7 @@ ClayWorld2d {
         grid = []
         rooms = []
         campProps = []
+        campSolids = []
         campLayout = -1
         // The minimap paints what is explored of the grid, and the grid is gone
         exploredCells = []
@@ -5561,14 +5562,8 @@ ClayWorld2d {
         campfire = cf
         // Its core is solid (issue #178)
         let core = Balance.camp.solid.fire
-        dungeonObjects.push(campSolidComponent.createObject(world.room, {
-            xWu: cf.xWu + cf.widthWu / 2 - core, yWu: cf.yWu - cf.heightWu / 2 + core,
-            widthWu: 2 * core, heightWu: 2 * core, kind: "fire",
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-            world: world.physics,
-            categories: catWall,
-            collidesWith: catPlayer
-        }))
+        _spawnCampSolid(cf.xWu + cf.widthWu / 2 - core, cf.yWu - cf.heightWu / 2 + core,
+                        2 * core, 2 * core, "oval", 1, "fire")
 
         // Tavern (west of the middle), open to the south: x the middle of
         // its floor, y0 its south edge
@@ -6078,16 +6073,24 @@ ClayWorld2d {
             dungeonObjects.push(o)
             campProps.push({ kind: p.kind, x: cx + px, y: cy + p.y, w: p.w, h: p.h })
             let solid = c.solid.kinds[p.kind]
-            if (solid)
-                dungeonObjects.push(campSolidComponent.createObject(world.room, {
-                    xWu: x0, yWu: y1, widthWu: p.w, heightWu: p.h,
-                    shape: solid.shape, fill: solid.fill, kind: p.kind,
-                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
-                    world: world.physics,
-                    categories: catWall,
-                    collidesWith: catPlayer
-                }))
+            if (solid) _spawnCampSolid(x0, y1, p.w, p.h, solid.shape, solid.fill, p.kind)
         }
+    }
+    // What the knights bump into in the camp (CampSolid): north-west
+    // corner (x, y), w x h wu, its shape at fill of that, standing for
+    // kind (a prop's or "fire"). campSolids holds them
+    property var campSolids: []
+    function _spawnCampSolid(x, y, w, h, shape, fill, kind) {
+        let o = campSolidComponent.createObject(world.room, {
+            xWu: x, yWu: y, widthWu: w, heightWu: h,
+            shape: shape, fill: fill, kind: kind,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catWall,
+            collidesWith: catPlayer
+        })
+        dungeonObjects.push(o)
+        campSolids.push(o)
     }
     function _propFits(x0, y0, x1, y1, cx, fire, fronts, spots) {
         let c = Balance.camp
