@@ -11,6 +11,8 @@ Item {
     visible: false
 
     property string speakerName: ""
+    // Who speaks, the Npc that opened it (null for none)
+    property var speaker: null
     property color speakerColor: "#C9A227"
     property var lines: []
     property int _lineIndex: 0
@@ -22,8 +24,9 @@ Item {
     // The speaker's answer to a purchase, shown instead of the line
     property string note: ""
 
-    function open(name, color, dialogueLines, offered) {
+    function open(name, color, dialogueLines, offered, who) {
         speakerName = name
+        speaker = who || null
         speakerColor = color
         lines = dialogueLines
         wares = offered || []
@@ -41,6 +44,7 @@ Item {
 
     function close() {
         visible = false
+        speaker = null
         lines = []
         wares = []
         note = ""

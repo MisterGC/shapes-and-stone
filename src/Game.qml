@@ -3001,9 +3001,12 @@ ClayWorld2d {
         game: world
     }
 
-    function openDialogue(name, color, lines, wares) {
-        dialoguePanel.open(name, color, lines, _offered(wares || []))
+    // who: the Npc that speaks, which listens while its dialogue is up
+    function openDialogue(name, color, lines, wares, who) {
+        dialoguePanel.open(name, color, lines, _offered(wares || []), who)
     }
+    // The Npc whose dialogue is up, or null
+    readonly property var talkingTo: dialoguePanel.visible ? dialoguePanel.speaker : null
     // The innkeeper's wares are always offered; the smith's are made as he
     // is talked to (smithWare), the next level of each upgrade he may sell,
     // and first, while the pouch holds gems, his offer for them (gemWare)

@@ -35,10 +35,10 @@ PhysicsItem {
     property real walkSpeed: 1.5
 
     // Talked to (issue #178): it stops what it is doing and faces the
-    // knight that talks to it until the talk ends, then goes back to it
-    // where it left off. listener is that knight, facing east (1) or west
-    // (-1), the way its icon looks
-    readonly property bool listening: _listener !== null && !!gameWorld && gameWorld.talking
+    // knight that talks to it while the dialogue it opened is up, then
+    // goes back to it where it left off. listener is that knight, facing
+    // east (1) or west (-1), the way its icon looks
+    readonly property bool listening: _listener !== null && !!gameWorld && gameWorld.talkingTo === npc
     readonly property var listener: listening ? _listener : null
     property var _listener: null
     property real facing: 1
@@ -340,10 +340,12 @@ PhysicsItem {
             if (_listener) {
                 body.linearVelocity = Qt.point(0, 0)
                 _faceListener()
+                // What it was saying to the others it leaves unsaid
+                saying = ""
             }
             if (greetingSound !== "" && gameWorld.playNpcGreeting)
                 gameWorld.playNpcGreeting(greetingSound)
-            gameWorld.openDialogue(npcName, npcColor, lines, wares)
+            gameWorld.openDialogue(npcName, npcColor, lines, wares, npc)
         }
     }
 }
