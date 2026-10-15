@@ -994,6 +994,7 @@ PhysicsItem {
         let healed = Math.min(Balance.shop.potionHeal, maxHp - hp)
         potions--
         hp += healed
+        view.healBurst()
         return healed
     }
 

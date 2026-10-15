@@ -959,6 +959,50 @@ Item {
         }
     }
 
+    // A potion drunk: a warm amber ring swells out from the knight and
+    // embers rise round it like sparks from a fire
+    function healBurst() { healAnim.restart() }
+    property real _heal: 0
+    NumberAnimation {
+        id: healAnim
+        target: view; property: "_heal"
+        from: 0; to: 1; duration: 1100
+    }
+    Rectangle {
+        id: healRing
+        parent: view.host.parent
+        width: view.host.width; height: view.host.height
+        x: view.host.x; y: view.host.y
+        radius: width / 2
+        color: "transparent"
+        border.color: "#FFA850"
+        border.width: Math.max(1, view.host.width * 0.08)
+        scale: 1 + 2.4 * Math.min(1, view._heal * 1.6)
+        opacity: healAnim.running ? 0.9 * (1 - Math.min(1, view._heal * 1.6)) : 0
+        visible: opacity > 0.01
+    }
+    Item {
+        parent: view.host.parent
+        x: view.host.x; y: view.host.y
+        width: view.host.width; height: view.host.height
+        visible: healAnim.running
+        Repeater {
+            model: 9
+            Rectangle {
+                readonly property real a: index * 2.39996
+                readonly property real d: view.host.width * (0.3 + 0.3 * ((index * 7) % 5) / 4)
+                readonly property real t: Math.max(0, Math.min(1, view._heal * 1.4 - (index % 4) * 0.1))
+                width: view.host.width * (0.06 + 0.03 * (index % 3)); height: width * 1.6
+                radius: width / 2
+                color: index % 3 === 0 ? "#FFD08A" : index % 3 === 1 ? "#FF9A40" : "#E86A20"
+                x: view.host.width / 2 + Math.cos(a) * d - width / 2
+                   + Math.sin(t * 9 + index) * view.host.width * 0.06
+                y: view.host.height / 2 + Math.sin(a) * d * 0.5 - height / 2 - t * view.host.height * 1.6
+                opacity: (1 - t) * Math.min(1, t * 6) * (0.75 + 0.25 * Math.sin(t * 40 + index))
+            }
+        }
+    }
+
     // A downed knight an ally lifts up: a ring fills clockwise around it
     // from the top, full when the knight rises. Reparented like the swing
     Canvas {

@@ -1872,6 +1872,29 @@ ClayWorld2d {
         }
     }
 
+    // Low on health: the screen's edge goes blood red, swelling with each
+    // heartbeat
+    Canvas {
+        id: lowHealthEdge
+        anchors.fill: parent
+        opacity: world.lowHealthLevel * (0.35 + 0.65 * world.heartPulse)
+        visible: opacity > 0.01
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var cx = width / 2, cy = height / 2
+            var r = Math.sqrt(cx * cx + cy * cy)
+            var g = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r)
+            g.addColorStop(0, "rgba(120, 0, 0, 0)")
+            g.addColorStop(0.55, "rgba(140, 0, 0, 0.35)")
+            g.addColorStop(1, "rgba(110, 0, 0, 0.85)")
+            ctx.fillStyle = g
+            ctx.fillRect(0, 0, width, height)
+        }
+    }
+
     // Player Health HUD (fixed position, not following camera)
     Rectangle {
         id: healthHud
@@ -1954,8 +1977,8 @@ ClayWorld2d {
                 return "#CC2222"
             }
 
-            Behavior on width { NumberAnimation { duration: 100 } }
-            Behavior on color { ColorAnimation { duration: 200 } }
+            Behavior on width { NumberAnimation { duration: world._healing ? 900 : 100; easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: world._healing ? 900 : 200 } }
         }
 
         Text {
@@ -2829,9 +2852,51 @@ ClayWorld2d {
         contrast: world.fx ? 1.05 : 1
         // The heartbeat sets in below a quarter of the health and grows
         // gently - a warning, not an alarm
-        lowHealth: world.fx && player && player.hp < player.maxHp * 0.25
-                   ? 0.8 * (1 - player.hp / (player.maxHp * 0.25)) : 0
+        lowHealth: world.lowHealthLevel
     }
+    // Low on health: below lowHealthAt of max HP the heartbeat and the
+    // fading colours set in clearly and grow as it falls; a potion lifts
+    // them off gently rather than at once
+    readonly property real lowHealthAt: 0.35
+    property real lowHealthLevel: fx && player && !fallen && player.hp < player.maxHp * lowHealthAt
+                                  ? 0.5 + 0.5 * (1 - player.hp / (player.maxHp * lowHealthAt)) : 0
+    Behavior on lowHealthLevel { NumberAnimation { duration: 900; easing.type: Easing.OutQuad } }
+    // The heartbeat itself, lowHealthLevel above 0: a beat every
+    // heartPeriod ms, quicker the lower the health, heard and seen as a
+    // red edge round the screen that swells on the lub and the dub
+    readonly property int heartPeriod: 1100 - 450 * Math.max(0, lowHealthLevel - 0.5) * 2
+    property real heartPulse: 0
+    Timer {
+        id: heartTimer
+        interval: world.heartPeriod; repeat: true; triggeredOnStart: true
+        running: world.lowHealthLevel > 0.05 && screen === "game"
+        onTriggered: {
+            heartSound.play()
+            heartBeatAnim.restart()
+        }
+    }
+    SequentialAnimation {
+        id: heartBeatAnim
+        NumberAnimation { target: world; property: "heartPulse"; to: 1; duration: 60 }
+        NumberAnimation { target: world; property: "heartPulse"; to: 0.35; duration: 110 }
+        NumberAnimation { target: world; property: "heartPulse"; to: 0.75; duration: 50 }
+        NumberAnimation { target: world; property: "heartPulse"; to: 0; duration: 420; easing.type: Easing.OutQuad }
+    }
+    Sound {
+        id: heartSound
+        source: "assets/heartbeat.wav"
+        volume: muted ? 0 : 0.9 * world.lowHealthLevel * soundVolume
+    }
+    // A potion's heal fills the health bar slowly, so it is seen
+    property bool _healing: false
+    Timer { id: healingTimer; interval: 1000; onTriggered: world._healing = false }
+    // The potion drunk: the cork, three gulps and a breath let out
+    Sound {
+        id: drinkSound
+        source: "assets/potion_drink.wav"
+        volume: muted ? 0 : 0.8 * soundVolume
+    }
+
     // Screen-space hit feedback used by impact(); null with fx off
     property var screenFx: world.fx ? screenFxApi : null
     QtObject {
@@ -3182,8 +3247,16 @@ ClayWorld2d {
     }
     function drinkPotion() {
         if (!player) return 0
+        _healing = true
+        healingTimer.restart()
         let healed = player.drinkPotion()
-        if (healed > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
+        if (healed > 0) {
+            spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
+            if (screenFx) screenFxItem.flash("#FFB060", 500, 0.16)
+            drinkSound.play()
+        } else {
+            _healing = false
+        }
         return healed
     }
     function drinkDraught() {
