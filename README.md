@@ -131,6 +131,21 @@ fall, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/enemies/enemies.qml
 ```
 
+An enemy judges its sight and its way from where it stands, the centre
+of its box, to the centre of the knight's: a corner pushed into a wall,
+as a hole's creatures crawl out, does not blind it. Its patrol walks from
+the cell its spawn is in to the cells beside it that it reaches straight,
+and back, each between cell centres; pushed behind a wall from its
+spawn, it patrols round the cell it stands in. The wall push bench
+shoves a grunt into the wall above it until its corner is inside, checks
+that it patrols again with the knight out of sight and that a second one
+spots the knight 4 wu below it and goes for it, and exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/wallpush/wallpush.qml
+```
+
 The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
 connected over Local (LAN) or Cloud signaling and started on a fixed seed.
