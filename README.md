@@ -185,7 +185,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
 LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
-potion, 2 draught, M mute and Esc menu.
+potion, 2 draught, M mute and Esc menu. F or the middle button locks on an
+enemy (see target lock).
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -308,6 +309,13 @@ buy what the panel offers, each ware named with its effect. Outside the
 panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
 mana back, up to the knight's max - at today's 40 it refills the bar; a
 knight with full mana drinks none. The campfire stays the healer.
+A potion drunk plays `potion_drink.wav` - the cork, three gulps and a
+breath let out - swells an amber ring out from the knight with embers
+rising round it, and fills the health bar over a second. Below
+`lowHealthAt` (Game.qml, 35%) of max HP the screen's edge beats blood red
+with a heartbeat (`heartbeat.wav`), quicker and louder the lower the
+health, over Clayground's faded colours (`ScreenFx2d.lowHealth`); a potion
+lifts it off over a second. `tools/knight_sounds.py` makes both sounds.
 
 The smith's upgrades have levels, I to III: the sharpened sword adds
 `shop.swordAtk` to the knight's attack and shows a brighter, wider blade
@@ -1417,6 +1425,12 @@ run out after it, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/hitstop/hitstop.qml
 ```
 
+A grunt does not run straight in: from `enemy.circleRange` on it circles
+the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
+`enemy.circleTime` seconds, then commits, goes in and lunges; a knight
+stepping inside `enemy.lungeRange` times `enemy.circleStrikeIn` meanwhile
+is struck at once.
+
 Every enemy attack can be read and answered. An attack runs on the physics
 steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
 lasts less than `enemy.minTelegraph`, and the last `enemy.parryFrames`
@@ -1484,20 +1498,32 @@ struck enemy in normal play; damage numbers only with the dojo's
 Mechanics debug on.
 The left button swings when it is let go of before `knight.chargeStart`, so
 a click plays as it always did. Held longer, the knight charges a heavy
-swing: it moves at `knight.chargeSpeed` of its speed, its blade, drawn
-back, glows brighter, and at `knight.chargeTime` the charge is full - a
-ring flashes out with a high tick. Let go of then, it swings a wide heavy
+swing: it moves at `knight.chargeSpeed` of its speed, and its sword, held
+out the way it faces, turns gold with a shine running from hilt to tip. At
+`knight.chargeTime` the charge is full - a ring flashes out with a high
+tick, the shine runs faster and a glow breathes round the blade. Let go of then, it swings a wide heavy
 blow: `knight.heavySwing` times atk, within `knight.heavyArc` and
 `knight.heavyRange` times the swing's reach. It goes through a guardian's
 shield, which staggers, and knocks enemies back `knight.heavyKnockback`
-times as far. Let go of before it is full, it is a normal swing; held
-`knight.chargeHold` past full, the knight lets it go at normal strength,
-so no charge is carried around. A hit taken while charging, a raised
+times as far. Let go of before it is full, it is a normal swing; full, the
+charge is kept for as long as the button is held. A hit taken while charging, a raised
 shield or a dash cancels it, and its release swings nothing; behind the
 shield or in a dash the button swings at once, as it always did. The
 charge counts the physics steps (Clayground's `InputAction` on the
 physics world), so a pause or a hit stop holds it. The `heavy` group of the
 table holds its glow, ring, sounds and hit feedback (`impact("heavyHit")`).
+A full charge keeps until the button is let go; the charging sword is the
+swing's sword held out the way the knight faces, a shine running along it.
+With `knight.heavyArc` at 180 the heavy blow spins all round the knight.
+
+Target lock: F or the middle button locks the knight on the standing
+enemy within `lockReach` (Game.qml) nearest the way the mouse points - the
+one it would pick shows four faint arcs. Locked, the knight faces it,
+four arcs with arrowheads close in and out round it, the screen's edge
+darkens, and the keys turn with it: W and S walk towards it and away, A
+and D circle it. F again, the enemy falling or `lockBreak` wu away lets
+go. The fight room's enemies are `fightRoomRoster` (Game.qml), the table's
+`spawn.fightRoom` unless a dojo eval sets another.
 The other screens of a session see the charge in the state's `s` (4
 charging, 5 full) and the heavy swing as `acted("heavy")`.
 A full charge let go right around a dash's start - at most

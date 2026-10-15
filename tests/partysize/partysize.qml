@@ -67,10 +67,12 @@ Window {
     // c7390a81; the petrified travellers in the veins' rock faces (issue
     // #158), left out with the veins too, from 162bb47b at 0.5 (none at
     // 1.5); the traveller of the deep on the floor in front of the face
-    // that took their place (issue #176) from e91af29e at 0.5
+    // that took their place (issue #176) from e91af29e at 0.5; the grunt's
+    // 60 HP (the duel fights) from 51748fd and 888308f2, b084ab49 and
+    // a1c350e8 without the veins
     readonly property var today: ({
-        "0.5": { hash: "51748fd", noVeins: "b084ab49", enemies: 15 },
-        "1.5": { hash: "888308f2", noVeins: "a1c350e8", enemies: 18 }
+        "0.5": { hash: "724f5b8", noVeins: "404dd8c", enemies: 15 },
+        "1.5": { hash: "774b9c3e", noVeins: "eea7aa24", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its

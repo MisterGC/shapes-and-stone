@@ -54,6 +54,57 @@ PhysicsItem {
 
     widthWu: 0.8
     heightWu: 0.8
+    // A knight's target lock is on it: four arcs round it, each with an arrowhead pointing in, closing
+    // in and out slowly
+    readonly property bool lockedOn: !!gameWorld && !!gameWorld.player
+                                     && gameWorld.player.lockTarget === enemy && !destroyed
+    // The one a lock would pick now: the arcs faint, thin and still
+    readonly property bool lockPreview: !lockedOn && !!gameWorld
+                                        && gameWorld.lockCandidate === enemy && !destroyed
+    Canvas {
+        id: lockMark
+        z: -1
+        opacity: enemy.lockedOn ? 1 : enemy.lockPreview ? 0.35 : 0
+        onOpacityChanged: requestPaint()
+        Behavior on opacity { NumberAnimation { duration: 250 } }
+        visible: opacity > 0.01
+        width: enemy.width * 3.2; height: enemy.height * 3.2
+        anchors.centerIn: parent
+        property real pulse: 0
+        NumberAnimation on pulse { running: enemy.lockedOn; loops: Animation.Infinite; from: 0; to: 1; duration: 1400 }
+        onPulseChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var r = width / 2
+            var live = enemy.lockedOn
+            var breath = live ? Math.sin(pulse * Math.PI * 2) : 0
+            var ring = r * (0.66 - 0.05 * breath)
+            var span = 50 * Math.PI / 180
+            var head = r * 0.13
+            ctx.strokeStyle = "rgba(255, 210, 140, 0.95)"
+            ctx.fillStyle = "rgba(255, 210, 140, 0.95)"
+            ctx.lineWidth = live ? 2.5 : 1.5
+            ctx.lineCap = "round"
+            for (var k = 0; k < 4; k++) {
+                var mid = Math.PI / 4 + k * Math.PI / 2
+                ctx.beginPath()
+                ctx.arc(r, r, ring, mid - span / 2, mid + span / 2)
+                ctx.stroke()
+                if (!live) continue
+                // Arrowhead at the arc's middle, pointing at the enemy
+                var c = Math.cos(mid), sn = Math.sin(mid)
+                var bx = r + c * ring, by = r + sn * ring
+                var tx = r + c * (ring - head), ty = r + sn * (ring - head)
+                ctx.beginPath()
+                ctx.moveTo(tx, ty)
+                ctx.lineTo(bx - sn * head * 0.6, by + c * head * 0.6)
+                ctx.lineTo(bx + sn * head * 0.6, by - c * head * 0.6)
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
+    }
     // Where it stands: the centre of its box. Its top-left corner reaches
     // into a wall it is pushed against, its centre does not (issue #184)
     readonly property real centreXWu: xWu + widthWu / 2
@@ -120,6 +171,11 @@ PhysicsItem {
     // Combat state
     property real attackCooldown: 0
     property real _attackTimer: 0
+    // Circling the knight (Balance.enemy.circle...): the time left, the way
+    // round (1 or -1), and whether it has made up its mind to go in
+    property real _circleT: 0
+    property int _circleDir: 1
+    property bool _committed: false
     property real _dirToTargetX: 0
     property real _dirToTargetY: 0
     property bool parryWindow: false
@@ -245,6 +301,7 @@ PhysicsItem {
             switch (enemy.aiState) {
             case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
             case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
+            case "circle": base = "#B84040"; break
             case "kite": base = "#8EBB5A"; break
             // A spitter winding up its shot turns warm yellow: an attack
             // coming, like the melee telegraph, and far from its kiting green
@@ -883,7 +940,15 @@ PhysicsItem {
                 }
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
+                if (enemyType === "grunt" && !_committed && canSee && dist < Balance.enemy.circleRange) {
+                    let ct = Balance.enemy.circleTime
+                    _circleT = ct[0] + Math.random() * (ct[1] - ct[0])
+                    _circleDir = Math.random() < 0.5 ? 1 : -1
+                    aiState = "circle"
+                    break
+                }
                 if (dist < lungeRange && canSee) {
+                    _committed = false
                     // Capture direction to target for wind-up/lunge
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
@@ -893,6 +958,40 @@ PhysicsItem {
                     _recalcChasePath()
                     _pathRecalcTimer = Balance.enemy.repathInterval
                 }
+            }
+            break
+
+        case "circle":
+            // Grunt: round the knight at circleDist, sizing it up
+            if (!canSee) {
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            _circleT -= dt
+            if (dist < lungeRange * Balance.enemy.circleStrikeIn && attackCooldown <= 0) {
+                let len = Math.max(0.01, dist)
+                _dirToTargetX = dx / len
+                _dirToTargetY = dy / len
+                _committed = false
+                windUp(windUpDuration)
+                break
+            }
+            if (_circleT <= 0) {
+                // Its mind made up: in it goes
+                _committed = true
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            {
+                let len = Math.max(0.01, dist)
+                let ndx = dx / len, ndy = dy / len
+                let s = Balance.enemy.circleSpeed
+                let radial = Math.max(-1, Math.min(1, (dist - Balance.enemy.circleDist) * 1.5))
+                let vx = -ndy * _circleDir * s + ndx * radial * s
+                let vy = ndx * _circleDir * s + ndy * radial * s
+                body.linearVelocity = Qt.point(vx, -vy)
             }
             break
 

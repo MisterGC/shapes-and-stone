@@ -68,14 +68,13 @@ QtObject {
         // and a release swings a heavy blow: heavySwing times atk, within
         // heavyArc and heavyRange times attackRange, through a guardian's
         // shield (it staggers), knocking back heavyKnockback times as far.
-        // Released before full, a normal swing. Held chargeHold past full,
-        // the knight lets it go at normal strength. A hit cancels it
+        // Released before full, a normal swing; full, the charge is kept
+        // until the button is let go. A hit cancels it
         chargeStart: 0.2,
         chargeTime: 0.6,
-        chargeHold: 1.0,
-        chargeSpeed: 0.7,
+        chargeSpeed: 0.55,
         heavySwing: 2.5,
-        heavyArc: 90,
+        heavyArc: 180,
         heavyRange: 1.25,
         heavyKnockback: 2,
         // Whirlwind: Q with full momentum (Balance.momentum) spins the
@@ -144,7 +143,8 @@ QtObject {
     })
 
     // The charged heavy swing (knight.charge...) reads as a commitment: the
-    // blade glows from the knight's blade colour to glow as it charges;
+    // sword, held out the way the knight faces, goes from the knight's
+    // blade colour to glow as it charges, a shine running along it;
     // when full a ring of ringColor flashes out to ringScale times the
     // knight's size over ring seconds with a tick pitch semitones up. The
     // heavy swing plays the swing sample swingPitch semitones; its hit
@@ -305,7 +305,7 @@ QtObject {
         // Base HP by tier: weak, normal, tough
         tierHp: [22, 36, 50],
         // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        grunt: { hpBonus: 24, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 10, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -6, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // How often an enemy decides, and how often a chase re-plans its path
@@ -322,8 +322,17 @@ QtObject {
         // Lunge: wind up backwards, then dash at the knight
         lungeRange: 2.0,
         windUpSpeed: 4.0,
-        windUp: 0.3,
+        windUp: 0.5,
         lungeDuration: 0.35,
+        // A grunt closing in circles the knight first, circleDist wu off at
+        // circleSpeed, from circleRange on, for circleTime seconds (rolled
+        // from the pair), then commits: it goes in and lunges. A knight
+        // stepping inside lungeRange * circleStrikeIn meanwhile is struck
+        circleRange: 3.6,
+        circleDist: 2.8,
+        circleSpeed: 2.2,
+        circleTime: [0.8, 2.2],
+        circleStrikeIn: 0.8,
         // A lunge hits when it ends this close to the knight
         lungeHitRange: 1.2,
         // The last physics steps (1/60 s each) of a lunge in which a swing
