@@ -554,14 +554,19 @@ beside its traveller a share of the way each step, so it trots along at
 its traveller's pace instead of stopping and starting, and never steps
 back and forth. A villager talked to - the innkeeper, the smith, the
 witch or a traveller - stops what it is doing and faces the knight until
-the talk ends, then goes on where it left off. The solid camp bench
+the talk ends, then goes on where it left off; a traveller talked to
+leaves its answer in the travellers' talk unsaid. The villagers and the
+travellers walk round the solids: a leg of a routine that would cross
+one passes through points beside it (`camp.solid.clear` wu off). The
+solid camp bench
 walks a knight's middle over the floor of 10 camps of each look with and
 without the solid bodies and checks that nothing but the solids
 themselves is lost and that the stairs, the fire's warmth and the
 people at every spot of their routines stay reachable; it walks a
-knight into the campfire, the pond and the ferns, traces the dog as its
+knight into the campfire, the pond and the ferns, checks that no
+villager's or traveller's walk crosses a solid, traces the dog as its
 traveller walks there and back, and talks to the smith on its way and
-at its anvil:
+at its anvil and to a traveller with an answer queued:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsolid/campsolid.qml
