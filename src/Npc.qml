@@ -22,10 +22,14 @@ PhysicsItem {
     property var wares: []
     property string greetingSound: ""
 
-    // Routine: [{x, y, duration, text, sound}, ...]; sound names what
-    // the camp hears while it is at that spot (CampSounds, issue #147)
+    // Routine: [{x, y, duration, text, sound, via}, ...]; sound names
+    // what the camp hears while it is at that spot (CampSounds, issue
+    // #147), via the points [{x, y}] it walks through on its way there
+    // without stopping, round what it must not walk over (issue #178)
     property var routine: []
     property int _routineIndex: 0
+    property int _viaIndex: 0
+    on_RoutineIndexChanged: _viaIndex = 0
     property string _activityText: ""
     property bool _atDestination: false
     // The routine's step it stands at doing, or null while it walks or
@@ -309,15 +313,20 @@ PhysicsItem {
             return
         }
 
-        // Walk toward destination
-        let dx = act.x - xWu
-        let dy = act.y - yWu
+        // Walk toward destination, through its via points first
+        let via = act.via || []
+        let to = _viaIndex < via.length ? via[_viaIndex] : act
+        let dx = to.x - xWu
+        let dy = to.y - yWu
         let dist = Math.sqrt(dx * dx + dy * dy)
 
-        if (dist < 0.3) {
+        if (dist < 0.3 && to !== act) {
+            _viaIndex++
+        } else if (dist < 0.3) {
             // Arrived
             body.linearVelocity = Qt.point(0, 0)
             _atDestination = true
+            _viaIndex = 0
             _activityTimer = act.duration || 3
             _activityText = act.text || ""
         } else {

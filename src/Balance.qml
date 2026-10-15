@@ -1036,7 +1036,8 @@ QtObject {
         // shape ("oval", the ellipse in its rectangle, or "box") at fill
         // of its size about its middle, nor on the campfire within fire wu
         // of its middle. The rails, the cracks, the coals and the
-        // mushrooms stay underfoot
+        // mushrooms stay underfoot. The villagers and the travellers walk
+        // round them, clear wu off
         solid: {
             kinds: {
                 pond: { shape: "oval", fill: 0.9 },
@@ -1049,7 +1050,8 @@ QtObject {
                 crates: { shape: "box", fill: 0.95 },
                 timber: { shape: "box", fill: 0.95 }
             },
-            fire: 0.6
+            fire: 0.6,
+            clear: 0.45
         },
         // Props stay this far, in wu, off the middle column (the way from
         // the entrance to the stairs), off the campfire's centre, off the

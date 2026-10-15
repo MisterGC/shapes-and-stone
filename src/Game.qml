@@ -5632,6 +5632,7 @@ ClayWorld2d {
         _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
         _placeCat(camp, levelSeed, cf, spots)
         _placeTravellers(camp, levelSeed, cf)
+        _routeWalks()
         _seatFreed(levelSeed, cf)
         campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
                          anvilAt, campLook, campProps)
@@ -5948,6 +5949,56 @@ ClayWorld2d {
             travellers: campTravellers, plan: plan, first: pick(n.first), waits: waits
         })
         dungeonObjects.push(campTalk)
+    }
+    // The villagers and the travellers walk round what the knights cannot
+    // walk over (issue #178): each leg of a routine that would cross a
+    // camp solid gets the points it passes through on its way (via)
+    function _routeWalks() {
+        let walkers = dungeonObjects.filter(o => o && (o.objectName === "npc" || o.objectName === "traveller"))
+        for (let w of walkers) {
+            let r = w.routine
+            if (r.length < 2) continue
+            // An Npc's x, y is its top-left corner, the legs run between
+            // the middles
+            let mid = (q) => Qt.point(q.x + w.widthWu / 2, q.y - w.heightWu / 2)
+            let routed = r.map((step, i) => {
+                let from = mid(r[(i + r.length - 1) % r.length])
+                let via = _detour(from, mid(step), 0)
+                return via.length === 0 ? step : Object.assign({}, step, {
+                    via: via.map(v => ({ x: v.x - w.widthWu / 2, y: v.y + w.heightWu / 2 })) })
+            })
+            if (routed.some(step => step.via)) w.routine = routed
+        }
+    }
+    // The points a walker passes through from a to b (middles, wu) to keep
+    // Balance.camp.solid.clear wu off every camp solid: none for a clear
+    // leg, else one beside the first solid in the way, on the side the leg
+    // passes it, and the same for the legs to it and from it
+    function _detour(a, b, depth) {
+        let m = Balance.camp.solid.clear
+        let ring = (sb, x, y) => sb.holds(x, y) || [0, 1, 2, 3, 4, 5, 6, 7].some(j =>
+            sb.holds(x + m * Math.cos(j * Math.PI / 4), y + m * Math.sin(j * Math.PI / 4)))
+        let d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(d / 0.1))
+        let hit = null
+        for (let k = 0; k <= n && !hit; k++) {
+            let x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+            hit = campSolids.find(sb => ring(sb, x, y)) || null
+        }
+        if (!hit || depth >= 3 || d < 1e-6) return []
+        let cx = hit.xWu + hit.widthWu / 2, cy = hit.yWu - hit.heightWu / 2
+        let ha = hit.widthWu / 2 * hit.fill + m, hb = hit.heightWu / 2 * hit.fill + m
+        // Across the leg, toward the side of it away from the solid
+        let ux = -(b.y - a.y) / d, uy = (b.x - a.x) / d
+        if ((cx - a.x) * ux + (cy - a.y) * uy > 0) { ux = -ux; uy = -uy }
+        for (let side of [1, -1]) {
+            let vx = side * ux, vy = side * uy
+            let reach = hit.shape === "box" ? ha * Math.abs(vx) + hb * Math.abs(vy)
+                                            : 1 / Math.hypot(vx / ha, vy / hb)
+            let v = Qt.point(cx + vx * reach * 1.3, cy + vy * reach * 1.3)
+            if (!_campFloorAt(v.x, v.y, 0.4) || campSolids.some(sb => ring(sb, v.x, v.y))) continue
+            return _detour(a, v, depth + 1).concat([v], _detour(v, b, depth + 1))
+        }
+        return []
     }
     // Whether a square half wu to each side of (x, y) lies whole on the
     // camp's floor, off its buildings
