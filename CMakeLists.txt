@@ -74,6 +74,7 @@ clay_app(shapes_and_stone
         src/Campfire.qml
         src/CaveOverhang.qml
         src/CampProp.qml
+        src/CampSolid.qml
         src/Creature.qml
         src/CaveCat.qml
         src/CampDog.qml

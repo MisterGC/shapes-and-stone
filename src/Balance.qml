@@ -1029,8 +1029,28 @@ QtObject {
         // centre (east, north), w x h wu.
         // A prop that would not lie whole on the cave's floor, clear of
         // the paths, the fire and the people, is left out. Props are drawn
-        // only: the knights walk over them, nothing blocks or hurts
+        // only, nothing hurts; the knights walk over the flat ones
         propSalt: 0x70726f70,
+        // What stands up from the camp's floor is solid (issue #178): the
+        // knights cannot walk on a prop of one of solid's kinds, inside its
+        // shape ("oval", the ellipse in its rectangle, or "box") at fill
+        // of its size about its middle, nor on the campfire within fire wu
+        // of its middle. The rails, the cracks, the coals and the
+        // mushrooms stay underfoot
+        solid: {
+            kinds: {
+                pond: { shape: "oval", fill: 0.9 },
+                ferns: { shape: "oval", fill: 0.8 },
+                stones: { shape: "oval", fill: 0.85 },
+                ore: { shape: "oval", fill: 0.85 },
+                basalt: { shape: "oval", fill: 0.85 },
+                slag: { shape: "oval", fill: 0.85 },
+                cart: { shape: "box", fill: 1 },
+                crates: { shape: "box", fill: 0.95 },
+                timber: { shape: "box", fill: 0.95 }
+            },
+            fire: 0.6
+        },
         // Props stay this far, in wu, off the middle column (the way from
         // the entrance to the stairs), off the campfire's centre, off the
         // fronts of the buildings, and off the innkeeper, the smith, the
