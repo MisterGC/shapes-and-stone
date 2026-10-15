@@ -101,12 +101,15 @@ Window {
                   + attackCd.toFixed(3) + " -> " + game.player.attackCooldown.toFixed(3) + " s)")
             // The AI thinks every thinkInterval of simulated time, so the
             // telegraph ends between one think before and two after the
-            // wind-up, counted in steps. The knight holds the left button
-            // from here: it charges a heavy swing through the hit stop below
-            game.player.pressSwing()
+            // wind-up, counted in steps
             telegraph()
             stepsToLunge = 0
+            // The knight holds the left button from 12 steps before the
+            // lunge: it charges a heavy swing through the hit stop below,
+            // still short of full there
+            let pressAt = Math.max(0, Math.round(enemy.windUpDuration / stepS) - 12)
             while (enemy.aiState === "telegraph" && stepsToLunge < 600) {
+                if (stepsToLunge === pressAt) game.player.pressSwing()
                 Clayground.physicsStep(1)
                 stepsToLunge++
             }
