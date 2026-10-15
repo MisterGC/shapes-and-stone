@@ -54,6 +54,20 @@ PhysicsItem {
 
     widthWu: 0.8
     heightWu: 0.8
+    // Where it stands: the centre of its box. Its top-left corner reaches
+    // into a wall it is pushed against, its centre does not (issue #184)
+    readonly property real centreXWu: xWu + widthWu / 2
+    readonly property real centreYWu: yWu - heightWu / 2
+    // The centre of a knight's box
+    function _centreOf(knight) {
+        return Qt.point(knight.xWu + knight.widthWu / 2, knight.yWu - knight.heightWu / 2)
+    }
+    // Whether it sees the knight, from where it stands to where the
+    // knight stands
+    function _sees(knight) {
+        let c = _centreOf(knight)
+        return gameWorld.hasLineOfSight(centreXWu, centreYWu, c.x, c.y)
+    }
 
     bodyType: remote ? Body.Kinematic : Body.Dynamic
     fixedRotation: true
@@ -599,7 +613,7 @@ PhysicsItem {
         repeat: enemy.aiState === "patrol"
         onArrived: {
             if (enemy.aiState === "chase") {
-                if (target && gameWorld && gameWorld.hasLineOfSight(xWu, yWu, target.xWu, target.yWu)) {
+                if (target && gameWorld && _sees(target)) {
                     _recalcChasePath()
                     followPath.running = true
                 } else {
@@ -826,10 +840,10 @@ PhysicsItem {
         let dx = target.xWu - xWu
         let dy = target.yWu - yWu
         let dist = Math.sqrt(dx * dx + dy * dy)
-        let canSee = gameWorld.hasLineOfSight(xWu, yWu, target.xWu, target.yWu)
+        let canSee = _sees(target)
         if (canSee) {
             _unseenT = 0
-            _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
+            _lastKnownTargetPos = _centreOf(target)
         } else {
             _unseenT += dt
         }
@@ -984,8 +998,8 @@ PhysicsItem {
     function _recalcChasePath() {
         if (!target || !gameWorld) return
         let goal = _unseenT > 0 && _lastKnownTargetPos ? _lastKnownTargetPos
-                                                       : Qt.point(target.xWu, target.yWu)
-        let path = gameWorld.findPath(xWu, yWu, goal.x, goal.y)
+                                                       : _centreOf(target)
+        let path = gameWorld.findPath(centreXWu, centreYWu, goal.x, goal.y)
         if (path.length > 1) {
             // Skip first waypoint (our current cell)
             followPath.wpsWu = path.slice(1)
@@ -1186,7 +1200,7 @@ PhysicsItem {
         if (aiState === "patrol" && target) {
             console.log("[Enemy] Hit while patrolling — chasing attacker!")
             _unseenT = 0
-            _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
+            _lastKnownTargetPos = _centreOf(target)
             aiState = "chase"
             _recalcChasePath()
         }
