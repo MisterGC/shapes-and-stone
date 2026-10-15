@@ -393,8 +393,11 @@ air). Each look has its own rock, faces, floor, lanterns, air and screen
 grade, and its props are one of two or three layouts, picked from the
 level's seed (`camp.propSalt`), so every screen of a session lays out the
 same. A prop lies whole on the cave's floor, off the way to the stairs,
-the campfire and the people, and is only drawn: the knights walk over
-it. The campfire stays the brightest light, and the campfire, the
+the campfire and the people. What stands up from the floor is solid:
+the knights cannot walk into the pond, the ferns, the stones, the ore,
+the basalt, the slag, the cart, the crates, the timber or the campfire;
+the rails, the cracks, the coals and the mushrooms stay underfoot. The
+campfire stays the brightest light, and the campfire, the
 innkeeper, the smith and the witch keep their places at every depth.
 The looks are a table in `Balance.camp.looks`: a fourth is a row with
 its depth, its colours and its layouts. The camps bench lands at every
@@ -542,6 +545,26 @@ hearsay and no wares, and that the dog follows its traveller:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/travellers/travellers.qml
+```
+
+A solid prop has an invisible static body (`CampSolid.qml`), the ellipse
+in its rectangle or the rectangle, at the share of its size and the
+campfire's core radius in `camp.solid`. The dog closes on its place
+beside its traveller a share of the way each step, so it trots along at
+its traveller's pace instead of stopping and starting, and never steps
+back and forth. A villager talked to - the innkeeper, the smith, the
+witch or a traveller - stops what it is doing and faces the knight until
+the talk ends, then goes on where it left off. The solid camp bench
+walks a knight's middle over the floor of 10 camps of each look with and
+without the solid bodies and checks that nothing but the solids
+themselves is lost and that the stairs, the fire's warmth and the
+people at every spot of their routines stay reachable; it walks a
+knight into the campfire, the pond and the ferns, traces the dog as its
+traveller walks there and back, and talks to the smith on its way and
+at its anvil:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsolid/campsolid.qml
 ```
 
 A descent gauge under the minimap shows how deep the knight is: a shaft of
