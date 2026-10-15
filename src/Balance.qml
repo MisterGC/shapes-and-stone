@@ -856,6 +856,47 @@ QtObject {
         pickupRange: 0.8
     })
 
+    // Fishing at a camp's pond, to come down between the dungeons: the
+    // left button, the knight within reach wu of the water and the mouse
+    // on it, casts the bobber there, at most castMax wu off. After wait
+    // seconds (rolled from the pair), with nibbles twitches before,
+    // nibbleGap seconds apart, a fish bites: the bobber goes under for
+    // biteWindow seconds and a click hooks it; a click before the bite
+    // reels in empty. Hooked, the button held reels it in at reelSpeed wu
+    // a second; now and then, every thrashEvery seconds (divided by the
+    // kind's fight), it thrashes for thrash seconds (times fight), a tell
+    // of tell seconds before: held through a thrash the line's tension
+    // rises by tensionRise a second and snaps at 1, let go it falls by
+    // tensionFall and the fish pulls slack wu a second back out. The pond
+    // gives bites bites a camp; the innkeeper buys the fish for their
+    // gold, the cave cat takes one from a knight within catReach wu (E).
+    // kinds: weight of the bites, size in cm, gold, fight
+    readonly property var fishing: ({
+        reach: 2.0,
+        castMax: 4.5,
+        leave: 0.9,
+        wait: [3.5, 9.0],
+        nibbles: [0, 2],
+        nibbleGap: [0.7, 1.8],
+        biteWindow: 0.55,
+        reelSpeed: 1.1,
+        thrashEvery: [1.2, 2.8],
+        thrash: [0.5, 1.0],
+        tell: 0.3,
+        tensionRise: 1.4,
+        tensionFall: 0.8,
+        slack: 0.5,
+        bites: 5,
+        catReach: 1.6,
+        kinds: [
+            { name: "Cave minnow", color: "#9FB8B0", weight: 40, size: [6, 11], gold: 1, fight: 0.6 },
+            { name: "Pale perch", color: "#C8C2A0", weight: 30, size: [14, 26], gold: 3, fight: 1.0 },
+            { name: "Stone carp", color: "#8A7A5A", weight: 18, size: [25, 48], gold: 5, fight: 1.4 },
+            { name: "Blind eel", color: "#6A6A80", weight: 9, size: [40, 80], gold: 8, fight: 1.8, eel: true },
+            { name: "Glimmerfin", color: "#7FE0D0", weight: 3, size: [18, 30], gold: 15, fight: 1.2, glows: true }
+        ]
+    })
+
     // The village's wares, in gold: the innkeeper's potions, drunk with
     // key 1, and mana draughts, drunk with key 2, and the smith's upgrades
     readonly property var shop: ({

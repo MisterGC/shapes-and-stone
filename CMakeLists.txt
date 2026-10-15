@@ -77,6 +77,7 @@ clay_app(shapes_and_stone
         src/CampSolid.qml
         src/Creature.qml
         src/CaveCat.qml
+        src/Fishing.qml
         src/CampDog.qml
         src/CampTalk.qml
         src/CampSounds.qml

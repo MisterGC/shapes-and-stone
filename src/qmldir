@@ -30,6 +30,7 @@ CampProp 1.0 CampProp.qml
 CampSolid 1.0 CampSolid.qml
 Creature 1.0 Creature.qml
 CaveCat 1.0 CaveCat.qml
+Fishing 1.0 Fishing.qml
 CampDog 1.0 CampDog.qml
 CampTalk 1.0 CampTalk.qml
 CampSounds 1.0 CampSounds.qml
