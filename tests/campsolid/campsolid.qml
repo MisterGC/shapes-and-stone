@@ -18,7 +18,9 @@
 // rests within numbers.rest; a knight walking through the resting
 // traveller and its dog pushes neither. Last the smith, talked to while
 // it walks and while it hammers, stops, faces the knight and does nothing
-// until the talk ends, then goes on where it left off.
+// until the talk ends, then goes on where it left off; a traveller talked
+// to between a line of the camp's talk and its answer leaves the answer
+// unsaid. In every camp no villager's or traveller's walk crosses a solid.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -179,6 +181,30 @@ Window {
               + (goals.length - 2) + " spots stay reachable"
               + (missed.length > 0 ? " - lost: " + missed.map(gl => gl.what).join(", ") : "")
               + (never.length > 0 ? " - never reached: " + never.map(gl => gl.what).join(", ") : ""))
+        // Nobody's walk crosses a solid: every routine's legs, through the
+        // points it passes on the way (via), its body (0.4 wu) clear
+        let walkers = game.room.children.filter(o => o && (o.objectName === "npc" || o.objectName === "traveller"))
+        let crossings = []
+        for (let w of walkers) {
+            let r = w.routine, pts = []
+            for (let i = 0; i < r.length; i++) {
+                for (let v of (r[i].via || [])) pts.push(Qt.point(v.x + 0.4, v.y - 0.4))
+                pts.push(Qt.point(r[i].x + 0.4, r[i].y - 0.4))
+            }
+            for (let i = 0; i < pts.length && pts.length > 1; i++) {
+                let a = pts[i], b = pts[(i + 1) % pts.length]
+                let n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.1))
+                for (let k = 0; k <= n; k++) {
+                    let x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+                    let hit = bodies.find(sb => sb.holds(x, y) || [0, 1, 2, 3, 4, 5, 6, 7].some(j =>
+                        sb.holds(x + 0.4 * Math.cos(j * Math.PI / 4), y + 0.4 * Math.sin(j * Math.PI / 4))))
+                    if (hit) { crossings.push(w.npcName + " over the " + hit.kind); break }
+                }
+            }
+        }
+        check(crossings.length === 0, look + " seed " + seed + ": the walks of " + walkers.length
+              + " villagers and travellers cross no solid" + (crossings.length > 0 ? " - "
+              + crossings.join(", ") : ""))
         return { seed: seed, look: look, props: props.map(p => p.kind) }
     }
 
@@ -409,6 +435,41 @@ Window {
                       : "on its way: " + r2(moved) + " wu"))
             }])
         }
+
+        // A traveller talked to between a line and its answer leaves the
+        // answer unsaid: the answer is queued by hand, as the camp's talk
+        // queues it
+        let hearer = null, queued = "(queued answer of the bench)", pairSeed = -1
+        // The first grotto of the seeds with two travellers or more: the
+        // camp's talk runs only there
+        for (let seed of seeds.slice(1)) {
+            s.push([() => true, () => { if (pairSeed < 0) game.applyScenario("village", 0, seed) }])
+            s.push([() => inCamp(game), () => { if (pairSeed < 0 && game.campTravellers.length >= 2) pairSeed = seed }])
+        }
+        s.push([() => true, () => {
+            check(pairSeed >= 0, "a grotto of the seeds has two travellers or more (seed " + pairSeed + ")")
+            hearer = game.campTravellers[0]
+            let c = Qt.point(hearer.xWu + 0.4, hearer.yWu - 0.4)
+            placeKnight(c.x + 1.2, c.y)
+            hearer.say("(a line still showing)", 10)
+            game.campTalk._answer = { who: hearer, line: queued, at: game.campTalk._t + 1 }
+        }])
+        s.push([() => hearer.nearbyPlayer !== null, () => {
+            game.forceActiveFocus()
+            press(Qt.Key_E)
+        }])
+        s.push([1500, () => {
+            let others = game.room.children.filter(o => o && o !== hearer
+                                                   && (o.objectName === "npc" || o.objectName === "traveller"))
+            check(hearer.listening && game.talkingTo === hearer && others.every(o => !o.listening),
+                  "talked to, the " + hearer.npcName + " listens, and only it: the dialogue is its own")
+            check(game.campTalk._answer === null && hearer.saying === ""
+                  && !game.campTalk.said.some(x => x.line === queued),
+                  "it leaves the camp talk: its bubble goes and its queued answer is never said (answer "
+                  + JSON.stringify(game.campTalk._answer ? game.campTalk._answer.line : null) + ", bubble \""
+                  + hearer.saying + "\", said " + game.campTalk.said.some(x => x.line === queued) + ")")
+            closeTalk()
+        }])
 
         s.push([300, () => game.destroy()])
         s.push([300, () => {
