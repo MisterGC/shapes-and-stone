@@ -1117,8 +1117,8 @@ PhysicsItem {
 
     // The left button. A press is a swing on its release before
     // knight.chargeStart, and a charge when held longer: charging from
-    // chargeStart, full at chargeTime, let go at normal strength
-    // chargeHold after that. Its clock is the physics steps (swingInput), so
+    // chargeStart, full at chargeTime and kept full until the release.
+    // Its clock is the physics steps (swingInput), so
     // a pause or a hit stop holds the charge. Game.qml hands the mouse
     // button's events to pressSwing() and releaseSwing(); a bench can call
     // them without one.
@@ -1173,11 +1173,7 @@ PhysicsItem {
             _charge = "full"
             if (gameWorld) gameWorld.playChargeFull()
         }
-        if (_charge === "full" && held >= (k.chargeTime + k.chargeHold) * 1000) {
-            // Held too long: it goes at normal strength, no charge is carried
-            _charge = "spent"
-            attack()
-        }
+        // Full, the charge is kept until the button is let go
     }
 
     function _onSwingReleased() {

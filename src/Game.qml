@@ -7786,8 +7786,11 @@ ClayWorld2d {
         }
     }
 
+    // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo
+    // eval can set it to try a fight against one enemy
+    property var fightRoomRoster: Balance.spawn.fightRoom
     function _spawnFightRoomEnemies() {
-        for (let e of Balance.spawn.fightRoom)
+        for (let e of fightRoomRoster)
             spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 

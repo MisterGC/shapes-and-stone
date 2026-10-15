@@ -68,14 +68,13 @@ QtObject {
         // and a release swings a heavy blow: heavySwing times atk, within
         // heavyArc and heavyRange times attackRange, through a guardian's
         // shield (it staggers), knocking back heavyKnockback times as far.
-        // Released before full, a normal swing. Held chargeHold past full,
-        // the knight lets it go at normal strength. A hit cancels it
+        // Released before full, a normal swing; full, the charge is kept
+        // until the button is let go. A hit cancels it
         chargeStart: 0.2,
         chargeTime: 0.6,
-        chargeHold: 1.0,
-        chargeSpeed: 0.7,
+        chargeSpeed: 0.55,
         heavySwing: 2.5,
-        heavyArc: 90,
+        heavyArc: 180,
         heavyRange: 1.25,
         heavyKnockback: 2,
         // Whirlwind: Q with full momentum (Balance.momentum) spins the
@@ -144,7 +143,8 @@ QtObject {
     })
 
     // The charged heavy swing (knight.charge...) reads as a commitment: the
-    // blade glows from the knight's blade colour to glow as it charges;
+    // sword, held out the way the knight faces, goes from the knight's
+    // blade colour to glow as it charges, a shine running along it;
     // when full a ring of ringColor flashes out to ringScale times the
     // knight's size over ring seconds with a tick pitch semitones up. The
     // heavy swing plays the swing sample swingPitch semitones; its hit

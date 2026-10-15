@@ -1484,15 +1484,15 @@ struck enemy in normal play; damage numbers only with the dojo's
 Mechanics debug on.
 The left button swings when it is let go of before `knight.chargeStart`, so
 a click plays as it always did. Held longer, the knight charges a heavy
-swing: it moves at `knight.chargeSpeed` of its speed, its blade, drawn
-back, glows brighter, and at `knight.chargeTime` the charge is full - a
-ring flashes out with a high tick. Let go of then, it swings a wide heavy
+swing: it moves at `knight.chargeSpeed` of its speed, and its sword, held
+out the way it faces, turns gold with a shine running from hilt to tip. At
+`knight.chargeTime` the charge is full - a ring flashes out with a high
+tick, the shine runs faster and a glow breathes round the blade. Let go of then, it swings a wide heavy
 blow: `knight.heavySwing` times atk, within `knight.heavyArc` and
 `knight.heavyRange` times the swing's reach. It goes through a guardian's
 shield, which staggers, and knocks enemies back `knight.heavyKnockback`
-times as far. Let go of before it is full, it is a normal swing; held
-`knight.chargeHold` past full, the knight lets it go at normal strength,
-so no charge is carried around. A hit taken while charging, a raised
+times as far. Let go of before it is full, it is a normal swing; full, the
+charge is kept for as long as the button is held. A hit taken while charging, a raised
 shield or a dash cancels it, and its release swings nothing; behind the
 shield or in a dash the button swings at once, as it always did. The
 charge counts the physics steps (Clayground's `InputAction` on the
