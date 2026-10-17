@@ -20,6 +20,10 @@ Item {
     property string message: ""
     // The deepest descent kept on this machine (Game.recordLine); "" for none
     property string recordLine: ""
+    // Who was freed tonight and the specials with the camps (CampFreed);
+    // "" for none (issue #159)
+    property string freedLine: ""
+    property string joinedLine: ""
 
     // Menu sounds
     Sound {
@@ -104,6 +108,28 @@ Item {
             font.pixelSize: 15
             font.bold: true
             font.letterSpacing: 1
+        }
+
+        Text {
+            objectName: "titleFreed"
+            visible: titleScreen.freedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.freedLine
+            color: "#A8D4FF"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 13
+        }
+
+        Text {
+            objectName: "titleJoined"
+            visible: titleScreen.joinedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.joinedLine
+            color: "#E8C35A"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 13
         }
 
         Text {

@@ -25,6 +25,7 @@ RectBoxBody {
         property vector2d sizeWu: Qt.vector2d(wall.widthWu, wall.heightWu)
         property real pixelsPerWu: 12
         property real face: 0
+        property real faceStyle: 0
         property color baseColor: wall.color
     }
 }

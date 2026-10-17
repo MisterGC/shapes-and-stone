@@ -87,9 +87,14 @@ ClayWorld2d {
     LoopMusic {
         id: villageMusic
         source: "assets/village_music.mp3"
-        level: muted ? 0 : 0.35 * musicVolume
+        level: muted ? 0 : 0.35 * musicVolume * campSounds.musicShare
         loop: true
     }
+
+    // The camp's near sounds, each at its source, and the music stepping
+    // back while every knight rests (issue #147)
+    CampSounds { id: campAudio; game: world; party: session }
+    readonly property alias campSounds: campAudio
 
     onLevelTypeChanged: {
         if (levelType === "village") {
@@ -244,6 +249,95 @@ ClayWorld2d {
     }
     function playSpikesRise() {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
+    }
+    // A vein (Balance.deep): the pickaxe's chink on the stone, a clean
+    // strike's tink, the stone's crumble as it splits and the gem's chime,
+    // the tink once for each of its notes. veinSounds lists the last
+    // veinSoundsKept of them as they play, "chink", "tink+4" or
+    // "crumble", muted too, and veinSoundCount counts them all, for the
+    // benches; a new level starts the list over
+    Sound {
+        id: chinkSound
+        source: "assets/deep_chink.wav"
+        volume: muted ? 0 : Balance.deep.chinkVolume * soundVolume
+    }
+    Sound {
+        id: tinkSound
+        source: "assets/deep_tink.wav"
+        volume: muted ? 0 : Balance.deep.tinkVolume * soundVolume
+    }
+    Sound {
+        id: crumbleSound
+        source: "assets/deep_crumble.wav"
+        volume: muted ? 0 : Balance.deep.crumbleVolume * soundVolume
+    }
+    property var veinSounds: []
+    property int veinSoundCount: 0
+    readonly property int veinSoundsKept: 12
+    function _heard(name) {
+        veinSounds = veinSounds.slice(1 - veinSoundsKept).concat([name])
+        veinSoundCount++
+    }
+    function playChink(pitch) {
+        chinkSound.triggerNote(chinkSound.rootNote + pitch, 1)
+        _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
+    }
+    function playTink(pitch, gain) {
+        tinkSound.triggerNote(tinkSound.rootNote + pitch, gain === undefined ? 1 : gain)
+        _heard("tink+" + pitch)
+    }
+    // gain 1 when left out; the last one played is crumbleGain
+    property real crumbleGain: 0
+    function playCrumble(gain) {
+        crumbleGain = gain === undefined ? 1 : gain
+        crumbleSound.triggerOneShot(crumbleGain)
+        _heard("crumble")
+    }
+    property var _chimeLeft: []
+    function playChime() {
+        _chimeLeft = Balance.deep.chime.slice()
+        _chimeNext()
+        chimeTimer.restart()
+    }
+    function _chimeNext() {
+        if (_chimeLeft.length === 0) chimeTimer.stop()
+        else playTink(_chimeLeft.shift())
+    }
+    Timer {
+        id: chimeTimer
+        interval: Balance.deep.chimeGap * 1000
+        repeat: true
+        onTriggered: world._chimeNext()
+    }
+    // A spawn hole (Balance.deep.hole): the rumble as it wakes and as a
+    // creature crawls out, the groan as its eyes open, the crumble as it
+    // closes, quieter the further it is from the knight. holeSounds lists
+    // the last veinSoundsKept of them as they play, "rumble", "groan" or
+    // "crumble", muted too, and holeSoundCount counts them all, for the
+    // benches; a new level starts the list over
+    Sound {
+        id: rumbleSound
+        source: "assets/deep_rumble.wav"
+        volume: muted ? 0 : Balance.deep.hole.rumbleVolume * soundVolume
+    }
+    Sound {
+        id: groanSound
+        source: "assets/deep_groan.wav"
+        volume: muted ? 0 : Balance.deep.hole.groanVolume * soundVolume
+    }
+    property var holeSounds: []
+    property int holeSoundCount: 0
+    function playHoleSound(name, h) {
+        let cfg = Balance.deep.hole, gain = 1
+        if (player && h) {
+            let c = _knightCentre()
+            gain = Math.max(cfg.quietest, 1 - Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y) / cfg.hearReach)
+        }
+        if (name === "rumble") rumbleSound.triggerOneShot(gain)
+        else if (name === "groan") groanSound.triggerOneShot(gain)
+        else crumbleSound.triggerOneShot(gain)
+        holeSounds = holeSounds.slice(1 - veinSoundsKept).concat([name])
+        holeSoundCount++
     }
 
     // How loud another knight is at xWu/yWu: never as loud as your own
@@ -677,14 +771,25 @@ ClayWorld2d {
             playDeathBurst()
             countFight("kill")
         }
-        onGoldSpawned: (objectId, props) => _makeGoldDrop(props, objectId)
-        onGoldDespawned: (objectId) => _removeGoldDrop(objectId)
-        onGoldClaimed: (fromId, objectId) => _giveGold(fromId, objectId)
+        onGoldSpawned: (objectId, props) => goldClaims.make(props, objectId)
+        onGoldDespawned: (objectId) => goldClaims.remove(objectId)
+        onGoldClaimed: (fromId, objectId) => goldClaims.give(fromId, objectId)
         onGoldGranted: (grant) => _collectGold(grant.amount, grant.x, grant.y)
         onBreakReported: (level, cell) => _hostBreak(level, cell)
         onSpringReported: (level, cell, riseAt) => _hostSpring(level, cell, riseAt)
         onDoorReported: (level, cell, open) => _hostDoor(level, cell, open)
         onSecretReported: (level, cell) => _hostSecret(level, cell)
+        onCutReported: (fromId, level, cell, clean) => _hostCut(fromId, level, cell, clean)
+        onTalkReported: (fromId, level, cell) => _hostTalk(fromId, level, cell)
+        onTalkRefused: (cell) => _talkRefused(cell)
+        onGemGranted: (gem) => _gemWon(gem.cell, gem)
+        onGemRefused: (cell) => _gemLost(cell)
+        onPouchDropped: (fromId, props) => _hostDropPouch(fromId, props)
+        onPouchDropAnswered: (ok) => _pouchDropAnswered(ok)
+        onPouchSpawned: (objectId, props) => pouchClaims.make(props, objectId)
+        onPouchDespawned: (objectId) => pouchClaims.remove(objectId)
+        onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
+        onPouchGranted: (grant) => _takePouch(grant.gems)
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -720,6 +825,19 @@ ClayWorld2d {
             if (d < bestD) { bestD = d; best = k }
         }
         return best
+    }
+    // The knights on this screen, this node's and the other players',
+    // that have not fallen: { knight, x, y, seated }, x and y its centre
+    // in wu. The camp's creatures watch them
+    function knightsHere() {
+        let knights = [player]
+        for (let id in session.remotePlayers) knights.push(session.remotePlayers[id])
+        let here = []
+        for (let k of knights) {
+            if (!k || (k === player ? player.fallen : !k.known || k.remoteHp <= 0)) continue
+            here.push({ knight: k, x: k.xWu + 0.5, y: k.yWu - 0.5, seated: !!k.seated })
+        }
+        return here
     }
     // The node a knight belongs to
     function knightIdOf(knight) {
@@ -849,8 +967,19 @@ ClayWorld2d {
     // host gives a drop to the first claim it gets and despawns it, so a
     // drop is picked up once, by one knight. Each knight's gold is its own
     // node's.
-    property var goldDrops: []
-    property var _goldById: ({})
+    FloorClaims {
+        id: goldClaims
+        component: goldDropComponent
+        room: world.room
+        link: session
+        extra: props => ({ pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+        grantOf: drop => ({ amount: drop.amount, x: drop.xWu, y: drop.yWu })
+        take: grant => _collectGold(grant.amount, grant.x, grant.y)
+        claimOf: objectId => session.claimGold(objectId)
+        despawnOf: objectId => session.despawnGold(objectId)
+        grantTo: (nodeId, grant) => session.grantGold(nodeId, grant)
+    }
+    readonly property var goldDrops: goldClaims.drops
     // Where an enemy died: gold for its tier, none in the fight room
     function dropGold(x, y, tier) {
         if (fightRoomActive) return
@@ -861,59 +990,15 @@ ClayWorld2d {
         if (amount <= 0) return
         let props = {xWu: x, yWu: y, amount: amount}
         if (!session.connected)
-            _makeGoldDrop(props)
+            goldClaims.make(props)
         else if (session.isHost)
             session.spawnGold(props)
-    }
-    function _makeGoldDrop(props, objectId) {
-        objectId = objectId || ""
-        if (objectId !== "" && _goldById[objectId]) return _goldById[objectId]
-        let drop = goldDropComponent.createObject(world.room, Object.assign({}, props, {
-            objectId: objectId,
-            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
-        }))
-        if (!drop) return null
-        goldDrops.push(drop)
-        if (objectId !== "") _goldById[objectId] = drop
-        return drop
-    }
-    function _removeGoldDrop(objectId) {
-        let drop = _goldById[objectId]
-        if (!drop) return
-        delete _goldById[objectId]
-        _forgetGoldDrop(drop)
-    }
-    function _forgetGoldDrop(drop) {
-        goldDrops = goldDrops.filter(d => d !== drop)
-        try { drop.destroy() } catch (err) {}
     }
     // Each step: the drops this node's knight stands on are its, or
     // claimed from the host in a session
     function _pickUpGold() {
         if (!player || player.fallen || goldDrops.length === 0) return
-        let range = Balance.loot.pickupRange
-        for (let drop of goldDrops.slice()) {
-            if (!drop || drop.claimed) continue
-            let dx = drop.xWu - player.xWu, dy = drop.yWu - player.yWu
-            if (dx * dx + dy * dy > range * range) continue
-            if (drop.objectId === "") {
-                _collectGold(drop.amount, drop.xWu, drop.yWu)
-                _forgetGoldDrop(drop)
-            } else if (session.connected) {
-                drop.claimed = true
-                session.claimGold(drop.objectId)
-            }
-        }
-    }
-    // Host: a node's knight reached a drop; the first claim takes it, a
-    // later one finds it gone
-    function _giveGold(nodeId, objectId) {
-        let drop = _goldById[objectId]
-        if (!drop || !session.isHost) return
-        let grant = {id: objectId, amount: drop.amount, x: drop.xWu, y: drop.yWu}
-        session.despawnGold(objectId)
-        if (nodeId === session.nodeId) _collectGold(grant.amount, grant.x, grant.y)
-        else session.grantGold(nodeId, grant)
+        goldClaims.claimNear(player.xWu, player.yWu, Balance.loot.pickupRange)
     }
     function _collectGold(amount, x, y) {
         if (!player) return
@@ -1020,6 +1105,17 @@ ClayWorld2d {
     // its band. The village and the fight room keep their own look
     readonly property bool dangerLook: levelType === "dungeon" && !fightRoomActive
     readonly property var look: Balance.danger.looks[dangerBand(dangerPosition)]
+    // What the camp looks like at its depth (issue #146): the last of
+    // Balance.camp.looks it is deep enough for - a mossy grotto, a miners'
+    // hall, an ember camp. The fight room keeps its own look
+    readonly property bool campStyled: levelType === "village" && !fightRoomActive
+    readonly property var campLook: campLookAt(depth)
+    function campLookAt(d) {
+        let looks = Balance.camp.looks
+        for (let i = looks.length - 1; i > 0; i--)
+            if (d >= looks[i].from) return looks[i]
+        return looks[0]
+    }
     function _setDanger(position, next) {
         if (position === undefined || isNaN(position)) return
         dangerPosition = position
@@ -1389,6 +1485,7 @@ ClayWorld2d {
     property string recordStoreName: "ShapesAndStone"
     KeyValueStore { id: records; name: world.recordStoreName }
     function _startRunRecord() {
+        campFreed.startRun()
         runKills = 0
         runSeconds = 0
         runSecrets = 0
@@ -1453,10 +1550,13 @@ ClayWorld2d {
         target: session
         function onConnectedChanged() {
             world.ownRuns = []
+            campFreed.startEvening()
             // Later: a host can set no session property before its
             // connectedChanged is over
             if (session.connected) Qt.callLater(() => {
-                if (session.connected && session.isHost) session.publishRecord(world.ownRecord)
+                if (!session.connected || !session.isHost) return
+                session.publishRecord(world.ownRecord)
+                campFreed.publish()
             })
         }
     }
@@ -1472,6 +1572,7 @@ ClayWorld2d {
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
         _loadRecord()
+        campFreed.load()
         _loadVolumes()
         _loadMaster()
         runStartRecord = ownRecord.depth
@@ -1532,26 +1633,100 @@ ClayWorld2d {
         id: mouseInput
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            // The left button swings on release, or charges while held
-            if (mouse.button === Qt.LeftButton) player.pressSwing(mouse)
+            // The left button strikes with the pickaxe while it aims at a
+            // vein in reach (pressPick), else swings on release, or
+            // charges while held
+            if (mouse.button === Qt.LeftButton) {
+                // At a camp's pond the left button fishes (Fishing)
+                _fishingPress = fishing.press()
+                if (_fishingPress) return
+                _picking = pressPick()
+                if (!_picking) player.pressSwing(mouse)
+            }
             if (mouse.button === Qt.RightButton) player.raiseShield()
+            if (mouse.button === Qt.MiddleButton) toggleLock()
         }
 
         onReleased: (mouse) => {
             if (!player) return
-            if (mouse.button === Qt.LeftButton) player.releaseSwing(mouse)
+            if (mouse.button === Qt.LeftButton && _fishingPress) {
+                fishing.release()
+                _fishingPress = false
+            } else if (mouse.button === Qt.LeftButton && !_picking) player.releaseSwing(mouse)
             if (mouse.button === Qt.RightButton) player.lowerShield()
         }
         onCanceled: if (player) {
+            _picking = false
+            _fishingPress = false
+            fishing.release()
             player.dropSwing()
             player.lowerShield()
         }
     }
+
+    // Target lock: F or the middle button locks the knight's facing on
+    // the standing enemy nearest the way the mouse points, within lockReach
+    // wu; again, or that enemy falling or lockBreak wu away, lets go
+    readonly property real lockReach: 10
+    readonly property real lockBreak: 14
+    function toggleLock() {
+        if (!player) return
+        if (player.lockedOn) { player.lockTarget = null; return }
+        player.lockTarget = _pickLockTarget()
+        lockCandidate = null
+    }
+    // The enemy F would lock on now, shown faintly (Enemy.lockPreview)
+    property var lockCandidate: null
+    Timer {
+        interval: 100; repeat: true
+        running: !!player && !player.lockedOn && screen === "game"
+        onTriggered: lockCandidate = _pickLockTarget()
+        onRunningChanged: if (!running) lockCandidate = null
+    }
+    function _pickLockTarget() {
+        let px = player.xWu + player.widthWu / 2, py = player.yWu - player.heightWu / 2
+        let aim = Math.atan2(playerScreenY - mouseInput.mouseY, mouseInput.mouseX - playerScreenX)
+        let best = null, bestScore = Infinity
+        for (let e of enemies) {
+            if (!e || e.destroyed !== false) continue
+            let dx = e.centreXWu - px, dy = e.centreYWu - py
+            let d = Math.sqrt(dx * dx + dy * dy)
+            if (d > lockReach) continue
+            let da = Math.abs(Math.atan2(dy, dx) - aim)
+            if (da > Math.PI) da = 2 * Math.PI - da
+            let score = da * 4 + d / lockReach
+            if (score < bestScore) { bestScore = score; best = e }
+        }
+        return best
+    }
+    Timer {
+        interval: 100; repeat: true
+        running: !!player && player.lockedOn
+        onTriggered: {
+            let e = player.lockTarget
+            let dx = e.centreXWu - (player.xWu + player.widthWu / 2)
+            let dy = e.centreYWu - (player.yWu - player.heightWu / 2)
+            if (dx * dx + dy * dy > lockBreak * lockBreak) player.lockTarget = null
+        }
+    }
+
+    // Fishing at a camp's pond: the rod, the line, the bobber and the fish
+    // (Balance.fishing); the left button's press it took swings nothing
+    Fishing {
+        id: fishing
+        parent: world.room
+        game: world
+    }
+    property bool _fishingPress: false
+
+    // The left button's press struck with the pickaxe: its release swings
+    // nothing
+    property bool _picking: false
 
     // Player center in screen coords (for aiming) - map from player's parent to mouseInput coords
     property var playerScreenPos: player ? player.parent.mapToItem(mouseInput, player.x + player.width * 0.5, player.y + player.height * 0.5) : Qt.point(width/2, height/2)
@@ -1567,6 +1742,11 @@ ClayWorld2d {
             if (talking) dialoguePanel.close()
             else if (knightPanelOpen) knightPanelOpen = false
             else if (screen === "game" && player && !fallen) openMenu()
+            event.accepted = true
+            return
+        }
+        if (event.key === Qt.Key_F && player && screen === "game") {
+            toggleLock()
             event.accepted = true
             return
         }
@@ -1591,9 +1771,10 @@ ClayWorld2d {
             event.accepted = true
             return
         }
-        // 1 to 4 buy what the dialogue panel offers; without wares 1
-        // drinks a potion and 2 a mana draught
-        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
+        // 1 to 5 buy what the dialogue panel offers (the smith's gems and
+        // four upgrades); without wares 1 drinks a potion and 2 a mana
+        // draught
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5) {
             let i = event.key - Qt.Key_1
             if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
                 if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
@@ -1611,17 +1792,21 @@ ClayWorld2d {
             if (dialoguePanel.visible) {
                 dialoguePanel.advance()
             } else if (player) {
-                // Find nearby NPC to interact with, else a door
+                // Find nearby NPC to interact with, else a traveller of
+                // the deep (issue #176), else a door; a vein is the left
+                // button's (issue #169)
                 let items = world.room.children
                 let talked = false
                 for (let i = 0; i < items.length; i++) {
                     let npc = items[i]
-                    if (npc.objectName === "npc" && npc.nearbyPlayer) {
+                    if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
                         npc.interact()
                         talked = true
                         break
                     }
                 }
+                if (!talked && !fallen) talked = feedCat()
+                if (!talked && !fallen) talked = talkToDeepTraveller()
                 if (!talked && !fallen)
                     useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
                                         Balance.dungeon.doorReach))
@@ -1649,8 +1834,14 @@ ClayWorld2d {
     // knight stands, so it cannot walk off and leave the panel up, and a
     // key still held moves it again once the panel closes
     readonly property bool talking: dialoguePanel.visible
-    readonly property real knightMoveX: talking ? 0 : gameCtrl.axisX
-    readonly property real knightMoveY: talking ? 0 : -gameCtrl.axisY
+    // Locked on an enemy (toggleLock), the keys turn with it: W and S
+    // walk towards it and away, A and D circle it
+    readonly property real _lockRad: player && player.lockedOn ? player.facingAngle * Math.PI / 180 : 0
+    readonly property bool _lockSteer: !!player && player.lockedOn
+    readonly property real knightMoveX: talking ? 0 : !_lockSteer ? gameCtrl.axisX
+        : gameCtrl.axisY * Math.cos(_lockRad) + gameCtrl.axisX * Math.sin(_lockRad)
+    readonly property real knightMoveY: talking ? 0 : !_lockSteer ? -gameCtrl.axisY
+        : -gameCtrl.axisY * Math.sin(_lockRad) + gameCtrl.axisX * Math.cos(_lockRad)
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -1673,6 +1864,52 @@ ClayWorld2d {
             if (buttonBPressed && player && !world.talking) {
                 player.dash()
             }
+        }
+    }
+
+    // Locked on (toggleLock), the world narrows: the screen's edges darken
+    Canvas {
+        id: lockFocus
+        anchors.fill: parent
+        opacity: player && player.lockedOn ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutQuad } }
+        visible: opacity > 0.01
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var cx = width / 2, cy = height / 2
+            var r = Math.sqrt(cx * cx + cy * cy)
+            var g = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r)
+            g.addColorStop(0, "rgba(0, 0, 0, 0)")
+            g.addColorStop(0.6, "rgba(0, 0, 0, 0.45)")
+            g.addColorStop(1, "rgba(0, 0, 0, 0.85)")
+            ctx.fillStyle = g
+            ctx.fillRect(0, 0, width, height)
+        }
+    }
+
+    // Low on health: the screen's edge goes blood red, swelling with each
+    // heartbeat
+    Canvas {
+        id: lowHealthEdge
+        anchors.fill: parent
+        opacity: world.lowHealthLevel * (0.35 + 0.65 * world.heartPulse)
+        visible: opacity > 0.01
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var cx = width / 2, cy = height / 2
+            var r = Math.sqrt(cx * cx + cy * cy)
+            var g = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r)
+            g.addColorStop(0, "rgba(120, 0, 0, 0)")
+            g.addColorStop(0.55, "rgba(140, 0, 0, 0.35)")
+            g.addColorStop(1, "rgba(110, 0, 0, 0.85)")
+            ctx.fillStyle = g
+            ctx.fillRect(0, 0, width, height)
         }
     }
 
@@ -1758,8 +1995,8 @@ ClayWorld2d {
                 return "#CC2222"
             }
 
-            Behavior on width { NumberAnimation { duration: 100 } }
-            Behavior on color { ColorAnimation { duration: 200 } }
+            Behavior on width { NumberAnimation { duration: world._healing ? 900 : 100; easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: world._healing ? 900 : 200 } }
         }
 
         Text {
@@ -1906,6 +2143,84 @@ ClayWorld2d {
         font.letterSpacing: 1
     }
 
+    // The knight's pouch beside its gold: a gem of each shape it holds
+    // and how many (issue #156), a gem won counted once it dropped into
+    // the pouch; then its shape's count bumps, bigger and white a moment
+    // (issue #169)
+    property string _bumpShape: ""
+    property real _bumpScale: 1
+    property int pouchBumps: 0
+    NumberAnimation {
+        id: pouchBump
+        target: world
+        property: "_bumpScale"
+        from: 1.7
+        to: 1
+        duration: 500
+        easing.type: Easing.OutQuad
+    }
+    // The pouch without the gems won still on their way into it
+    function _pouchShown() {
+        let out = player ? player.pouch.slice() : []
+        for (let shape of _gemsFlying) {
+            for (let i = out.length - 1; i >= 0; i--)
+                if (out[i].shape === shape) {
+                    out.splice(i, 1)
+                    break
+                }
+        }
+        return out
+    }
+    Row {
+        id: hudPouch
+        objectName: "hudPouch"
+        anchors.left: hudGold.right
+        anchors.leftMargin: 12
+        anchors.verticalCenter: hudGold.verticalCenter
+        z: 1000
+        spacing: 8
+        readonly property var shown: player ? _pouchShown() : []
+        visible: shown.length > 0
+        readonly property var counts: pouchCounts(shown)
+        // "cube 2, tetrahedron 1", for the benches
+        readonly property string summary: counts.map(c => c.shape + " " + c.count).join(", ")
+        Repeater {
+            model: hudPouch.counts
+            Row {
+                required property var modelData
+                readonly property bool bumped: modelData.shape === world._bumpShape && world._bumpScale > 1
+                spacing: 3
+                transformOrigin: Item.Left
+                scale: bumped ? world._bumpScale : 1
+                Gem {
+                    width: 16
+                    height: 16
+                    shape: modelData.shape
+                    color: modelData.color
+                    anchors.verticalCenter: parent.verticalCenter
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width * 2
+                        height: width
+                        radius: width / 2
+                        z: -1
+                        color: modelData.color
+                        opacity: parent.parent.bumped ? 0.5 * (world._bumpScale - 1) : 0
+                    }
+                }
+                Text {
+                    text: modelData.count
+                    color: parent.bumped && world._bumpScale > 1.2 ? "#FFFFFF" : "#E8E0D0"
+                    style: Text.Outline
+                    styleColor: "#000000"
+                    font.pixelSize: 14
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+    }
+
     // The knight's potions, and the key that drinks one
     Text {
         objectName: "hudPotions"
@@ -1917,6 +2232,23 @@ ClayWorld2d {
         visible: player !== null && player.potions > 0
         text: "Potions " + (player ? player.potions : 0) + "  [1]"
         color: "#66CC66"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The knight's fish (Fishing), next to the gold
+    Text {
+        objectName: "hudCreel"
+        anchors.top: hudGold.top
+        anchors.left: hudGold.right
+        anchors.leftMargin: 14
+        z: 1000
+        visible: player !== null && player.creel.length > 0
+        text: "Fish " + (player ? player.creel.length : 0)
+        color: "#9FC8C0"
         style: Text.Outline
         styleColor: "#000000"
         font.pixelSize: 14
@@ -1955,7 +2287,7 @@ ClayWorld2d {
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        text: "WASD move  •  LMB strike, hold to charge  •  RMB shield  •  Space dash  •  "
+        text: "WASD move  •  LMB strike, hold to charge, at a vein dig  •  RMB shield  •  Space dash  •  "
               + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
@@ -2231,6 +2563,7 @@ ClayWorld2d {
         menuOpen = false
         knightPanelOpen = false
         fallen = true
+        _dropPouch()
         _keepRecord(true)
         if (!session.connected) _countRun()
         countFight("fall")
@@ -2296,6 +2629,7 @@ ClayWorld2d {
             if (before < 1 && player.reviveProgress >= 1) {
                 console.log("[Game] Lifted up the knight of", id)
                 session.liftKnight(id)
+                _claimPouchesOf(id)
                 countFight("lift")
             }
         }
@@ -2403,11 +2737,17 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world._pickUpGold()
+            world._pickUpPouches()
             world._stepRevive()
             world._stepPlates()
             world._stepSlits()
             world._stepDoors()
             world._stepSecrets()
+            world._stepVeins()
+            world._stepDig()
+            fishing.step(world.physics.timeStep)
+            world._stepHoles()
+            world._stepDeepTravellers()
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -2420,7 +2760,8 @@ ClayWorld2d {
     // were the party to leave now: the exit stairs show it. Once the run
     // has ended nextPosition is the next run's
     function _forecastDanger() {
-        if (levelType !== "dungeon" || fightRoomActive || !player || _physicsSteps % 10 !== 0) return
+        if (levelType !== "dungeon" || fightRoomActive || deepRoomActive || !player
+            || _physicsSteps % 10 !== 0) return
         if (session.connected ? partyFallen : fallen) return
         nextPosition = settleDanger(dangerPosition, partyRecords())
     }
@@ -2525,7 +2866,7 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? "#4a5670" : look.ambient
+        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -2536,20 +2877,62 @@ ClayWorld2d {
     ScreenFx2d {
         id: screenFxItem
         world: world
-        vignette: world.fx ? (levelType === "village" ? 0.35 : 0.55) : 0
+        vignette: world.fx ? (campStyled ? campLook.grade.vignette : 0.55) : 0
         vignetteColor: "#000000"
-        // Danger rooms run warm, the village cool (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : levelType === "village" && !fightRoomActive ? -0.15
+        // Danger rooms run warm, the camps as their look (README: Atmosphere Toolkit)
+        temperature: !world.fx ? 0 : campStyled ? campLook.grade.temperature
                      : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
-        saturation: world.fx ? 1.15 : 1
+        saturation: !world.fx ? 1 : campStyled ? campLook.grade.saturation : 1.15
         contrast: world.fx ? 1.05 : 1
         // The heartbeat sets in below a quarter of the health and grows
         // gently - a warning, not an alarm
-        lowHealth: world.fx && player && player.hp < player.maxHp * 0.25
-                   ? 0.8 * (1 - player.hp / (player.maxHp * 0.25)) : 0
+        lowHealth: world.lowHealthLevel
     }
+    // Low on health: below lowHealthAt of max HP the heartbeat and the
+    // fading colours set in clearly and grow as it falls; a potion lifts
+    // them off gently rather than at once
+    readonly property real lowHealthAt: 0.35
+    property real lowHealthLevel: fx && player && !fallen && player.hp < player.maxHp * lowHealthAt
+                                  ? 0.5 + 0.5 * (1 - player.hp / (player.maxHp * lowHealthAt)) : 0
+    Behavior on lowHealthLevel { NumberAnimation { duration: 900; easing.type: Easing.OutQuad } }
+    // The heartbeat itself, lowHealthLevel above 0: a beat every
+    // heartPeriod ms, quicker the lower the health, heard and seen as a
+    // red edge round the screen that swells on the lub and the dub
+    readonly property int heartPeriod: 1100 - 450 * Math.max(0, lowHealthLevel - 0.5) * 2
+    property real heartPulse: 0
+    Timer {
+        id: heartTimer
+        interval: world.heartPeriod; repeat: true; triggeredOnStart: true
+        running: world.lowHealthLevel > 0.05 && screen === "game"
+        onTriggered: {
+            heartSound.play()
+            heartBeatAnim.restart()
+        }
+    }
+    SequentialAnimation {
+        id: heartBeatAnim
+        NumberAnimation { target: world; property: "heartPulse"; to: 1; duration: 60 }
+        NumberAnimation { target: world; property: "heartPulse"; to: 0.35; duration: 110 }
+        NumberAnimation { target: world; property: "heartPulse"; to: 0.75; duration: 50 }
+        NumberAnimation { target: world; property: "heartPulse"; to: 0; duration: 420; easing.type: Easing.OutQuad }
+    }
+    Sound {
+        id: heartSound
+        source: "assets/heartbeat.wav"
+        volume: muted ? 0 : 0.9 * world.lowHealthLevel * soundVolume
+    }
+    // A potion's heal fills the health bar slowly, so it is seen
+    property bool _healing: false
+    Timer { id: healingTimer; interval: 1000; onTriggered: world._healing = false }
+    // The potion drunk: the cork, three gulps and a breath let out
+    Sound {
+        id: drinkSound
+        source: "assets/potion_drink.wav"
+        volume: muted ? 0 : 0.8 * soundVolume
+    }
+
     // Screen-space hit feedback used by impact(); null with fx off
     property var screenFx: world.fx ? screenFxApi : null
     QtObject {
@@ -2702,13 +3085,13 @@ ClayWorld2d {
     // overrides, the dungeon master's
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
-        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold,
-                                 potions: player.potions, draughts: player.draughts,
+        let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
+                                 potions: player.potions, draughts: player.draughts, creel: player.creel,
                                  momentum: player.momentum, levels: smithLevels(player) }
-                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0,
-                                 potions: 0, draughts: 0, momentum: 0, levels: smithLevels(null) }
+                             : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0, pouch: [],
+                                 potions: 0, draughts: 0, creel: [], momentum: 0, levels: smithLevels(null) }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
-                    "gold:", carried.gold, "potions:", carried.potions, "draughts:", carried.draughts,
+                    "gold:", carried.gold, "gems:", carried.pouch.length, "potions:", carried.potions, "draughts:", carried.draughts,
                     "smith:", JSON.stringify(carried.levels))
         clearDungeon()
         levelIndex = newIndex
@@ -2725,8 +3108,10 @@ ClayWorld2d {
             player.hp = carried.hp
             player.mana = carried.mana
             player.gold = carried.gold
+            player.pouch = carried.pouch
             player.potions = carried.potions
             player.draughts = carried.draughts
+            player.creel = carried.creel
             player.momentum = carried.momentum
         }
         // A knight still down when the party reaches the camp rises there
@@ -2742,11 +3127,22 @@ ClayWorld2d {
     Component { id: motesComponent; Motes {} }
 
     function spawnMotes() {
-        // Fireflies glow on their own; dust only shows where light falls
-        let village = levelType === "village" && !fightRoomActive
-        let m = motesComponent.createObject(village ? glowParent() : world.room, {
+        // Fireflies and embers glow on their own; dust only shows where
+        // light falls. A camp's air is its look's
+        if (campStyled) {
+            let a = campLook.air
+            let col = Qt.color(a.color)
+            dungeonObjects.push(motesComponent.createObject(a.glows ? glowParent() : world.room, {
+                widthWu: xWuMax, heightWu: yWuMax,
+                fireflies: a.blink, density: a.density, moteSize: a.size, drift: a.drift,
+                color: Qt.rgba(col.r, col.g, col.b, a.alpha),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                visible: Qt.binding(() => world.fx)
+            }))
+            return
+        }
+        let m = motesComponent.createObject(world.room, {
             widthWu: xWuMax, heightWu: yWuMax,
-            fireflies: village,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -2788,15 +3184,20 @@ ClayWorld2d {
         game: world
     }
 
-    function openDialogue(name, color, lines, wares) {
-        dialoguePanel.open(name, color, lines, _offered(wares || []))
+    // who: the Npc that speaks, which listens while its dialogue is up
+    function openDialogue(name, color, lines, wares, who) {
+        dialoguePanel.open(name, color, lines, _offered(wares || []), who)
     }
+    // The Npc whose dialogue is up, or null
+    readonly property var talkingTo: dialoguePanel.visible ? dialoguePanel.speaker : null
     // The innkeeper's wares are always offered; the smith's are made as he
-    // is talked to (smithWare), the next level of each upgrade he may sell
+    // is talked to (smithWare), the next level of each upgrade he may sell,
+    // and first, while the pouch holds gems, his offer for them (gemWare)
     function _offered(wares) {
         let out = []
         for (let w of wares) {
-            let offer = w.id === "potion" || w.id === "draught" ? w : smithWare(w.id)
+            let offer = w.id === "potion" || w.id === "draught" ? w
+                : w.id === "gems" ? gemWare() : w.id === "fish" ? fishWare() : smithWare(w.id)
             if (offer) out.push(offer)
         }
         return out
@@ -2849,6 +3250,8 @@ ClayWorld2d {
     // a draught for key 2; a smith's level lasts the run
     function buyWare(ware) {
         if (!player || player.fallen) return false
+        if (ware.id === "gems") return sellGems()
+        if (ware.id === "fish") return sellFish()
         let inn = ware.id === "potion" || ware.id === "draught"
         // The smith sells only what he offers now: a ware from before the
         // knight bought here, or above the camp's limit, is refused
@@ -2882,8 +3285,16 @@ ClayWorld2d {
     }
     function drinkPotion() {
         if (!player) return 0
+        _healing = true
+        healingTimer.restart()
         let healed = player.drinkPotion()
-        if (healed > 0) spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
+        if (healed > 0) {
+            spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
+            if (screenFx) screenFxItem.flash("#FFB060", 500, 0.16)
+            drinkSound.play()
+        } else {
+            _healing = false
+        }
         return healed
     }
     function drinkDraught() {
@@ -2970,11 +3381,16 @@ ClayWorld2d {
 
         // Step 5: Convert grid to actual game objects
         buildDungeonFromGrid()
-        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look)
+        let veinCells = featureList.filter(f => f.kind === "vein").map(f => f.wgx + "," + f.wgy)
+        placeRockFaces(veinCells)
+        placeRoomTorches(createRng(levelSeed ^ 0x5bd1e995), look, veinCells)
         placeDebris(createRng(levelSeed ^ 0x2c1b3c6d), look)
         placeFeatures(featureList)
         placeDoors(doorList)
         placeSecrets()
+        let holeList = planHoles(levelSeed, featureList)
+        placeHoles(holeList)
+        placeDeepTravellers(planDeepTravellers(levelSeed, featureList, holeList))
 
         // Step 6: Spawn player in first room
         if (rooms.length > 0) {
@@ -3015,6 +3431,9 @@ ClayWorld2d {
         _applyBroken(_sessionBroken)
         _applySprung(_sessionSprung)
         _applyDoors(_sessionDoors)
+        _applyVeins(_sessionVeins)
+        _applyHoles(_sessionHoles, true)
+        _applyDeep(_sessionDeep, true)
 
         // Spawn remote players for multiplayer
         if (rooms.length > 0) {
@@ -3456,6 +3875,7 @@ ClayWorld2d {
             collidesWith: catPlayer | catEnemy | catProjectile,
             fx: Qt.binding(() => world.fx)
         })
+        if (campStyled) wall.color = campLook.rock
         dungeonObjects.push(wall)
         return wall
     }
@@ -3465,8 +3885,17 @@ ClayWorld2d {
     // With a look (Balance.danger.looks) only its torchShare of them burn,
     // in its torch colour
     property var torches: []
-    function placeRoomTorches(decoRng, look) {
+    // The wall cells the torches stand on, "gx,gy": a spawn hole keeps
+    // off them (planHoles)
+    property var _torchCells: ({})
+    // A torch whose spot holds a vein (veinCells, "gx,gy") takes the
+    // nearest spot of its wall without one and without the wall's other
+    // torch, the stream drawn the same
+    function placeRoomTorches(decoRng, look, veinCells) {
+        let veined = {}
+        for (let c of veinCells || []) veined[c] = true
         torches = []
+        _torchCells = ({})
         for (let room of rooms) {
             let gy = room.y + room.h
             if (gy >= gridHeight) continue
@@ -3476,12 +3905,19 @@ ClayWorld2d {
                     spots.push(gx)
             if (spots.length === 0) continue
             let count = room.w >= 7 && spots.length >= 4 ? 2 : 1
+            let lit = {}
             for (let i = 0; i < count; i++) {
                 // Spread two torches across the wall, one sits near the middle
                 let t = count === 1 ? 0.5 : (i === 0 ? 0.25 : 0.75)
                 t += (decoRng() - 0.5) * 0.15
-                let gx = spots[Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))]
+                let at = Math.max(0, Math.min(spots.length - 1, Math.round(t * (spots.length - 1))))
+                let free = spots.map((x, i) => i).filter(i => !veined[spots[i] + "," + gy] && !lit[spots[i]])
+                    .sort((a, b) => Math.abs(a - at) - Math.abs(b - at))
+                let gx = free.length > 0 ? spots[free[0]] : -1
                 if (look && decoRng() >= look.torchShare) continue
+                if (gx < 0) continue
+                lit[gx] = true
+                _torchCells[gx + "," + gy] = true
                 placeTorch(gx * cellSize + cellSize / 2, gy * cellSize + wallFaceWu * 0.75,
                            look ? look.torch : undefined)
             }
@@ -3564,7 +4000,8 @@ ClayWorld2d {
     // the first of them still free (a slit one on the room's edge,
     // _slitAim). So a kind added or retuned moves another only off a cell
     // it takes first. kinds is Balance.dungeon's when left out. The slits
-    // get their rhythms last (_rhythmSlits)
+    // get their rhythms last (_rhythmSlits). A vein's cell is one with a
+    // wall north of it, whose face it sits in (_veinAim)
     function planFeatures(levelSeed, band, showcase, kinds) {
         kinds = kinds || Balance.dungeon.kinds
         let out = []
@@ -3591,7 +4028,8 @@ ClayWorld2d {
                 for (let c of cells) {
                     if (n <= 0) break
                     if (taken[c[1] * gridWidth + c[0]]) continue
-                    let aim = kind === "slit" ? _slitAim(c[0], c[1], room, picked) : {}
+                    let aim = kind === "slit" ? _slitAim(c[0], c[1], room, picked)
+                        : kind === "vein" ? _veinAim(c[0], c[1]) : {}
                     if (!aim) continue
                     taken[c[1] * gridWidth + c[0]] = true
                     let f = Object.assign({ kind: kind, gx: c[0], gy: c[1],
@@ -3604,6 +4042,12 @@ ClayWorld2d {
         }
         return _rhythmSlits(out, levelSeed, band)
     }
+    // A vein for the room's cell (gx, gy): the wall cell north of it,
+    // {wgx, wgy}, or null when that is no wall
+    function _veinAim(gx, gy) {
+        let row = grid[gy + 1]
+        return row && row[gx] === cellWall ? { wgx: gx, wgy: gy + 1 } : null
+    }
     function _nameHash(name) {
         let h = 5381
         for (let i = 0; i < name.length; i++) h = (Math.imul(h, 33) ^ name.charCodeAt(i)) | 0
@@ -3614,6 +4058,7 @@ ClayWorld2d {
         features = list
         breakables = []
         _propCells = ({})
+        _buildingCells = ({})
         _brokenCells = []
         plates = []
         _sprungCells = ({})
@@ -3628,6 +4073,8 @@ ClayWorld2d {
                 o = _placePlate(f, band)
             else if (f.kind === "slit")
                 o = _placeSlit(f, band)
+            else if (f.kind === "vein")
+                placeVein(f.wgx, f.wgy)
             if (o) dungeonObjects.push(o)
         }
     }
@@ -3662,6 +4109,9 @@ ClayWorld2d {
     // The whole ones still standing, and their cells by grid key, which
     // the enemies' paths go around
     property var breakables: []
+    // The camp's campfire, null in a dungeon: a knight that stands still
+    // in its warmth sits down (Player, issue #148)
+    property var campfire: null
     property var _propCells: ({})
     // Host, and alone: the cells broken in this level, "gx,gy"
     property var _brokenCells: []
@@ -4745,6 +5195,7 @@ ClayWorld2d {
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
+        if (campStyled) r.color = campLook.rim
         dungeonObjects.push(r)
         return r
     }
@@ -4772,7 +5223,8 @@ ClayWorld2d {
             yWu: gy * cellSize + wallFaceWu,
             widthWu: (toGx - fromGx) * cellSize,
             heightWu: wallFaceWu,
-            color: levelType === "village" && !fightRoomActive ? "#34465A" : "#3A4658",
+            color: campStyled ? campLook.face : "#3A4658",
+            faceStyle: campStyled ? campLook.faceStyle : "bricks",
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             visible: Qt.binding(() => world.fx)
         })
@@ -4849,8 +5301,9 @@ ClayWorld2d {
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
-    // knights: the knights the dungeon is built for, 1 when left out
-    function spawnEnemy(ex, ey, tier, type, knights) {
+    // knights: the knights the dungeon is built for, 1 when left out;
+    // fromHole the spawn hole it crawls out of, "gx,gy" (issue #157)
+    function spawnEnemy(ex, ey, tier, type, knights, fromHole) {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
@@ -4863,7 +5316,8 @@ ClayWorld2d {
             hp: ehp, maxHp: ehp,
             atk: eatk, def: edef,
             tier: tier,
-            enemyType: type
+            enemyType: type,
+            fromHole: fromHole || ""
         }
         // In a session only the host spawns, for every node
         if (!session.connected)
@@ -4894,6 +5348,8 @@ ClayWorld2d {
             if (!remote) enemy.target = player
             enemies.push(enemy)
             if (objectId !== "") _enemyById[objectId] = enemy
+            let h = enemy.fromHole !== "" ? holeAt(enemy.fromHole) : null
+            if (h) _holeEvent(h, "creature")
         } else {
             console.log("[Game] ERROR: enemyComponent.createObject returned null")
         }
@@ -5106,6 +5562,7 @@ ClayWorld2d {
     }
 
     function clearDungeon() {
+        fishing.reset()
         _attackRng = null
         exitSensor = null
         exitStairs = null
@@ -5127,20 +5584,35 @@ ClayWorld2d {
         _enemyById = kept
 
         // Gold drops go as the enemies do: the host's on every node with
-        // their despawn, a joiner's when that arrives
-        for (let d of goldDrops.slice()) {
-            if (!d) continue
-            if (d.objectId !== "" && session.connected) {
-                if (session.isHost) session.despawnGold(d.objectId)
-                continue
-            }
-            try { d.destroy() } catch(err) {}
-        }
-        goldDrops = goldDrops.filter(d => d && d.objectId !== "" && session.connected
-                                     && _goldById[d.objectId] === d)
+        // their despawn, a joiner's when that arrives; and so do the
+        // pouches: one left on the floor is lost
+        goldClaims.clear()
+        pouchClaims.clear()
 
         // Destroy remote players
         session.clearRemotePlayers()
+
+        // The dig ends with its vein, which goes with the level's objects
+        if (player) player.digging = false
+        dig = null
+        veins = []
+        rockFaces = []
+        _cutVeins = []
+        _cutsAsked = ({})
+        for (let w of wonGems.slice()) w.destroy()
+        wonGems = []
+        _gemsFlying = []
+        veinSounds = []
+        holes = []
+        _holeRuns = ({})
+        _holePuffs = ({})
+        holeEvents = []
+        holeSounds = []
+        deepTravellers = []
+        _deepRuns = ({})
+        deepTravellerEvents = []
+        deepTravellerSounds = []
+        deepRoomActive = false
 
         // Destroy player
         if (player) {
@@ -5153,10 +5625,18 @@ ClayWorld2d {
             try { if (obj) obj.destroy() } catch(err) {}
         }
         dungeonObjects = []
+        campfire = null
+        campCat = null
+        campTravellers = []
+        campDog = null
+        campTalk = null
+        campFreed.clear()
+        campSounds.clear()
         features = []
         featureShowcase = false
         breakables = []
         _propCells = ({})
+        _buildingCells = ({})
         _brokenCells = []
         plates = []
         _sprungCells = ({})
@@ -5182,6 +5662,9 @@ ClayWorld2d {
 
         grid = []
         rooms = []
+        campProps = []
+        campSolids = []
+        campLayout = -1
         // The minimap paints what is explored of the grid, and the grid is gone
         exploredCells = []
     }
@@ -5211,24 +5694,28 @@ ClayWorld2d {
         rng = createRng(levelSeed)
         console.log("[Game] Village - Seed:", masterSeed, "Level:", levelIndex)
 
-        let roomSize = 20
-        let ox = Math.floor((gridWidth - roomSize) / 2)
-        let oy = Math.floor((gridHeight - roomSize) / 2)
-
-        // Initialize grid and carve village area
+        // The cave, the tavern and the smithy are cells of the grid: they
+        // block the way, the light and the paths like a dungeon's rock
         initializeGrid()
         initExploredCells()
-        for (let y = oy; y < oy + roomSize; y++)
-            for (let x = ox; x < ox + roomSize; x++) {
-                grid[y][x] = cellRoom
-                exploredCells[y][x] = true
-            }
+        let camp = carveCamp(levelSeed)
+        let b = Balance.camp.building
+        let tavern = { gx: camp.mid - b.side - b.width, gy: camp.midRow + b.raised, w: b.width, h: b.height }
+        let smithy = { gx: camp.mid + b.side, gy: tavern.gy, w: b.width, h: b.height }
+        _buildingCells = ({})
+        _carveBuilding(tavern)
+        _carveBuilding(smithy)
+        for (let y = 0; y < gridHeight; y++)
+            for (let x = 0; x < gridWidth; x++)
+                if (grid[y][x] === cellRoom || _buildingCells[y * gridWidth + x])
+                    exploredCells[y][x] = true
 
-        // Entrance at bottom, exit at top
-        let entranceX = Math.floor(ox + roomSize / 2)
+        // Entrance at the bottom, exit at the top: a tunnel each from the
+        // edge of the map to the cave's bay
+        let entranceX = camp.mid
         let exitX = entranceX
-        for (let y = 0; y < oy; y++) grid[y][entranceX] = cellHallway
-        for (let y = oy + roomSize; y < gridHeight; y++) grid[y][exitX] = cellHallway
+        for (let y = 0; y < gridHeight && grid[y][entranceX] === cellWall; y++) grid[y][entranceX] = cellHallway
+        for (let y = gridHeight - 1; y >= 0 && grid[y][exitX] === cellWall; y--) grid[y][exitX] = cellHallway
         entranceGridX = entranceX
         exitGridX = exitX
 
@@ -5237,21 +5724,28 @@ ClayWorld2d {
             xWu: 0, yWu: yWuMax, widthWu: xWuMax, heightWu: yWuMax,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             fx: Qt.binding(() => world.fx),
-            style: levelType === "village" && !fightRoomActive ? "earth" : "stone",
+            style: campLook.floor.style,
+            grass: campLook.floor.grass,
+            moss: campLook.floor.moss,
+            crackShare: campLook.floor.crackShare,
             seed: (levelIndex * 0.137) % 1
         })
-        floorObj.color = "#2A3A4A"
+        floorObj.color = campLook.floor.color
         dungeonObjects.push(floorObj)
+        let built = dungeonObjects.length
         createMergedWalls()
         createBoundaryWalls()
         createWallFaces()
         createWallRims()
+        _tintBuildings(built)
+        _placeOverhangs(camp.seed)
         updateOccluders()
         spawnMotes()
 
-        // Room center in world units
-        let cx = (ox + roomSize / 2) * cellSize
-        let cy = (oy + roomSize / 2) * cellSize
+        // The camp's centre in world units: the middle column's west edge,
+        // the middle row's south edge
+        let cx = camp.mid * cellSize
+        let cy = camp.midRow * cellSize
 
         // Campfire (bottom-center of village)
         let cf = campfireComponent.createObject(world.room, {
@@ -5261,39 +5755,52 @@ ClayWorld2d {
             gameWorld: world
         })
         dungeonObjects.push(cf)
+        campfire = cf
+        // Its core is solid (issue #178)
+        let core = Balance.camp.solid.fire
+        _spawnCampSolid(cf.xWu + cf.widthWu / 2 - core, cf.yWu - cf.heightWu / 2 + core,
+                        2 * core, 2 * core, "oval", 1, "fire")
 
-        // Tavern building (top-left) — entrance facing south
-        _buildVillageBuilding(cx - 8, cy + 5, 6, 5, "south")
+        // Tavern (west of the middle), open to the south: x the middle of
+        // its floor, y0 its south edge
+        let tx = (tavern.gx + tavern.w / 2) * cellSize
+        let ty0 = tavern.gy * cellSize
+        _lightBuilding(tavern)
         // Innkeeper NPC with routine
-        _spawnVillageNpc(cx - 8, cy + 4, "#C9A227", "mug", "Innkeeper", [
-            { x: cx - 8, y: cy + 6, duration: 4, text: "*polishing mugs*" },
-            { x: cx - 8, y: cy + 4, duration: 3, text: "*sweeping floor*" },
-            { x: cx - 9, y: cy + 3, duration: 2, text: "*checking supplies*" }
+        _spawnVillageNpc(tx, ty0 + 5, "#C9A227", "mug", "Innkeeper", [
+            { x: tx, y: ty0 + 5, duration: 4, text: "*polishing mugs*" },
+            { x: tx, y: ty0 + 3, duration: 3, text: "*sweeping floor*" },
+            { x: tx - 1, y: ty0 + 2, duration: 2, text: "*checking supplies*" }
         ], [
             "Welcome, traveler! You look like you've seen better days.",
             "Rest by the campfire — it'll patch you right up.",
             "For the road, a potion or a mana draught. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
         ], "assets/innkeeper_greeting.wav", [
+            { id: "fish" },
             { id: "potion", label: "Health potion", price: Balance.shop.potionPrice },
             { id: "draught", label: "Mana draught (+" + Balance.shop.draughtMana + " mana)",
               price: Balance.shop.draughtPrice }
         ])
 
-        // Blacksmith building (top-right) — entrance facing south
-        _buildVillageBuilding(cx + 6, cy + 5, 6, 5, "south")
-        // Anvil in front of blacksmith
-        _spawnAnvil(cx + 6, cy + 2)
+        // Smithy (east of the middle), open to the south
+        let sx = (smithy.gx + smithy.w / 2) * cellSize
+        let sy0 = smithy.gy * cellSize
+        _lightBuilding(smithy)
+        // Anvil in front of the smithy
+        _spawnAnvil(sx, sy0 - 1)
+        let anvilAt = Qt.point(sx, sy0 - 1)
         // Blacksmith NPC with routine
-        _spawnVillageNpc(cx + 6, cy + 4, "#B87333", "hammer", "Blacksmith", [
-            { x: cx + 6, y: cy + 2, duration: 5, text: "*hammering*" },
-            { x: cx + 6, y: cy + 6, duration: 3, text: "*sorting tools*" },
-            { x: cx + 5, y: cy + 4, duration: 2, text: "*inspecting blade*" }
+        _spawnVillageNpc(sx, sy0 + 3, "#B87333", "hammer", "Blacksmith", [
+            { x: sx, y: sy0 - 1, duration: 5, text: "*hammering*", sound: "anvil" },
+            { x: sx, y: sy0 + 5, duration: 3, text: "*sorting tools*" },
+            { x: sx - 1, y: sy0 + 3, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
             "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
-            "The deeper you've been, the finer I can make it. Bring gold from below."
-        ], "assets/blacksmith_greeting.wav", smithLines.map(line => ({ id: line })))
+            "The deeper you've been, the finer I can make it. Bring gold from below.",
+            "Cut stones from the veins down there? I'll buy every one."
+        ], "assets/blacksmith_greeting.wav", [{ id: "gems" }].concat(smithLines.map(line => ({ id: line }))))
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {
@@ -5303,7 +5810,7 @@ ClayWorld2d {
             world: world.physics,
             categories: catWall,
             collidesWith: catPlayer,
-            color: "#2A4A2A"
+            color: campLook.tree
         })
         tree.radius = tree.width * 0.5
         dungeonObjects.push(tree)
@@ -5314,10 +5821,19 @@ ClayWorld2d {
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
         ], witchReading, "assets/witch_greeting.wav")
+        let spots = [Qt.point(tree.xWu, tree.yWu)]
+        _placeCampProps(camp, levelSeed, spots)
+        _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
+        _placeCat(camp, levelSeed, cf, spots)
+        _placeTravellers(camp, levelSeed, cf)
+        _routeWalks()
+        _seatFreed(levelSeed, cf)
+        campSounds.build(cf, dungeonObjects.find(o => o && o.objectName === "npc" && o.npcName === "Blacksmith"),
+                         anvilAt, campLook, campProps)
 
         // Spawn player at entrance
-        spawnPlayer(cx, (oy + 2) * cellSize)
-        session.spawnRemotePlayers(cx, (oy + 2) * cellSize)
+        spawnPlayer(cx, (camp.oy + 2) * cellSize)
+        session.spawnRemotePlayers(cx, (camp.oy + 2) * cellSize)
 
         // Block entrance + exit sensor
         blockEntrance()
@@ -5338,29 +5854,506 @@ ClayWorld2d {
         console.log("[Game] Village generated")
     }
 
-    function _buildVillageBuilding(cx, cy, bw, bh, entrance) {
-        // All params in world units. Builds 3 walls with one side open.
-        let wallColor = "#1E2E3E"
-        let t = 0.5  // Wall thickness in wu
-        let x1 = cx - bw / 2
-        let x2 = cx + bw / 2
-        let y1 = cy - bh / 2
-        let y2 = cy + bh / 2
-
-        // Top wall (always present)
-        createWallAt(x1, y2 + t, bw, t).color = wallColor
-        // Left wall
-        createWallAt(x1, y2 + t, t, bh + t).color = wallColor
-        // Right wall
-        createWallAt(x2 - t, y2 + t, t, bh + t).color = wallColor
-        // Bottom wall (skip if entrance is south)
-        if (entrance !== "south")
-            createWallAt(x1, y1 + t, bw, t).color = wallColor
-        // Lanterns flanking the open front
-        if (entrance === "south") {
-            placeTorch(x1 + t / 2, y1 + 0.35, "#FFC870")
-            placeTorch(x2 - t / 2, y1 + 0.35, "#FFC870")
+    // The camp's cave in the grid (issue #145): the floor of a box of
+    // Balance.camp cells, its edge moved out into bays and in as outcrops
+    // and its corners cut off, all from the level's own stream. Returns
+    // the box (ox, oy), its middle column and row, and a seed for what is
+    // drawn along the edge
+    function carveCamp(levelSeed) {
+        let c = Balance.camp
+        let rand = createRng(levelSeed ^ c.seedSalt)
+        let ox = Math.floor((gridWidth - c.width) / 2)
+        let oy = gridHeight - c.exitTunnel - c.height
+        let mid = Math.floor(ox + c.width / 2)
+        let midRow = Math.floor(oy + c.height / 2)
+        let pick = (range) => range[0] + Math.floor(rand() * (range[1] - range[0] + 1))
+        // A side's edge, per cell along it: how many cells it moves in
+        // from its base line (an outcrop) or, below 0, out (a bay). It
+        // steps by one or two cells at a time, so it terraces rather than
+        // growing fingers of rock or floor one cell wide, and leans back
+        // to the base line, so no side stays in or out all along
+        let side = (n) => {
+            let edge = []
+            let inset = pick([-c.bay, c.outcrop])
+            while (edge.length < n) {
+                let run = pick(c.stretch)
+                for (let i = 0; i < run && edge.length < n; i++) edge.push(inset)
+                let back = 0.5 + 0.2 * inset
+                let step = pick([1, 2]) * (rand() < back ? -1 : 1)
+                inset = Math.max(-c.bay, Math.min(c.outcrop, inset + step))
+            }
+            return edge
         }
+        let south = side(c.width), north = side(c.width)
+        let west = side(c.height), east = side(c.height)
+        // The entrance and the exit open in a bay
+        for (let i = -1; i <= 1; i++) {
+            south[mid - ox + i] = -c.bay
+            north[mid - ox + i] = -c.bay
+        }
+        // Cut off: south-west, south-east, north-west, north-east
+        let corners = [pick(c.corner), pick(c.corner), pick(c.corner), pick(c.corner)]
+        for (let y = 0; y < c.height; y++)
+            for (let x = 0; x < c.width; x++) {
+                let xe = c.width - 1 - x, yn = c.height - 1 - y
+                if (y < c.bay + south[x] || yn < c.bay + north[x]
+                    || x < c.bay + west[y] || xe < c.bay + east[y])
+                    continue
+                if (x + y < corners[0] || xe + y < corners[1] || x + yn < corners[2] || xe + yn < corners[3])
+                    continue
+                grid[oy + y][ox + x] = cellRoom
+            }
+        // Only what the knights can walk to from the entrance stays floor
+        let reached = ({})
+        let open = [[mid, oy + 2]]
+        reached[(oy + 2) * gridWidth + mid] = true
+        while (open.length > 0) {
+            let at = open.pop()
+            for (let d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                let nx = at[0] + d[0], ny = at[1] + d[1], k = ny * gridWidth + nx
+                if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight || reached[k]
+                    || grid[ny][nx] !== cellRoom) continue
+                reached[k] = true
+                open.push([nx, ny])
+            }
+        }
+        for (let y = oy; y < oy + c.height; y++)
+            for (let x = ox; x < ox + c.width; x++)
+                if (grid[y][x] === cellRoom && !reached[y * gridWidth + x]) grid[y][x] = cellWall
+        return { ox: ox, oy: oy, mid: mid, midRow: midRow, seed: rand() }
+    }
+
+    // The cells of the tavern's and the smithy's walls, (gy * gridWidth + gx)
+    property var _buildingCells: ({})
+    // A building of whole cells at (gx, gy), its south-west cell: walls
+    // west, north and east, open to the south
+    function _carveBuilding(r) {
+        for (let y = r.gy; y < r.gy + r.h; y++)
+            for (let x = r.gx; x < r.gx + r.w; x++) {
+                if (x !== r.gx && x !== r.gx + r.w - 1 && y !== r.gy + r.h - 1) continue
+                grid[y][x] = cellWall
+                _buildingCells[y * gridWidth + x] = true
+            }
+    }
+    // The walls and faces made since dungeonObjects held `from` that stand
+    // on a building's cells take its timber colours
+    function _tintBuildings(from) {
+        let c = campLook
+        for (let i = from; i < dungeonObjects.length; i++) {
+            let o = dungeonObjects[i]
+            let face = o.shadowWu !== undefined
+            if (!face && o.categories === undefined) continue
+            // A wall's yWu is its top edge, a face's the top of the face
+            let gy = face ? Math.floor(o.yWu / cellSize) : Math.round(o.yWu / cellSize) - 1
+            let gx = Math.round(o.xWu / cellSize)
+            if (!_buildingCells[gy * gridWidth + gx]) continue
+            o.color = face ? c.buildingFace : c.buildingWall
+        }
+    }
+    // The camp's lights breathe, the campfire and the lanterns, each on its
+    // own breath from the level's seed ^ Balance.camp.lightSalt (issue
+    // #149). A breath is a whole share of the lights' 1000 s round of
+    // time, so it never jumps when the round starts over. Returns the
+    // stream, for what else hangs on the lights
+    function _breatheLights(levelSeed, lights) {
+        let b = Balance.camp.breath
+        let rand = createRng(levelSeed ^ Balance.camp.lightSalt)
+        for (let l of lights) {
+            let seconds = b.seconds[0] + rand() * (b.seconds[1] - b.seconds[0])
+            l.breath = b.depth
+            l.breathSeconds = 1000 / Math.round(1000 / seconds)
+            l.breathPhase = rand() * 2 * Math.PI
+        }
+        return rand
+    }
+    // Moths circle the campfire and the lanterns (issue #149), all of them
+    // in one item; how many at each light and their colour are the look's
+    Component { id: mothsComponent; Moths {} }
+    function _spawnMoths(rand, fire, lanterns) {
+        let m = Balance.camp.moths, look = campLook.moths
+        let col = Qt.color(look.color)
+        // Where the lights shine from (their Light2d offsets): the middle
+        // of the fire's body, half a wu in front of a lantern's wall
+        let lights = [{ x: fire.xWu + fire.widthWu / 2, y: fire.yWu - fire.heightWu / 2,
+                        orbit: m.fire.orbit, count: look.fire }]
+        for (let t of lanterns)
+            lights.push({ x: t.xWu, y: t.yWu - 0.5, orbit: m.lantern.orbit, count: look.lantern })
+        dungeonObjects.push(mothsComponent.createObject(glowParent(), {
+            mothLights: lights,
+            seed: Math.floor(rand() * 1000),
+            color: Qt.rgba(col.r, col.g, col.b, look.alpha),
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        }))
+    }
+    // The cave cat (issue #150): in Balance.camp.cat.share of the camps,
+    // curled on a ring round the campfire, out of the warmth where the
+    // knights sit, on the floor and clear of the way to the stairs, the
+    // people's spots (the routines' and the tree, as _placeCampProps
+    // leaves them) and the props. Its own stream, the level's seed ^
+    // Balance.camp.catSalt, so every screen of a session sees the same cat
+    // or none. campCat is it, or null
+    Component { id: caveCatComponent; CaveCat {} }
+    property var campCat: null
+    function _placeCat(camp, levelSeed, fire, spots) {
+        let c = Balance.camp, n = c.cat
+        let rand = createRng(levelSeed ^ c.catSalt)
+        campCat = null
+        if (rand() >= n.share) return
+        let r = n.ring[0] + rand() * (n.ring[1] - n.ring[0])
+        let start = rand() * 2 * Math.PI
+        let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
+        let cx = camp.mid * cellSize, half = n.size / 2
+        let fits = []
+        for (let i = 0; i < n.angles; i++) {
+            let a = start + i * 2 * Math.PI / n.angles
+            let x = fx + r * Math.cos(a), y = fy + r * Math.sin(a)
+            if (x + half > cx - c.clearOfPath && x - half < cx + c.clearOfPath) continue
+            if (spots.some(s => Math.hypot(s.x - x, s.y - y) < c.clearOfPeople)) continue
+            if (campProps.some(p => Math.hypot(Math.max(0, Math.abs(p.x - x) - p.w / 2),
+                                               Math.max(0, Math.abs(p.y - y) - p.h / 2)) < half + n.clearOfProps)) continue
+            let floor = true
+            for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+                for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                    if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) floor = false
+            if (floor) fits.push(Qt.point(x, y))
+        }
+        let at = fits[Math.floor(rand() * fits.length)]
+        let seed = rand()
+        if (!at) return
+        campCat = caveCatComponent.createObject(world.room, {
+            xWu: at.x, yWu: at.y, seed: seed,
+            gameWorld: world,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(campCat)
+    }
+    // Travellers rest at the camp (issue #151): Balance.camp.travellers
+    // other adventurers, each sitting at the fire and wandering to one of
+    // the look's props and back, two now and then exchanging a pair of
+    // lines, one of them followed by a dog. All of it - who comes, where
+    // each sits and wanders, what each says - draws from its own stream,
+    // the level's seed ^ Balance.camp.travellerSalt, so every screen of a
+    // session sees the same. A traveller is an Npc named "traveller", not
+    // "npc": the benches that look for the innkeeper, the smith and the
+    // witch never find one. It sells nothing, and the knights walk
+    // through it
+    Component { id: travellerComponent; Npc { objectName: "traveller"; solid: false } }
+    Component { id: campDogComponent; CampDog {} }
+    Component { id: campTalkComponent; CampTalk {} }
+    property var campTravellers: []
+    property var campDog: null
+    property var campTalk: null
+    function _placeTravellers(camp, levelSeed, fire) {
+        let c = Balance.camp, n = c.travellers
+        let rand = createRng(levelSeed ^ c.travellerSalt)
+        campTravellers = []
+        campDog = null
+        campTalk = null
+        let pick = (range) => range[0] + rand() * (range[1] - range[0])
+        let half = 0.4
+        let onFloor = (x, y) => _campFloorAt(x, y, half)
+        let count = n.count[0] + Math.floor(rand() * (n.count[1] - n.count[0] + 1))
+        // The seats: on a ring round the fire, on the floor, off the cat
+        let fx = fire.xWu + fire.widthWu / 2, fy = fire.yWu - fire.heightWu / 2
+        let r = pick(n.ring), start = rand() * 2 * Math.PI
+        let seats = []
+        for (let i = 0; i < n.angles; i++) {
+            let a = start + i * 2 * Math.PI / n.angles
+            let x = fx + r * Math.cos(a), y = fy + r * Math.sin(a)
+            if (!onFloor(x, y)) continue
+            if (campCat && Math.hypot(campCat.xWu - x, campCat.yWu - y) < campCat.sizeWu / 2 + half + 0.3) continue
+            seats.push(Qt.point(x, y))
+        }
+        // The props they wander to, by the look
+        let goals = n.props[campLook.name] || []
+        let wanders = campProps.filter(p => goals.some(g => g.kind === p.kind))
+        let cx = camp.mid * cellSize, cy = camp.midRow * cellSize
+        let kinds = n.kinds.slice()
+        let spread = Math.max(1, Math.floor(seats.length / count))
+        for (let i = 0; i < count && i < seats.length; i++) {
+            let kind = kinds.splice(Math.floor(rand() * kinds.length), 1)[0]
+            let seat = seats[i * spread]
+            // Its walk: off the prop's edge toward the camp's middle, each
+            // apart wu aside of the one before, so they stand side by side
+            let spot = null, text = n.seatText
+            let p = wanders.length > 0 ? wanders[Math.floor(rand() * wanders.length)] : null
+            let aside = (i - (count - 1) / 2) * n.apart + (rand() - 0.5) * 0.4
+            if (p) {
+                let dx = cx - p.x, dy = cy - p.y, d = Math.hypot(dx, dy) || 1
+                let ux = dx / d, uy = dy / d
+                let t = Math.min(Math.abs(ux) > 1e-6 ? (p.w / 2 + n.off) / Math.abs(ux) : Infinity,
+                                 Math.abs(uy) > 1e-6 ? (p.h / 2 + n.off) / Math.abs(uy) : Infinity)
+                let x = p.x + ux * t - uy * aside, y = p.y + uy * t + ux * aside
+                if (onFloor(x, y)) {
+                    spot = Qt.point(x, y)
+                    text = goals.find(g => g.kind === p.kind).text
+                }
+            }
+            if (!spot) spot = seats[(i * spread + Math.floor(seats.length / 2)) % seats.length]
+            let rest = pick(n.rest), wander = pick(n.wander)
+            let heard = n.hearsay.slice(), lines = []
+            for (let k = 0; k < n.hearsayLines && heard.length > 0; k++)
+                lines.push(heard.splice(Math.floor(rand() * heard.length), 1)[0])
+            // An Npc's xWu, yWu is its top-left corner; seats are centres
+            let at = (q) => ({ x: q.x - half, y: q.y + half })
+            let t = travellerComponent.createObject(world.room, {
+                xWu: at(seat).x, yWu: at(seat).y,
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                world: world.physics,
+                gameWorld: world,
+                interactionCategories: catWall,
+                interactionCollidesWith: catPlayer,
+                npcColor: kind.color,
+                iconType: kind.icon,
+                shape: kind.shape,
+                npcName: kind.name,
+                walkSpeed: n.walk,
+                routine: [ Object.assign(at(seat), { duration: rest, text: n.seatText }),
+                           Object.assign(at(spot), { duration: wander, text: text }) ],
+                dialogueLines: lines
+            })
+            dungeonObjects.push(t)
+            campTravellers.push(t)
+        }
+        if (campTravellers.length === 0) return
+        // The dog, beside the traveller it follows
+        let leader = campTravellers[Math.floor(rand() * campTravellers.length)]
+        let dogSeed = rand()
+        campDog = campDogComponent.createObject(world.room, {
+            leader: leader, seed: dogSeed,
+            xWu: leader.xWu + half + (dogSeed < 0.5 ? 1 : -1) * n.dog.follow, yWu: leader.yWu - half - 0.25,
+            gameWorld: world,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        dungeonObjects.push(campDog)
+        // The talk: every exchange once in an order of the stream, each
+        // between two of them
+        let order = n.exchanges.map((e, i) => i)
+        let plan = [], waits = []
+        while (order.length > 0) {
+            let e = n.exchanges[order.splice(Math.floor(rand() * order.length), 1)[0]]
+            let a = Math.floor(rand() * campTravellers.length)
+            let b = campTravellers.length > 1
+                ? (a + 1 + Math.floor(rand() * (campTravellers.length - 1))) % campTravellers.length : a
+            plan.push({ a: a, b: b, lines: e })
+            waits.push(pick(n.every))
+        }
+        campTalk = campTalkComponent.createObject(world.room, {
+            travellers: campTravellers, plan: plan, first: pick(n.first), waits: waits
+        })
+        dungeonObjects.push(campTalk)
+    }
+    // The villagers and the travellers walk round what the knights cannot
+    // walk over (issue #178): each leg of a routine that would cross a
+    // camp solid gets the points it passes through on its way (via)
+    function _routeWalks() {
+        let walkers = dungeonObjects.filter(o => o && (o.objectName === "npc" || o.objectName === "traveller"))
+        for (let w of walkers) {
+            let r = w.routine
+            if (r.length < 2) continue
+            // An Npc's x, y is its top-left corner, the legs run between
+            // the middles
+            let mid = (q) => Qt.point(q.x + w.widthWu / 2, q.y - w.heightWu / 2)
+            let routed = r.map((step, i) => {
+                let from = mid(r[(i + r.length - 1) % r.length])
+                let via = _detour(from, mid(step), 0)
+                return via.length === 0 ? step : Object.assign({}, step, {
+                    via: via.map(v => ({ x: v.x - w.widthWu / 2, y: v.y + w.heightWu / 2 })) })
+            })
+            if (routed.some(step => step.via)) w.routine = routed
+        }
+    }
+    // The points a walker passes through from a to b (middles, wu) to keep
+    // Balance.camp.solid.clear wu off every camp solid: none for a clear
+    // leg, else one beside the first solid in the way, on the side the leg
+    // passes it, and the same for the legs to it and from it
+    function _detour(a, b, depth) {
+        let m = Balance.camp.solid.clear
+        let ring = (sb, x, y) => sb.holds(x, y) || [0, 1, 2, 3, 4, 5, 6, 7].some(j =>
+            sb.holds(x + m * Math.cos(j * Math.PI / 4), y + m * Math.sin(j * Math.PI / 4)))
+        let d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(d / 0.1))
+        let hit = null
+        for (let k = 0; k <= n && !hit; k++) {
+            let x = a.x + (b.x - a.x) * k / n, y = a.y + (b.y - a.y) * k / n
+            hit = campSolids.find(sb => ring(sb, x, y)) || null
+        }
+        if (!hit || depth >= 3 || d < 1e-6) return []
+        let cx = hit.xWu + hit.widthWu / 2, cy = hit.yWu - hit.heightWu / 2
+        let ha = hit.widthWu / 2 * hit.fill + m, hb = hit.heightWu / 2 * hit.fill + m
+        // Across the leg, toward the side of it away from the solid
+        let ux = -(b.y - a.y) / d, uy = (b.x - a.x) / d
+        if ((cx - a.x) * ux + (cy - a.y) * uy > 0) { ux = -ux; uy = -uy }
+        for (let side of [1, -1]) {
+            let vx = side * ux, vy = side * uy
+            let reach = hit.shape === "box" ? ha * Math.abs(vx) + hb * Math.abs(vy)
+                                            : 1 / Math.hypot(vx / ha, vy / hb)
+            let v = Qt.point(cx + vx * reach * 1.3, cy + vy * reach * 1.3)
+            if (!_campFloorAt(v.x, v.y, 0.4) || campSolids.some(sb => ring(sb, v.x, v.y))) continue
+            return _detour(a, v, depth + 1).concat([v], _detour(v, b, depth + 1))
+        }
+        return []
+    }
+    // Whether a square half wu to each side of (x, y) lies whole on the
+    // camp's floor, off its buildings
+    function _campFloorAt(x, y, half) {
+        for (let gy = Math.floor((y - half) / cellSize); gy <= Math.floor((y + half) / cellSize); gy++)
+            for (let gx = Math.floor((x - half) / cellSize); gx <= Math.floor((x + half) / cellSize); gx++)
+                if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+        return true
+    }
+    // The travellers freed in the dungeon just before this camp and the
+    // specials with the camps sit by the fire (CampFreed, issue #159,
+    // #177), clear of the camp's travellers
+    // and its cat, from their own stream of the level's seed
+    CampFreed {
+        id: campFreed
+        figure: deepTravellerComponent
+        room: world.room
+        link: session
+        store: records
+        knight: world.player
+        extra: props => ({ glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit) })
+    }
+    readonly property var freedCamp: campFreed
+    function _seatFreed(levelSeed, fire) {
+        let avoid = campTravellers.map(t => ({ x: t.xWu + 0.4, y: t.yWu - 0.4 }))
+        if (campCat) avoid.push({ x: campCat.xWu, y: campCat.yWu })
+        for (let f of campFreed.seat(fire, createRng(levelSeed ^ Balance.deep.camp.salt),
+                                     (x, y) => _campFloorAt(x, y, 0.4), avoid,
+                                     levelIndexOf(depth, "dungeon")))
+            dungeonObjects.push(f)
+    }
+
+    // Lanterns flanking a building's open front
+    function _lightBuilding(r) {
+        let y0 = r.gy * cellSize + 0.35
+        placeTorch((r.gx + 0.5) * cellSize, y0, campLook.lantern)
+        placeTorch((r.gx + r.w - 0.5) * cellSize, y0, campLook.lantern)
+    }
+    // The rock overhanging the cave's north-facing edges, one piece per
+    // run of face, as the faces are; the buildings have none
+    Component { id: overhangComponent; CaveOverhang {} }
+    function _placeOverhangs(seed) {
+        let o = Balance.camp.overhang
+        let isEdge = (gx, gy) => grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+                                 && !_buildingCells[gy * gridWidth + gx]
+        for (let gy = 1; gy < gridHeight; gy++) {
+            let gx = 0
+            while (gx < gridWidth) {
+                if (!isEdge(gx, gy)) { gx++; continue }
+                let startX = gx
+                while (gx < gridWidth && isEdge(gx, gy)) gx++
+                dungeonObjects.push(overhangComponent.createObject(world.room, {
+                    xWu: startX * cellSize, yWu: gy * cellSize + wallFaceWu,
+                    widthWu: (gx - startX) * cellSize, faceWu: wallFaceWu,
+                    lipWu: o.lip, stalactiteWu: o.stalactite, toothWu: o.tooth, shadowWu: o.shadow,
+                    seed: seed * 1000,
+                    baseColor: campLook.rock,
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                }))
+            }
+        }
+    }
+
+    // The camp's props (issue #146): one of its look's layouts, picked
+    // from the level's own stream (seed ^ Balance.camp.propSalt), so every
+    // screen of a session lays out the same. A prop is left out unless it
+    // lies whole on the cave's floor - in its place, else moved in or to
+    // the camp's other side onto no other prop - clear of the way to the stairs, the
+    // campfire, the buildings' fronts, and the people and where they walk
+    // and the spots (points in wu) given. campProps holds what was laid:
+    // { kind, x, y, w, h } in world units, the prop's centre. A prop of
+    // a solid kind (Balance.camp.solid) gets its CampSolid, which the
+    // knights bump into
+    Component { id: campPropComponent; CampProp {} }
+    Component { id: campSolidComponent; CampSolid {} }
+    property var campProps: []
+    property var campLayout: -1
+    property real campClock: 0
+    NumberAnimation on campClock {
+        from: 0; to: 3600; duration: 3600000
+        loops: Animation.Infinite
+        running: campStyled && world.fx
+    }
+    function _placeCampProps(camp, levelSeed, spots) {
+        let c = Balance.camp, look = campLook
+        // The innkeeper, the smith and the witch, and every spot of their
+        // routines
+        for (let o of dungeonObjects)
+            if (o && o.objectName === "npc") {
+                spots.push(Qt.point(o.xWu, o.yWu))
+                for (let r of o.routine) spots.push(Qt.point(r.x, r.y))
+            }
+        let rand = createRng(levelSeed ^ c.propSalt)
+        campLayout = Math.floor(rand() * look.layouts.length)
+        campProps = []
+        let cx = camp.mid * cellSize, cy = camp.midRow * cellSize
+        let fire = dungeonObjects.find(o => o && o.healRadius !== undefined)
+        let b = c.building
+        let fronts = [camp.mid - b.side - b.width, camp.mid + b.side].map(gx => ({
+            x0: gx * cellSize, x1: (gx + b.width) * cellSize,
+            y: (camp.midRow + b.raised) * cellSize }))
+        for (let p of look.layouts[campLayout]) {
+            let seed = rand()
+            // Where the cave's edge cuts its place, the prop steps in
+            // toward the middle, wu by wu up to c.propShift, then tries the
+            // same on the other side of the camp; moved, it lands on no
+            // other prop
+            let tries = []
+            for (let side of [1, -1])
+                for (let k = 0; k <= c.propShift; k++) tries.push(side * (p.x - Math.sign(p.x) * k))
+            let px = tries.find(x => _propFits(cx + x - p.w / 2, cy + p.y - p.h / 2, cx + x + p.w / 2,
+                                               cy + p.y + p.h / 2, cx, fire, fronts, spots)
+                                     && (x === p.x || !campProps.some(q => Math.abs(q.x - cx - x) < (q.w + p.w) / 2
+                                                                      && Math.abs(q.y - cy - p.y) < (q.h + p.h) / 2)))
+            if (px === undefined) continue
+            let x0 = cx + px - p.w / 2, y1 = cy + p.y + p.h / 2
+            let glows = ["mushrooms", "cracks", "coals"].indexOf(p.kind) >= 0
+            let o = campPropComponent.createObject(glows ? glowParent() : world.room, {
+                xWu: x0, yWu: y1, widthWu: p.w, heightWu: p.h,
+                propKind: p.kind, seed: seed,
+                time: Qt.binding(() => campClock),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                visible: Qt.binding(() => world.fx)
+            })
+            dungeonObjects.push(o)
+            campProps.push({ kind: p.kind, x: cx + px, y: cy + p.y, w: p.w, h: p.h })
+            let solid = c.solid.kinds[p.kind]
+            if (solid) _spawnCampSolid(x0, y1, p.w, p.h, solid.shape, solid.fill, p.kind)
+        }
+    }
+    // What the knights bump into in the camp (CampSolid): north-west
+    // corner (x, y), w x h wu, its shape at fill of that, standing for
+    // kind (a prop's or "fire"). campSolids holds them
+    property var campSolids: []
+    function _spawnCampSolid(x, y, w, h, shape, fill, kind) {
+        let o = campSolidComponent.createObject(world.room, {
+            xWu: x, yWu: y, widthWu: w, heightWu: h,
+            shape: shape, fill: fill, kind: kind,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            categories: catWall,
+            collidesWith: catPlayer
+        })
+        dungeonObjects.push(o)
+        campSolids.push(o)
+    }
+    function _propFits(x0, y0, x1, y1, cx, fire, fronts, spots) {
+        let c = Balance.camp
+        // How far the rectangle is from a point
+        let off = (px, py) => Math.hypot(px - Math.max(x0, Math.min(px, x1)), py - Math.max(y0, Math.min(py, y1)))
+        if (x1 > cx - c.clearOfPath && x0 < cx + c.clearOfPath) return false
+        if (off(fire.xWu, fire.yWu) < c.clearOfFire) return false
+        for (let f of fronts)
+            if (x1 > f.x0 && x0 < f.x1 && y1 > f.y - c.clearOfFront && y0 < f.y) return false
+        for (let s of spots)
+            if (off(s.x, s.y) < c.clearOfPeople) return false
+        for (let gy = Math.floor(y0 / cellSize); gy <= Math.floor((y1 - 0.001) / cellSize); gy++)
+            for (let gx = Math.floor(x0 / cellSize); gx <= Math.floor((x1 - 0.001) / cellSize); gx++)
+                if (!grid[gy] || grid[gy][gx] !== cellRoom || _buildingCells[gy * gridWidth + gx]) return false
+        return true
     }
 
     // dialogue: its lines, or a function making them when it is talked to
@@ -5399,22 +6392,1579 @@ ClayWorld2d {
         dungeonObjects.push(anvil)
     }
 
+    // --- Veins (issue #155) ---
+    // A vein of gems on a wall cell's face (Vein.qml, Balance.deep): its
+    // gem's shape and colour by the depth, its strikes from the level's
+    // seed and its cell, a stream of its own. The mouse aiming at one in
+    // reach starts the dig (issue #169): the knight's sword turns into the
+    // pickaxe, and a ring closes on the vein every ringTime seconds of
+    // physics steps, so a pause or a hit stop holds it. The left button
+    // strikes then instead of swinging: within window of a close clean,
+    // once a close, any other press chips; the last of its strikes splits the stone
+    // and the gem pops out, the bigger the more of them were clean, spins
+    // once and drifts to the knight. Each node digs with its own knight;
+    // a dungeon's veins are its features (issue #156, below), the dojo's
+    // deep scenario has one (enterDeepRoom)
+    Component { id: veinComponent; Vein {} }
+    // The gem won (issue #169): it rises off the face spinning once, flies
+    // up above the knight and holds there a moment, bigger and lit, then
+    // drops into the knight's pouch (landed) and is gone. A clean cut,
+    // every strike clean, holds in a white ring with a star turning on it
+    // and says CLEAN CUT; a chipped one shows its notches, sheds grey
+    // flakes and says CHIPPED
+    Component {
+        id: gemWonComponent
+        Item {
+            id: won
+            objectName: "wonGem"
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real sizeWu: 0.5
+            property string shape: "tetrahedron"
+            property color color: "#F2B33D"
+            property var knight: null
+            property bool clean: false
+            property int notches: 0
+            // "rise", "fly", "hold" or "drop"
+            property string phase: "rise"
+            property real rise: 0
+            property real spin: 0
+            property real fly: 0
+            property real grow: 0
+            property real shine: 0
+            property real drop: 0
+            signal landed()
+            readonly property var cfg: Balance.deep
+            readonly property real kx: knight ? knight.xWu + knight.widthWu / 2 : xWu
+            readonly property real ky: knight ? knight.yWu - knight.heightWu / 2 : yWu
+            readonly property real upWu: yWu + 0.6 * rise
+            readonly property real holdY: ky + cfg.wonAbove
+            readonly property real atX: xWu + (kx - xWu) * fly
+            readonly property real atY: upWu + (holdY - upWu) * fly + (ky - holdY) * drop
+            width: sizeWu * pixelPerUnit
+            height: width
+            x: atX * pixelPerUnit - width / 2
+            y: (parent ? parent.height : 0) - atY * pixelPerUnit - height / 2
+            z: 6
+            // Held at least wonMin wu across, so a small chipped gem shows
+            // its notches too
+            readonly property real held: Math.max(cfg.wonScale, cfg.wonMin / Math.max(0.01, sizeWu))
+            scale: (1 + (held - 1) * grow) * (1 - 0.75 * drop)
+            opacity: 1 - drop * drop
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 2.4
+                height: width
+                radius: width / 2
+                color: won.color
+                opacity: 0.12 + (won.clean ? 0.3 : 0.12) * won.grow
+            }
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 1.7
+                height: width
+                radius: width / 2
+                color: "transparent"
+                border.color: "#FFFFFF"
+                border.width: Math.max(1, parent.width * 0.06)
+                visible: won.clean
+                opacity: 0.8 * won.grow
+            }
+            Repeater {
+                model: won.clean ? [0, 90] : []
+                Rectangle {
+                    required property real modelData
+                    anchors.centerIn: parent
+                    width: won.width * 2.1
+                    height: Math.max(1.5, won.width * 0.07)
+                    radius: height / 2
+                    rotation: modelData + 45 + 90 * won.shine
+                    color: Qt.lighter(won.color, 1.8)
+                    opacity: won.grow * (0.5 + 0.5 * Math.sin(Math.PI * won.shine))
+                }
+            }
+            Gem {
+                anchors.fill: parent
+                shape: won.shape
+                color: won.color
+                notches: won.notches
+                light: won.clean ? 1 : 0.8
+                rotation: 360 * won.spin
+            }
+            Repeater {
+                model: won.clean ? 0 : 2 + 2 * won.notches
+                Rectangle {
+                    required property int index
+                    readonly property real k: (index * 0.618) % 1
+                    width: Math.max(1.5, won.width * 0.1)
+                    height: width
+                    rotation: 45 + 70 * index
+                    color: "#8C8A86"
+                    x: won.width * (0.15 + 0.7 * k) - width / 2
+                    y: won.height * (0.55 + (1.2 + 0.6 * k) * ((won.shine + k * 0.5) % 1))
+                    opacity: won.phase === "hold" ? 1 - ((won.shine + k * 0.5) % 1) : 0
+                }
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.top
+                anchors.bottomMargin: parent.height * 0.4
+                scale: 1 / Math.max(0.01, won.scale)
+                text: won.clean ? "CLEAN CUT" : "CHIPPED"
+                color: won.clean ? Qt.lighter(won.color, 1.5) : "#A8A49C"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 13
+                font.bold: true
+                font.letterSpacing: 1
+                opacity: won.grow * (1 - won.drop)
+            }
+            property bool _landed: false
+            function _land() {
+                if (_landed) return
+                _landed = true
+                landed()
+            }
+            Component.onDestruction: _land()
+            SequentialAnimation {
+                running: true
+                ParallelAnimation {
+                    NumberAnimation { target: won; property: "rise"; to: 1; duration: won.cfg.wonRise * 1000; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: won; property: "spin"; to: 1; duration: won.cfg.wonRise * 1000; easing.type: Easing.InOutQuad }
+                }
+                ScriptAction { script: won.phase = "fly" }
+                ParallelAnimation {
+                    NumberAnimation { target: won; property: "fly"; to: 1; duration: won.cfg.wonFly * 1000; easing.type: Easing.InOutQuad }
+                    NumberAnimation { target: won; property: "grow"; to: 1; duration: won.cfg.wonFly * 1000; easing.type: Easing.OutBack }
+                }
+                ScriptAction { script: won.phase = "hold" }
+                NumberAnimation { target: won; property: "shine"; to: 1; duration: won.cfg.wonHold * 1000 }
+                ScriptAction { script: won.phase = "drop" }
+                NumberAnimation { target: won; property: "drop"; to: 1; duration: won.cfg.wonDrop * 1000; easing.type: Easing.InQuad }
+                ScriptAction { script: { won._land(); won.destroy() } }
+            }
+        }
+    }
+    // A gem lost: grey as the stone, it rises a little off the face, shakes,
+    // and crumbles into grey shards with the crumble, LOST over it
+    Component {
+        id: gemLostComponent
+        Item {
+            id: lost
+            objectName: "lostGem"
+            property real pixelPerUnit: 1
+            property real xWu: 0
+            property real yWu: 0
+            property real sizeWu: 0.5
+            property string shape: "tetrahedron"
+            property real rise: 0
+            property real shake: 0
+            width: sizeWu * pixelPerUnit
+            height: width
+            x: xWu * pixelPerUnit - width / 2 + Math.sin(shake * Math.PI * 10) * width * 0.08
+            y: (parent ? parent.height : 0) - (yWu + 0.5 * rise) * pixelPerUnit - height / 2
+            z: 6
+            Gem {
+                anchors.fill: parent
+                shape: lost.shape
+                color: "#77736C"
+                notches: 2
+                light: 0.8
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.top
+                anchors.bottomMargin: 4
+                text: "LOST"
+                color: "#A8A49C"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 13
+                font.bold: true
+                font.letterSpacing: 1
+            }
+            SequentialAnimation {
+                running: true
+                NumberAnimation { target: lost; property: "rise"; to: 1; duration: 300; easing.type: Easing.OutCubic }
+                NumberAnimation { target: lost; property: "shake"; to: 1; duration: 350 }
+                ScriptAction { script: { world._gemCrumbled(lost.xWu, lost.yWu + 0.5); lost.destroy() } }
+            }
+        }
+    }
+    property var veins: []
+    // The dig under way, null when there is none: {vein, t, used, endAt},
+    // vein the vein dug; t its seconds of physics steps, used the last
+    // close a clean strike took (counted from 1), endAt the t it ends at
+    // once the stone split
+    property var dig: null
+    // The last strike, {clean, t, off, struck}, off its seconds from the
+    // nearest close, and the last gem cut, {shape, color, sizeWu, clean,
+    // chips, strikes}, for the benches
+    property var lastStrike: null
+    property var lastGem: null
+    // The gems won on their way to the pouch (gemWonComponent), and their
+    // shapes, which the HUD counts once they landed
+    property var wonGems: []
+    property var _gemsFlying: []
+    // The veins this node's knight split, by cell, until the gem is won:
+    // what the gem won shows ({shape, color, sizeWu, clean, chips, x, y})
+    property var _cutsAsked: ({})
+    // The dojo's deep room is up
+    property bool deepRoomActive: false
+
+    // The gem at depth d: the last of Balance.deep.shapes from at most d
+    function gemOf(d) {
+        let out = Balance.deep.shapes[0]
+        for (let g of Balance.deep.shapes) if (g.from <= d) out = g
+        return out
+    }
+    // The strikes the vein on cell "gx,gy" takes, from the level's seed and
+    // the cell alone
+    function veinStrikes(cell) {
+        let c = cell.split(",").map(Number)
+        let rand = createRng(levelSeedNow() ^ 0x7665696e ^ (c[1] * gridWidth + c[0]))
+        let r = Balance.deep.strikes
+        return r[0] + Math.floor(rand() * (r[1] - r[0] + 1))
+    }
+    // A gem's size in wu, by the share of its strikes that were clean
+    function gemSize(clean, strikes) {
+        let g = Balance.deep.gemSize
+        return g[0] + (g[1] - g[0]) * Math.max(0, Math.min(1, clean / Math.max(1, strikes)))
+    }
+    // The wall face round each vein's cell ("gx,gy") is rough rock, a
+    // miners' face (issue #169): rockCells cells to each side of it as far
+    // as the face runs, merged where they meet, ragged over rockRagged wu
+    // at an end where the bricks go on. Laid over the bricks before the
+    // torches, which stand on it
+    property var rockFaces: []
+    function _isFace(gx, gy) {
+        return gx >= 0 && gx < gridWidth && gy >= 1 && gy < gridHeight
+               && grid[gy][gx] === cellWall && grid[gy - 1][gx] !== cellWall
+    }
+    function placeRockFaces(cells) {
+        let cfg = Balance.deep, rows = {}
+        for (let cell of cells) {
+            let c = cell.split(",").map(Number)
+            if (!_isFace(c[0], c[1])) continue
+            let row = rows[c[1]] = rows[c[1]] || {}
+            row[c[0]] = true
+            for (let dir of [-1, 1])
+                for (let k = 1; k <= cfg.rockCells && _isFace(c[0] + dir * k, c[1]); k++)
+                    row[c[0] + dir * k] = true
+        }
+        for (let gy in rows) {
+            let xs = Object.keys(rows[gy]).map(Number).sort((a, b) => a - b)
+            let y = Number(gy)
+            for (let i = 0; i < xs.length; ) {
+                let from = xs[i]
+                while (i + 1 < xs.length && xs[i + 1] === xs[i] + 1) i++
+                let to = xs[i] + 1
+                i++
+                let left = _isFace(from - 1, y) ? cfg.rockRagged : 0
+                let right = _isFace(to, y) ? cfg.rockRagged : 0
+                let f = wallFaceComponent.createObject(world.room, {
+                    xWu: from * cellSize - left, yWu: y * cellSize + wallFaceWu,
+                    widthWu: (to - from) * cellSize + left + right, heightWu: wallFaceWu,
+                    color: cfg.rockColor, faceStyle: "rock", raggedLeft: left, raggedRight: right,
+                    shadow: false, objectName: "rockFace",
+                    pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+                    visible: Qt.binding(() => world.fx)
+                })
+                if (!f) continue
+                rockFaces.push(f)
+                dungeonObjects.push(f)
+            }
+        }
+    }
+    // A vein on the wall cell (gx, gy), whose face looks onto the floor
+    // south of it
+    function placeVein(gx, gy) {
+        let g = gemOf(dangerDepth)
+        let cell = gx + "," + gy
+        let v = veinComponent.createObject(world.room, {
+            cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
+            faceWu: wallFaceWu, cell: cell, shape: g.shape, gemColor: g.color, selfLit: g.selfLit === true,
+            strikes: veinStrikes(cell), seed: createRng(gx * 7349 + gy * 3571)(),
+            glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!v) return null
+        veins.push(v)
+        dungeonObjects.push(v)
+        return v
+    }
+    function _knightCentre() {
+        return { x: player.xWu + player.widthWu / 2, y: player.yWu - player.heightWu / 2 }
+    }
+    // Whether knight p is free to dig: no shield up or wanted (also one
+    // out of mana), no swing, no charge and no dash
+    function _canDig(p) {
+        return !p.isBlocking && !p.shieldWanted && !p.isAttacking && !p.isCharging && !p.isDashing
+    }
+    // Where the mouse aims, in wu: the point under it in the world, or a
+    // bench's aimOverride ({x, y})
+    property var aimOverride: null
+    function aimWu() {
+        if (aimOverride) return aimOverride
+        let p = mouseInput.mapToItem(world.room, mouseInput.mouseX, mouseInput.mouseY)
+        return { x: p.x / world.pixelPerUnit, y: (world.room.height - p.y) / world.pixelPerUnit }
+    }
+    // Whether the aim is on v's cell or within pad wu of it
+    function _aimOn(v, pad) {
+        let a = aimWu()
+        return Math.abs(a.x - v.cxWu) <= v.sizeWu / 2 + pad && Math.abs(a.y - v.cyWu) <= v.sizeWu / 2 + pad
+    }
+    // The whole vein the mouse aims at (aimPad) with its face within reach
+    // of the knight, or null
+    function veinAimed() {
+        return _aimedOf(veins.filter(v => !v.split))
+    }
+    // The one of targets the mouse aims at (aimPad), nearest to the aim,
+    // with its face within reach of the knight, or null
+    function _aimedOf(targets) {
+        if (!player) return null
+        let c = _knightCentre(), a = aimWu(), out = null, best = Infinity
+        for (let v of targets) {
+            if (!_aimOn(v, Balance.deep.aimPad)
+                    || Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) > Balance.deep.reach) continue
+            let d = Math.hypot(a.x - v.cxWu, a.y - v.cyWu)
+            if (d < best) {
+                best = d
+                out = v
+            }
+        }
+        return out
+    }
+    // The dig of the vein aimed at begins, while the knight is free to
+    // dig (_canDig) and not in a dialogue; the vein dug or null
+    function _beginDig() {
+        if (!player || fallen || talking || !_canDig(player)) return null
+        let t = veinAimed()
+        if (!t) return null
+        dig = { vein: t, t: 0, used: 0, endAt: -1 }
+        player.digging = true
+        _aimPick()
+        _showRing()
+        console.log("[Game] Digging the vein at", t.cell, "-", t.strikes, "strikes")
+        return t
+    }
+    // The left button: aimed at a vein in reach it strikes with the
+    // pickaxe, a dig not yet begun (no physics step since the aim came on
+    // the vein) begins with it; false when it aims at none, or the knight
+    // is not free to dig, and the sword swings
+    function pressPick() {
+        if (!player || fallen) return false
+        if (dig && dig.endAt < 0 && _aimOn(dig.vein, Balance.deep.aimHold)) {
+            strikeVein()
+            return true
+        }
+        if (dig) return false
+        return _beginDig() !== null
+    }
+    function endDig() {
+        if (!dig) return
+        dig.vein.ringShows = false
+        dig = null
+        if (player) player.digging = false
+    }
+    function _aimPick() {
+        let c = _knightCentre(), v = dig.vein
+        player.digAngle = Math.atan2(v.faceYWu - c.y, v.faceXWu - c.x) * 180 / Math.PI
+    }
+    // The ring of the dig: closing over each ringTime, closed and white for
+    // window after a close, white for window before one
+    function _showRing() {
+        let cfg = Balance.deep, v = dig.vein, t = dig.t
+        let k = Math.floor(t / cfg.ringTime + 1e-6), since = Math.max(0, t - k * cfg.ringTime)
+        v.ringShows = dig.endAt < 0
+        if (k >= 1 && since <= cfg.window + 1e-6) {
+            v.ringProgress = 1
+            v.ringOpen = true
+        } else {
+            v.ringProgress = since / cfg.ringTime
+            v.ringOpen = cfg.ringTime - since <= cfg.window + 1e-6
+        }
+    }
+    // Each physics step: the dig of a vein aimed at begins; the dig's
+    // clock, and its end when the aim or the knight moves off, it raises
+    // the shield, swings or dashes, or the stone split a moment ago
+    function _stepDig() {
+        if (!dig) {
+            if (veins.length > 0) _beginDig()
+            return
+        }
+        let p = player
+        if (!p || fallen || !dig.vein) {
+            endDig()
+            return
+        }
+        dig.t += world.physics.timeStep
+        let c = _knightCentre(), v = dig.vein
+        if ((dig.endAt >= 0 && dig.t >= dig.endAt - 1e-6)
+                || !_canDig(p) || talking
+                || (dig.endAt < 0 && !_aimOn(v, Balance.deep.aimHold))
+                || Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y) > Balance.deep.leave) {
+            endDig()
+            return
+        }
+        _aimPick()
+        _showRing()
+    }
+    // A strike of the pickaxe on the vein dug: clean on a close's window,
+    // else a chip
+    function strikeVein() {
+        let cfg = Balance.deep, v = dig.vein
+        if (v.split) return
+        let k = Math.round(dig.t / cfg.ringTime)
+        let off = dig.t - k * cfg.ringTime
+        let clean = k >= 1 && k !== dig.used && Math.abs(off) <= cfg.window + 1e-6
+        let before = v.clean
+        if (clean) {
+            dig.used = k
+            v.clean++
+        } else {
+            v.chips++
+        }
+        lastStrike = { clean: clean, t: dig.t, off: off, struck: v.struck }
+        player.pickStrike()
+        // From the face towards the knight
+        let c = _knightCentre()
+        let len = Math.max(0.01, Math.hypot(c.x - v.faceXWu, c.y - v.faceYWu))
+        let nx = (c.x - v.faceXWu) / len, ny = (c.y - v.faceYWu) / len
+        if (clean) {
+            spawnSparks(v.faceXWu, v.faceYWu, nx, ny, cfg.sparks, v.gemColor)
+            _trauma(0.06)
+            playChink(0)
+            playTink(cfg.phrase[Math.min(before, cfg.phrase.length - 1)])
+        } else {
+            spawnShards(v.faceXWu, v.faceYWu, nx, ny, cfg.chips, cfg.chipColor, 0.1)
+            playChink(cfg.chipPitch)
+        }
+        console.log("[Game] Vein", v.cell, clean ? "clean" : "chipped", "strike", v.struck, "of", v.strikes,
+                    "off the close by", off.toFixed(3), "s")
+        if (v.split) _splitVein(v, nx, ny)
+    }
+    // The last strike split the stone: it crumbles, the gem's size by the
+    // clean strikes, and the dig ends a moment later; the gem is won once
+    // the game gives it (_veinCut, _gemWon)
+    function _splitVein(v, nx, ny) {
+        let size = gemSize(v.clean, v.strikes)
+        lastGem = { shape: v.shape, color: String(v.gemColor), sizeWu: size,
+                    clean: v.clean, chips: v.chips, strikes: v.strikes }
+        _cutsAsked[v.cell] = { shape: v.shape, color: v.gemColor, sizeWu: size, clean: v.clean,
+                               chips: v.chips, x: v.faceXWu, y: v.faceYWu }
+        spawnShards(v.faceXWu, v.faceYWu, nx, ny, 10, "#4E525A", 0.16)
+        playCrumble()
+        _veinCut(v)
+        dig.endAt = dig.t + 0.4
+        v.ringShows = false
+        console.log("[Game] The vein at", v.cell, "split: a", v.shape, "of", size.toFixed(2), "wu,",
+                    v.clean, "of", v.strikes, "strikes clean")
+    }
+    // Each physics step: a vein in the lantern's reach glints, the brighter
+    // the nearer in litLevels steps, so its gems redraw only as it passes
+    // one, and shimmers once as the knight comes close
+    function _stepVeins() {
+        if (veins.length === 0 || !player) return
+        let cfg = Balance.deep, c = _knightCentre(), lanterns = knightsHere()
+        for (let v of veins) {
+            let d = Math.hypot(v.faceXWu - c.x, v.faceYWu - c.y)
+            let nearest = d
+            for (let k of lanterns) nearest = Math.min(nearest, Math.hypot(v.faceXWu - k.x, v.faceYWu - k.y))
+            let lit = Math.max(0, Math.min(1, 2 * (cfg.glintReach - nearest) / cfg.glintReach))
+            v.lit = Math.ceil(lit * cfg.litLevels) / cfg.litLevels
+            let near = d <= cfg.shimmerReach && !v.split && !player.fallen
+            if (near && !v.knightNear) playTink(cfg.shimmerPitch, cfg.shimmerVolume)
+            v.knightNear = near
+        }
+    }
+
+    // --- Veins in the dungeon, the pouch and the smith (issue #156) ---
+    // A dungeon's veins are features (Balance.dungeon.kinds.vein), each in
+    // the face of the wall north of its cell, its gem the depth's. A gem
+    // cut goes into the knight's pouch (Player.pouch, [{shape, value}]),
+    // worth by its shape and its clean strikes (gemValue); the HUD shows
+    // a count per shape, and the smith buys them all for their worth.
+    // Alone the game splits a vein for good on its last strike. In a
+    // session each node judges its own knight's strikes and the host
+    // decides the rest: the node tells it the vein split and how many of
+    // its strikes were clean, the host splits it on every screen (session
+    // property "veins", a node that joins later too) and gives the gem of
+    // its own vein to the first knight that split it
+    property var _cutVeins: []
+    function veinAt(cell) {
+        return veins.find(v => v.cell === cell) || null
+    }
+    // The gold a gem of shape is worth, clean of its strikes clean
+    function gemValue(shape, clean, strikes) {
+        let g = Balance.deep.shapes.find(x => x.shape === shape) || Balance.deep.shapes[0]
+        let share = Math.max(0, Math.min(1, clean / Math.max(1, strikes)))
+        return Math.round(g.value[0] + (g.value[1] - g.value[0]) * share)
+    }
+    function gemColorOf(shape) {
+        let g = Balance.deep.shapes.find(x => x.shape === shape)
+        return g ? g.color : Balance.deep.shapes[0].color
+    }
+    // This node's knight split v: alone its gem is won, in a session the
+    // host is asked for it
+    function _veinCut(v) {
+        if (session.connected && !deepRoomActive) {
+            session.reportCut(levelIndex, v.cell, v.clean)
+            return
+        }
+        if (_cutVeins.indexOf(v.cell) < 0) _cutVeins.push(v.cell)
+        let gem = { shape: v.shape, value: gemValue(v.shape, v.clean, v.strikes) }
+        _gemCut(v.cell, gem.value)
+        _gemWon(v.cell, gem)
+    }
+    // The gem of the vein on cell is this node's knight's: the chime, and
+    // it shows as won (gemWonComponent) on its way into the pouch
+    property int gemsWon: 0
+    function _gemWon(cell, gem) {
+        let cut = _cutsAsked[cell]
+        delete _cutsAsked[cell]
+        gemsWon++
+        addGem(gem)
+        if (!player) return
+        playChime()
+        let c = _knightCentre()
+        let w = gemWonComponent.createObject(glowParent(), {
+            xWu: cut ? cut.x : c.x, yWu: cut ? cut.y : c.y,
+            sizeWu: cut ? cut.sizeWu : Balance.deep.gemSize[0], shape: gem.shape,
+            color: cut ? cut.color : gemColorOf(gem.shape), knight: player,
+            clean: cut ? cut.chips === 0 : false, notches: cut ? Math.min(3, cut.chips) : 1,
+            pixelPerUnit: world.pixelPerUnit
+        })
+        if (!w) return
+        _gemsFlying = _gemsFlying.concat([gem.shape])
+        wonGems = wonGems.concat([w])
+        w.landed.connect(() => _gemLanded(w, gem.shape))
+    }
+    // The gem of the vein on cell is not this node's knight's: another
+    // knight split it first. A grey gem rises off the face, shakes and
+    // crumbles (gemLostComponent)
+    property int gemsLost: 0
+    function _gemLost(cell) {
+        let cut = _cutsAsked[cell]
+        delete _cutsAsked[cell]
+        gemsLost++
+        if (!player) return
+        let c = _knightCentre()
+        gemLostComponent.createObject(glowParent(), {
+            xWu: cut ? cut.x : c.x, yWu: cut ? cut.y : c.y + 0.6,
+            sizeWu: cut ? Math.max(cut.sizeWu, 0.5) : 0.5, shape: cut ? cut.shape : gemOf(dangerDepth).shape,
+            pixelPerUnit: world.pixelPerUnit
+        })
+    }
+    function _gemCrumbled(x, y) {
+        spawnShards(x, y, 0, 1, 9, Balance.deep.chipColor, 0.12)
+        playCrumble()
+    }
+    // A gem won dropped into the pouch: the HUD counts it, its count bumps
+    function _gemLanded(w, shape) {
+        wonGems = wonGems.filter(x => x !== w)
+        let i = _gemsFlying.indexOf(shape)
+        if (i < 0) return
+        _gemsFlying = _gemsFlying.slice(0, i).concat(_gemsFlying.slice(i + 1))
+        _bumpShape = shape
+        pouchBumps++
+        pouchBump.restart()
+    }
+    // Host: a node's knight split the vein on that cell of that level, the
+    // first one gets its gem; one split already, or on another level than
+    // the host's, is refused
+    function _hostCut(fromId, level, cell, clean) {
+        let v = level === levelIndex && levelType === "dungeon" && _cutVeins.indexOf(cell) < 0 ? veinAt(cell) : null
+        if (!v) {
+            console.log("[Game] The vein at", cell, "of level", level, "was split by", fromId, "- refused")
+            if (fromId === session.nodeId) _gemLost(cell)
+            else session.refuseGem(fromId, cell)
+            return
+        }
+        _cutVeins.push(cell)
+        session.publishVeins({ seed: session.runSeed, level: levelIndex, cells: _cutVeins.slice() })
+        let gem = { shape: v.shape, value: gemValue(v.shape, clean, v.strikes) }
+        console.log("[Game] The vein at", cell, "was split by", fromId, "- a", gem.shape, "worth", gem.value)
+        _gemCut(cell, gem.value)
+        if (fromId === session.nodeId) {
+            _gemWon(cell, gem)
+            return
+        }
+        _veinGone(v)
+        session.grantGem(fromId, Object.assign({ cell: cell }, gem))
+    }
+    // The host's veins split in the level: those still whole here split
+    function _applyVeins(val) {
+        if (!val || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (val.seed !== session.runSeed || val.level !== levelIndex) return
+        for (let cell of val.cells) {
+            let v = veinAt(cell)
+            if (v && !v.split) _veinGone(v)
+        }
+    }
+    readonly property var _sessionVeins: session.veins
+    on_SessionVeinsChanged: _applyVeins(_sessionVeins)
+    // A knight of another screen split v: its stone breaks here too, and
+    // a dig of it ends
+    function _veinGone(v) {
+        v.cut = true
+        v.ringShows = false
+        spawnShards(v.faceXWu, v.faceYWu, 0, -1, 10, "#4E525A", 0.16)
+        if (dig && dig.vein === v) endDig()
+    }
+
+    // --- Spawn holes (issue #157) ---
+    // A room that holds a vein has one spawn hole low in its north wall
+    // (Hole.qml, Balance.deep.hole), laid out after everything else from
+    // its own stream of the level's seed, so nothing moves for it. Each
+    // gem cut from one of its room's veins wakes it by chance (issue
+    // #175), likelier the more the gem is worth, the more its room's
+    // miners dug (issue #176) and the more knights the level was built
+    // for, the roll from the vein's own stream of the level's seed; woken
+    // it goes through its stages, dust and then eyes;
+    // telegraph seconds after the eyes creatures of the depth crawl out of
+    // its mouth in waves, and then it closes for good. Alone the game
+    // rolls and runs it. In a session the host, which decides every cut
+    // gem, rolls it, runs every hole, spawns its creatures as it does
+    // every enemy, and publishes the holes' stages and waves (session
+    // property "holes"), which every screen shows and hears, a node that
+    // joins later too. holeEvents lists what the holes did on this screen,
+    // for the benches: {cell, what, t}, what "dust", "eyes", "waves",
+    // "wave" (each wave), "creature" (one shown here) or "closed", t the
+    // holes' physics clock, seconds
+    Component { id: holeComponent; Hole {} }
+    property var holes: []
+    property var holeEvents: []
+    property real _holeClock: 0
+    // A woken hole's run on the node that runs it, by cell: {t, eyesAt,
+    // plan, closeAt, rand}, t its seconds since it woke, eyesAt when its
+    // eyes open, plan the creatures still to come [{at, wave}], rand its
+    // stream of the level's seed
+    property var _holeRuns: ({})
+    // The seconds since each awake hole last puffed dust, by cell
+    property var _holePuffs: ({})
+    readonly property var holeStages: ["rest", "dust", "eyes", "waves", "closed"]
+
+    // The spawn holes of the carved dungeon with its features (list): one
+    // for each room but the first that holds a vein, [{gx, gy, veins}],
+    // gx, gy its wall cell, veins the cells of its room's veins. Each
+    // room draws from its own stream of the level's seed
+    function planHoles(levelSeed, list) {
+        let out = [], taken = {}, blocked = {}
+        for (let f of list) {
+            taken[f.gx + "," + f.gy] = true
+            if (f.kind === "slit") blocked[(f.gx - f.dx) + "," + (f.gy - f.dy)] = true
+        }
+        rooms.forEach((room, ri) => {
+            if (ri === 0) return
+            let veins = list.filter(f => f.kind === "vein" && f.gx >= room.x && f.gx < room.x + room.w
+                                         && f.gy >= room.y && f.gy < room.y + room.h)
+            if (veins.length === 0) return
+            let spot = _holeSpot(room, veins, blocked, _torchCells, _mouthsTaken(taken),
+                                 createRng(levelSeed ^ 0x686f6c65 ^ ri))
+            if (!spot) {
+                console.log("[Game] No spot for the spawn hole of room", ri)
+                return
+            }
+            out.push({ gx: spot.gx, gy: spot.gy, veins: veins.map(v => v.wgx + "," + v.wgy) })
+        })
+        return out
+    }
+    // The wall cells over the features' cells, which a hole keeps off
+    function _mouthsTaken(taken) {
+        let out = {}
+        for (let c in taken) {
+            let p = c.split(",").map(Number)
+            out[p[0] + "," + (p[1] + 1)] = true
+        }
+        return out
+    }
+    // The spot of a room's spawn hole, {gx, gy}, or null: a cell of the
+    // face of its north wall, not blocked ("gx,gy": a slit), not a torch
+    // (torchCells), a secret nor a vein, off its veins' ({wgx, wgy}) rock
+    // faces, over a room cell that holds no feature (overFeature, "gx,gy"
+    // of the wall cell) and lies beside no corridor; drawn by rand from
+    // those at least gap cells from each vein, else from those furthest
+    // from them. A small room with no such cell lets go of the rules one
+    // after the other until one is left: the rock face, the feature, the
+    // corridor, and last the torch, which goes out (placeHole)
+    function _holeSpot(room, veins, blocked, torchCells, overFeature, rand) {
+        let cfg = Balance.deep, gy = room.y + room.h, spots = []
+        for (let relax = 0; relax <= 4 && spots.length === 0; relax++) {
+            for (let gx = room.x; gx < room.x + room.w; gx++) {
+                if (!_isFace(gx, gy) || blocked[gx + "," + gy] || _secretOf(gx, gy) >= 0) continue
+                if (torchCells[gx + "," + gy] && relax < 4) continue
+                if (grid[gy - 1][gx] !== cellRoom) continue
+                let d = Math.min(...veins.map(v => Math.abs(v.wgx - gx) + Math.abs(v.wgy - gy)))
+                if (d === 0 || (d <= cfg.rockCells && relax < 1)) continue
+                if (overFeature[gx + "," + gy] && relax < 2) continue
+                let corridor = [[1, 0], [-1, 0], [0, -1]].some(n => grid[gy - 1 + n[1]]
+                                                             && grid[gy - 1 + n[1]][gx + n[0]] === cellHallway)
+                if (corridor && relax < 3) continue
+                spots.push({ gx: gx, gy: gy, d: d })
+            }
+        }
+        if (spots.length === 0) return null
+        let far = spots.filter(s => s.d >= cfg.hole.gap)
+        let top = Math.max(...spots.map(s => s.d))
+        let pool = far.length > 0 ? far : spots.filter(s => s.d === top)
+        return pool[Math.floor(rand() * pool.length)]
+    }
+    function placeHoles(list) {
+        for (let h of list) placeHole(h.gx, h.gy, h.veins)
+    }
+    // A spawn hole in the face of the wall cell (gx, gy), woken by the
+    // veins on veinCells ("gx,gy"); a torch on the cell goes out
+    function placeHole(gx, gy, veinCells) {
+        if (_torchCells[gx + "," + gy]) {
+            delete _torchCells[gx + "," + gy]
+            let row = gy * cellSize
+            for (let t of torches.filter(t => Math.floor(t.xWu / cellSize) === gx && t.yWu >= row && t.yWu < row + cellSize)) {
+                torches = torches.filter(x => x !== t)
+                dungeonObjects = dungeonObjects.filter(x => x !== t)
+                t.destroy()
+            }
+        }
+        let h = holeComponent.createObject(world.room, {
+            cxWu: (gx + 0.5) * cellSize, cyWu: (gy + 0.5) * cellSize, sizeWu: cellSize,
+            faceWu: wallFaceWu, cell: gx + "," + gy, veinCells: veinCells,
+            seed: createRng(gx * 7349 + gy * 3571 + 17)(),
+            glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!h) return null
+        holes.push(h)
+        dungeonObjects.push(h)
+        console.log("[Game] A spawn hole at", h.cell, "for the veins at", veinCells.join(" "))
+        return h
+    }
+    function holeAt(cell) {
+        return holes.find(h => h.cell === cell) || null
+    }
+    // The hole the vein on cell wakes, or null
+    function holeOf(veinCell) {
+        return holes.find(h => h.veinCells.indexOf(veinCell) >= 0) || null
+    }
+    // The chance a gem worth value cut from a vein wakes its room's hole:
+    // wakeChance, wakePerGold for each gold it is worth and wakePerDig for
+    // each of dug, the strikes its room's miners made while it rested (0
+    // when left out), times wakePerKnight more for each knight past the
+    // first of knights (the knights the level was built for when left
+    // out), at most wakeMost
+    function holeWakeChance(value, knights, dug) {
+        let cfg = Balance.deep.hole, n = knights === undefined ? partyKnights : knights
+        return Math.min(cfg.wakeMost, (cfg.wakeChance + cfg.wakePerGold * value + cfg.wakePerDig * (dug || 0))
+                                      * (1 + cfg.wakePerKnight * (n - 1)))
+    }
+    // The roll of the vein on cell "gx,gy" against holeWakeChance, 0..1,
+    // from the level's seed and the cell alone: the same seed and party
+    // wake the same holes, and a gem worth more or more dug never wakes
+    // fewer
+    function holeWakeRoll(cell) {
+        let c = cell.split(",").map(Number)
+        return createRng(levelSeedNow() ^ 0x77616b65 ^ (c[1] * gridWidth + c[0]))()
+    }
+    // Whether a gem worth value cut from the vein on cell wakes its hole,
+    // for knights (partyKnights when left out) after dug strikes of its
+    // room's miners (0 when left out)
+    function holeWakes(cell, value, knights, dug) {
+        return holeWakeRoll(cell) < holeWakeChance(value, knights, dug)
+    }
+    // The node that decides a cut (alone the game, in a session the host):
+    // the gem worth value cut from the vein on cell rolls whether its
+    // room's hole wakes, a hole at rest only, after the strikes its room's
+    // miners made
+    function _gemCut(cell, value) {
+        let h = holeOf(cell)
+        if (!h || h.stage !== "rest") return
+        let wakes = holeWakes(cell, value, undefined, h.dug)
+        console.log("[Game] The gem from", cell, "worth", value, "rolls", holeWakeRoll(cell).toFixed(3), "against",
+                    holeWakeChance(value, undefined, h.dug).toFixed(3), "for", partyKnights,
+                    partyKnights === 1 ? "knight" : "knights", "and", h.dug, "strikes of its miners:",
+                    wakes ? "the hole at " + h.cell + " wakes" : "the hole sleeps on")
+        if (wakes) _wakeHole(h)
+    }
+    // Hole h wakes: dust at once, eyesAfter seconds later its eyes, and
+    // its creatures are planned from then; a hole woken already stays as
+    // it is
+    function _wakeHole(h) {
+        if (!h || h.stage !== "rest") return
+        let cfg = Balance.deep.hole
+        let plan = [], first = cfg.eyesAfter + Math.max(Balance.enemy.minTelegraph, cfg.telegraph)
+        for (let w = 0; w < cfg.waves; w++)
+            for (let i = 0; i < cfg.perWave; i++)
+                plan.push({ at: first + w * cfg.waveGap + i * cfg.crawlGap, wave: w + 1 })
+        let c = h.cell.split(",").map(Number)
+        _holeRuns[h.cell] = { t: 0, eyesAt: cfg.eyesAfter, plan: plan,
+                              closeAt: plan[plan.length - 1].at + cfg.closeAfter,
+                              rand: createRng(levelSeedNow() ^ 0x63726177 ^ (c[1] * gridWidth + c[0])) }
+        _holeTo(h, "dust")
+    }
+    // Hole h goes on to stage: its look and its sound, unless quiet (a
+    // level built with a hole woken already); the host tells every node
+    function _holeTo(h, stage, quiet) {
+        if (h.stage === stage) return
+        h.stage = stage
+        _holeEvent(h, stage)
+        console.log("[Game] The spawn hole at", h.cell, "-", stage)
+        if (!quiet) {
+            if (stage === "dust") {
+                _holeDust(h, 10)
+                playHoleSound("rumble", h)
+            } else if (stage === "eyes") {
+                playHoleSound("groan", h)
+            } else if (stage === "closed") {
+                spawnShards(h.mouthXWu, h.mouthYWu + 0.3, 0, -1, 12, "#5E574E", 0.16)
+                _holeDust(h, 8)
+                playHoleSound("crumble", h)
+            }
+        }
+        _publishHoles()
+    }
+    // Wave w of hole h begins
+    function _holeWave(h, w, quiet) {
+        h.wave = w
+        _holeEvent(h, "wave")
+        if (!quiet) _holeDust(h, 6)
+        _publishHoles()
+        if (w === 1) _minersFlee(h)
+    }
+    function _holeEvent(h, what) {
+        holeEvents = holeEvents.concat([{ cell: h.cell, what: what, t: _holeClock }])
+    }
+    // Dust puffing from hole h's rim, count specks
+    function _holeDust(h, count) {
+        spawnShards(h.mouthXWu, h.mouthYWu + 0.25, 0, -1, count, Balance.deep.hole.dustColor, 0.09)
+    }
+    // A creature of the depth crawls out of hole h, in wave w: its kind
+    // and tier from the hole's stream, as the dungeon's enemies are
+    // rolled, standing in its mouth
+    function _holeCreature(h, w, rand) {
+        if (w > h.wave) {
+            if (h.stage === "eyes") _holeTo(h, "waves")
+            _holeWave(h, w)
+        }
+        let sb = spawnRolls(danger, partyKnights)
+        let r = rand(), tier = r < sb.weakChance ? 0 : r < sb.normalChance ? 1 : 2
+        let g = tier === 2 ? sb.guardianChanceTough : sb.guardianChance, k = rand()
+        let type = k < g ? "guardian" : k < g + sb.spitterChance ? "spitter" : "grunt"
+        spawnEnemy(h.mouthXWu - 0.4 + (rand() - 0.5) * 0.4, h.mouthYWu - 0.1, tier, type, partyKnights, h.cell)
+        _holeDust(h, 5)
+        playHoleSound("rumble", h)
+    }
+    // Each physics step: an awake hole puffs dust now and then; the node
+    // that runs a hole sends its creatures when they are due, and closes
+    // it after the last
+    function _stepHoles() {
+        if (holes.length === 0) return
+        let dt = world.physics.timeStep, cfg = Balance.deep.hole
+        _holeClock += dt
+        for (let h of holes) {
+            if (h.awake) {
+                let p = (_holePuffs[h.cell] || 0) + dt
+                if (p >= cfg.puffEvery) {
+                    p = 0
+                    _holeDust(h, 3)
+                }
+                _holePuffs[h.cell] = p
+            }
+            let run = _holeRuns[h.cell]
+            if (!run) continue
+            run.t += dt
+            if (h.stage === "dust" && run.t >= run.eyesAt - 1e-9) _holeTo(h, "eyes")
+            while (run.plan.length > 0 && run.plan[0].at <= run.t + 1e-9)
+                _holeCreature(h, run.plan.shift().wave, run.rand)
+            if (run.plan.length === 0 && run.t >= run.closeAt - 1e-9) {
+                delete _holeRuns[h.cell]
+                _holeTo(h, "closed")
+            }
+        }
+    }
+    // Host: the holes woken in its level, for every node
+    function _publishHoles() {
+        if (!session.connected || !session.isHost || deepRoomActive || levelType !== "dungeon") return
+        let out = {}
+        for (let h of holes)
+            if (h.stage !== "rest") out[h.cell] = { stage: h.stage, wave: h.wave }
+        session.publishHoles({ seed: session.runSeed, level: levelIndex, holes: out })
+    }
+    // The host's holes woken in the level: each goes through the stages
+    // it missed here in order, its waves before it closes; quiet when the
+    // level was just built
+    function _applyHoles(val, quiet) {
+        if (!val || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (val.seed !== session.runSeed || val.level !== levelIndex) return
+        for (let cell in val.holes) {
+            let h = holeAt(cell), s = val.holes[cell]
+            if (!h) continue
+            let to = holeStages.indexOf(s.stage), waves = holeStages.indexOf("waves")
+            for (let i = holeStages.indexOf(h.stage) + 1; i <= Math.min(to, waves); i++)
+                _holeTo(h, holeStages[i], quiet)
+            for (let w = h.wave + 1; w <= s.wave; w++) {
+                _holeWave(h, w, quiet)
+                if (!quiet) playHoleSound("rumble", h)
+            }
+            if (to > waves) _holeTo(h, holeStages[to], quiet)
+        }
+    }
+    readonly property var _sessionHoles: session.holes
+    on_SessionHolesChanged: _applyHoles(_sessionHoles)
+
+    // --- Travellers of the deep (issue #176) ---
+    // A room that holds a vein may hold a traveller of the deep
+    // (DeepTraveller.qml, Balance.dungeon.travellers, Balance.deep
+    // .traveller), a miner or a lost one, on the floor in front of the
+    // rock face beside one of its veins, laid out after the holes from its
+    // own stream of the level's seed, so nothing moves for it. A lost one
+    // sits there afraid. A miner digs beside the vein with its own pick
+    // while a knight is near, and each strike while the room's spawn hole
+    // rests makes a gem cut there likelier to wake it (hole.dug): a miner
+    // is pressure. E talks to either: it says its line and walks off
+    // toward the exit, fading; a special (issue #159) says its own and
+    // joins the camps for good. A miner still there flees once its hole's
+    // first wave comes. Alone the game decides how each goes on. In a
+    // session the node whose knight talked to it shows its line at once
+    // and tells the host, which refuses a talk to one gone already or on
+    // another level; the host decides and publishes every traveller
+    // that goes on and how (session property "deepTravellers"), which
+    // every screen shows, a node that joins later too, and counts the
+    // miners' strikes, as it rolls the holes. deepTravellerEvents lists
+    // what they did on this screen, for the benches: {cell, what, t}, what
+    // "talked" (this node's knight talked to it), "refused" (the host
+    // refused that talk), "leaving", "fleeing" or "gone", t the
+    // travellers' physics clock, seconds;
+    // deepTravellerSounds the last veinSoundsKept of their sounds, "dig"
+    // or "chord", muted too, deepTravellerSoundCount all of them
+    Component { id: deepTravellerComponent; DeepTraveller {} }
+    Sound {
+        id: travellerChord
+        source: "assets/deep_freed.wav"
+        volume: muted ? 0 : Balance.deep.traveller.chordVolume * soundVolume
+    }
+    property var deepTravellers: []
+    property var deepTravellerEvents: []
+    property var deepTravellerSounds: []
+    property int deepTravellerSoundCount: 0
+    property real _deepClock: 0
+    // A traveller's run on this screen, by cell: {say, dig, swing, path,
+    // leave, chord, talked}, say the seconds its line still shows, dig the
+    // seconds toward a miner's next strike, swing the seconds into a
+    // strike (-1 none), path the points it walks to [{x, y}], leave its
+    // seconds since it set off, chord the seconds until the chord (-1
+    // none), talked whether this node's knight talked to it
+    property var _deepRuns: ({})
+
+    // The travellers of the deep of the carved dungeon with its features
+    // (list) and its holes (holeList, planHoles): one with chance in each
+    // room but the first that holds a vein, [{gx, gy, kind, special,
+    // veins, hole, room}], gx, gy the wall cell of the rock face beside
+    // one of the room's veins it is in front of, over a room's cell that
+    // holds no feature, off a vein, a hole, a torch, a slit and a secret;
+    // kind "miner" or "lost", special the id of the special it is (""
+    // none). Each room draws from its own streams of the level's seed
+    function planDeepTravellers(levelSeed, list, holeList) {
+        let cfg = Balance.dungeon.travellers, band = dangerBand(dangerPosition)
+        let out = [], off = {}, floor = {}
+        for (let f of list) {
+            if (f.kind === "vein") off[f.wgx + "," + f.wgy] = true
+            if (f.kind === "slit") off[(f.gx - f.dx) + "," + (f.gy - f.dy)] = true
+            floor[f.gx + "," + f.gy] = true
+        }
+        for (let h of holeList) off[h.gx + "," + h.gy] = true
+        rooms.forEach((room, ri) => {
+            if (ri === 0) return
+            let veins = list.filter(f => f.kind === "vein" && f.gx >= room.x && f.gx < room.x + room.w
+                                         && f.gy >= room.y && f.gy < room.y + room.h)
+            if (veins.length === 0) return
+            let rand = createRng(levelSeed ^ 0x73746f6e ^ ri)
+            if (rand() >= cfg.chance[band]) return
+            let spots = []
+            for (let v of veins)
+                for (let k = 1; k <= Balance.deep.rockCells; k++)
+                    for (let dir of [-1, 1]) {
+                        let gx = v.wgx + dir * k, gy = v.wgy, key = gx + "," + gy
+                        if (!_isFace(gx, gy) || off[key] || _torchCells[key] || _secretOf(gx, gy) >= 0
+                                || grid[gy - 1][gx] !== cellRoom || floor[gx + "," + (gy - 1)]
+                                || spots.some(s => s.key === key)) continue
+                        spots.push({ gx: gx, gy: gy, key: key })
+                    }
+            if (spots.length === 0) return
+            let spot = spots[Math.floor(rand() * spots.length)]
+            let cells = veins.map(v => v.wgx + "," + v.wgy)
+            let hole = holeList.find(h => h.veins.some(c => cells.indexOf(c) >= 0))
+            let kind = rand() < cfg.minerShare ? "miner" : "lost", special = ""
+            // Rarely one of the specials (issue #159), from a stream of its
+            // own and the whole table, so the level is the same whatever
+            // the record holds; one already with the camps is there as an
+            // ordinary traveller of its kind
+            let rare = createRng(levelSeed ^ 0x73706563 ^ ri)
+            if (rare() < cfg.specialShare) {
+                let table = Balance.deep.specials
+                let sp = table[Math.floor(rare() * table.length)]
+                kind = sp.kind
+                if (campFreed.candidates().some(c => c.id === sp.id)) special = sp.id
+            }
+            out.push({ gx: spot.gx, gy: spot.gy, kind: kind, special: special,
+                       veins: cells, hole: hole ? hole.gx + "," + hole.gy : "", room: ri })
+        })
+        return out
+    }
+    function placeDeepTravellers(list) {
+        for (let s of list) placeDeepTraveller(s.gx, s.gy, s.kind, s.veins, s.hole, s.room, s.special)
+    }
+    // Where a traveller of kind in front of the wall cell (gx, gy) is, by
+    // the veins on veinCells: {x, y, facing}, its feet on the floor below
+    // the face, a lost one sit wu out from it, a miner stand wu, a little
+    // toward the vein of its row nearest to it and facing it
+    function _deepSpot(gx, gy, kind, veinCells) {
+        let cfg = Balance.deep.traveller, x = (gx + 0.5) * cellSize
+        if (kind !== "miner") return { x: x, y: gy * cellSize - cfg.sit, facing: 1 }
+        let best = null
+        for (let cell of veinCells) {
+            let c = cell.split(",").map(Number)
+            if (c[1] === gy && (best === null || Math.abs(c[0] - gx) < Math.abs(best - gx))) best = c[0]
+        }
+        let facing = best !== null && best < gx ? -1 : 1
+        return { x: x + facing * cfg.toVein, y: gy * cellSize - cfg.stand, facing: facing }
+    }
+    // A traveller of the deep of kind in front of the wall cell (gx, gy),
+    // of the room roomIndex with the veins on veinCells and the spawn hole
+    // on holeCell ("" none), the special of that id ("" or left out none)
+    function placeDeepTraveller(gx, gy, kind, veinCells, holeCell, roomIndex, special) {
+        let cell = gx + "," + gy, at = _deepSpot(gx, gy, kind, veinCells)
+        let s = deepTravellerComponent.createObject(world.room, {
+            cxWu: at.x, cyWu: at.y + cellSize / 2 - 0.05, sizeWu: cellSize, footXWu: at.x, footYWu: at.y,
+            facing: at.facing, cell: cell, kind: kind, veinCells: veinCells, holeCell: holeCell || "",
+            roomIndex: roomIndex, special: special || "", seed: createRng(gx * 7349 + gy * 3571 + 29)(),
+            glowParent: glowParent(), pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+        })
+        if (!s) return null
+        deepTravellers.push(s)
+        dungeonObjects.push(s)
+        _deepRuns[cell] = { say: 0, dig: 0, swing: -1, path: [], leave: 0, chord: -1, talked: false }
+        console.log("[Game] A", kind === "miner" ? "miner" : "lost traveller", special ? "(the special " + special + ")" : "",
+                    "before", cell, "- its hole", holeCell || "none")
+        return s
+    }
+    function deepTravellerAt(cell) {
+        return deepTravellers.find(s => s.cell === cell) || null
+    }
+    // Whether this screen decides how a traveller of the deep goes on and
+    // counts the miners' strikes: alone, in the dojo's deep room, or the
+    // host
+    function _decidesDeep() {
+        return !session.connected || deepRoomActive || session.isHost
+    }
+
+    // The traveller this node's knight can talk to: still there, not
+    // talked to yet, its middle within talkReach of the knight, the
+    // nearest; or null
+    function deepTravellerToTalk() {
+        if (!player || fallen || talking) return null
+        let c = _knightCentre(), out = null, best = Infinity
+        for (let s of deepTravellers) {
+            let run = _deepRuns[s.cell]
+            if (s.outcome !== "" || s.gone || !run || run.talked) continue
+            let d = Math.hypot(s.midXWu - c.x, s.midYWu - c.y)
+            if (d <= Balance.deep.traveller.talkReach && d < best) {
+                best = d
+                out = s
+            }
+        }
+        return out
+    }
+    // E: this node's knight talks to the traveller near it, which says its
+    // line at once; alone it leaves, in a session the host decides. False
+    // when there is none to talk to
+    function talkToDeepTraveller() {
+        let s = deepTravellerToTalk()
+        if (!s) return false
+        _deepRuns[s.cell].talked = true
+        s.talkable = false
+        _deepEvent(s, "talked")
+        _deepSay(s, "leaving")
+        console.log("[Game] Talked to the", s.kind, "before", s.cell, "- \"" + s.saying + "\"")
+        if (session.connected && !deepRoomActive) session.reportTalk(levelIndex, s.cell)
+        else _deepOutcome(s, "leaving")
+        return true
+    }
+    // Host: a node's knight talked to the traveller on cell of that level:
+    // it leaves, unless it went on already or is on another level than
+    // the host's; then the host refuses the talk, as it refuses a gem
+    function _hostTalk(fromId, level, cell) {
+        let s = level === levelIndex && levelType === "dungeon" ? deepTravellerAt(cell) : null
+        if (!s || s.outcome !== "") {
+            console.log("[Game] The talk of", fromId, "to the traveller before", cell, "of level", level, "- refused")
+            if (fromId === session.nodeId) _talkRefused(cell)
+            else session.refuseTalk(fromId, cell)
+            return
+        }
+        _deepOutcome(s, "leaving")
+    }
+    // The host refused this node's talk to the traveller on cell: one the
+    // host decided already goes on as it decided, any other stops saying
+    // its line and can be talked to again
+    property int talksRefused: 0
+    function _talkRefused(cell) {
+        let s = deepTravellerAt(cell), run = s ? _deepRuns[cell] : null
+        if (!s || !run || s.outcome !== "") return
+        let val = session.deepTravellers
+        if (val && val.seed === session.runSeed && val.level === levelIndex && val.travellers[cell]) {
+            _deepOutcome(s, val.travellers[cell])
+            return
+        }
+        talksRefused++
+        run.talked = false
+        run.say = 0
+        s.saying = ""
+        _deepEvent(s, "refused")
+        console.log("[Game] The talk to the", s.kind, "before", s.cell, "was refused by the host: it stays")
+    }
+    // The line traveller s says as it goes on as outcome: a special's own,
+    // else one of its kind's table, from its own stream of the level's
+    // seed, so every screen shows the same
+    function deepLineOf(s, outcome) {
+        let cfg = Balance.deep.traveller
+        if (s.special !== "") return campFreed.specialOf(s.special).line
+        let c = s.cell.split(",").map(Number)
+        let rand = createRng(levelSeedNow() ^ 0x6c696e65 ^ (c[1] * gridWidth + c[0]) ^ outcome.length)
+        let lines = outcome === "fleeing" ? cfg.fleeLines : s.kind === "miner" ? cfg.minerLines : cfg.lostLines
+        return lines[Math.floor(rand() * lines.length)]
+    }
+    function _deepSay(s, outcome) {
+        s.saying = deepLineOf(s, outcome)
+        let run = _deepRuns[s.cell]
+        if (run) run.say = Balance.deep.traveller.say
+    }
+    // Traveller s goes on as outcome, "leaving" or "fleeing": it says its
+    // line, unless it says it already, and walks off toward its room's way
+    // to the exit; quiet (a level built with it gone already), it is gone
+    // at once. The host tells every node. The camps take it in (CampFreed)
+    function _deepOutcome(s, outcome, quiet) {
+        if (s.outcome !== "") return
+        s.outcome = outcome
+        s.digging = false
+        s.talkable = false
+        _deepEvent(s, outcome)
+        console.log("[Game] The", s.kind, "before", s.cell, "-", outcome)
+        campFreed.goneOn(levelIndex + ":" + s.cell, s.kind, outcome, s.special, _decidesDeep())
+        let run = _deepRuns[s.cell]
+        if (quiet || !run) {
+            s.gone = true
+            s.saying = ""
+            delete _deepRuns[s.cell]
+        } else {
+            if (s.saying === "") _deepSay(s, outcome)
+            run.swing = -1
+            run.path = _wayOut(s.roomIndex, s.footXWu, s.footYWu)
+            run.leave = 0
+            run.chord = outcome === "leaving" ? Balance.deep.traveller.chordDelay : -1
+        }
+        _publishDeep()
+    }
+    // Hole h sent its first wave: the miners still in its room flee
+    function _minersFlee(h) {
+        if (!_decidesDeep()) return
+        for (let s of deepTravellers)
+            if (s.holeCell === h.cell && s.kind === "miner" && s.outcome === "") _deepOutcome(s, "fleeing")
+    }
+    function _deepEvent(s, what) {
+        deepTravellerEvents = deepTravellerEvents.concat([{ cell: s.cell, what: what, t: _deepClock }])
+    }
+    function _deepSound(name) {
+        deepTravellerSounds = deepTravellerSounds.slice(1 - veinSoundsKept).concat([name])
+        deepTravellerSoundCount++
+    }
+    // How loud traveller s is to this knight: gain at its side, down to
+    // nothing at reach wu
+    function _deepGain(s, gain, reach) {
+        if (!player) return gain
+        let c = _knightCentre()
+        return gain * Math.max(0, 1 - Math.hypot(s.midXWu - c.x, s.midYWu - c.y) / reach)
+    }
+    // The way out of room ri toward the exit: a corridor's cell beside it,
+    // the northmost, then the nearest to the exit's column, as the points
+    // to walk [{x, y}] from inside the room out into it; from a room with
+    // none (the dojo's deep room), straight down from (x, y)
+    function _wayOut(ri, x, y) {
+        let room = rooms[ri], best = null
+        if (room) {
+            let edge = []
+            for (let gx = room.x; gx < room.x + room.w; gx++) {
+                edge.push([gx, room.y + room.h, gx, room.y + room.h - 1])
+                edge.push([gx, room.y - 1, gx, room.y])
+            }
+            for (let gy = room.y; gy < room.y + room.h; gy++) {
+                edge.push([room.x - 1, gy, room.x, gy])
+                edge.push([room.x + room.w, gy, room.x + room.w - 1, gy])
+            }
+            for (let e of edge) {
+                if (!grid[e[1]] || grid[e[1]][e[0]] !== cellHallway) continue
+                if (!best || e[1] > best[1] || (e[1] === best[1] && Math.abs(e[0] - exitGridX) < Math.abs(best[0] - exitGridX)))
+                    best = e
+            }
+        }
+        let at = (gx, gy) => ({ x: (gx + 0.5) * cellSize, y: (gy + 0.5) * cellSize })
+        if (!best) return [{ x: x, y: y - 3 * cellSize }]
+        let inside = at(best[2], best[3]), out = at(best[0], best[1])
+        return [inside, out, { x: out.x + (out.x - inside.x) * 2, y: out.y + (out.y - inside.y) * 2 }]
+    }
+    // A strike of miner s's pick on the rock beside its vein: the tink,
+    // a few chips, and on the node that decides, one more strike its
+    // room's hole counts while it rests
+    function _minerStrike(s) {
+        let cfg = Balance.deep.traveller
+        s.digs++
+        spawnShards(s.pickXWu, s.pickYWu, -s.facing, 0.4, 2, Balance.deep.chipColor, 0.06)
+        let gain = _deepGain(s, cfg.digVolume, cfg.hearReach)
+        if (gain > 0.005) {
+            tinkSound.triggerNote(tinkSound.rootNote + cfg.digPitch, gain / Balance.deep.tinkVolume)
+            _deepSound("dig")
+        }
+        if (!_decidesDeep()) return
+        let h = s.holeCell !== "" ? holeAt(s.holeCell) : null
+        if (h && h.stage === "rest") h.dug++
+    }
+    // Each physics step: a lost one waits, afraid; a miner digs while a
+    // knight of any screen is within digReach of it; one that goes on says
+    // its line, the chord plays, and it walks off fading. "[E] Talk" shows
+    // over the one this node's knight can talk to
+    function _stepDeepTravellers() {
+        if (deepTravellers.length === 0) return
+        let cfg = Balance.deep.traveller, dt = world.physics.timeStep
+        _deepClock += dt
+        let knights = knightsHere(), near = deepTravellerToTalk()
+        for (let s of deepTravellers) {
+            let run = _deepRuns[s.cell]
+            s.talkable = s === near
+            if (!run || s.gone) continue
+            if (run.say > 0) {
+                run.say -= dt
+                if (run.say <= 0) s.saying = ""
+            }
+            if (s.outcome === "") {
+                if (s.kind !== "miner") continue
+                s.digging = knights.some(k => Math.hypot(k.x - s.midXWu, k.y - s.midYWu) <= cfg.digReach)
+                if (s.digging) {
+                    run.dig += dt
+                    if (run.dig >= cfg.digEvery && run.swing < 0) {
+                        run.dig -= cfg.digEvery
+                        run.swing = 0
+                    }
+                }
+                // A strike: the pick raised over raise seconds, then down
+                // on the rock in a tenth of one
+                if (run.swing >= 0) {
+                    run.swing += dt
+                    let raise = cfg.raise
+                    if (run.swing < raise) {
+                        s.swing = 1 - run.swing / raise
+                    } else if (run.swing < raise + 0.1) {
+                        s.swing = (run.swing - raise) / 0.1
+                    } else {
+                        s.swing = 1
+                        run.swing = -1
+                        _minerStrike(s)
+                    }
+                }
+                continue
+            }
+            // Going: the chord, the walk, the fade
+            s.swing = 1
+            if (run.chord >= 0) {
+                run.chord -= dt
+                if (run.chord < 0) {
+                    travellerChord.triggerOneShot(Math.max(Balance.deep.hole.quietest,
+                                                           _deepGain(s, 1, Balance.deep.hole.hearReach)))
+                    _deepSound("chord")
+                }
+            }
+            if (run.path.length > 0) {
+                let p = run.path[0], dx = p.x - s.footXWu, dy = p.y - s.footYWu
+                let d = Math.hypot(dx, dy), stepWu = cfg.leaveSpeed * dt
+                s.walking = true
+                if (Math.abs(dx) > 0.02) s.facing = dx > 0 ? 1 : -1
+                if (d <= stepWu) {
+                    s.footXWu = p.x
+                    s.footYWu = p.y
+                    run.path.shift()
+                } else {
+                    s.footXWu += dx / d * stepWu
+                    s.footYWu += dy / d * stepWu
+                }
+            } else {
+                s.walking = false
+            }
+            run.leave += dt
+            if (run.leave > cfg.fadeAfter) s.fade = Math.max(0, 1 - (run.leave - cfg.fadeAfter) / cfg.fade)
+            if (s.fade <= 0) {
+                s.gone = true
+                s.walking = false
+                s.saying = ""
+                delete _deepRuns[s.cell]
+                _deepEvent(s, "gone")
+                console.log("[Game] The", s.kind, "from before", s.cell, "is gone toward the exit")
+            }
+        }
+    }
+    // Host: the travellers of the deep that go on in its level and how,
+    // for every node
+    function _publishDeep() {
+        if (!session.connected || !session.isHost || deepRoomActive || levelType !== "dungeon") return
+        let out = {}
+        for (let s of deepTravellers)
+            if (s.outcome !== "") out[s.cell] = s.outcome
+        session.publishDeepTravellers({ seed: session.runSeed, level: levelIndex, travellers: out })
+    }
+    // The host's travellers that go on in the level: each still here goes
+    // on as the host decided; quiet when the level was just built
+    function _applyDeep(val, quiet) {
+        if (!val || !session.connected || session.isHost || levelType !== "dungeon") return
+        if (val.seed !== session.runSeed || val.level !== levelIndex) return
+        for (let cell in val.travellers) {
+            let s = deepTravellerAt(cell)
+            if (s) _deepOutcome(s, val.travellers[cell], quiet)
+        }
+    }
+    readonly property var _sessionDeep: session.deepTravellers
+    on_SessionDeepChanged: _applyDeep(_sessionDeep)
+
+    // The pouch: a gem into it
+    function addGem(gem) {
+        if (!player) return
+        player.pouch = player.pouch.concat([{ shape: gem.shape, value: gem.value }])
+        console.log("[Game] A", gem.shape, "worth", gem.value, "into the pouch,", player.pouch.length, "gems in it")
+    }
+    // The gems of a pouch per shape, in the table's order and only those
+    // it holds: [{shape, color, count}]
+    function pouchCounts(pouch) {
+        let out = []
+        for (let g of Balance.deep.shapes) {
+            let n = (pouch || []).filter(x => x.shape === g.shape).length
+            if (n > 0) out.push({ shape: g.shape, color: g.color, count: n })
+        }
+        return out
+    }
+    function pouchWorth(pouch) {
+        return (pouch || []).reduce((a, g) => a + g.value, 0)
+    }
+    // A pouch as text and back, "shape:value,shape:value", for the network
+    function pouchText(pouch) {
+        return (pouch || []).map(g => g.shape + ":" + g.value).join(",")
+    }
+    function pouchOf(text) {
+        if (!text) return []
+        return String(text).split(",").map(t => {
+            let p = t.split(":")
+            return { shape: p[0], value: Number(p[1]) }
+        })
+    }
+
+    // The smith buys the gems: his ware while the pouch holds any, the
+    // whole pouch for its worth
+    function gemWare() {
+        if (!player || player.pouch.length === 0) return null
+        let n = player.pouch.length
+        return { id: "gems", sell: true, price: pouchWorth(player.pouch),
+                 label: "Sell your " + (n === 1 ? "gem" : n + " gems") }
+    }
+    // The innkeeper buys the fish: his ware while the creel holds any, the
+    // whole creel for the kinds' gold
+    function fishWare() {
+        if (!player || player.creel.length === 0) return null
+        let n = player.creel.length
+        let price = player.creel.reduce((s, f) => s + Balance.fishing.kinds[f.kind].gold, 0)
+        return { id: "fish", sell: true, price: price,
+                 label: "Sell your " + (n === 1 ? "fish" : n + " fish") }
+    }
+    function sellFish() {
+        let offer = fishWare()
+        if (!offer || player.fallen) return false
+        player.gold += offer.price
+        player.creel = []
+        dialoguePanel.note = "Fresh from the pond? They'll go in the pan tonight. " + offer.price + " gold."
+        dialoguePanel.wares = _offered(dialoguePanel.wares)
+        Qt.callLater(_clink)
+        return true
+    }
+    // The cave cat takes a fish (E, within Balance.fishing.catReach): the
+    // smallest in the creel; it eats and purrs
+    function feedCat() {
+        if (!player || !campCat || player.creel.length === 0) return false
+        let c = _knightCentre()
+        if (Math.hypot(campCat.xWu - c.x, campCat.yWu - c.y) > Balance.fishing.catReach + campCat.sizeWu / 2)
+            return false
+        let creel = player.creel.slice(), at = 0
+        for (let i = 1; i < creel.length; i++) if (creel[i].size < creel[at].size) at = i
+        let fish = creel.splice(at, 1)[0]
+        player.creel = creel
+        campCat.feed(Balance.fishing.kinds[fish.kind].color)
+        spawnDamageNumber(campCat.xWu, campCat.yWu + 0.5, "*purrs*", "#E8D8B0")
+        purrSound.play()
+        return true
+    }
+    Sound {
+        id: purrSound
+        source: "assets/cat_purr.wav"
+        volume: muted ? 0 : 0.8 * soundVolume
+    }
+    function sellGems() {
+        let offer = gemWare()
+        if (!offer || player.fallen) return false
+        player.gold += offer.price
+        player.pouch = []
+        dialoguePanel.note = "Fine stones, cut clean. " + offer.price + " gold, and fair."
+        dialoguePanel.wares = _offered(dialoguePanel.wares)
+        Qt.callLater(_clink)
+        console.log("[Game] Sold the gems for", offer.price, "gold,", player.gold, "now")
+        return true
+    }
+
+    // A fallen knight's pouch lies where it fell (PouchDrop): any other
+    // knight that walks over it or lifts the fallen one up takes it. In a
+    // session the host owns it as it owns the gold: a replicated object
+    // every node claims for its own knight, given to the first claim
+    Component { id: pouchDropComponent; PouchDrop {} }
+    FloorClaims {
+        id: pouchClaims
+        component: pouchDropComponent
+        room: world.room
+        link: session
+        extra: props => {
+            let best = pouchOf(props.gems).reduce((a, g) => !a || g.value > a.value ? g : a, null)
+            return { gemColor: best ? gemColorOf(best.shape) : "#F2B33D",
+                     pixelPerUnit: Qt.binding(() => world.pixelPerUnit) }
+        }
+        grantOf: drop => ({ gems: drop.gems })
+        take: grant => _takePouch(grant.gems)
+        claimOf: objectId => session.claimPouch(objectId)
+        despawnOf: objectId => session.despawnPouch(objectId)
+        grantTo: (nodeId, grant) => session.grantPouch(nodeId, grant)
+    }
+    readonly property var pouchDrops: pouchClaims.drops
+    // This node's knight fell: its pouch drops where it lies. In a session
+    // it leaves the knight once the host laid it on the floor; the gems
+    // asked for, until it answers (_pouchDropAnswered)
+    property int _pouchDropAsked: 0
+    property int pouchDropsRefused: 0
+    function _dropPouch() {
+        if (!player || player.pouch.length === 0 || (_pouchDropAsked > 0 && session.connected)) return
+        _pouchDropAsked = 0
+        let c = _knightCentre()
+        let props = { xWu: c.x, yWu: c.y, gems: pouchText(player.pouch) }
+        console.log("[Game] The pouch drops with", player.pouch.length, "gems at", c.x.toFixed(2), c.y.toFixed(2))
+        if (session.connected) {
+            _pouchDropAsked = player.pouch.length
+            session.dropPouch(Object.assign({ level: levelIndex }, props))
+            return
+        }
+        player.pouch = []
+        pouchClaims.make(props)
+    }
+    function _pouchDropAnswered(ok) {
+        let n = _pouchDropAsked
+        _pouchDropAsked = 0
+        if (!ok) {
+            pouchDropsRefused++
+            console.log("[Game] The host is on another level: the pouch stays with the knight")
+            return
+        }
+        if (player && n > 0) player.pouch = player.pouch.slice(n)
+    }
+    // Host: a node's knight dropped its pouch on that level; on another
+    // level than the host's it stays with the knight
+    function _hostDropPouch(fromId, props) {
+        let ok = screen === "game" && levelType === "dungeon" && props.level === levelIndex
+        if (ok) session.spawnPouch({ xWu: props.xWu, yWu: props.yWu, gems: props.gems, owner: fromId })
+        else console.log("[Game] A pouch dropped on level", props.level, "by", fromId, "- refused")
+        session.answerPouchDrop(fromId, ok)
+    }
+    // Each step: a pouch this node's knight stands on is its, or claimed
+    // from the host in a session
+    function _pickUpPouches() {
+        if (!player || player.fallen || pouchDrops.length === 0) return
+        let c = _knightCentre()
+        pouchClaims.claimNear(c.x, c.y, Balance.deep.pouchReach)
+    }
+    // This node's knight lifted that node's knight up: its pouch too
+    function _claimPouchesOf(nodeId) {
+        for (let drop of pouchDrops.slice())
+            if (drop && drop.owner === nodeId) pouchClaims.claim(drop)
+    }
+    function _takePouch(gems) {
+        if (!player) return
+        let got = pouchOf(gems)
+        player.pouch = player.pouch.concat(got)
+        spawnDamageNumber(player.xWu, player.yWu, "+" + got.length + (got.length === 1 ? " gem" : " gems"), "#E8B83A")
+        Qt.callLater(_clink)
+        console.log("[Game] Took a pouch of", got.length, "gems,", player.pouch.length, "in this one now")
+    }
+
+    // The dojo's deep scenario: a walled room with a vein in the middle of
+    // its north wall, the gem of the scenario's depth, the knight right
+    // below it, in reach, the vein's spawn hole in the same wall, a miner
+    // and a lost traveller before its rock face, and a special beside
+    // them
+    function enterDeepRoom() {
+        console.log("[Game] Entering the deep room")
+        clearDungeon()
+        deepRoomActive = true
+        let size = 11
+        let ox = Math.floor((gridWidth - size) / 2), oy = Math.floor((gridHeight - size) / 2)
+        let gx = ox + Math.floor(size / 2), gy = oy + size
+        let a = _buildArena(size, [gx + "," + gy])
+        placeVein(gx, gy)
+        // Its spawn hole on the nearest free spot gap cells or more off
+        // the vein, in sight of the knight
+        for (let k = Balance.deep.hole.gap; k < size; k++) {
+            let hx = [gx + k, gx - k].find(x => _isFace(x, gy) && !_torchCells[x + "," + gy])
+            if (hx === undefined) continue
+            placeHole(hx, gy, [gx + "," + gy])
+            break
+        }
+        // A miner and a lost traveller before the vein's rock face, one
+        // each side of it
+        let hole = holes.length > 0 ? holes[0].cell : ""
+        placeDeepTraveller(gx - 1, gy, "miner", [gx + "," + gy], hole, 0)
+        placeDeepTraveller(gx + 1, gy, "lost", [gx + "," + gy], hole, 0)
+        // And a special beside the lost one: the first not yet with the
+        // camps, else the first (issue #159)
+        let sp = campFreed.candidates()[0] || Balance.deep.specials[0]
+        placeDeepTraveller(gx + 2, gy, sp.kind, [gx + "," + gy], hole, 0, sp.id)
+        spawnPlayer((gx + 0.5) * cellSize - 0.5, gy * cellSize - 0.4)
+        _bindKnight()
+    }
+
     // --- Fight Room ---
     function enterFightRoom() {
         console.log("[Game] Entering fight room")
         clearDungeon()
         fightRoomActive = true
+        let a = _buildArena(15)
 
-        // Simple walled room: 15x15 cells centered
-        let roomSize = 15
-        let ox = Math.floor((gridWidth - roomSize) / 2)
-        let oy = Math.floor((gridHeight - roomSize) / 2)
+        // Spawn player at center
+        let cx = (a.ox + a.size / 2) * cellSize
+        let cy = (a.oy + a.size / 2) * cellSize
+        _fightRoomCx = cx
+        _fightRoomCy = cy
+        spawnPlayer(cx, cy)
+        _bindKnight()
+
+        // Spawn the fight room's enemies
+        _spawnFightRoomEnemies()
+    }
+
+    // A walled square room of size cells in the middle of the grid, all of
+    // it explored, with its floor, walls, torches and motes: {ox, oy, size},
+    // its lower left cell and its size
+    function _buildArena(size, rockCells) {
+        let ox = Math.floor((gridWidth - size) / 2)
+        let oy = Math.floor((gridHeight - size) / 2)
 
         // Initialize grid and carve room
         initializeGrid()
         initExploredCells()
-        for (let y = oy; y < oy + roomSize; y++)
-            for (let x = ox; x < ox + roomSize; x++) {
+        for (let y = oy; y < oy + size; y++)
+            for (let x = ox; x < ox + size; x++) {
                 grid[y][x] = cellRoom
                 exploredCells[y][x] = true
             }
@@ -5434,29 +7984,22 @@ ClayWorld2d {
         createWallRims()
         updateOccluders()
         spawnMotes()
-        rooms = [{x: ox, y: oy, w: roomSize, h: roomSize}]
+        rooms = [{x: ox, y: oy, w: size, h: size}]
+        placeRockFaces(rockCells || [])
         placeRoomTorches(createRng(7))
+        return { ox: ox, oy: oy, size: size }
+    }
 
-        // Spawn player at center
-        let cx = (ox + roomSize / 2) * cellSize
-        let cy = (oy + roomSize / 2) * cellSize
-        _fightRoomCx = cx
-        _fightRoomCy = cy
-        spawnPlayer(cx, cy)
-
-        // Bind controls
-        if (player) {
-            player.moveX = Qt.binding(() => knightMoveX)
-            player.moveY = Qt.binding(() => knightMoveY)
-            player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
-            player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
-            player.playerScreenX = Qt.binding(() => playerScreenX)
-            player.playerScreenY = Qt.binding(() => playerScreenY)
-            gameCamera.target = player
-        }
-
-        // Spawn the fight room's enemies
-        _spawnFightRoomEnemies()
+    // The keys and the mouse steer the knight, and the camera follows it
+    function _bindKnight() {
+        if (!player) return
+        player.moveX = Qt.binding(() => knightMoveX)
+        player.moveY = Qt.binding(() => knightMoveY)
+        player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
+        player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+        player.playerScreenX = Qt.binding(() => playerScreenX)
+        player.playerScreenY = Qt.binding(() => playerScreenY)
+        gameCamera.target = player
     }
 
     // Auto-respawn enemies in fight room when all dead
@@ -5477,8 +8020,11 @@ ClayWorld2d {
         }
     }
 
+    // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo
+    // eval can set it to try a fight against one enemy
+    property var fightRoomRoster: Balance.spawn.fightRoom
     function _spawnFightRoomEnemies() {
-        for (let e of Balance.spawn.fightRoom)
+        for (let e of fightRoomRoster)
             spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 
@@ -5495,7 +8041,10 @@ ClayWorld2d {
     readonly property int scenarioSeed: 424242
     // "features" is the dungeon with every feature kind at its showcase
     // count (Balance.dungeon), to try a kind right after a reload
-    function scenarios() { return ["dungeon", "village", "fight", "features"] }
+    // "deep" is a walled room with a vein in its north wall and the knight
+    // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
+    // hole, a miner and a lost traveller before its rock face and a special
+    function scenarios() { return ["dungeon", "village", "fight", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -5523,6 +8072,8 @@ ClayWorld2d {
         _startRunRecord()
         if (name === "fight")
             enterFightRoom()
+        else if (name === "deep")
+            enterDeepRoom()
         else if (name === "village")
             generateVillage()
         else
@@ -5709,6 +8260,8 @@ ClayWorld2d {
                 secrets: world.runSecrets
                 seconds: world.runSeconds
                 recordLine: world.recordLine
+                freedLine: campFreed.tonightLine
+                joinedLine: campFreed.joinedLine
                 newRecord: world.recordPassed
                 runs: world.sessionRuns
                 canGoAgain: !session.connected || (world.partyFallen && session.isHost)
@@ -5733,6 +8286,8 @@ ClayWorld2d {
                 soundVolume: world.soundVolume
                 message: world.titleMessage
                 recordLine: world.recordLine
+                freedLine: campFreed.tonightLine
+                joinedLine: campFreed.joinedLine
                 dungeonMaster: world.dungeonMaster
                 onDungeonMasterToggled: world.setDungeonMaster(!world.dungeonMaster)
                 onSinglePlayerSelected: screen = "game"

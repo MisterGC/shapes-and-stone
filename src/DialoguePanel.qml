@@ -11,18 +11,22 @@ Item {
     visible: false
 
     property string speakerName: ""
+    // Who speaks, the Npc that opened it (null for none)
+    property var speaker: null
     property color speakerColor: "#C9A227"
     property var lines: []
     property int _lineIndex: 0
-    // What the speaker sells, picked with keys 1 and 2: [{label, price}]
+    // What the speaker sells, picked with keys 1 to 5: [{label, price}];
+    // one with sell is what the speaker buys from the knight, for price
     property var wares: []
     // The knight's gold, to grey out what it cannot pay
     property int gold: 0
     // The speaker's answer to a purchase, shown instead of the line
     property string note: ""
 
-    function open(name, color, dialogueLines, offered) {
+    function open(name, color, dialogueLines, offered, who) {
         speakerName = name
+        speaker = who || null
         speakerColor = color
         lines = dialogueLines
         wares = offered || []
@@ -40,6 +44,7 @@ Item {
 
     function close() {
         visible = false
+        speaker = null
         lines = []
         wares = []
         note = ""
@@ -103,8 +108,9 @@ Item {
             Text {
                 required property var modelData
                 required property int index
-                text: "[" + (index + 1) + "] " + modelData.label + " - " + modelData.price + " gold"
-                color: panel.gold >= modelData.price ? "#E8B83A" : "#776644"
+                text: "[" + (index + 1) + "] " + modelData.label + (modelData.sell ? " + " : " - ")
+                      + modelData.price + " gold"
+                color: modelData.sell || panel.gold >= modelData.price ? "#E8B83A" : "#776644"
                 font.pixelSize: 12
                 font.bold: true
             }

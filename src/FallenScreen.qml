@@ -2,7 +2,8 @@ import QtQuick
 
 // Shown when the knight falls: how deep the run got, its kills, the
 // secret rooms found and its time,
-// the record of the deepest descent, this session's runs with the depth
+// the record of the deepest descent, who was freed tonight and the
+// specials with the camps, this session's runs with the depth
 // and time of each, newest first, Enter to go again, Esc back to the
 // title. In a session whose other knights still fight it says the knight
 // is down, keeps the dungeon in sight and offers only Esc, which leaves;
@@ -26,6 +27,10 @@ Item {
     property string recordLine: ""
     // This run went deeper than the record
     property bool newRecord: false
+    // Who was freed tonight and the specials with the camps (CampFreed);
+    // "" for none (issue #159)
+    property string freedLine: ""
+    property string joinedLine: ""
     // The session's runs, newest first: {depth, seconds}
     property var runs: []
     // Enter starts the next run: alone, or the host once the party has
@@ -107,6 +112,24 @@ Item {
             color: fallenScreen.newRecord ? "#E8C35A" : "#AAAAAA"
             font.pixelSize: 14
             font.bold: fallenScreen.newRecord
+        }
+
+        Text {
+            objectName: "fallenFreed"
+            visible: fallenScreen.freedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: fallenScreen.freedLine
+            color: "#A8D4FF"
+            font.pixelSize: 13
+        }
+
+        Text {
+            objectName: "fallenJoined"
+            visible: fallenScreen.joinedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: fallenScreen.joinedLine
+            color: "#E8C35A"
+            font.pixelSize: 13
         }
 
         // Tonight's runs, newest first, numbered from the first

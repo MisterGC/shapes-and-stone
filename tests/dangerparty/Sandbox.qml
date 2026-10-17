@@ -6,8 +6,10 @@
 // The instance runs the real game. The driver makes up each knight's
 // record of a dungeon, lets the host lead the party down and reads what
 // each screen shows: the danger of the level, the dungeon's look and its
-// enemies, which grow with the party (issue #102), and its descent gauge
-// (issue #97).
+// enemies, which grow with the party (issue #102), its descent gauge
+// (issue #97), whether the knights sit by the camp's fire (issue #148),
+// whether the camp's music steps back while they rest (issue #147), and
+// whom the camp's cat looks up at (issue #150).
 
 import QtQuick
 import Clayground.Network
@@ -110,6 +112,66 @@ Item {
             else if (o.moteSize !== undefined) out.air.push(r3(o.density))
         }
         return out
+    }
+    // What the camp on this screen looks like (issue #146): its look,
+    // the layout of its props and every prop laid, and where its cat lies
+    // (issue #150), or null
+    function camp() {
+        let c = game.campCat
+        return {look: game.campLook.name, layout: game.campLayout,
+                props: game.campProps.map(p => [p.kind, r3(p.x), r3(p.y), r3(p.w), r3(p.h)]),
+                cat: c ? [r3(c.xWu), r3(c.yWu), r3(c.seed)] : null}
+    }
+    // The camp's cat on this screen (issue #150): whether it looks up,
+    // and at this screen's knight ("me") or the other's ("other")
+    function cat() {
+        let c = game.campCat
+        if (!c) return null
+        let rp = Object.values(session.remotePlayers)[0]
+        return {mood: c.mood, watching: c.watching === game.player ? "me"
+                                        : c.watching && c.watching === rp ? "other" : null}
+    }
+    // This screen's knight comes near the cat: between it and the fire,
+    // just out of the fire's warmth so it does not sit down; or, far
+    // false, back at the entrance
+    function byCat(near) {
+        let c = game.campCat, f = game.campfire
+        let fx = f.xWu + f.widthWu / 2, fy = f.yWu - f.heightWu / 2
+        let d = Math.hypot(c.xWu - fx, c.yWu - fy), r = Balance.campfire.healRadius + 0.6
+        if (near) {
+            game.player.xWu = fx + r * (c.xWu - fx) / d - 0.5
+            game.player.yWu = fy + r * (c.yWu - fy) / d + 0.5
+        } else {
+            game.player.xWu = game.entranceGridX * game.cellSize
+            game.player.yWu = c.yWu - 12
+        }
+        game.camera.target = null
+        game.camera.target = game.player
+        return true
+    }
+    // Sitting by the fire (issue #148): this screen's knight stands still
+    // dx wu east of the campfire, walks east (1) or stands (0); seated()
+    // tells whether this screen draws its knight and the other's seated
+    function sitBy(dx) {
+        game.player.xWu = game.campfire.xWu + dx
+        game.player.yWu = game.campfire.yWu
+        // The camera follows only a knight that moves
+        game.camera.target = null
+        game.camera.target = game.player
+        return true
+    }
+    function walk(x) { game.player.moveX = x; return true }
+    function seated() {
+        let rp = Object.values(session.remotePlayers)[0]
+        return {me: game.player.seated, other: rp ? rp.seated : null,
+                x: r3(game.player.xWu), shield: _find(game.player, "shieldDown").visible}
+    }
+    // The camp at rest on this screen (issue #147): whether it is quiet,
+    // the music's share of its level, and how loud this screen hears the
+    // campfire's crackle
+    function rest() {
+        let cs = game.campSounds
+        return {quiet: cs.quiet, music: r3(cs.musicShare), crackle: r3(cs.gainOf("crackle"))}
     }
     // The enemies on this screen, by their replicated object, and the
     // knights the dungeon was built for: per enemy its id, type, tier, max

@@ -36,6 +36,15 @@ Item {
     // At 0 HP: the knight slumps to the floor, dark, its lantern low and
     // no aim shown - the same on every screen that draws it
     property bool downed: false
+    // Sitting by the fire (Balance.camp.sit): the knight sinks down,
+    // breathes slow and deep, and its shield lies on the floor beside it.
+    // _sit runs 0 standing to 1 seated, down slowly, up at once
+    property bool seated: false
+    property real _sit: seated ? 1 : 0
+    Behavior on _sit {
+        NumberAnimation { duration: (view.seated ? Balance.camp.sit.down : Balance.camp.sit.up) * 1000
+                          easing.type: Easing.InOutQuad }
+    }
     // How far an ally has lifted the downed knight up, 0..1: the ring
     // around it (Balance.party)
     property real reviveProgress: 0
@@ -187,6 +196,8 @@ Item {
         loops: Animation.Infinite
     }
     readonly property real _breath: Math.sin(_lifeT * 2.4) * (1 - moveAmount)
+    // Seated, the breath is slower and deeper
+    readonly property real _sitBreath: Math.sin(_lifeT * Balance.camp.sit.breath) * _sit
     // One bob a footstep, at the beat the footsteps sound (Balance.steps)
     readonly property real _step: Math.abs(Math.sin(_lifeT * Math.PI * Balance.steps.perSecond)) * moveAmount
 
@@ -198,8 +209,12 @@ Item {
         transform: [
             Scale {
                 origin.x: visual.width / 2; origin.y: visual.height
-                xScale: view.downed ? 1.2 : view._fx ? 1 - 0.02 * view._breath + 0.03 * view._step : 1
-                yScale: view.downed ? 0.5 : view._fx ? 1 + 0.03 * view._breath - 0.05 * view._step : 1
+                xScale: view.downed ? 1.2
+                    : (view._fx ? 1 - 0.02 * view._breath + 0.03 * view._step - 0.5 * Balance.camp.sit.breathDepth * view._sitBreath : 1)
+                      + 0.5 * Balance.camp.sit.squash * view._sit
+                yScale: view.downed ? 0.5
+                    : (view._fx ? 1 + 0.03 * view._breath - 0.05 * view._step + Balance.camp.sit.breathDepth * view._sitBreath : 1)
+                      - Balance.camp.sit.squash * view._sit
             },
             Translate {
                 x: view._fx ? view.moveX * visual.width * 0.04 : 0
@@ -448,6 +463,38 @@ Item {
         }
     }
 
+    // Seated by the fire, the shield lies on the floor beside the knight,
+    // on its off side from the lantern, rim in the knight's own colour
+    Rectangle {
+        id: shieldDown
+        objectName: "shieldDown"
+        visible: view._sit > 0
+        opacity: view._sit
+        readonly property real angleRad: (view.facingAngle - 140) * Math.PI / 180
+        readonly property real orbit: view.width * 0.68
+        width: view.width * 0.5
+        height: view.width * 0.36
+        radius: height * 0.45
+        x: view.width / 2 - width / 2 + Math.cos(angleRad) * orbit
+        y: view.height / 2 - height / 2 - Math.sin(angleRad) * orbit + (1 - view._sit) * view.height * 0.2
+        rotation: -view.facingAngle + 50
+        z: -0.5
+        gradient: Gradient {
+            GradientStop { position: 0; color: "#C9D2D9" }
+            GradientStop { position: 0.5; color: "#9AA6AF" }
+            GradientStop { position: 1; color: "#4A535A" }
+        }
+        border.color: Qt.darker(view.accentColor, 1.6)
+        border.width: Math.max(1, view.width * 0.04)
+        // The boss in its middle
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.height * 0.3; height: width
+            radius: width / 2
+            color: "#3A4248"
+        }
+    }
+
     // Shield arc visual (orbits on facing side when blocking)
     Canvas {
         id: shieldArc
@@ -681,7 +728,7 @@ Item {
     // Direction indicator arrowhead (orbits around the knight)
     Canvas {
         id: aimArrow
-        visible: !view.downed
+        visible: !view.downed && !chargeBlade.visible
         opacity: 0.5
         readonly property real arrowSize: view.width * 0.3
         readonly property real orbitRadius: view.width * 0.7
@@ -706,9 +753,32 @@ Item {
         }
     }
 
-    // The charge: the blade drawn back at the far edge of the heavy arc,
-    // its colour going from the blade's to Balance.heavy.glow, with a halo
-    // that grows with the charge. Reparented like the swing.
+    // The sword's outline at angle a (radians, canvas space) from cx, cy:
+    // the cross-guard inner from the centre, the tip at outer. Only the
+    // path; the caller fills and strokes it. The blade's half width
+    function _swordPath(ctx, cx, cy, a, inner, outer) {
+        var len = outer - inner
+        var w = len * 0.15
+        var c = Math.cos(a), s = Math.sin(a)
+        var px = -s, py = c
+        var bx = cx + inner * c, by = cy + inner * s
+        var shx = cx + (inner + len * 0.7) * c, shy = cy + (inner + len * 0.7) * s
+        ctx.beginPath()
+        ctx.moveTo(cx + outer * c, cy + outer * s)
+        ctx.lineTo(shx + px * w, shy + py * w)
+        ctx.lineTo(bx + px * w * 0.6, by + py * w * 0.6)
+        ctx.lineTo(bx + px * w * 0.9, by + py * w * 0.9)
+        ctx.lineTo(bx - px * w * 0.9, by - py * w * 0.9)
+        ctx.lineTo(bx - px * w * 0.6, by - py * w * 0.6)
+        ctx.lineTo(shx - px * w, shy - py * w)
+        ctx.closePath()
+        return w
+    }
+
+    // The charge: the sword held out the way the knight faces, its colour
+    // going from the blade's to Balance.heavy.glow, a shine running from
+    // the hilt to the tip, faster once the charge is full. Reparented like
+    // the swing.
     Canvas {
         id: chargeBlade
         objectName: "chargeBlade"
@@ -720,6 +790,14 @@ Item {
         visible: view.charging && !view.downed && !attackAnimation.running
         rotation: -view.facingAngle
         readonly property real charge: view.charge
+        property real shine: 0
+        NumberAnimation on shine {
+            running: chargeBlade.visible
+            loops: Animation.Infinite
+            from: 0; to: 1
+            duration: view.chargeFull ? 380 : 760
+        }
+        onShineChanged: requestPaint()
         onChargeChanged: requestPaint()
         onVisibleChanged: requestPaint()
         onPaint: {
@@ -728,36 +806,125 @@ Item {
             var c = view.charge
             var glow = view._glow
             var cx = width / 2, cy = height / 2
-            var a = -Balance.knight.heavyArc * Math.PI / 180
-            var inner = view.host.width * 0.55, outer = view.host.width * 1.4
-            var bx = cx + inner * Math.cos(a), by = cy + inner * Math.sin(a)
-            var tx = cx + outer * Math.cos(a), ty = cy + outer * Math.sin(a)
-            var px = -Math.sin(a), py = Math.cos(a)
-            var w = (outer - inner) * 0.1
-            // Halo
-            ctx.beginPath()
-            ctx.moveTo(tx, ty)
-            ctx.lineTo(bx, by)
-            ctx.strokeStyle = view._rgba(glow, 0.15 + 0.45 * c)
-            ctx.lineWidth = w * (2 + 3 * c)
-            ctx.lineCap = "round"
-            ctx.stroke()
-            // Blade
-            ctx.beginPath()
-            ctx.moveTo(tx, ty)
-            ctx.lineTo(bx + px * w, by + py * w)
-            ctx.lineTo(bx - px * w, by - py * w)
-            ctx.closePath()
+            var inner = view.host.width * 0.6, outer = view.host.width * 1.6
             var r = view.bladeColor.r + (glow.r - view.bladeColor.r) * c
             var g = view.bladeColor.g + (glow.g - view.bladeColor.g) * c
             var b = view.bladeColor.b + (glow.b - view.bladeColor.b) * c
-            ctx.fillStyle = "rgba(" + Math.round(r * 255) + ", " + Math.round(g * 255) + ", "
+            var base = "rgba(" + Math.round(r * 255) + ", " + Math.round(g * 255) + ", "
                     + Math.round(b * 255) + ", 1)"
+            // A soft glow round the blade once the charge is full, breathing
+            if (view.chargeFull) {
+                ctx.beginPath()
+                ctx.moveTo(cx + inner, cy)
+                ctx.lineTo(cx + outer, cy)
+                ctx.strokeStyle = view._rgba(glow, 0.25 + 0.2 * Math.sin(shine * Math.PI * 2))
+                ctx.lineWidth = (outer - inner) * 0.5
+                ctx.lineCap = "round"
+                ctx.stroke()
+            }
+            // The swing's sword, the shine a bright band sliding hilt to tip
+            view._swordPath(ctx, cx, cy, 0, inner, outer)
+            var grad = ctx.createLinearGradient(cx + inner, cy, cx + outer, cy)
+            var p = shine, band = 0.18
+            grad.addColorStop(0, base)
+            grad.addColorStop(Math.max(0, p - band), base)
+            grad.addColorStop(p, "rgba(255, 255, 255, " + (0.35 + 0.65 * c).toFixed(3) + ")")
+            grad.addColorStop(Math.min(1, p + band), base)
+            grad.addColorStop(1, base)
+            ctx.fillStyle = grad
             ctx.fill()
             var sharp = view.swordLevel > 0
             ctx.strokeStyle = view.chargeFull ? "#FFFFFF"
                                               : view._rgba(sharp ? view._edgeColor : view.accentColor, 0.9)
-            ctx.lineWidth = view.chargeFull || sharp ? 2 : 1
+            ctx.lineWidth = view.chargeFull ? 2 : sharp ? 2.5 : 1.5
+            ctx.stroke()
+            // Centre ridge
+            ctx.beginPath()
+            ctx.moveTo(cx + inner, cy)
+            ctx.lineTo(cx + outer, cy)
+            ctx.strokeStyle = view._rgba(view.ridgeColor, 0.8)
+            ctx.lineWidth = 1
+            ctx.stroke()
+        }
+    }
+
+    // Digging a vein (Balance.deep): the sword folds into a pickaxe, its
+    // blade narrowing into the haft as the tip folds out sideways into
+    // the pick's head, held towards the vein at pickAngle (as facingAngle).
+    // pickMorph runs 0 for the sword to 1 for the pickaxe and back, bound
+    // by the driver; pickStrike() swings it down onto the stone and back
+    property real pickMorph: 0
+    property real pickAngle: 0
+    property real _chop: 0
+    readonly property color _haftColor: "#6B4A2E"
+    function pickStrike() { pickChop.restart() }
+    SequentialAnimation {
+        id: pickChop
+        NumberAnimation { target: view; property: "_chop"; to: 1; duration: 60; easing.type: Easing.InQuad }
+        NumberAnimation { target: view; property: "_chop"; to: 0; duration: 260; easing.type: Easing.OutQuad }
+    }
+    Canvas {
+        id: pickaxe
+        objectName: "pickaxe"
+        parent: view.host.parent
+        x: view.host.x + view.host.width/2 - width/2
+        y: view.host.y + view.host.height/2 - height/2
+        width: view.host.width * 4
+        height: view.host.height * 4
+        visible: view.pickMorph > 0 && !view.downed
+        rotation: -view.pickAngle
+        readonly property real morph: view.pickMorph
+        readonly property real chop: view._chop
+        onMorphChanged: requestPaint()
+        onChopChanged: requestPaint()
+        onVisibleChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var m = Math.max(0, Math.min(1, morph))
+            var cx = width / 2, cy = height / 2
+            // Raised back while held, down on the stone at the chop
+            var a = (-0.55 + 0.7 * chop) * m
+            var inner = view.host.width * 0.35, outer = view.host.width * (1.35 + 0.1 * m)
+            var dx = Math.cos(a), dy = Math.sin(a), px = -dy, py = dx
+            var bx = cx + inner * dx, by = cy + inner * dy
+            var tx = cx + outer * dx, ty = cy + outer * dy
+            // The blade narrows into the haft and takes the wood's colour
+            var w = (outer - inner) * (0.1 - 0.04 * m)
+            var tipLen = (outer - inner) * 0.35 * (1 - m)
+            var blade = view.bladeColor, wood = view._haftColor
+            ctx.beginPath()
+            ctx.moveTo(tx + dx * tipLen, ty + dy * tipLen)
+            ctx.lineTo(tx + px * w, ty + py * w)
+            ctx.lineTo(bx + px * w, by + py * w)
+            ctx.lineTo(bx - px * w, by - py * w)
+            ctx.lineTo(tx - px * w, ty - py * w)
+            ctx.closePath()
+            ctx.fillStyle = "rgba(" + Math.round((blade.r + (wood.r - blade.r) * m) * 255) + ", "
+                    + Math.round((blade.g + (wood.g - blade.g) * m) * 255) + ", "
+                    + Math.round((blade.b + (wood.b - blade.b) * m) * 255) + ", 1)"
+            ctx.fill()
+            ctx.strokeStyle = view._rgba(view.accentColor, 0.9 * (1 - m))
+            ctx.lineWidth = 1
+            ctx.stroke()
+            // The head: the tip folded out to both sides into a crescent
+            // across the haft's end, its two points bent back
+            if (m <= 0.02) return
+            var half = (outer - inner) * 0.5 * m
+            var bulge = (outer - inner) * 0.2
+            var back = (outer - inner) * 0.22 * m
+            ctx.beginPath()
+            ctx.moveTo(tx + px * half - dx * back, ty + py * half - dy * back)
+            ctx.quadraticCurveTo(tx + dx * bulge * 1.6, ty + dy * bulge * 1.6,
+                                 tx - px * half - dx * back, ty - py * half - dy * back)
+            ctx.quadraticCurveTo(tx + dx * bulge * 0.2, ty + dy * bulge * 0.2,
+                                 tx + px * half - dx * back, ty + py * half - dy * back)
+            ctx.closePath()
+            ctx.fillStyle = view._rgba(view.bladeColor, 1)
+            ctx.fill()
+            ctx.strokeStyle = view._rgba(Qt.lighter(view.accentColor, 1.4), 0.95)
+            ctx.lineWidth = 1.5
+            ctx.lineJoin = "round"
             ctx.stroke()
         }
     }
@@ -788,6 +955,50 @@ Item {
                 target: chargeRing; property: "opacity"
                 from: 0.9; to: 0
                 duration: Balance.heavy.ring * 1000
+            }
+        }
+    }
+
+    // A potion drunk: a warm amber ring swells out from the knight and
+    // embers rise round it like sparks from a fire
+    function healBurst() { healAnim.restart() }
+    property real _heal: 0
+    NumberAnimation {
+        id: healAnim
+        target: view; property: "_heal"
+        from: 0; to: 1; duration: 1100
+    }
+    Rectangle {
+        id: healRing
+        parent: view.host.parent
+        width: view.host.width; height: view.host.height
+        x: view.host.x; y: view.host.y
+        radius: width / 2
+        color: "transparent"
+        border.color: "#FFA850"
+        border.width: Math.max(1, view.host.width * 0.08)
+        scale: 1 + 2.4 * Math.min(1, view._heal * 1.6)
+        opacity: healAnim.running ? 0.9 * (1 - Math.min(1, view._heal * 1.6)) : 0
+        visible: opacity > 0.01
+    }
+    Item {
+        parent: view.host.parent
+        x: view.host.x; y: view.host.y
+        width: view.host.width; height: view.host.height
+        visible: healAnim.running
+        Repeater {
+            model: 9
+            Rectangle {
+                readonly property real a: index * 2.39996
+                readonly property real d: view.host.width * (0.3 + 0.3 * ((index * 7) % 5) / 4)
+                readonly property real t: Math.max(0, Math.min(1, view._heal * 1.4 - (index % 4) * 0.1))
+                width: view.host.width * (0.06 + 0.03 * (index % 3)); height: width * 1.6
+                radius: width / 2
+                color: index % 3 === 0 ? "#FFD08A" : index % 3 === 1 ? "#FF9A40" : "#E86A20"
+                x: view.host.width / 2 + Math.cos(a) * d - width / 2
+                   + Math.sin(t * 9 + index) * view.host.width * 0.06
+                y: view.host.height / 2 + Math.sin(a) * d * 0.5 - height / 2 - t * view.host.height * 1.6
+                opacity: (1 - t) * Math.min(1, t * 6) * (0.75 + 0.25 * Math.sin(t * 40 + index))
             }
         }
     }
@@ -906,24 +1117,7 @@ Item {
             var perpX = -Math.sin(currentAngle)
             var perpY = Math.cos(currentAngle)
 
-            ctx.beginPath()
-            // Tip
-            ctx.moveTo(tx, ty)
-            // Right shoulder
-            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) + perpX * bladeW,
-                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) + perpY * bladeW)
-            // Right base
-            ctx.lineTo(bx + perpX * bladeW * 0.6, by + perpY * bladeW * 0.6)
-            // Cross-guard right
-            ctx.lineTo(bx + perpX * bladeW * 0.9, by + perpY * bladeW * 0.9)
-            // Cross-guard left
-            ctx.lineTo(bx - perpX * bladeW * 0.9, by - perpY * bladeW * 0.9)
-            // Left base
-            ctx.lineTo(bx - perpX * bladeW * 0.6, by - perpY * bladeW * 0.6)
-            // Left shoulder
-            ctx.lineTo(centerX + (innerRadius + bladeLen * 0.7) * Math.cos(currentAngle) - perpX * bladeW,
-                       centerY + (innerRadius + bladeLen * 0.7) * Math.sin(currentAngle) - perpY * bladeW)
-            ctx.closePath()
+            view._swordPath(ctx, centerX, centerY, currentAngle, innerRadius, radius)
             ctx.fillStyle = view._rgba(heavy ? view._glow : view.bladeColor, swingOpacity)
             ctx.fill()
             var sharp = view.swordLevel > 0

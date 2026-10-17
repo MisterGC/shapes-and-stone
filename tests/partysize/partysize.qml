@@ -7,7 +7,11 @@
 // enemiesPerKnight more enemies, within depth.enemiesCap, each with
 // hpPerKnight more of its HP. The rooms and everything laid on the floor
 // stay the same. For 1 knight the dungeon is today's: its fingerprint is
-// the one recorded below, from the game with 9 to 12 rooms. A knight
+// the one recorded below, from the game with 9 to 12 rooms, and without
+// its veins, their rock faces, their rooms' spawn holes (issue #157) and
+// travellers of the deep (issue #158, #176) the one recorded before there were
+// any (issue #156), but for a torch
+// stepped aside for a vein. A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -53,18 +57,31 @@ Window {
     readonly property var parties: [1, 2, 4]
     // Today's dungeon for one knight (9 to 12 rooms, 10 to 15 enemies at
     // depth 0, its breakables, spike plates, arrow slits and doors): the
-    // fingerprint hash and enemy count at each danger, on the scenario seed
+    // fingerprint hash and enemy count at each danger, on the scenario
+    // seed, and the hash without its veins and their rock faces (noVeins):
+    // as before them at 1.5 (a1c350e8), at 0.5 with one torch a spot aside
+    // for a vein (it was 63976147, the torch at x 27 then, 29 now). The
+    // rock faces round the veins (issue #169) changed the hash from
+    // fc4fbc6d at 0.5 and 8684d4a2 at 1.5; the spawn holes in the veins'
+    // rooms (issue #157), left out with the veins, from 8ae03641 and
+    // c7390a81; the petrified travellers in the veins' rock faces (issue
+    // #158), left out with the veins too, from 162bb47b at 0.5 (none at
+    // 1.5); the traveller of the deep on the floor in front of the face
+    // that took their place (issue #176) from e91af29e at 0.5; the grunt's
+    // 60 HP (the duel fights) from 51748fd and 888308f2, b084ab49 and
+    // a1c350e8 without the veins
     readonly property var today: ({
-        "0.5": { hash: "63976147", enemies: 15 },
-        "1.5": { hash: "a1c350e8", enemies: 18 }
+        "0.5": { hash: "724f5b8", noVeins: "404dd8c", enemies: 15 },
+        "1.5": { hash: "774b9c3e", noVeins: "eea7aa24", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
-    // rooms and every object laid in it
-    function layout() {
+    // rooms and every object laid in it, without the veins' rock faces
+    // when noRock
+    function layout(noRock) {
         let out = [JSON.stringify(game.rooms)]
         for (let o of game.dungeonObjects) {
-            if (!o) continue
+            if (!o || (noRock && o.objectName === "rockFace")) continue
             // The type without the number QML gives it, or an inline
             // type of Game.qml, in load order: a new type shifts it
             let parts = [String(o).split("(")[0].replace(/_QML(TYPE)?_\d+$/, "")]
@@ -86,8 +103,10 @@ Window {
     }
     // The fingerprint of today's dungeon: layout and enemies, without the
     // HP an enemy has left (all of it)
-    function todayLines() {
-        return layout().concat(foes().map(f => f.split(":").slice(0, 6).join(":")))
+    function todayLines(noVeins) {
+        let lines = layout(noVeins).filter(l => !noVeins || (l.indexOf("Vein ") !== 0 && l.indexOf("Hole ") !== 0
+                                                             && l.indexOf("DeepTraveller ") !== 0))
+        return lines.concat(foes().map(f => f.split(":").slice(0, 6).join(":")))
     }
 
     // The table, read here from Balance and not from the game's spawnRolls
@@ -136,6 +155,9 @@ Window {
                         check(h === t.hash && b.n === t.enemies,
                               tag + "today's dungeon, " + b.n + " enemies (fingerprint " + h
                               + ", recorded " + t.hash + ", " + t.enemies + " enemies)")
+                        let hv = hash(todayLines(true))
+                        check(hv === t.noVeins, tag + "without its veins the dungeon recorded before them ("
+                              + hv + ", recorded " + t.noVeins + ")")
                     } else {
                         check(JSON.stringify(b.layout) === JSON.stringify(s.layout),
                               tag + "the same rooms and floor as for 1 knight (" + b.layout.length + " objects)")

@@ -9,7 +9,11 @@ PhysicsItem {
     property var gameWorld: null
     property string npcName: ""
     property color npcColor: "#C9A227"
-    property string iconType: ""  // "mug", "hammer", "crystal"
+    property string iconType: ""  // "mug", "hammer", "crystal", "pack", "staff", "lute"
+    // Its shape: "circle", "square" or "diamond"
+    property string shape: "circle"
+    // Solid, a knight bumps into it; else the knights walk through it
+    property bool solid: true
     property var dialogueLines: []
     // Lines made when it is talked to, instead of dialogueLines: a
     // function returning them (the witch's reading), or null
@@ -18,13 +22,31 @@ PhysicsItem {
     property var wares: []
     property string greetingSound: ""
 
-    // Routine: [{x, y, duration, text}, ...]
+    // Routine: [{x, y, duration, text, sound, via}, ...]; sound names
+    // what the camp hears while it is at that spot (CampSounds, issue
+    // #147), via the points [{x, y}] it walks through on its way there
+    // without stopping, round what it must not walk over (issue #178)
     property var routine: []
     property int _routineIndex: 0
+    property int _viaIndex: 0
+    on_RoutineIndexChanged: _viaIndex = 0
     property string _activityText: ""
     property bool _atDestination: false
+    // The routine's step it stands at doing, or null while it walks or
+    // listens
+    readonly property var doing: _atDestination && routine.length > 0 && !listening ? routine[_routineIndex] : null
     property real _activityTimer: 0
     property real walkSpeed: 1.5
+
+    // Talked to (issue #178): it stops what it is doing and faces the
+    // knight that talks to it while the dialogue it opened is up, then
+    // goes back to it where it left off. listener is that knight, facing
+    // east (1) or west (-1), the way its icon looks
+    readonly property bool listening: _listener !== null && !!gameWorld && gameWorld.talkingTo === npc
+    readonly property var listener: listening ? _listener : null
+    property var _listener: null
+    property real facing: 1
+    onListeningChanged: if (!listening) _listener = null
 
     // Interaction
     property var nearbyPlayer: null
@@ -77,7 +99,9 @@ PhysicsItem {
             Translate { y: (gameWorld ? gameWorld.fx : false) ? -npc._bob * visual.height * 0.06 : 0 }
         ]
         anchors.fill: parent
-        radius: width * 0.5
+        anchors.margins: shape === "diamond" ? parent.width * 0.13 : 0
+        radius: shape === "circle" ? width * 0.5 : width * 0.18
+        rotation: shape === "diamond" ? 45 : 0
         color: npcColor
 
         BodyShade {
@@ -88,6 +112,7 @@ PhysicsItem {
         Canvas {
             id: icon
             anchors.centerIn: parent
+            transform: Scale { origin.x: icon.width / 2; xScale: npc.facing }
             width: parent.width * 0.6
             height: parent.height * 0.6
             onPaint: {
@@ -126,6 +151,24 @@ PhysicsItem {
                     // Base
                     ctx.fillStyle = dark
                     ctx.fillRect(w * 0.35, h * 0.62, w * 0.3, h * 0.08)
+                } else if (iconType === "pack") {
+                    // A bedroll on a pack
+                    ctx.fillRect(w * 0.28, h * 0.38, w * 0.44, h * 0.4)
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.3, w * 0.12, 0, Math.PI * 2)
+                    ctx.fill()
+                } else if (iconType === "staff") {
+                    // A crooked staff
+                    ctx.fillRect(w * 0.46, h * 0.3, w * 0.08, h * 0.55)
+                    ctx.beginPath()
+                    ctx.arc(w * 0.42, h * 0.3, w * 0.12, Math.PI, Math.PI * 2)
+                    ctx.stroke()
+                } else if (iconType === "lute") {
+                    // A lute's belly and neck
+                    ctx.beginPath()
+                    ctx.arc(w * 0.42, h * 0.6, w * 0.18, 0, Math.PI * 2)
+                    ctx.fill()
+                    ctx.fillRect(w * 0.5, h * 0.2, w * 0.08, h * 0.35)
                 }
             }
         }
@@ -151,15 +194,56 @@ PhysicsItem {
         font.italic: true
         style: Text.Outline
         styleColor: "#000000"
-        opacity: _atDestination && _activityText !== "" ? 1.0 : 0
+        opacity: _atDestination && _activityText !== "" && saying === "" && !listening ? 1.0 : 0
         Behavior on opacity { NumberAnimation { duration: 300 } }
+    }
+
+    // What it says aloud, in a bubble over its head, for a few seconds
+    property string saying: ""
+    function say(line, seconds) {
+        saying = line
+        sayTimer.interval = seconds * 1000
+        sayTimer.restart()
+    }
+    Timer { id: sayTimer; onTriggered: npc.saying = "" }
+    Rectangle {
+        id: bubble
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.top
+        anchors.bottomMargin: 6
+        width: Math.min(bubbleText.implicitWidth, 160) + 12
+        height: bubbleText.height + 8
+        radius: 6
+        color: "#E8E2D0"
+        border.color: Qt.darker(npcColor, 1.4)
+        border.width: 1
+        opacity: npc.saying !== "" ? 0.95 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Text {
+            id: bubbleText
+            x: 6; y: 4
+            width: Math.min(implicitWidth, 160)
+            text: npc.saying
+            wrapMode: Text.WordWrap
+            color: "#2A2420"
+            font.pixelSize: 10
+        }
+        // The tail, down to the speaker
+        Rectangle {
+            width: 7; height: 7
+            rotation: 45
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height - 4
+            color: parent.color
+        }
     }
 
     // Interaction prompt
     Text {
         id: promptLabel
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: activityLabel.top
+        anchors.bottom: npc.saying !== "" ? bubble.top : activityLabel.top
         anchors.bottomMargin: 2
         text: "[E] Talk"
         color: "#FFFFFF"
@@ -179,6 +263,7 @@ PhysicsItem {
             density: 1.0
             friction: 0.0
             restitution: 0.0
+            collidesWith: npc.solid ? Box.All : Box.None
         },
         Circle {
             id: interactionSensor
@@ -210,6 +295,11 @@ PhysicsItem {
 
     function _updateRoutine(dt) {
         if (routine.length === 0) return
+        if (listening) {
+            _faceListener()
+            body.linearVelocity = Qt.point(0, 0)
+            return
+        }
         let act = routine[_routineIndex]
 
         if (_atDestination) {
@@ -223,15 +313,20 @@ PhysicsItem {
             return
         }
 
-        // Walk toward destination
-        let dx = act.x - xWu
-        let dy = act.y - yWu
+        // Walk toward destination, through its via points first
+        let via = act.via || []
+        let to = _viaIndex < via.length ? via[_viaIndex] : act
+        let dx = to.x - xWu
+        let dy = to.y - yWu
         let dist = Math.sqrt(dx * dx + dy * dy)
 
-        if (dist < 0.3) {
+        if (dist < 0.3 && to !== act) {
+            _viaIndex++
+        } else if (dist < 0.3) {
             // Arrived
             body.linearVelocity = Qt.point(0, 0)
             _atDestination = true
+            _viaIndex = 0
             _activityTimer = act.duration || 3
             _activityText = act.text || ""
         } else {
@@ -239,15 +334,27 @@ PhysicsItem {
             let ndy = dy / dist
             body.linearVelocity = Qt.point(
                 ndx * walkSpeed, -ndy * walkSpeed)
+            if (Math.abs(dx) > 0.05) facing = dx > 0 ? 1 : -1
         }
+    }
+    function _faceListener() {
+        let dx = _listener.xWu + _listener.widthWu / 2 - (xWu + widthWu / 2)
+        if (Math.abs(dx) > 0.05) facing = dx > 0 ? 1 : -1
     }
 
     function interact() {
         let lines = speak ? speak() : dialogueLines
         if (gameWorld && lines.length > 0) {
+            _listener = nearbyPlayer
+            if (_listener) {
+                body.linearVelocity = Qt.point(0, 0)
+                _faceListener()
+                // What it was saying to the others it leaves unsaid
+                saying = ""
+            }
             if (greetingSound !== "" && gameWorld.playNpcGreeting)
                 gameWorld.playNpcGreeting(greetingSound)
-            gameWorld.openDialogue(npcName, npcColor, lines, wares)
+            gameWorld.openDialogue(npcName, npcColor, lines, wares, npc)
         }
     }
 }
