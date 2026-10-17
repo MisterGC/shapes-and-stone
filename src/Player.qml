@@ -66,6 +66,9 @@ PhysicsItem {
     property int potions: 0
     // Mana draughts bought from the innkeeper, drunk with key 2
     property int draughts: 0
+    // The fish caught at a camp's pond (Fishing), {kind, size}, sold to the
+    // innkeeper or one given to the cave cat
+    property var creel: []
     // The smith's upgrades of the run, each a level from 0 (none) to the
     // table's last (Balance.shop): the sharpened sword, the reinforced
     // shield, the lighter harness and the balanced blade. Every effect

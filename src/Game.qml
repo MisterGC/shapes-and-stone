@@ -1642,6 +1642,9 @@ ClayWorld2d {
             // vein in reach (pressPick), else swings on release, or
             // charges while held
             if (mouse.button === Qt.LeftButton) {
+                // At a camp's pond the left button fishes (Fishing)
+                _fishingPress = fishing.press()
+                if (_fishingPress) return
                 _picking = pressPick()
                 if (!_picking) player.pressSwing(mouse)
             }
@@ -1651,11 +1654,16 @@ ClayWorld2d {
 
         onReleased: (mouse) => {
             if (!player) return
-            if (mouse.button === Qt.LeftButton && !_picking) player.releaseSwing(mouse)
+            if (mouse.button === Qt.LeftButton && _fishingPress) {
+                fishing.release()
+                _fishingPress = false
+            } else if (mouse.button === Qt.LeftButton && !_picking) player.releaseSwing(mouse)
             if (mouse.button === Qt.RightButton) player.lowerShield()
         }
         onCanceled: if (player) {
             _picking = false
+            _fishingPress = false
+            fishing.release()
             player.dropSwing()
             player.lowerShield()
         }
@@ -1706,6 +1714,15 @@ ClayWorld2d {
             if (dx * dx + dy * dy > lockBreak * lockBreak) player.lockTarget = null
         }
     }
+
+    // Fishing at a camp's pond: the rod, the line, the bobber and the fish
+    // (Balance.fishing); the left button's press it took swings nothing
+    Fishing {
+        id: fishing
+        parent: world.room
+        game: world
+    }
+    property bool _fishingPress: false
 
     // The left button's press struck with the pickaxe: its release swings
     // nothing
@@ -1788,6 +1805,7 @@ ClayWorld2d {
                         break
                     }
                 }
+                if (!talked && !fallen) talked = feedCat()
                 if (!talked && !fallen) talked = talkToDeepTraveller()
                 if (!talked && !fallen)
                     useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
@@ -2214,6 +2232,23 @@ ClayWorld2d {
         visible: player !== null && player.potions > 0
         text: "Potions " + (player ? player.potions : 0) + "  [1]"
         color: "#66CC66"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 14
+        font.bold: true
+        font.letterSpacing: 1
+    }
+
+    // The knight's fish (Fishing), next to the gold
+    Text {
+        objectName: "hudCreel"
+        anchors.top: hudGold.top
+        anchors.left: hudGold.right
+        anchors.leftMargin: 14
+        z: 1000
+        visible: player !== null && player.creel.length > 0
+        text: "Fish " + (player ? player.creel.length : 0)
+        color: "#9FC8C0"
         style: Text.Outline
         styleColor: "#000000"
         font.pixelSize: 14
@@ -2710,6 +2745,7 @@ ClayWorld2d {
             world._stepSecrets()
             world._stepVeins()
             world._stepDig()
+            fishing.step(world.physics.timeStep)
             world._stepHoles()
             world._stepDeepTravellers()
             world._forecastDanger()
@@ -3050,10 +3086,10 @@ ClayWorld2d {
     function _enterLevel(newIndex, d) {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
-                                 potions: player.potions, draughts: player.draughts,
+                                 potions: player.potions, draughts: player.draughts, creel: player.creel,
                                  momentum: player.momentum, levels: smithLevels(player) }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0, pouch: [],
-                                 potions: 0, draughts: 0, momentum: 0, levels: smithLevels(null) }
+                                 potions: 0, draughts: 0, creel: [], momentum: 0, levels: smithLevels(null) }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
                     "gold:", carried.gold, "gems:", carried.pouch.length, "potions:", carried.potions, "draughts:", carried.draughts,
                     "smith:", JSON.stringify(carried.levels))
@@ -3075,6 +3111,7 @@ ClayWorld2d {
             player.pouch = carried.pouch
             player.potions = carried.potions
             player.draughts = carried.draughts
+            player.creel = carried.creel
             player.momentum = carried.momentum
         }
         // A knight still down when the party reaches the camp rises there
@@ -3160,7 +3197,7 @@ ClayWorld2d {
         let out = []
         for (let w of wares) {
             let offer = w.id === "potion" || w.id === "draught" ? w
-                : w.id === "gems" ? gemWare() : smithWare(w.id)
+                : w.id === "gems" ? gemWare() : w.id === "fish" ? fishWare() : smithWare(w.id)
             if (offer) out.push(offer)
         }
         return out
@@ -3214,6 +3251,7 @@ ClayWorld2d {
     function buyWare(ware) {
         if (!player || player.fallen) return false
         if (ware.id === "gems") return sellGems()
+        if (ware.id === "fish") return sellFish()
         let inn = ware.id === "potion" || ware.id === "draught"
         // The smith sells only what he offers now: a ware from before the
         // knight bought here, or above the camp's limit, is refused
@@ -5524,6 +5562,7 @@ ClayWorld2d {
     }
 
     function clearDungeon() {
+        fishing.reset()
         _attackRng = null
         exitSensor = null
         exitStairs = null
@@ -5738,6 +5777,7 @@ ClayWorld2d {
             "For the road, a potion or a mana draught. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
         ], "assets/innkeeper_greeting.wav", [
+            { id: "fish" },
             { id: "potion", label: "Health potion", price: Balance.shop.potionPrice },
             { id: "draught", label: "Mana draught (+" + Balance.shop.draughtMana + " mana)",
               price: Balance.shop.draughtPrice }
@@ -7726,6 +7766,46 @@ ClayWorld2d {
         let n = player.pouch.length
         return { id: "gems", sell: true, price: pouchWorth(player.pouch),
                  label: "Sell your " + (n === 1 ? "gem" : n + " gems") }
+    }
+    // The innkeeper buys the fish: his ware while the creel holds any, the
+    // whole creel for the kinds' gold
+    function fishWare() {
+        if (!player || player.creel.length === 0) return null
+        let n = player.creel.length
+        let price = player.creel.reduce((s, f) => s + Balance.fishing.kinds[f.kind].gold, 0)
+        return { id: "fish", sell: true, price: price,
+                 label: "Sell your " + (n === 1 ? "fish" : n + " fish") }
+    }
+    function sellFish() {
+        let offer = fishWare()
+        if (!offer || player.fallen) return false
+        player.gold += offer.price
+        player.creel = []
+        dialoguePanel.note = "Fresh from the pond? They'll go in the pan tonight. " + offer.price + " gold."
+        dialoguePanel.wares = _offered(dialoguePanel.wares)
+        Qt.callLater(_clink)
+        return true
+    }
+    // The cave cat takes a fish (E, within Balance.fishing.catReach): the
+    // smallest in the creel; it eats and purrs
+    function feedCat() {
+        if (!player || !campCat || player.creel.length === 0) return false
+        let c = _knightCentre()
+        if (Math.hypot(campCat.xWu - c.x, campCat.yWu - c.y) > Balance.fishing.catReach + campCat.sizeWu / 2)
+            return false
+        let creel = player.creel.slice(), at = 0
+        for (let i = 1; i < creel.length; i++) if (creel[i].size < creel[at].size) at = i
+        let fish = creel.splice(at, 1)[0]
+        player.creel = creel
+        campCat.feed(Balance.fishing.kinds[fish.kind].color)
+        spawnDamageNumber(campCat.xWu, campCat.yWu + 0.5, "*purrs*", "#E8D8B0")
+        purrSound.play()
+        return true
+    }
+    Sound {
+        id: purrSound
+        source: "assets/cat_purr.wav"
+        volume: muted ? 0 : 0.8 * soundVolume
     }
     function sellGems() {
         let offer = gemWare()

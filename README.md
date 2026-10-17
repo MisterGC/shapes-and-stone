@@ -511,7 +511,8 @@ back in; now and then, asleep, it stretches. A knight that sits down by
 the fire lets it sleep. It lies on a ring round the fire, out of the
 warmth where the knights sit, on the floor and clear of the way to the
 stairs, the people and the props. It is drawn only: nothing collides with
-it, nobody talks to it, nothing depends on it. Whether it is there and
+it and nothing depends on it; only a knight with a fish gets its
+attention (see fishing). Whether it is there and
 where it lies come from the level's seed (`camp.catSalt`), so every
 screen of a session sees the same cat or none, and each screen sees it
 look up at whichever knight comes near. Its numbers and colours are
@@ -525,6 +526,35 @@ screens, and on both it looks up at the host's knight:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cat/cat.qml
+```
+
+A camp with a pond (the grotto's) can be fished, to come down between the
+dungeons: calm enough to talk over, with a little timing in it
+(`src/Fishing.qml`, `Balance.fishing`). Within `reach` wu of the water,
+the mouse on it shows a faint ring where the bobber would land; the left
+button casts it there, at most `castMax` wu off. After `wait` seconds,
+with a nibble or two before, a fish bites: the bobber goes under with a
+plop and a wide ring, and a click within `biteWindow` seconds hooks it; a
+click before the bite reels in empty, a bite missed gets away. Hooked,
+the button held reels it in; now and then it thrashes - a plip and a
+ring a moment before, then splashes - and held through a thrash the
+line's tension rises until it snaps, let go the fish pulls some line back
+out. Landed, it leaps to the bank and goes into the knight's creel (Fish
+next to the gold): five kinds, from the common cave minnow to the rare
+glowing glimmerfin, each with its size, gold and fight. The pond gives
+`bites` bites a camp. The innkeeper buys the creel for the kinds' gold -
+a few gold a fish, so it eases the purse without changing the descent -
+and a knight beside the cave cat gives it the smallest fish with E: it
+eats it, purrs and lies content a while. The rod, the line and the fish
+are drawn on the fishing knight's own screen only. `tools/fishing_sounds.py`
+makes the cast, the plop, the nibble, the bite, the reel's ratchet, the
+splash, the landing, the snap and the purr. The fishing bench checks
+where it may cast, the cast, a click too soon, a bite missed and hooked,
+the reel into the creel, the snap and the slack, walking off, the still
+water, the sale, the cat and the bites filled again on a new level:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fishing/fishing.qml
 ```
 
 The cat is made from a creature template, `src/Creature.qml`, for the
