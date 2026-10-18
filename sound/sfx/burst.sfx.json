@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "burst",
+  "variation": {"seed": 3, "pool": 3},
+  "layers": [
+    {"name": "pop", "role": "transient", "source": "noise", "length": 45, "gain": -0.3, "envelope": {"attack": 0.5, "decay": 40, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 3000, "resonance": 0.15}},
+    {"name": "fall", "role": "body", "source": "sine", "freq": 320, "length": 300, "gain": -10.3, "envelope": {"attack": 1, "decay": 280, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": -24, "time": 260}, "vary": {"detune": [-2, 2]}},
+    {"name": "spray", "role": "tail", "source": "noise", "length": 420, "gain": -4.3, "offset": 10, "envelope": {"attack": 5, "decay": 400, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 7000, "attack": 0, "decay": 300, "sustain": 0, "amount": -1.5}}
+  ]
+}

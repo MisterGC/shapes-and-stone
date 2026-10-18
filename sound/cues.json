@@ -372,6 +372,381 @@
       },
       "delivered": "2026-10-18T17:19:57.827181+00:00",
       "verdict": null
+    },
+    "sfx/fish_cast": {
+      "category": "sfx",
+      "brief": "the rod swung and the line whipping out, the reel letting line run",
+      "mode": "live",
+      "source": "sfx/fish_cast.sfx.json",
+      "render": "sfx/fish_cast.wav",
+      "report": "sfx/fish_cast.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.493753+00:00",
+      "verdict": null
+    },
+    "sfx/fish_plop": {
+      "category": "sfx",
+      "brief": "the bobber landing on the water",
+      "mode": "live",
+      "source": "sfx/fish_plop.sfx.json",
+      "render": "sfx/fish_plop.wav",
+      "report": "sfx/fish_plop.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.576952+00:00",
+      "verdict": null
+    },
+    "sfx/fish_plip": {
+      "category": "sfx",
+      "brief": "a nibble: a tiny tug at the bobber",
+      "mode": "live",
+      "source": "sfx/fish_plip.sfx.json",
+      "render": "sfx/fish_plip.wav",
+      "report": "sfx/fish_plip.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.662229+00:00",
+      "verdict": null
+    },
+    "sfx/fish_bite": {
+      "category": "sfx",
+      "brief": "the bite: the bobber pulled under, a deep plop",
+      "mode": "live",
+      "source": "sfx/fish_bite.sfx.json",
+      "render": "sfx/fish_bite.wav",
+      "report": "sfx/fish_bite.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.750296+00:00",
+      "verdict": null
+    },
+    "sfx/fish_click": {
+      "category": "sfx",
+      "brief": "one tick of the reel's ratchet",
+      "mode": "live",
+      "source": "sfx/fish_click.sfx.json",
+      "render": "sfx/fish_click.wav",
+      "report": "sfx/fish_click.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.833659+00:00",
+      "verdict": null
+    },
+    "sfx/fish_splash": {
+      "category": "sfx",
+      "brief": "the fish thrashing at the surface",
+      "mode": "live",
+      "source": "sfx/fish_splash.sfx.json",
+      "render": "sfx/fish_splash.wav",
+      "report": "sfx/fish_splash.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.917538+00:00",
+      "verdict": null
+    },
+    "sfx/fish_land": {
+      "category": "sfx",
+      "brief": "the fish lifted out: a splash and a wet flop on the bank",
+      "mode": "live",
+      "source": "sfx/fish_land.sfx.json",
+      "render": "sfx/fish_land.wav",
+      "report": "sfx/fish_land.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.001341+00:00",
+      "verdict": null
+    },
+    "sfx/fish_snap": {
+      "category": "sfx",
+      "brief": "the line snapping: a crack and the slack line's falling twang",
+      "mode": "live",
+      "source": "sfx/fish_snap.sfx.json",
+      "render": "sfx/fish_snap.wav",
+      "report": "sfx/fish_snap.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.086560+00:00",
+      "verdict": null
+    },
+    "sfx/cat_purr": {
+      "category": "sfx",
+      "brief": "the cave cat purring over its fish: 25 pulses a second, in and out on the breath",
+      "mode": "live",
+      "source": "sfx/cat_purr.sfx.json",
+      "render": "sfx/cat_purr.wav",
+      "report": "sfx/cat_purr.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.172234+00:00",
+      "verdict": null
+    },
+    "sfx/sword_swing": {
+      "category": "sfx",
+      "brief": "a light blade cutting air: a whoosh of band noise sweeping up and back; played pitched down for the heavy swing and the whirlwind, up for the spikes",
+      "mode": "rendered",
+      "source": "sfx/sword_swing.sfx.json",
+      "render": "sfx/sword_swing.wav",
+      "report": "sfx/sword_swing.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.256733+00:00",
+      "verdict": null
+    },
+    "sfx/dash": {
+      "category": "sfx",
+      "brief": "the knight's dash: a low rush of air with a soft push under it",
+      "mode": "live",
+      "source": "sfx/dash.sfx.json",
+      "render": "sfx/dash.wav",
+      "report": "sfx/dash.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.343281+00:00",
+      "verdict": null
+    },
+    "sfx/punch_hitting": {
+      "category": "sfx",
+      "brief": "the knight's sword hitting a creature: a sharp crack, a heavy low thump and a short dull body",
+      "mode": "live",
+      "source": "sfx/punch_hitting.sfx.json",
+      "render": "sfx/punch_hitting.wav",
+      "report": "sfx/punch_hitting.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.427793+00:00",
+      "verdict": null
+    },
+    "sfx/burst": {
+      "category": "sfx",
+      "brief": "a creature bursting as it dies: a bright pop over a falling thud and a spray of debris",
+      "mode": "live",
+      "source": "sfx/burst.sfx.json",
+      "render": "sfx/burst.wav",
+      "report": "sfx/burst.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.511762+00:00",
+      "verdict": null
+    },
+    "sfx/shield_clang": {
+      "category": "sfx",
+      "brief": "the shield blocking: a metal clang, never the thud of a hit; played higher for a perfect block",
+      "mode": "live",
+      "source": "sfx/shield_clang.sfx.json",
+      "render": "sfx/shield_clang.wav",
+      "report": "sfx/shield_clang.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.595239+00:00",
+      "verdict": null
+    },
+    "sfx/shield_break": {
+      "category": "sfx",
+      "brief": "the shield breaking at no mana: a crack and metal shards scattering",
+      "mode": "live",
+      "source": "sfx/shield_break.sfx.json",
+      "render": "sfx/shield_break.wav",
+      "report": "sfx/shield_break.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.681062+00:00",
+      "verdict": null
+    },
+    "sfx/shield_empty": {
+      "category": "sfx",
+      "brief": "the right button with no mana: a short dull thunk, the shield won't come up",
+      "mode": "live",
+      "source": "sfx/shield_empty.sfx.json",
+      "render": "sfx/shield_empty.wav",
+      "report": "sfx/shield_empty.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.766721+00:00",
+      "verdict": null
+    },
+    "sfx/knight_hurt": {
+      "category": "sfx",
+      "brief": "the knight hurt: a low heavy thud and a grunt of breath, never the punch of a sword",
+      "mode": "live",
+      "source": "sfx/knight_hurt.sfx.json",
+      "render": "sfx/knight_hurt.wav",
+      "report": "sfx/knight_hurt.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.853388+00:00",
+      "verdict": null
+    },
+    "sfx/footstep": {
+      "category": "sfx",
+      "brief": "the knight's footstep on stone: a short soft heel and a scuff; played on a few pitches in turn",
+      "mode": "rendered",
+      "source": "sfx/footstep.sfx.json",
+      "render": "sfx/footstep.wav",
+      "report": "sfx/footstep.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.940027+00:00",
+      "verdict": null
+    },
+    "sfx/spitter": {
+      "category": "sfx",
+      "brief": "a spitter's shot: a wet gurgle that builds and a spit; played lower as a tough enemy's growl",
+      "mode": "rendered",
+      "source": "sfx/spitter.sfx.json",
+      "render": "sfx/spitter.wav",
+      "report": "sfx/spitter.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.025496+00:00",
+      "verdict": null
+    },
+    "sfx/goblin_scream": {
+      "category": "sfx",
+      "brief": "a grunt or a guardian winding up its lunge: a goblin's short rasping scream, falling; pitched by its tier",
+      "mode": "live",
+      "source": "sfx/goblin_scream.sfx.json",
+      "render": "sfx/goblin_scream.wav",
+      "report": "sfx/goblin_scream.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.114184+00:00",
+      "verdict": null
+    },
+    "sfx/coin_pickup": {
+      "category": "sfx",
+      "brief": "gold picked up: a coin's bright two-note clink",
+      "mode": "live",
+      "source": "sfx/coin_pickup.sfx.json",
+      "render": "sfx/coin_pickup.wav",
+      "report": "sfx/coin_pickup.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.201149+00:00",
+      "verdict": null
+    },
+    "sfx/menu_change": {
+      "category": "sfx",
+      "brief": "a menu step: a soft short tick; also the full charge's high tick and a spike plate's low click, pitched",
+      "mode": "live",
+      "source": "sfx/menu_change.sfx.json",
+      "render": "sfx/menu_change.wav",
+      "report": "sfx/menu_change.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.288594+00:00",
+      "verdict": null
+    },
+    "sfx/menu_confirm": {
+      "category": "sfx",
+      "brief": "a menu choice confirmed: a warm rising two-note chime",
+      "mode": "live",
+      "source": "sfx/menu_confirm.sfx.json",
+      "render": "sfx/menu_confirm.wav",
+      "report": "sfx/menu_confirm.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.374679+00:00",
+      "verdict": null
+    },
+    "ambience/dungeon": {
+      "category": "ambience",
+      "brief": "the dungeon's air: a low rumbling draught, a far moan of wind and a drip now and then; a bed under the music, crossfaded into itself",
+      "mode": "live",
+      "source": "ambience/dungeon.sfx.json",
+      "render": "ambience/dungeon.wav",
+      "report": "ambience/dungeon.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.461422+00:00",
+      "verdict": null
+    },
+    "ambience/village": {
+      "category": "ambience",
+      "brief": "the camp's night outside: a soft breeze through grass and crickets far off; a bed under the music and the fire, crossfaded into itself",
+      "mode": "live",
+      "source": "ambience/village.sfx.json",
+      "render": "ambience/village.wav",
+      "report": "ambience/village.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.548519+00:00",
+      "verdict": null
     }
   }
 }

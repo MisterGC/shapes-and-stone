@@ -1,0 +1,120 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.11,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -16.470831,
+    "lufs_block_s": 0.11,
+    "true_peak_dbtp": -5.950528,
+    "peak_dbfs": -5.973848,
+    "rms_dbfs": -15.935892,
+    "crest_factor_db": 9.962044
+  },
+  "envelope": {
+    "silence_start_s": 2.3e-05,
+    "silence_end_s": 0.00932,
+    "attack_s": 0.002472,
+    "peak_at_s": 0.007483,
+    "peak_db": -11.765121,
+    "fall_20db_at_s": 0.09229,
+    "fall_60db_at_s": 0.107256
+  },
+  "spectrum": {
+    "centroid_hz": 929.292481,
+    "rolloff_hz": 893.62793,
+    "flatness": 0.000121,
+    "band_shares": {
+      "20_60": 1e-06,
+      "60_250": 3.7e-05,
+      "250_500": 0.000354,
+      "500_2k": 0.985162,
+      "2k_5k": 0.013708,
+      "5k_10k": 0.000647,
+      "10k_20k": 9.1e-05
+    }
+  },
+  "pitch": {
+    "voiced_share": 1.0,
+    "median_hz": 882.543058,
+    "start_hz": 882.543058,
+    "end_hz": 882.543058,
+    "sweep_semitones": 0.0,
+    "track": [
+      [
+        0.0,
+        882.543058
+      ],
+      [
+        0.01161,
+        882.543058
+      ],
+      [
+        0.02322,
+        882.543058
+      ],
+      [
+        0.03483,
+        882.543058
+      ],
+      [
+        0.04644,
+        882.543058
+      ],
+      [
+        0.05805,
+        882.543058
+      ],
+      [
+        0.06966,
+        882.543058
+      ],
+      [
+        0.08127,
+        882.543058
+      ],
+      [
+        0.09288,
+        882.543058
+      ],
+      [
+        0.10449,
+        882.543058
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.491898,
+    "roughness_asper": 0.070987,
+    "roughness_max_asper": 0.070987
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": -3.6e-05,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "menu_change.wav",
+  "pictures": {
+    "spectrogram": "menu_change.spec.png",
+    "waveform": "menu_change.wave.png"
+  }
+}

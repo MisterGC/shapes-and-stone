@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "shield_break",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "crack", "role": "transient", "source": "noise", "length": 40, "gain": -8.5, "envelope": {"attack": 0.5, "decay": 35, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 2500, "resonance": 0.2}},
+    {"name": "snap", "role": "body", "source": "sine", "freq": 160, "length": 200, "gain": -16.5, "envelope": {"attack": 1, "decay": 190, "sustain": 0, "release": 0}, "pitch": {"start": 12, "end": 0, "time": 30}},
+    {"name": "shard1", "role": "tail", "source": "sine", "freq": 867, "length": 300, "gain": -8.5, "offset": 10, "envelope": {"attack": 1, "decay": 290, "sustain": 0, "release": 0}},
+    {"name": "shard2", "role": "tail", "source": "sine", "freq": 1734, "length": 220, "gain": -10.5, "offset": 35, "envelope": {"attack": 1, "decay": 210, "sustain": 0, "release": 0}},
+    {"name": "shard3", "role": "tail", "source": "sine", "freq": 2610, "length": 160, "gain": -13.5, "offset": 70, "envelope": {"attack": 1, "decay": 150, "sustain": 0, "release": 0}},
+    {"name": "scatter", "role": "tail", "source": "noise", "length": 380, "gain": -12.5, "offset": 20, "envelope": {"attack": 5, "decay": 360, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 4500, "resonance": 0.1}}
+  ]
+}

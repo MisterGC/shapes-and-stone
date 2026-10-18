@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "name": "cat_purr",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "purr", "role": "body", "source": "noise", "length": 800, "gain": 10.3, "envelope": {"attack": 150, "decay": 0, "sustain": 1, "release": 250}, "filter": {"type": "lowpass", "cutoff": 300}, "lfo": {"target": "volume", "rate": 25, "depth": 0.9}},
+    {"name": "purr_out", "role": "body", "source": "noise", "length": 800, "gain": 7.3, "offset": 800, "envelope": {"attack": 200, "decay": 0, "sustain": 1, "release": 300}, "filter": {"type": "lowpass", "cutoff": 260}, "lfo": {"target": "volume", "rate": 23, "depth": 0.9}}
+  ]
+}
