@@ -2,9 +2,10 @@
 // sound/cues.json, the way the sheet says (issue #190).
 //
 // For each cue the game must have a player of the cue's file: a Sound of
-// the render for a rendered cue, an SfxPlayer of the recipe for a live
-// one, loaded and without an error. A live player's play() must play a
-// variation and its renderOffline() must hold samples. The game's own
+// the render for a rendered cue, an SfxPlayer of the recipe or a
+// SongPlayer of the song for a live one (issue #191), loaded and without
+// an error. A live recipe's play() must play a variation and its
+// renderOffline() must hold samples, as a song's must. The game's own
 // calls must reach them, M must silence them all and M again bring them
 // back. Prints one PASS or FAIL line per check and exits with the number
 // of failures. Reading the sheet needs QML_XHR_ALLOW_FILE_READ=1.
@@ -65,7 +66,9 @@ Window {
         for (let i = 0; i < kids.length; i++) players(kids[i], out)
         return out
     }
-    function live(p) { return p.layers !== undefined }
+    // A live cue is a recipe's SfxPlayer or a song's SongPlayer
+    function live(p) { return p.layers !== undefined || song(p) }
+    function song(p) { return p.segment !== undefined }
     function ready(p) { return live(p) ? p.loaded : p.status === 2 }
     function cues() { return Object.keys(sheet.cues).sort() }
     function file(cue) { let c = sheet.cues[cue]; return c.mode === "live" ? c.source : c.render }
@@ -85,7 +88,11 @@ Window {
                       + file(c))
                 if (!pl) continue
                 check(ready(pl) && !(live(pl) && pl.error), c + " is loaded" + (pl.error ? ": " + pl.error : ""))
-                if (live(pl)) {
+                if (song(pl)) {
+                    let mono = pl.renderOffline(1)
+                    check(pl.version === 2 && mono.length > 0,
+                          c + " is a version 2 song and renders " + mono.length + " samples")
+                } else if (live(pl)) {
                     let seed = pl.play()
                     let mono = pl.renderOffline(seed)
                     check(pl.lastSeed === seed && mono.length > 0,
@@ -117,15 +124,21 @@ Window {
         }],
         [100, () => {
             let p = players(game)
-            check(game.muted && cues().every(c => p[file(c)].volume === 0), "M silences every cue")
+            // The title's song goes with the title screen
+            let gone = cues().filter(c => !p[file(c)])
+            check(gone.join(",") === "music/title", "in the game every cue's player is there but the title's ("
+                  + gone.join(", ") + ")")
+            check(game.muted && cues().every(c => !p[file(c)] || p[file(c)].volume === 0), "M silences every cue")
             pressM()
         }],
         [100, () => {
             let p = players(game)
-            // The heartbeat is heard only while the knight is low on health
-            let quiet = ["sfx/heartbeat"]
-            check(!game.muted && cues().every(c => quiet.indexOf(c) >= 0 || p[file(c)].volume > 0),
-                  "M again brings them back")
+            // The heartbeat is heard only while the knight is low on
+            // health, the camp's ambience only in the camp
+            let quiet = ["sfx/heartbeat", "ambience/village", "music/title"]
+            let still = cues().filter(c => quiet.indexOf(c) < 0 && !(p[file(c)] && p[file(c)].volume > 0))
+            check(!game.muted && still.length === 0,
+                  "M again brings them back" + (still.length > 0 ? ", but not " + still.join(", ") : ""))
             console.log("[Cues] done,", failures, "failed")
         }],
         // Torn down before quitting, as the sound bench does

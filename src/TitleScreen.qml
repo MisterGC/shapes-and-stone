@@ -26,23 +26,22 @@ Item {
     property string joinedLine: ""
 
     // Menu sounds
-    Sound {
+    SfxPlayer {
         id: menuHoverSound
-        source: "assets/menu_change.wav"
+        source: "../sound/sfx/menu_change.sfx.json"
         volume: muted ? 0 : 0.5 * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: menuConfirmSound
-        source: "assets/menu_confirm.wav"
+        source: "../sound/sfx/menu_confirm.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
 
-    // Title music
-    LoopMusic {
+    // Title music, the sound factory's song (sound/cues.json)
+    SongMusic {
         id: titleMusic
-        source: "assets/title_music.mp3"
+        source: "../sound/music/title.song.json"
         level: muted ? 0 : 0.4 * musicVolume
-        loop: true
     }
     // A browser refuses to play before the first key press or click, and the
     // refused play() is not tried again: there the first gesture starts it.

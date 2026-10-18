@@ -271,6 +271,20 @@ QtObject {
         pitches: [0, -2]
     })
 
+    // The dungeon music (sound/music/dungeon.song.json) follows the fight:
+    // its intensity is how many enemies within reach world units of the
+    // knight are after it - chasing, winding up or striking - out of
+    // fullAt, eased up at rise and down at fall per second, so the pulse
+    // layer (0.15..0.5) comes in with the first enemy and the battle layer
+    // (0.5..1) with the second and third
+    readonly property var music: ({
+        fullAt: 3,
+        reach: 14,
+        rise: 1.5,
+        fall: 0.2,
+        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash"]
+    })
+
     // A grunt or a guardian winding up its lunge screams like a goblin,
     // fading with the distance as the crushing blow's growl does: the
     // sample pitched by tierPitch semitones (weak, normal, tough) at volume

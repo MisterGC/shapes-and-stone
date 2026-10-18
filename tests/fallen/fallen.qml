@@ -135,7 +135,7 @@ Window {
         [() => game.screen === "title", () => {
             check(!game.fallen && fallenScreen() === null, "Esc closes the fallen screen")
             check(game.player === null && game.enemies.length === 0, "Esc clears the run")
-            check(!music("dungeon_music.mp3").playing, "the dungeon music stops on the title")
+            check(!music("dungeon.song.json").playing, "the dungeon music stops on the title")
             game.screen = "game"
             game.forceActiveFocus()
         }],
