@@ -1,0 +1,55 @@
+# title: the title screen's theme, heroic and a little sad - the knight
+# about to go down. One segment of two patterns, D minor, 80 bpm, 16 bars:
+# a horn tune over a dark string pad in dyads, a harp in quarters, a
+# round bass and a soft kick on each bar's first beat like a far drum.
+# Both patterns end on A, the dominant, so each leads into the next.
+tempo 80
+meter 4
+
+instrument brass = warm:brass
+instrument pad   = warm:strings
+instrument harp  = warm:harp
+instrument bass  = warm:bass
+instrument kick  = warm:kick
+
+track tune  brass vel=0.9
+track pad   pad   vel=0.55
+track harp  harp  vel=0.52
+track bass  bass  vel=0.55
+track drum  kick  vel=0.5 transpose=0
+
+let pad[Dm] = F3+A3:4
+let pad[Bb] = F3+Bb3:4
+let pad[C]  = E3+G3:4
+let pad[A]  = E3+A3:4
+let pad[Gm] = G3+Bb3:4
+let hp[Dm] = D3 A3 D4 A3
+let hp[Bb] = D3 F3 Bb3 F3
+let hp[C]  = C3 G3 C4 G3
+let hp[A]  = E3 A3 C#4 A3
+let hp[Gm] = D3 G3 Bb3 G3
+let root[Dm] = D2:2! A1:2
+let root[Bb] = Bb1:2! F2:2
+let root[C]  = C2:2! G1:2
+let root[A]  = A1:2! E2:2
+let root[Gm] = G1:2! D2:2
+let first = Dm Dm Bb Bb C C Dm A
+let second = Gm Gm Dm Dm Bb C A A
+let far = C2! r:3
+
+pattern Call
+  tune: D4:2 A3 D4 | F4:3 E4 | D4:2 Bb3:2 | F4:4 | E4:1.5 F4:.5 G4:2 | E4:2 C4:2 | D4:1.5 E4:.5 F4 A4 | A4:2 C#4:2
+  pad: $pad[$first]
+  harp: $hp[$first]
+  bass: $root[$first]
+  drum: $far*8
+
+pattern Answer
+  tune: G4:2 Bb4:2 | A4:1.5 G4:.5 D4:2 | F4:2 A4:2 | A4:4 | Bb4:1.5 A4:.5 G4 F4 | E4:2 G4:2 | A4:3 G4:.5 F4:.5 | E4:2 C#4:2
+  pad: $pad[$second]
+  harp: $hp[$second]
+  bass: $root[$second]
+  drum: $far*8
+
+segment title: Call Answer
+start title
