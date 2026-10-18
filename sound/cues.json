@@ -196,6 +196,134 @@
       },
       "delivered": "2026-10-18T16:37:15.414052+00:00",
       "verdict": null
+    },
+    "voice/npc_greetings/innkeeper_greeting": {
+      "category": "voice",
+      "brief": "the innkeeper, to the knight who walks up to her in the camp: warm and hearty, glad of a guest, a little teasing; conversational pace; her first line when the knight talks to her",
+      "mode": "rendered",
+      "source": "voice/npc_greetings.voice.json",
+      "render": "voice/npc_greetings/innkeeper_greeting.wav",
+      "report": "voice/npc_greetings/innkeeper_greeting.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "innkeeper_warm",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 9
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.205547+00:00",
+      "verdict": null
+    },
+    "voice/npc_greetings/blacksmith_greeting": {
+      "category": "voice",
+      "brief": "the blacksmith, to the knight back from the dungeon: gruff and dry, a craftsman's appraising look at the knight's blade, unhurried; his first line when the knight talks to him",
+      "mode": "rendered",
+      "source": "voice/npc_greetings.voice.json",
+      "render": "voice/npc_greetings/blacksmith_greeting.wav",
+      "report": "voice/npc_greetings/blacksmith_greeting.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "blacksmith",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 7
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.301840+00:00",
+      "verdict": null
+    },
+    "voice/npc_greetings/witch_greeting": {
+      "category": "voice",
+      "brief": "the witch, fortune teller by the tree, to the knight: slow and hushed, ominous, trailing off at the end; she says it as the knight asks for her reading of the next dungeon",
+      "mode": "rendered",
+      "source": "voice/npc_greetings.voice.json",
+      "render": "voice/npc_greetings/witch_greeting.wav",
+      "report": "voice/npc_greetings/witch_greeting.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "witch_hushed",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 9
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.398163+00:00",
+      "verdict": null
+    },
+    "voice/knight/whirl_shout": {
+      "category": "voice",
+      "brief": "the knight, mid-fight, as the charged whirlwind spins out: one short battle cry, forceful and clipped, over in well under a second; the game plays it pitched down under the spin, so it is heard many times a fight",
+      "mode": "rendered",
+      "source": "voice/knight.voice.json",
+      "render": "voice/knight/whirl_shout.wav",
+      "report": "voice/knight/whirl_shout.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "knight_shout",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 8
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.494135+00:00",
+      "verdict": null
     }
   }
 }

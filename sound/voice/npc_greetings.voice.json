@@ -1,0 +1,463 @@
+{
+  "format": 1,
+  "game": "shapes-and-stone",
+  "language": "en",
+  "lines": [
+    {
+      "id": "innkeeper_greeting",
+      "text": "Welcome, traveler! You look like you've seen better days.",
+      "voice": "innkeeper_warm",
+      "direction": "the innkeeper, to the knight who walks up to her in the camp: warm and hearty, glad of a guest, a little teasing; conversational pace; her first line when the knight talks to her",
+      "params": {
+        "exaggeration": 0.6,
+        "cfg_weight": 0.4
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "npc_greetings/takes/innkeeper_greeting.take01.wav",
+          "seed": 535397922,
+          "text": "Welcome, traveler! You look like you've seen better days.",
+          "rendered": "2026-10-18T17:10:00+00:00",
+          "duration_s": 4.08,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "innkeeper_warm",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 9
+            }
+          },
+          "params": {
+            "exaggeration": 0.6,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 2,
+          "file": "npc_greetings/takes/innkeeper_greeting.take02.wav",
+          "seed": 183971395,
+          "text": "Welcome, traveler! You look like you've seen better days.",
+          "rendered": "2026-10-18T17:10:01+00:00",
+          "duration_s": 3.16,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "innkeeper_warm",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 9
+            }
+          },
+          "params": {
+            "exaggeration": 0.6,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 3,
+          "file": "npc_greetings/takes/innkeeper_greeting.take03.wav",
+          "seed": 1769194505,
+          "text": "Welcome, traveler! You look like you've seen better days.",
+          "rendered": "2026-10-18T17:10:03+00:00",
+          "duration_s": 4.0,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "innkeeper_warm",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 9
+            }
+          },
+          "params": {
+            "exaggeration": 0.6,
+            "cfg_weight": 0.4
+          }
+        }
+      ],
+      "chosen": 3,
+      "render": "npc_greetings/innkeeper_greeting.wav",
+      "visemes": "npc_greetings/innkeeper_greeting.visemes.json",
+      "processed": {
+        "take": 3,
+        "at": "2026-10-18T17:11:07.074195+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -17.07,
+        "lufs": -18.0,
+        "true_peak_dbtp": -2.25,
+        "gain_db": -0.93,
+        "limiter_max_reduction_db": 0.0,
+        "deess_max_reduction_db": 5.94,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "blacksmith_greeting",
+      "text": "Ah, another one from the depths. Your blade's seen some work.",
+      "voice": "blacksmith",
+      "direction": "the blacksmith, to the knight back from the dungeon: gruff and dry, a craftsman's appraising look at the knight's blade, unhurried; his first line when the knight talks to him",
+      "params": {
+        "exaggeration": 0.4,
+        "cfg_weight": 0.4
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "npc_greetings/takes/blacksmith_greeting.take01.wav",
+          "seed": 273011256,
+          "text": "Ah, another one from the depths. Your blade's seen some work.",
+          "rendered": "2026-10-18T17:10:04+00:00",
+          "duration_s": 5.28,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "blacksmith",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 7
+            }
+          },
+          "params": {
+            "exaggeration": 0.4,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 2,
+          "file": "npc_greetings/takes/blacksmith_greeting.take02.wav",
+          "seed": 1871381443,
+          "text": "Ah, another one from the depths. Your blade's seen some work.",
+          "rendered": "2026-10-18T17:10:06+00:00",
+          "duration_s": 4.92,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "blacksmith",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 7
+            }
+          },
+          "params": {
+            "exaggeration": 0.4,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 3,
+          "file": "npc_greetings/takes/blacksmith_greeting.take03.wav",
+          "seed": 734496471,
+          "text": "Ah, another one from the depths. Your blade's seen some work.",
+          "rendered": "2026-10-18T17:10:08+00:00",
+          "duration_s": 5.4,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "blacksmith",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 7
+            }
+          },
+          "params": {
+            "exaggeration": 0.4,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 4,
+          "file": "npc_greetings/takes/blacksmith_greeting.take04.wav",
+          "seed": 1226965759,
+          "text": "Ah, another one from the depths. Your blade's seen some work.",
+          "rendered": "2026-10-18T17:11:53+00:00",
+          "duration_s": 4.36,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "blacksmith",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 7
+            }
+          },
+          "params": {
+            "exaggeration": 0.4,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 5,
+          "file": "npc_greetings/takes/blacksmith_greeting.take05.wav",
+          "seed": 465182923,
+          "text": "Ah, another one from the depths. Your blade's seen some work.",
+          "rendered": "2026-10-18T17:11:55+00:00",
+          "duration_s": 5.4,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "blacksmith",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 7
+            }
+          },
+          "params": {
+            "exaggeration": 0.4,
+            "cfg_weight": 0.4
+          }
+        },
+        {
+          "take": 6,
+          "file": "npc_greetings/takes/blacksmith_greeting.take06.wav",
+          "seed": 133982881,
+          "text": "Ah, another one from the depths. Your blade's seen some work.",
+          "rendered": "2026-10-18T17:11:57+00:00",
+          "duration_s": 6.16,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "blacksmith",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 7
+            }
+          },
+          "params": {
+            "exaggeration": 0.4,
+            "cfg_weight": 0.4
+          }
+        }
+      ],
+      "chosen": 5,
+      "render": "npc_greetings/blacksmith_greeting.wav",
+      "visemes": "npc_greetings/blacksmith_greeting.visemes.json",
+      "processed": {
+        "take": 5,
+        "at": "2026-10-18T17:12:11.726785+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -18.91,
+        "lufs": -18.0,
+        "true_peak_dbtp": -1.21,
+        "gain_db": 0.91,
+        "limiter_max_reduction_db": 0.0,
+        "deess_max_reduction_db": 5.89,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "witch_greeting",
+      "text": "The stones whisper of what lies below...",
+      "voice": "witch_hushed",
+      "direction": "the witch, fortune teller by the tree, to the knight: slow and hushed, ominous, trailing off at the end; she says it as the knight asks for her reading of the next dungeon",
+      "params": {
+        "exaggeration": 0.7,
+        "cfg_weight": 0.25
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "npc_greetings/takes/witch_greeting.take01.wav",
+          "seed": 1652430720,
+          "text": "The stones whisper of what lies below...",
+          "rendered": "2026-10-18T17:10:09+00:00",
+          "duration_s": 3.56,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "witch_hushed",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 9
+            }
+          },
+          "params": {
+            "exaggeration": 0.7,
+            "cfg_weight": 0.25
+          }
+        },
+        {
+          "take": 2,
+          "file": "npc_greetings/takes/witch_greeting.take02.wav",
+          "seed": 1097268614,
+          "text": "The stones whisper of what lies below...",
+          "rendered": "2026-10-18T17:10:11+00:00",
+          "duration_s": 4.32,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "witch_hushed",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 9
+            }
+          },
+          "params": {
+            "exaggeration": 0.7,
+            "cfg_weight": 0.25
+          }
+        },
+        {
+          "take": 3,
+          "file": "npc_greetings/takes/witch_greeting.take03.wav",
+          "seed": 907224809,
+          "text": "The stones whisper of what lies below...",
+          "rendered": "2026-10-18T17:10:12+00:00",
+          "duration_s": 3.52,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "witch_hushed",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 9
+            }
+          },
+          "params": {
+            "exaggeration": 0.7,
+            "cfg_weight": 0.25
+          }
+        }
+      ],
+      "chosen": 3,
+      "render": "npc_greetings/witch_greeting.wav",
+      "visemes": "npc_greetings/witch_greeting.visemes.json",
+      "processed": {
+        "take": 3,
+        "at": "2026-10-18T17:11:11.246110+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -30.87,
+        "lufs": -18.02,
+        "true_peak_dbtp": -1.05,
+        "gain_db": 12.87,
+        "limiter_max_reduction_db": 0.22,
+        "deess_max_reduction_db": 6.0,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    }
+  ]
+}
