@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The deep's, the camp's and the knight's sounds** come from the sound factory: the chink, the tink, the crumble, the rumble, the groan, the freed chord, the camp's crackle, anvil, drip, creak and hiss, the potion and the heartbeat are recipes in `sound/`, listed with their sound reports in the cue sheet `sound/cues.json`. Ten play live through Clayground's `SfxPlayer`, a little different each time, the chink, the tink, the anvil and the drip transposed per play; the crackle, the creak and the hiss play their renders, pitched per play as before, since their pitch is in noise and filters a recipe's detune does not move. The Python scripts that synthesised them are gone. Built on Clayground `8574700` (issue-439, on release/v2026.11). (#190)
+
 ## [0.3.0] - 2026-10-12
 
 Dungeons fight back and hide things: spike plates and arrow slits you learn to read, doors you shut and enemies bash, loops and secret rooms to find, urns, barrels, crates and crystals to break for gold, and a Dungeon Master panel to tune the next dungeon before you enter it. Built on Clayground v2026.9.

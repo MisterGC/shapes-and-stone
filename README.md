@@ -183,6 +183,35 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
+The deep's, the camp's and the knight's sound effects come from the sound
+factory (github.com/MisterGC/sound-productions): each is a recipe,
+`sound/sfx/<name>.sfx.json`, an entry in the cue sheet `sound/cues.json`
+with its sound report beside it, and a person's verdict once it has been
+heard. A live cue plays its recipe through Clayground's `SfxPlayer`, a
+little different each time and, where the game pitches it, transposed by
+`play(velocity, detune)`; a rendered cue plays the factory's render,
+`sound/sfx/<name>.wav`, through a `Sound` at another rate. The crackle,
+the hiss and the creak stay rendered: their pitch is in noise and in
+filters, which a recipe's detune does not move. The build ships what the
+sheet names: a live cue's recipe, a rendered cue's render. A changed recipe is
+rendered and delivered again with the factory's `sp`:
+
+```
+sp render sound/sfx/deep_tink.sfx.json -o /tmp/deep_tink.wav
+sp analyze /tmp/deep_tink.wav
+sp deliver /tmp/deep_tink.wav sfx/deep_tink --game . --source sound/sfx/deep_tink.sfx.json
+sp cues --game .
+```
+
+The cue bench checks that the game has a player for every cue of the
+sheet - an `SfxPlayer` of the recipe for a live one, a `Sound` of the render
+for a rendered one - loaded, that the live ones play and render, that the
+game's own calls reach them, and that M silences them:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cues/cues.qml
+```
+
 At depth 0 a line at the bottom of the screen names the controls: WASD,
 LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
 potion, 2 draught, M mute and Esc menu. F or the middle button locks on an
@@ -309,13 +338,13 @@ buy what the panel offers, each ware named with its effect. Outside the
 panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
 mana back, up to the knight's max - at today's 40 it refills the bar; a
 knight with full mana drinks none. The campfire stays the healer.
-A potion drunk plays `potion_drink.wav` - the cork, three gulps and a
+A potion drunk plays the cue `sfx/potion_drink` - the cork, three gulps and a
 breath let out - swells an amber ring out from the knight with embers
 rising round it, and fills the health bar over a second. Below
 `lowHealthAt` (Game.qml, 35%) of max HP the screen's edge beats blood red
-with a heartbeat (`heartbeat.wav`), quicker and louder the lower the
+with a heartbeat (`sfx/heartbeat`), quicker and louder the lower the
 health, over Clayground's faded colours (`ScreenFx2d.lowHealth`); a potion
-lifts it off over a second. `tools/knight_sounds.py` makes both sounds.
+lifts it off over a second. Both play live from their recipes in `sound/`.
 
 The smith's upgrades have levels, I to III: the sharpened sword adds
 `shop.swordAtk` to the knight's attack and shows a brighter, wider blade
@@ -469,8 +498,8 @@ knight in the camp has stood still `camp.restQuiet` seconds (10) - all of
 them seated by the fire - the camp music steps down to `restMusic` of its
 level and the near sounds come forward; a knight that moves brings the
 music back. M mutes all of it. Every number is in `Balance.camp.sounds`;
-the samples are made by `tools/camp_sounds.py`. The camp sound bench
-steps the world: the crackle's gain falls from beside the fire to the
+the anvil and the drip play live from their recipes in `sound/`, the
+crackle, the creak and the hiss their renders there. The camp sound bench steps the world: the crackle's gain falls from beside the fire to the
 cave's far edge, the music holds until restQuiet, steps down and comes
 back on a press of D, the anvil rings only while the smith hammers, each
 look has its own sound on 12 seeds, and M silences it all. The danger
@@ -1118,7 +1147,8 @@ physics steps, so a pause or a hit stop holds them. The gem's shape and
 colour come with the depth (`shapes`): an amber tetrahedron from depth 0,
 a jade cube from 2, a sapphire octahedron from 4, an amethyst
 dodecahedron from 6 and an ember icosahedron from 8. Every number is
-`Balance.deep`; the samples are synthesised by `tools/deep_sounds.py`.
+`Balance.deep`; the chink, the tink and the crumble play live from their
+recipes in `sound/`, the chink and the tink transposed per play.
 The dojo's `applyScenario("deep")` lands the knight in front of one in a
 walled room, its spawn hole in the same wall (#157), and
 `applyScenario("deep", 4)` shows depth 4's gem. The deep
@@ -1232,8 +1262,8 @@ crawl out of its mouth, each with the rumble: `waves` waves of
 `perWave`, `waveGap` seconds apart. `closeAfter` seconds after the last
 one its rim crumbles shut, a heap of rubble, and it never wakes again.
 The hole's sounds are quieter the further it is from the knight. Every
-number is `Balance.deep.hole`; the rumble and the groan are synthesised
-by `tools/deep_sounds.py`. In a session the host, which decides every
+number is `Balance.deep.hole`; the rumble and the groan play live from
+their recipes in `sound/`. In a session the host, which decides every
 cut gem, rolls the wake, runs every hole, sends its creatures as it
 sends every enemy, and publishes the holes' stages and waves (the
 session property `holes`), which every screen shows and hears in order,
@@ -1295,8 +1325,8 @@ fading out of sight, while a warm low major chord plays - the only one
 in the dungeon's sounds. Talking never wakes the hole. A miner still
 there when its hole's first wave comes flees the same way, without the
 chord. The pickaxe is the veins' alone: aimed at a traveller it starts
-no dig. Every number and line is `Balance.deep.traveller`; the chord is
-synthesised by `tools/deep_sounds.py`. In a session the node whose
+no dig. Every number and line is `Balance.deep.traveller`; the chord
+plays live from its recipe in `sound/`. In a session the node whose
 knight talked to one shows its line at once and tells the host; the
 host decides how it goes on and publishes every traveller that goes on
 (the session property `deepTravellers`), which every screen shows, a
