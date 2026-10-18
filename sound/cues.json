@@ -5,31 +5,31 @@
     "sfx/deep_chink": {
       "category": "sfx",
       "brief": "the pickaxe on stone: a heavy thud under an iron click; played a step lower or higher per strike",
-      "mode": "rendered",
+      "mode": "live",
       "source": "sfx/deep_chink.sfx.json",
       "render": "sfx/deep_chink.wav",
       "report": "sfx/deep_chink.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:25:54.967157+00:00",
+      "delivered": "2026-10-18T16:37:04.098349+00:00",
       "verdict": null
     },
     "sfx/deep_tink": {
       "category": "sfx",
       "brief": "a clean strike's bright tink on the gem, a glassy bell; played a pentatonic step higher per clean strike and three times as the gem's chime",
-      "mode": "rendered",
+      "mode": "live",
       "source": "sfx/deep_tink.sfx.json",
       "render": "sfx/deep_tink.wav",
       "report": "sfx/deep_tink.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:08.080346+00:00",
+      "delivered": "2026-10-18T16:37:14.000094+00:00",
       "verdict": null
     },
     "sfx/deep_crumble": {
@@ -41,10 +41,10 @@
       "report": "sfx/deep_crumble.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:09.677962+00:00",
+      "delivered": "2026-10-18T16:37:05.808559+00:00",
       "verdict": null
     },
     "sfx/deep_rumble": {
@@ -56,10 +56,10 @@
       "report": "sfx/deep_rumble.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:11.672251+00:00",
+      "delivered": "2026-10-18T16:37:12.493526+00:00",
       "verdict": null
     },
     "sfx/deep_groan": {
@@ -71,10 +71,10 @@
       "report": "sfx/deep_groan.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:14.210309+00:00",
+      "delivered": "2026-10-18T16:37:10.436469+00:00",
       "verdict": null
     },
     "sfx/deep_freed": {
@@ -86,10 +86,10 @@
       "report": "sfx/deep_freed.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:16.179132+00:00",
+      "delivered": "2026-10-18T16:37:07.835716+00:00",
       "verdict": null
     },
     "sfx/camp_crackle": {
@@ -101,40 +101,40 @@
       "report": "sfx/camp_crackle.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:25:56.702165+00:00",
+      "delivered": "2026-10-18T16:36:55.790658+00:00",
       "verdict": null
     },
     "sfx/camp_anvil": {
       "category": "sfx",
       "brief": "the smith's hammer on the anvil: a short metal ring; played at its source, pitched a little each time",
-      "mode": "rendered",
+      "mode": "live",
       "source": "sfx/camp_anvil.sfx.json",
       "render": "sfx/camp_anvil.wav",
       "report": "sfx/camp_anvil.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:19.426566+00:00",
+      "delivered": "2026-10-18T16:36:54.016620+00:00",
       "verdict": null
     },
     "sfx/camp_drip": {
       "category": "sfx",
       "brief": "water dripping in the grotto: a plink rising in pitch; played at its source, pitched a little each time",
-      "mode": "rendered",
+      "mode": "live",
       "source": "sfx/camp_drip.sfx.json",
       "render": "sfx/camp_drip.wav",
       "report": "sfx/camp_drip.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:25:58.050876+00:00",
+      "delivered": "2026-10-18T16:36:59.269580+00:00",
       "verdict": null
     },
     "sfx/camp_creak": {
@@ -146,10 +146,10 @@
       "report": "sfx/camp_creak.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:22.715101+00:00",
+      "delivered": "2026-10-18T16:36:57.901272+00:00",
       "verdict": null
     },
     "sfx/camp_hiss": {
@@ -161,10 +161,10 @@
       "report": "sfx/camp_hiss.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:25.983784+00:00",
+      "delivered": "2026-10-18T16:37:02.664106+00:00",
       "verdict": null
     },
     "sfx/potion_drink": {
@@ -176,10 +176,10 @@
       "report": "sfx/potion_drink.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:28.439199+00:00",
+      "delivered": "2026-10-18T16:37:17.958359+00:00",
       "verdict": null
     },
     "sfx/heartbeat": {
@@ -191,10 +191,10 @@
       "report": "sfx/heartbeat.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground c85cc76)",
+        "version": "2026.9 (clayground 8574700)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:21:29.758713+00:00",
+      "delivered": "2026-10-18T16:37:15.414052+00:00",
       "verdict": null
     }
   }

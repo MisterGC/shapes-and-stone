@@ -63,11 +63,11 @@ Window {
     function steps(seconds) { return Math.round(seconds / stepS) }
     function run(seconds) { Clayground.physicsStep(steps(seconds)) }
 
-    // Every Music and Sound in the item tree under root, by file name
+    // Every Music, Sound and SfxPlayer in the item tree under root, by file name
     function tracks(root, out) {
         out = out || {}
         let src = root.source !== undefined ? String(root.source) : ""
-        if (src.endsWith(".mp3") || src.endsWith(".wav"))
+        if (src.endsWith(".mp3") || src.endsWith(".wav") || src.endsWith(".sfx.json"))
             out[src.substring(src.lastIndexOf("/") + 1)] = root
         let kids = root.data || []
         for (let i = 0; i < kids.length; i++) tracks(kids[i], out)
@@ -201,7 +201,7 @@ Window {
             put(fire.xWu - 1.5, fire.yWu)
             keys.keyClick(Qt.Key_M, Qt.NoModifier, -1)
             let t = tracks(game)
-            let camp = ["camp_crackle.wav", "camp_anvil.wav", "camp_drip.wav", "camp_creak.wav", "camp_hiss.wav"]
+            let camp = ["camp_crackle.wav", "camp_anvil.sfx.json", "camp_drip.sfx.json", "camp_creak.wav", "camp_hiss.wav"]
             check(game.muted && camp.every(n => t[n] && t[n].volume === 0)
                   && t["village_music.mp3"].volume === 0 && t["village_ambience.mp3"].volume === 0,
                   "M silences the camp's near sounds, its music and its ambience")

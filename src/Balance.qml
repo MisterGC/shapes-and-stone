@@ -1142,9 +1142,9 @@ QtObject {
         // their volume; a knight that moves brings both back in fadeUp
         sounds: {
             fire: { sample: "camp_crackle.wav", volume: 0.55, reach: 16, every: [0.12, 0.45], pitch: [-3, 2] },
-            anvil: { sample: "camp_anvil.wav", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
+            anvil: { sample: "camp_anvil.sfx.json", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
             looks: {
-                grotto: { sample: "camp_drip.wav", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
+                grotto: { sample: "camp_drip.sfx.json", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
                 hall: { sample: "camp_creak.wav", props: ["cart"], volume: 0.45, reach: 14, every: [3.0, 7.0], pitch: [-2, 2] },
                 ember: { sample: "camp_hiss.wav", props: ["coals", "cracks"], volume: 0.35, reach: 12, every: [1.5, 4.5], pitch: [-3, 1] }
             },

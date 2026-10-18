@@ -256,16 +256,16 @@ ClayWorld2d {
     // veinSoundsKept of them as they play, "chink", "tink+4" or
     // "crumble", muted too, and veinSoundCount counts them all, for the
     // benches; a new level starts the list over. They are the sound
-    // factory's cues (sound/cues.json): the chink and the tink are played
-    // pitched, from their renders, the crumble live from its recipe
-    Sound {
+    // factory's cues (sound/cues.json), played live from their recipes,
+    // the chink and the tink transposed per play
+    SfxPlayer {
         id: chinkSound
-        source: "../sound/sfx/deep_chink.wav"
+        source: "../sound/sfx/deep_chink.sfx.json"
         volume: muted ? 0 : Balance.deep.chinkVolume * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: tinkSound
-        source: "../sound/sfx/deep_tink.wav"
+        source: "../sound/sfx/deep_tink.sfx.json"
         volume: muted ? 0 : Balance.deep.tinkVolume * soundVolume
     }
     SfxPlayer {
@@ -281,11 +281,11 @@ ClayWorld2d {
         veinSoundCount++
     }
     function playChink(pitch) {
-        chinkSound.triggerNote(chinkSound.rootNote + pitch, 1)
+        chinkSound.play(1, pitch)
         _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
     }
     function playTink(pitch, gain) {
-        tinkSound.triggerNote(tinkSound.rootNote + pitch, gain === undefined ? 1 : gain)
+        tinkSound.play(gain === undefined ? 1 : gain, pitch)
         _heard("tink+" + pitch)
     }
     // gain 1 when left out; the last one played is crumbleGain
@@ -7622,7 +7622,7 @@ ClayWorld2d {
         spawnShards(s.pickXWu, s.pickYWu, -s.facing, 0.4, 2, Balance.deep.chipColor, 0.06)
         let gain = _deepGain(s, cfg.digVolume, cfg.hearReach)
         if (gain > 0.005) {
-            tinkSound.triggerNote(tinkSound.rootNote + cfg.digPitch, gain / Balance.deep.tinkVolume)
+            tinkSound.play(gain / Balance.deep.tinkVolume, cfg.digPitch)
             _deepSound("dig")
         }
         if (!_decidesDeep()) return
