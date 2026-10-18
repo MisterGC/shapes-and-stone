@@ -4014,7 +4014,7 @@ ClayWorld2d {
         bonePiles.splice(i, 1)
         spawnShards(pile.xWu, pile.yWu, nx, ny, 9, "#D8D0BC", 0.14)
         spawnShards(pile.xWu, pile.yWu, nx, ny, 3, "#DDD5C2", 0.22)
-        impactSound.triggerOneShot(0.35)
+        impactSound.play(0.35)
         pile.destroy()
     }
 
@@ -4209,7 +4209,7 @@ ClayWorld2d {
     // A blow too weak for it: a crystal glances a swing off with sparks
     function glanceThing(b, nx, ny) {
         spawnSparks(b.cxWu, b.cyWu, -nx, -ny, 6, "#BFF4FF")
-        impactSound.triggerOneShot(0.25)
+        impactSound.play(0.25)
     }
     // Alone, or the host: b broke for good, its gold drops where it stood
     // and, in a session, every screen is told
@@ -4254,15 +4254,15 @@ ClayWorld2d {
         if (b.kind === "urn") {
             spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
             spawnShards(x, y, nx, ny, 4, Qt.lighter(b._clay, 1.3), 0.28)
-            impactSound.triggerOneShot(0.5)
+            impactSound.play(0.5)
         } else if (b.kind === "crate") {
             spawnShards(x, y, nx, ny, 9, b._wood, 0.24)
             spawnShards(x, y, nx, ny, 5, Qt.lighter(b._wood, 1.3), 0.14)
-            impactSound.triggerOneShot(0.6)
+            impactSound.play(0.6)
         } else {
             spawnShards(x, y, nx, ny, 12, "#7FE6FF", 0.18)
             spawnSparks(x, y, nx, ny, 10, "#E8FBFF")
-            impactSound.triggerOneShot(0.7)
+            impactSound.play(0.7)
         }
         if (b.glow) b.glow.destroy()
         b.destroy()
@@ -4847,9 +4847,9 @@ ClayWorld2d {
             let nx = d.across ? -d.roomSide : 0, ny = d.across ? 0 : -d.roomSide
             spawnShards(d.cxWu, d.cyWu, nx, ny, 10, d._wood, 0.26)
             spawnShards(d.cxWu, d.cyWu, nx, ny, 6, Qt.lighter(d._wood, 1.35), 0.16)
-            impactSound.triggerOneShot(0.8)
+            impactSound.play(0.8)
         } else {
-            impactSound.triggerOneShot(0.2)
+            impactSound.play(0.2)
         }
     }
     // The host's doors not closed in the level: every door here as they say
@@ -5149,7 +5149,7 @@ ClayWorld2d {
         let cx = (s.gx + 0.5) * cellSize, cy = (s.gy + 0.5) * cellSize
         spawnShards(cx, cy, s.nx, s.ny, 12, "#5A6272", 0.28)
         spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
-        impactSound.triggerOneShot(0.7)
+        impactSound.play(0.7)
         shake(0.4)
         runSecrets++
         minimap.requestPaint()
@@ -5184,7 +5184,7 @@ ClayWorld2d {
             _glancedBy = s
             let cx = (s.gx + 0.5 + s.nx * 0.5) * cellSize, cy = (s.gy + 0.5 + s.ny * 0.5) * cellSize
             spawnShards(cx, cy, s.nx, s.ny, 6, "#D8CDB6", 0.1)
-            impactSound.triggerOneShot(0.25)
+            impactSound.play(0.25)
             secretGlanced(s.cell)
         }
     }
