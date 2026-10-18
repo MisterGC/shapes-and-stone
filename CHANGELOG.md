@@ -6,7 +6,14 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The dungeon's music follows the fight:** the more enemies near the knight are after it, up to three, the more the dungeon's song plays - a pulse of kick and snare with the first, a horn's counter-line and brushes with the second and third - and it settles slowly once they give up or fall (`Balance.music`). (#191)
+- **The villagers speak and their mouths move:** the innkeeper's, the blacksmith's and the witch's greetings are voiced lines from the sound factory, and while one plays the speaker shows a mouth that follows the line's lip-sync cues, resting once the line is over. (#191)
+
 ### Changed
+
+- **All of the game's sound comes from the sound factory** (#191): the title's, the camp's and the dungeon's music are songs in the factory's note notation that Clayground's `SongPlayer` plays live; the dungeon's and the camp's ambience, the fight's, the menus', the coin's and the fishing sounds and the cat's purr are recipes in `sound/`; the greetings and the knight's whirlwind shout are spoken by vocli and lip-synced. Every one is a cue in `sound/cues.json` with its sound report, waiting for a person's verdict. The hand-made wav and mp3 files and `tools/fishing_sounds.py` are gone. Built on Clayground `8574700` (issue-439, on release/v2026.11).
 
 - **The deep's, the camp's and the knight's sounds** come from the sound factory: the chink, the tink, the crumble, the rumble, the groan, the freed chord, the camp's crackle, anvil, drip, creak and hiss, the potion and the heartbeat are recipes in `sound/`, listed with their sound reports in the cue sheet `sound/cues.json`. Ten play live through Clayground's `SfxPlayer`, a little different each time, the chink, the tink, the anvil and the drip transposed per play; the crackle, the creak and the hiss play their renders, pitched per play as before, since their pitch is in noise and filters a recipe's detune does not move. The Python scripts that synthesised them are gone. Built on Clayground `8574700` (issue-439, on release/v2026.11). (#190)
 
