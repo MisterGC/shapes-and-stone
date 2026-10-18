@@ -18,9 +18,75 @@ again writes the same files:
 """
 
 import math
+import os
 import random
+import struct
+import wave
 
-from camp_sounds import RATE, add, bandpass, fade_out, highpass, lowpass, silence, write
+RATE = 44100
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "assets")
+
+
+def silence(seconds):
+    return [0.0] * int(seconds * RATE)
+
+
+def add(buf, at, samples, gain=1.0):
+    i0 = int(at * RATE)
+    for i, s in enumerate(samples):
+        if i0 + i < len(buf):
+            buf[i0 + i] += s * gain
+
+
+def highpass(samples, cutoff):
+    a = 1.0 / (1.0 + 2 * math.pi * cutoff / RATE)
+    out, prev_x, prev_y = [], 0.0, 0.0
+    for x in samples:
+        prev_y = a * (prev_y + x - prev_x)
+        prev_x = x
+        out.append(prev_y)
+    return out
+
+
+def lowpass(samples, cutoff):
+    k = 1.0 - math.exp(-2 * math.pi * cutoff / RATE)
+    out, y = [], 0.0
+    for x in samples:
+        y += k * (x - y)
+        out.append(y)
+    return out
+
+
+def bandpass(samples, centre, q):
+    # A two-pole resonator (RBJ band-pass, constant peak gain)
+    w = 2 * math.pi * centre / RATE
+    alpha = math.sin(w) / (2 * q)
+    b0, b2 = alpha, -alpha
+    a0, a1, a2 = 1 + alpha, -2 * math.cos(w), 1 - alpha
+    out, x1, x2, y1, y2 = [], 0.0, 0.0, 0.0, 0.0
+    for x in samples:
+        y = (b0 * x + b2 * x2 - a1 * y1 - a2 * y2) / a0
+        x2, x1, y2, y1 = x1, x, y1, y
+        out.append(y)
+    return out
+
+
+def fade_out(samples, seconds):
+    n = min(len(samples), int(seconds * RATE))
+    for i in range(n):
+        samples[len(samples) - n + i] *= 1 - i / n
+    return samples
+
+
+def write(name, samples, peak):
+    top = max(abs(s) for s in samples) or 1.0
+    path = os.path.join(OUT, name)
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(RATE)
+        w.writeframes(b"".join(struct.pack("<h", int(s / top * peak * 32767)) for s in samples))
+    print("wrote", os.path.relpath(path), "%.2f s" % (len(samples) / RATE))
 
 
 def noise(rng, seconds, decay, attack=0.002):
