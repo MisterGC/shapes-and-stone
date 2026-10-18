@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "punch_hitting",
+  "variation": {"seed": 7, "pool": 4},
+  "layers": [
+    {"name": "crack", "role": "transient", "source": "noise", "length": 14, "gain": -12.2, "envelope": {"attack": 0.5, "decay": 10, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 1800}},
+    {"name": "thump", "role": "body", "source": "sine", "freq": 75, "length": 260, "gain": -6.2, "envelope": {"attack": 1, "decay": 250, "sustain": 0, "release": 0}, "pitch": {"start": 12, "end": 0, "time": 45}, "vary": {"detune": [-1.5, 1.5]}},
+    {"name": "flesh", "role": "body", "source": "noise", "length": 160, "gain": -10.2, "envelope": {"attack": 1, "decay": 140, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 900}, "vary": {"filter.cutoff": [-150, 150]}},
+    {"name": "ring", "role": "tail", "source": "triangle", "freq": 230, "length": 180, "gain": -22.2, "offset": 4, "envelope": {"attack": 1, "decay": 170, "sustain": 0, "release": 0}}
+  ]
+}

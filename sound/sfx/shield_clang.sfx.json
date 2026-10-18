@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "shield_clang",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "strike", "role": "transient", "source": "noise", "length": 8, "gain": -14.2, "envelope": {"attack": 0.5, "decay": 6, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 3200, "resonance": 0.3}},
+    {"name": "plate", "role": "body", "source": "triangle", "freq": 212, "length": 680, "gain": -6.2, "envelope": {"attack": 1, "decay": 680, "sustain": 0, "release": 0}},
+    {"name": "mode2", "role": "body", "source": "sine", "freq": 585, "length": 520, "gain": -12.2, "envelope": {"attack": 1, "decay": 500, "sustain": 0, "release": 0}},
+    {"name": "mode3", "role": "tail", "source": "sine", "freq": 1146, "length": 380, "gain": -18.2, "envelope": {"attack": 1, "decay": 370, "sustain": 0, "release": 0}},
+    {"name": "mode4", "role": "tail", "source": "sine", "freq": 1871, "length": 260, "gain": -24.2, "envelope": {"attack": 1, "decay": 250, "sustain": 0, "release": 0}}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "footstep",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "heel", "role": "body", "source": "sine", "freq": 120, "length": 90, "gain": -3.4, "envelope": {"attack": 1, "decay": 80, "sustain": 0, "release": 0}, "pitch": {"start": 5, "end": 0, "time": 25}},
+    {"name": "stone", "role": "body", "source": "noise", "length": 70, "gain": 0.6, "envelope": {"attack": 1, "decay": 60, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 700}},
+    {"name": "scuff", "role": "tail", "source": "noise", "length": 110, "gain": -15.4, "offset": 25, "envelope": {"attack": 10, "decay": 95, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 1300, "resonance": 0.1}}
+  ]
+}

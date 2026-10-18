@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "coin_pickup",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "clink", "role": "body", "source": "triangle", "freq": 1318.5, "length": 120, "gain": -8.3, "envelope": {"attack": 1, "decay": 115, "sustain": 0, "release": 0}},
+    {"name": "ring", "role": "tail", "source": "triangle", "freq": 1760, "length": 300, "gain": -6.3, "offset": 60, "envelope": {"attack": 1, "decay": 290, "sustain": 0, "release": 0}},
+    {"name": "glint", "role": "tail", "source": "sine", "freq": 3520, "length": 200, "gain": -24.3, "offset": 60, "envelope": {"attack": 1, "decay": 190, "sustain": 0, "release": 0}}
+  ]
+}

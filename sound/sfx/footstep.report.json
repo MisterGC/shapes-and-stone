@@ -1,0 +1,128 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.135011,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -14.752147,
+    "lufs_block_s": 0.135011,
+    "true_peak_dbtp": -1.906092,
+    "peak_dbfs": -1.911619,
+    "rms_dbfs": -13.133099,
+    "crest_factor_db": 11.22148
+  },
+  "envelope": {
+    "silence_start_s": 6.8e-05,
+    "silence_end_s": 0.007211,
+    "attack_s": 0.0,
+    "peak_at_s": 0.004989,
+    "peak_db": -7.368865,
+    "fall_20db_at_s": 0.07483,
+    "fall_60db_at_s": 0.1322
+  },
+  "spectrum": {
+    "centroid_hz": 162.709308,
+    "rolloff_hz": 150.732422,
+    "flatness": 0.000821,
+    "band_shares": {
+      "20_60": 0.009788,
+      "60_250": 0.939018,
+      "250_500": 0.02982,
+      "500_2k": 0.018873,
+      "2k_5k": 0.001901,
+      "5k_10k": 0.000487,
+      "10k_20k": 0.000113
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.75,
+    "median_hz": 124.544962,
+    "start_hz": 136.604026,
+    "end_hz": 124.544962,
+    "sweep_semitones": -1.6,
+    "track": [
+      [
+        0.0,
+        148.109755
+      ],
+      [
+        0.01161,
+        136.604026
+      ],
+      [
+        0.02322,
+        132.715174
+      ],
+      [
+        0.03483,
+        123.827636
+      ],
+      [
+        0.04644,
+        120.999409
+      ],
+      [
+        0.05805,
+        120.302504
+      ],
+      [
+        0.06966,
+        120.302504
+      ],
+      [
+        0.08127,
+        124.544962
+      ],
+      [
+        0.09288,
+        133.483985
+      ],
+      [
+        0.10449,
+        null
+      ],
+      [
+        0.1161,
+        null
+      ],
+      [
+        0.12771,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.132884,
+    "roughness_asper": 0.104501,
+    "roughness_max_asper": 0.104501
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.005238,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "footstep.wav",
+  "pictures": {
+    "spectrogram": "footstep.spec.png",
+    "waveform": "footstep.wave.png"
+  }
+}
