@@ -108,7 +108,11 @@ Window {
             let n = game.veinSoundCount
             game.playChink(-1)
             game.playTink(4)
-            check(game.veinSoundCount === n + 2, "the game plays the chink and the tink, pitched, from their renders")
+            check(game.veinSoundCount === n + 2, "the game plays the chink and the tink from their recipes, transposed")
+            let tink = p["sfx/deep_tink.sfx.json"], seed = tink.variationSeed(0)
+            let up = tink.renderOffline(seed, 1, 4), plain = tink.renderOffline(seed)
+            check(up.length > 0 && up.length === plain.length && up[200] !== plain[200],
+                  "a tink played 4 semitones up is the same length and other samples")
             pressM()
         }],
         [100, () => {
