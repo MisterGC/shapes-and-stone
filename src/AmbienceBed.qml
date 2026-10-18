@@ -12,6 +12,7 @@ SfxPlayer {
     property real level: 1
     property real every: 8.5
     property bool wanted: false
+    // Silenced by volume until SfxPlayer has stop() (clayground#441)
     volume: wanted ? level : 0
     function start() {
         if (wanted) return
@@ -23,6 +24,7 @@ SfxPlayer {
         wanted = false
         _again.stop()
     }
+    // Re-played by hand until SfxPlayer loops a recipe (clayground#442)
     property Timer _again: Timer {
         interval: bed.every * 1000
         repeat: true
