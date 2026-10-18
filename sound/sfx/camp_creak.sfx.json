@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "camp_creak",
+  "variation": { "seed": 150, "pool": 1 },
+  "layers": [
+    { "name": "body", "role": "body", "source": "sawtooth", "freq": 45, "length": 900,
+      "gain": 4.7, "envelope": { "attack": 450, "decay": 450, "sustain": 0, "release": 0 },
+      "lfo": { "target": "pitch", "rate": 1.7, "depth": 4 },
+      "filter": { "type": "bandpass", "cutoff": 750, "resonance": 0.81 } },
+    { "name": "wood", "role": "tail", "source": "sawtooth", "freq": 45, "length": 900,
+      "gain": 4.8, "envelope": { "attack": 450, "decay": 450, "sustain": 0, "release": 0 },
+      "lfo": { "target": "pitch", "rate": 1.7, "depth": 4 },
+      "filter": { "type": "bandpass", "cutoff": 1900, "resonance": 0.92 } }
+  ]
+}

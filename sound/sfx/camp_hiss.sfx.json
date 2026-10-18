@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "camp_hiss",
+  "variation": { "seed": 151, "pool": 1 },
+  "layers": [
+    { "name": "hiss", "role": "body", "source": "noise", "length": 1500, "gain": -11.3,
+      "envelope": { "attack": 400, "decay": 1100, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 2500 } },
+    { "name": "spark1", "role": "transient", "source": "noise", "offset": 430.6, "length": 3,
+      "gain": -9.1, "envelope": { "attack": 0, "decay": 3, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 3000 } },
+    { "name": "spark2", "role": "transient", "source": "noise", "offset": 250.4, "length": 3.9,
+      "gain": -7.2, "envelope": { "attack": 0, "decay": 3.9, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 3000 } },
+    { "name": "spark3", "role": "transient", "source": "noise", "offset": 620.9, "length": 3.9,
+      "gain": -9.7, "envelope": { "attack": 0, "decay": 3.9, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 3000 } },
+    { "name": "spark4", "role": "transient", "source": "noise", "offset": 232.1, "length": 3.4,
+      "gain": -10, "envelope": { "attack": 0, "decay": 3.4, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 3000 } }
+  ]
+}

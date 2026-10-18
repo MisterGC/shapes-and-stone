@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "camp_drip",
+  "variation": { "seed": 149, "pool": 1 },
+  "layers": [
+    { "name": "plink", "role": "body", "source": "sine", "freq": 1600, "length": 90, "gain": -3,
+      "envelope": { "attack": 2, "decay": 60, "sustain": 0, "release": 0 },
+      "pitch": { "start": -14.31, "end": 0, "time": 50 } },
+    { "name": "echo", "role": "tail", "source": "sine", "freq": 1600, "offset": 110,
+      "length": 90, "gain": -15,
+      "envelope": { "attack": 2, "decay": 60, "sustain": 0, "release": 0 },
+      "pitch": { "start": -14.31, "end": 0, "time": 50 } }
+  ]
+}
