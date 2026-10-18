@@ -255,20 +255,22 @@ ClayWorld2d {
     // the tink once for each of its notes. veinSounds lists the last
     // veinSoundsKept of them as they play, "chink", "tink+4" or
     // "crumble", muted too, and veinSoundCount counts them all, for the
-    // benches; a new level starts the list over
+    // benches; a new level starts the list over. They are the sound
+    // factory's cues (sound/cues.json): the chink and the tink are played
+    // pitched, from their renders, the crumble live from its recipe
     Sound {
         id: chinkSound
-        source: "assets/deep_chink.wav"
+        source: "../sound/sfx/deep_chink.wav"
         volume: muted ? 0 : Balance.deep.chinkVolume * soundVolume
     }
     Sound {
         id: tinkSound
-        source: "assets/deep_tink.wav"
+        source: "../sound/sfx/deep_tink.wav"
         volume: muted ? 0 : Balance.deep.tinkVolume * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: crumbleSound
-        source: "assets/deep_crumble.wav"
+        source: "../sound/sfx/deep_crumble.sfx.json"
         volume: muted ? 0 : Balance.deep.crumbleVolume * soundVolume
     }
     property var veinSounds: []
@@ -290,7 +292,7 @@ ClayWorld2d {
     property real crumbleGain: 0
     function playCrumble(gain) {
         crumbleGain = gain === undefined ? 1 : gain
-        crumbleSound.triggerOneShot(crumbleGain)
+        crumbleSound.play(crumbleGain)
         _heard("crumble")
     }
     property var _chimeLeft: []
@@ -314,15 +316,16 @@ ClayWorld2d {
     // closes, quieter the further it is from the knight. holeSounds lists
     // the last veinSoundsKept of them as they play, "rumble", "groan" or
     // "crumble", muted too, and holeSoundCount counts them all, for the
-    // benches; a new level starts the list over
-    Sound {
+    // benches; a new level starts the list over. All three play live from
+    // their recipes (sound/cues.json)
+    SfxPlayer {
         id: rumbleSound
-        source: "assets/deep_rumble.wav"
+        source: "../sound/sfx/deep_rumble.sfx.json"
         volume: muted ? 0 : Balance.deep.hole.rumbleVolume * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: groanSound
-        source: "assets/deep_groan.wav"
+        source: "../sound/sfx/deep_groan.sfx.json"
         volume: muted ? 0 : Balance.deep.hole.groanVolume * soundVolume
     }
     property var holeSounds: []
@@ -333,9 +336,9 @@ ClayWorld2d {
             let c = _knightCentre()
             gain = Math.max(cfg.quietest, 1 - Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y) / cfg.hearReach)
         }
-        if (name === "rumble") rumbleSound.triggerOneShot(gain)
-        else if (name === "groan") groanSound.triggerOneShot(gain)
-        else crumbleSound.triggerOneShot(gain)
+        if (name === "rumble") rumbleSound.play(gain)
+        else if (name === "groan") groanSound.play(gain)
+        else crumbleSound.play(gain)
         holeSounds = holeSounds.slice(1 - veinSoundsKept).concat([name])
         holeSoundCount++
     }
@@ -2918,18 +2921,19 @@ ClayWorld2d {
         NumberAnimation { target: world; property: "heartPulse"; to: 0.75; duration: 50 }
         NumberAnimation { target: world; property: "heartPulse"; to: 0; duration: 420; easing.type: Easing.OutQuad }
     }
-    Sound {
+    // Played live from its recipe (sound/cues.json), as the potion is
+    SfxPlayer {
         id: heartSound
-        source: "assets/heartbeat.wav"
+        source: "../sound/sfx/heartbeat.sfx.json"
         volume: muted ? 0 : 0.9 * world.lowHealthLevel * soundVolume
     }
     // A potion's heal fills the health bar slowly, so it is seen
     property bool _healing: false
     Timer { id: healingTimer; interval: 1000; onTriggered: world._healing = false }
     // The potion drunk: the cork, three gulps and a breath let out
-    Sound {
+    SfxPlayer {
         id: drinkSound
-        source: "assets/potion_drink.wav"
+        source: "../sound/sfx/potion_drink.sfx.json"
         volume: muted ? 0 : 0.8 * soundVolume
     }
 
@@ -7335,9 +7339,10 @@ ClayWorld2d {
     // deepTravellerSounds the last veinSoundsKept of their sounds, "dig"
     // or "chord", muted too, deepTravellerSoundCount all of them
     Component { id: deepTravellerComponent; DeepTraveller {} }
-    Sound {
+    // The chord plays live from its recipe (sound/cues.json)
+    SfxPlayer {
         id: travellerChord
-        source: "assets/deep_freed.wav"
+        source: "../sound/sfx/deep_freed.sfx.json"
         volume: muted ? 0 : Balance.deep.traveller.chordVolume * soundVolume
     }
     property var deepTravellers: []
@@ -7673,7 +7678,7 @@ ClayWorld2d {
             if (run.chord >= 0) {
                 run.chord -= dt
                 if (run.chord < 0) {
-                    travellerChord.triggerOneShot(Math.max(Balance.deep.hole.quietest,
+                    travellerChord.play(Math.max(Balance.deep.hole.quietest,
                                                            _deepGain(s, 1, Balance.deep.hole.hearReach)))
                     _deepSound("chord")
                 }

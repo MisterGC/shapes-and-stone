@@ -37,27 +37,27 @@ Item {
 
     Sound {
         id: crackle
-        source: "assets/" + cfg.fire.sample
+        source: "../sound/sfx/" + cfg.fire.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     Sound {
         id: anvil
-        source: "assets/" + cfg.anvil.sample
+        source: "../sound/sfx/" + cfg.anvil.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     Sound {
         id: drip
-        source: "assets/" + cfg.looks.grotto.sample
+        source: "../sound/sfx/" + cfg.looks.grotto.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     Sound {
         id: creak
-        source: "assets/" + cfg.looks.hall.sample
+        source: "../sound/sfx/" + cfg.looks.hall.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     Sound {
         id: hiss
-        source: "assets/" + cfg.looks.ember.sample
+        source: "../sound/sfx/" + cfg.looks.ember.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     readonly property var _byLook: ({ grotto: drip, hall: creak, ember: hiss })

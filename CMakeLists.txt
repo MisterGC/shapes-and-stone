@@ -30,6 +30,25 @@ set_source_files_properties(src/Balance.qml PROPERTIES QT_QML_SINGLETON_TYPE TRU
 # in the resources the native app has no cover art, no music and no sound.
 file(GLOB SNS_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS src/assets/*)
 
+# The sound factory's cues (sound/cues.json, written by its sp tool): a
+# rendered cue ships its render, a live one its recipe, which clay_sound
+# synthesizes on the device. The QML finds them at "../sound/...".
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS sound/cues.json)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/sound/cues.json SNS_CUE_SHEET)
+string(JSON SNS_CUE_COUNT LENGTH "${SNS_CUE_SHEET}" cues)
+math(EXPR SNS_CUE_LAST "${SNS_CUE_COUNT} - 1")
+set(SNS_SOUND)
+foreach(i RANGE ${SNS_CUE_LAST})
+    string(JSON cue MEMBER "${SNS_CUE_SHEET}" cues ${i})
+    string(JSON mode GET "${SNS_CUE_SHEET}" cues ${cue} mode)
+    if(mode STREQUAL "live")
+        string(JSON file GET "${SNS_CUE_SHEET}" cues ${cue} source)
+    else()
+        string(JSON file GET "${SNS_CUE_SHEET}" cues ${cue} render)
+    endif()
+    list(APPEND SNS_SOUND sound/${file})
+endforeach()
+
 clay_app(shapes_and_stone
 
     VERSION 0.3.0
@@ -98,6 +117,7 @@ clay_app(shapes_and_stone
     RES_FILES
         src/qmldir
         ${SNS_ASSETS}
+        ${SNS_SOUND}
 )
 
 # The downloads for a friend without Qt (.github/workflows/package.yml):
