@@ -324,6 +324,54 @@
       },
       "delivered": "2026-10-18T17:12:27.494135+00:00",
       "verdict": null
+    },
+    "music/dungeon": {
+      "category": "music",
+      "brief": "the dungeon below, A minor: a reed tune over strings, harp and bass; a pulse of kick and snare grows in as enemies give chase (intensity 0.15-0.5) and a horn counter-line with brushes at full fight (0.5-1); the delivered render is the full fight",
+      "mode": "live",
+      "source": "music/dungeon.song.json",
+      "render": "music/dungeon.wav",
+      "report": "music/dungeon.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:19:57.656533+00:00",
+      "verdict": null
+    },
+    "music/village": {
+      "category": "music",
+      "brief": "the camp by night between two dungeons, F major: a flute tune over a plucked harp, a round bass and soft brushes; quiet under the fire",
+      "mode": "live",
+      "source": "music/village.song.json",
+      "render": "music/village.wav",
+      "report": "music/village.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:19:57.742909+00:00",
+      "verdict": null
+    },
+    "music/title": {
+      "category": "music",
+      "brief": "the title screen's theme, D minor, heroic and a little sad: a horn tune over dark strings, harp, bass and a far drum",
+      "mode": "live",
+      "source": "music/title.song.json",
+      "render": "music/title.wav",
+      "report": "music/title.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:19:57.827181+00:00",
+      "verdict": null
     }
   }
 }
