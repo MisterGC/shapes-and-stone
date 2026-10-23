@@ -2,38 +2,38 @@
   "format": 1,
   "sample_rate": 44100,
   "channels": 1,
-  "duration_s": 0.423991,
+  "duration_s": 0.45,
   "time_span_s": 0.5,
   "loop": false,
   "loudness": {
-    "lufs_integrated": -26.075743,
+    "lufs_integrated": -25.928701,
     "lufs_block_s": 0.4,
-    "true_peak_dbtp": -4.406144,
-    "peak_dbfs": -4.45613,
-    "rms_dbfs": -28.30542,
-    "crest_factor_db": 23.84929
+    "true_peak_dbtp": -4.12384,
+    "peak_dbfs": -4.5409,
+    "rms_dbfs": -27.785553,
+    "crest_factor_db": 23.244654
   },
   "envelope": {
-    "silence_start_s": 0.001247,
-    "silence_end_s": 0.000136,
-    "attack_s": 0.0,
-    "peak_at_s": 0.004989,
-    "peak_db": -18.389868,
-    "fall_20db_at_s": 0.269388,
-    "fall_60db_at_s": null
+    "silence_start_s": 0.000658,
+    "silence_end_s": 0.025556,
+    "attack_s": 0.006825,
+    "peak_at_s": 0.009977,
+    "peak_db": -18.534666,
+    "fall_20db_at_s": 0.429025,
+    "fall_60db_at_s": 0.431519
   },
   "spectrum": {
-    "centroid_hz": 2581.036498,
-    "rolloff_hz": 3940.576172,
-    "flatness": 0.133702,
+    "centroid_hz": 2266.779767,
+    "rolloff_hz": 3746.777344,
+    "flatness": 0.118486,
     "band_shares": {
-      "20_60": 5.5e-05,
-      "60_250": 0.000885,
-      "250_500": 0.006958,
-      "500_2k": 0.542115,
-      "2k_5k": 0.354118,
-      "5k_10k": 0.074178,
-      "10k_20k": 0.021692
+      "20_60": 0.005983,
+      "60_250": 0.056383,
+      "250_500": 0.016268,
+      "500_2k": 0.551632,
+      "2k_5k": 0.279963,
+      "5k_10k": 0.073326,
+      "10k_20k": 0.016445
     }
   },
   "pitch": {
@@ -190,20 +190,28 @@
       [
         0.417959,
         null
+      ],
+      [
+        0.429569,
+        null
+      ],
+      [
+        0.441179,
+        null
       ]
     ]
   },
   "psychoacoustics": {
-    "sharpness_acum": 2.084885,
-    "roughness_asper": 4.507166,
-    "roughness_max_asper": 4.682054
+    "sharpness_acum": 1.945582,
+    "roughness_asper": 4.836777,
+    "roughness_max_asper": 4.897776
   },
   "defects": {
     "clipped_samples": 0,
     "clipped_share": 0.0,
-    "dc_offset": 2.5e-05,
-    "loop_seam_jump": 3.6e-05,
-    "loop_seam_jump_ratio": 0.00021
+    "dc_offset": -3.8e-05,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
   },
   "provenance": {
     "tool": "sp analyze",
@@ -221,7 +229,6 @@
   },
   "flags": [
     "too_quiet_vs_target",
-    "harsh_2_5k",
     "rough"
   ],
   "file": "deep_crumble.wav",

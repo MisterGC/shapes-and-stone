@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "shield_clang",
+  "template": {
+    "id": "metal-hit",
+    "version": 1
+  },
+  "macros": {
+    "size": 0.5,
+    "ring": 0.24,
+    "bright": 0.5,
+    "clang": 0
+  },
+  "overrides": {
+    "layers[plate].gain": -6.2,
+    "layers[mode2].gain": -12.2,
+    "layers[plate].envelope.decayCurve": 0,
+    "layers[mode2].envelope.decayCurve": 0
+  },
+  "locks": []
+}

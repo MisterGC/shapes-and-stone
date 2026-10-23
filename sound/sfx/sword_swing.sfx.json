@@ -1,10 +1,38 @@
 {
   "version": 1,
   "name": "sword_swing",
-  "variation": {"seed": 1, "pool": 1},
+  "variation": { "seed": 1, "pool": 1 },
   "layers": [
-    {"name": "whoosh", "role": "body", "source": "noise", "length": 420, "gain": 2.6, "envelope": {"attack": 90, "decay": 330, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 500, "resonance": 0.35, "attack": 120, "decay": 260, "sustain": 0, "amount": 1.8}},
-    {"name": "air", "role": "body", "source": "sine", "freq": 180, "length": 300, "gain": -7.4, "offset": 40, "envelope": {"attack": 60, "decay": 240, "sustain": 0, "release": 0}, "pitch": {"start": 5, "end": -7, "time": 300}},
-    {"name": "edge", "role": "tail", "source": "noise", "length": 200, "gain": -11.4, "offset": 80, "envelope": {"attack": 40, "decay": 160, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 2400, "resonance": 0.2}}
+    {
+      "name": "whoosh",
+      "role": "body",
+      "source": "noise",
+      "gain": 6,
+      "length": 420,
+      "envelope": { "attack": 90, "decay": 330, "sustain": 0, "decayCurve": 0 },
+      "filter": { "type": "bandpass", "cutoff": 500, "resonance": 0.35, "attack": 120, "decay": 260, "sustain": 0, "amount": 1.8, "decayCurve": 0 },
+      "noise": { "color": "pink" }
+    },
+    {
+      "name": "air",
+      "role": "body",
+      "source": "sine",
+      "freq": 180,
+      "gain": -8.3,
+      "offset": 40,
+      "length": 300,
+      "envelope": { "attack": 60, "decay": 240, "sustain": 0, "decayCurve": 0 },
+      "pitch": { "start": 7.4, "end": -7, "time": 300, "curve": 0.3 }
+    },
+    {
+      "name": "edge",
+      "role": "tail",
+      "source": "noise",
+      "gain": -5.4,
+      "offset": 80,
+      "length": 200,
+      "envelope": { "attack": 40, "decay": 160, "sustain": 0, "decayCurve": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 2000, "resonance": 0.35 }
+    }
   ]
 }

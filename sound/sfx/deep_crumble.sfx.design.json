@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "deep_crumble",
+  "template": {
+    "id": "crumble",
+    "version": 1
+  },
+  "macros": {
+    "amount": 0.6,
+    "duration": 0.5,
+    "coarse": 0,
+    "fade": 0.5,
+    "rumble": 0
+  },
+  "overrides": {
+    "layers[grit].gain": 7.5
+  },
+  "locks": []
+}
