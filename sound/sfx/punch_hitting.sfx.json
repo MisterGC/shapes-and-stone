@@ -1,11 +1,124 @@
 {
   "version": 1,
   "name": "punch_hitting",
-  "variation": {"seed": 7, "pool": 4},
+  "variation": {
+    "seed": 7,
+    "pool": 4
+  },
   "layers": [
-    {"name": "crack", "role": "transient", "source": "noise", "length": 14, "gain": -12.2, "envelope": {"attack": 0.5, "decay": 10, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 1800}},
-    {"name": "thump", "role": "body", "source": "sine", "freq": 75, "length": 260, "gain": -6.2, "envelope": {"attack": 1, "decay": 250, "sustain": 0, "release": 0}, "pitch": {"start": 12, "end": 0, "time": 45}, "vary": {"detune": [-1.5, 1.5]}},
-    {"name": "flesh", "role": "body", "source": "noise", "length": 160, "gain": -10.2, "envelope": {"attack": 1, "decay": 140, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 900}, "vary": {"filter.cutoff": [-150, 150]}},
-    {"name": "ring", "role": "tail", "source": "triangle", "freq": 230, "length": 180, "gain": -22.2, "offset": 4, "envelope": {"attack": 1, "decay": 170, "sustain": 0, "release": 0}}
+    {
+      "name": "slap",
+      "role": "transient",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 18,
+      "gain": -2.5,
+      "envelope": {
+        "attack": 0.3,
+        "decay": 18,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1700,
+        "resonance": 0.15
+      },
+      "vary": {
+        "filter.cutoff": [
+          -250,
+          250
+        ]
+      }
+    },
+    {
+      "name": "flesh",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 110,
+      "gain": 4.5,
+      "envelope": {
+        "attack": 1,
+        "decay": 110,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 330,
+        "resonance": 0.05
+      },
+      "drive": 4,
+      "vary": {
+        "filter.cutoff": [
+          -90,
+          90
+        ]
+      }
+    },
+    {
+      "name": "weight",
+      "role": "body",
+      "source": "sine",
+      "freq": 68,
+      "length": 120,
+      "gain": -5.5,
+      "envelope": {
+        "attack": 6,
+        "decay": 120,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "pitch": {
+        "start": 3,
+        "end": 0,
+        "time": 30
+      },
+      "vary": {
+        "detune": [
+          -1.5,
+          1.5
+        ]
+      }
+    },
+    {
+      "name": "give",
+      "role": "tail",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 6,
+      "gain": -11.5,
+      "offset": 10,
+      "envelope": {
+        "attack": 0,
+        "decay": 6,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 1200
+      },
+      "burst": {
+        "count": 3,
+        "duration": 50,
+        "density": 0.5,
+        "jitter": {
+          "time": 0.7,
+          "gain": 4
+        }
+      }
+    }
   ]
 }

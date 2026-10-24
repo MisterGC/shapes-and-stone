@@ -12,10 +12,26 @@
     "clang": 0
   },
   "overrides": {
-    "layers[plate].gain": -6.2,
-    "layers[mode2].gain": -12.2,
-    "layers[plate].envelope.decayCurve": 0,
-    "layers[mode2].envelope.decayCurve": 0
+    "layers[plate].gain": -2.5,
+    "layers[mode2].gain": -8.5,
+    "layers[plate].envelope.decayCurve": 1,
+    "layers[mode2].envelope.decayCurve": 1,
+    "layers[plate].length": 330,
+    "layers[plate].envelope.decay": 330,
+    "layers[mode2].length": 230,
+    "layers[mode2].envelope.decay": 230,
+    "layers[mode3].length": 110,
+    "layers[mode3].envelope.decay": 110,
+    "layers[mode3].envelope.decayCurve": 1,
+    "layers[mode4].length": 70,
+    "layers[mode4].envelope.decay": 70,
+    "layers[mode4].envelope.decayCurve": 1,
+    "layers[shimmer].length": 120,
+    "layers[shimmer].envelope.decay": 120,
+    "layers[shimmer].envelope.decayCurve": 1,
+    "layers[strike].length": 12,
+    "layers[strike].envelope.decay": 12,
+    "layers[strike].filter.cutoff": 1800
   },
   "locks": []
 }

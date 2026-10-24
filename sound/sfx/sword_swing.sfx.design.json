@@ -6,15 +6,11 @@
     "version": 1
   },
   "macros": {
-    "speed": 0.5,
-    "pitch": 0.5,
-    "weight": 0.9,
-    "edge": 1
+    "speed": 0.9,
+    "pitch": 0.6,
+    "weight": 0.25,
+    "edge": 0.7
   },
-  "overrides": {
-    "layers[whoosh].envelope.decayCurve": 0,
-    "layers[whoosh].filter.decayCurve": 0,
-    "layers[air].envelope.decayCurve": 0
-  },
+  "overrides": {},
   "locks": []
 }

@@ -15,7 +15,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:04.098349+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:27:42+00:00",
+        "render": "sfx/deep_chink.wav"
+      }
     },
     "sfx/deep_tink": {
       "category": "sfx",
@@ -30,7 +35,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:14.000094+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:02:37+00:00",
+        "render": "sfx/deep_tink.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "again a little too much swinging, I think the pick hitting the stone would be audible but stops more aprubtly",
+          "at": "2026-10-24T12:29:50+00:00",
+          "render": "sfx/deep_tink.wav"
+        }
+      ]
     },
     "sfx/deep_crumble": {
       "category": "sfx",
@@ -50,7 +68,20 @@
         }
       },
       "delivered": "2026-10-23T21:06:14.674466+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:02:15+00:00",
+        "render": "sfx/deep_crumble.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "too high, to hollow, needs more volume, the stones grumble and we hear the sound from the deep resonating",
+          "at": "2026-10-24T12:28:22+00:00",
+          "render": "sfx/deep_crumble.wav"
+        }
+      ]
     },
     "sfx/deep_rumble": {
       "category": "sfx",
@@ -65,7 +96,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:12.493526+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:29:08+00:00",
+        "render": "sfx/deep_rumble.wav"
+      }
     },
     "sfx/deep_groan": {
       "category": "sfx",
@@ -80,7 +116,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:10.436469+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:29:05+00:00",
+        "render": "sfx/deep_groan.wav"
+      }
     },
     "sfx/deep_freed": {
       "category": "sfx",
@@ -95,7 +136,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:07.835716+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:02:20+00:00",
+        "render": "sfx/deep_freed.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "generally I like it but maybe a little bit more uplifting it reminds me of a church organ at the moment",
+          "at": "2026-10-24T12:28:59+00:00",
+          "render": "sfx/deep_freed.wav"
+        }
+      ]
     },
     "sfx/camp_crackle": {
       "category": "sfx",
@@ -110,7 +164,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:55.790658+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:01:42+00:00",
+        "render": "sfx/camp_crackle.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "a little calmer, and a little deeper inviting to sit at the fire maybe also longer!?",
+          "at": "2026-10-24T12:25:46+00:00",
+          "render": "sfx/camp_crackle.wav"
+        }
+      ]
     },
     "sfx/camp_anvil": {
       "category": "sfx",
@@ -125,7 +192,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:54.016620+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:01:39+00:00",
+        "render": "sfx/camp_anvil.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "sounds too much like a little gong and not like an anvil, I think it is the swinging afterwards, an anvil gives the same basic sound but it gets absorbed by the body of the heavy anvil",
+          "at": "2026-10-24T12:25:05+00:00",
+          "render": "sfx/camp_anvil.wav"
+        }
+      ]
     },
     "sfx/camp_drip": {
       "category": "sfx",
@@ -140,7 +220,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:59.269580+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:26:30+00:00",
+        "render": "sfx/camp_drip.wav"
+      }
     },
     "sfx/camp_creak": {
       "category": "sfx",
@@ -155,7 +240,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:57.901272+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:01:44+00:00",
+        "render": "sfx/camp_creak.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "goes to much in the direction of a frog making a sound not the wood on wood",
+          "at": "2026-10-24T12:26:26+00:00",
+          "render": "sfx/camp_creak.wav"
+        }
+      ]
     },
     "sfx/camp_hiss": {
       "category": "sfx",
@@ -170,7 +268,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:02.664106+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:01:56+00:00",
+        "render": "sfx/camp_hiss.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "a little deeper",
+          "at": "2026-10-24T12:26:52+00:00",
+          "render": "sfx/camp_hiss.wav"
+        }
+      ]
     },
     "sfx/potion_drink": {
       "category": "sfx",
@@ -185,7 +296,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:17.958359+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:31:39+00:00",
+        "render": "sfx/potion_drink.wav"
+      }
     },
     "sfx/heartbeat": {
       "category": "sfx",
@@ -200,7 +316,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:15.414052+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:31:21+00:00",
+        "render": "sfx/heartbeat.wav"
+      }
     },
     "voice/npc_greetings/innkeeper_greeting": {
       "category": "voice",
@@ -232,7 +353,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.205547+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "revise",
+        "note": "sounds very unnatural",
+        "at": "2026-10-24T12:34:09+00:00",
+        "render": "voice/npc_greetings/innkeeper_greeting.wav"
+      }
     },
     "voice/npc_greetings/blacksmith_greeting": {
       "category": "voice",
@@ -264,7 +390,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.301840+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "revise",
+        "note": "deeper voice needed, it is a powerful smith",
+        "at": "2026-10-24T12:33:55+00:00",
+        "render": "voice/npc_greetings/blacksmith_greeting.wav"
+      }
     },
     "voice/npc_greetings/witch_greeting": {
       "category": "voice",
@@ -296,7 +427,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.398163+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "revise",
+        "note": "generally good direction but has some unnatural touch",
+        "at": "2026-10-24T12:34:31+00:00",
+        "render": "voice/npc_greetings/witch_greeting.wav"
+      }
     },
     "voice/knight/whirl_shout": {
       "category": "voice",
@@ -328,7 +464,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.494135+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "revise",
+        "note": "needs to be deeper, more volume",
+        "at": "2026-10-24T12:33:36+00:00",
+        "render": "voice/knight/whirl_shout.wav"
+      }
     },
     "music/dungeon": {
       "category": "music",
@@ -344,7 +485,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:19:57.656533+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "revise",
+        "note": "it is a little to sad, can we make a it a little more adventourus, think of a zelda a link to the past dungeons ",
+        "at": "2026-10-24T12:23:13+00:00",
+        "render": "music/dungeon.wav"
+      },
+      "history": [
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T12:22:28+00:00",
+          "render": "music/dungeon.wav"
+        }
+      ]
     },
     "music/village": {
       "category": "music",
@@ -360,7 +514,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:19:57.742909+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:23:47+00:00",
+        "render": "music/village.wav"
+      }
     },
     "music/title": {
       "category": "music",
@@ -376,7 +535,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:19:57.827181+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:23:44+00:00",
+        "render": "music/title.wav"
+      }
     },
     "sfx/fish_cast": {
       "category": "sfx",
@@ -391,7 +555,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.493753+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:29:56+00:00",
+        "render": "sfx/fish_cast.wav"
+      }
     },
     "sfx/fish_plop": {
       "category": "sfx",
@@ -406,7 +575,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.576952+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:30:05+00:00",
+        "render": "sfx/fish_plop.wav"
+      }
     },
     "sfx/fish_plip": {
       "category": "sfx",
@@ -421,7 +595,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.662229+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:30:02+00:00",
+        "render": "sfx/fish_plip.wav"
+      }
     },
     "sfx/fish_bite": {
       "category": "sfx",
@@ -436,7 +615,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.750296+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:29:55+00:00",
+        "render": "sfx/fish_bite.wav"
+      }
     },
     "sfx/fish_click": {
       "category": "sfx",
@@ -451,7 +635,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.833659+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:29:58+00:00",
+        "render": "sfx/fish_click.wav"
+      }
     },
     "sfx/fish_splash": {
       "category": "sfx",
@@ -466,7 +655,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.917538+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:30:12+00:00",
+        "render": "sfx/fish_splash.wav"
+      }
     },
     "sfx/fish_land": {
       "category": "sfx",
@@ -481,7 +675,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.001341+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:30:00+00:00",
+        "render": "sfx/fish_land.wav"
+      }
     },
     "sfx/fish_snap": {
       "category": "sfx",
@@ -496,7 +695,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.086560+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:30:09+00:00",
+        "render": "sfx/fish_snap.wav"
+      }
     },
     "sfx/cat_purr": {
       "category": "sfx",
@@ -511,7 +715,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.172234+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:26:56+00:00",
+        "render": "sfx/cat_purr.wav"
+      }
     },
     "sfx/sword_swing": {
       "category": "sfx",
@@ -531,7 +740,20 @@
         }
       },
       "delivered": "2026-10-23T21:06:11.484803+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:03:43+00:00",
+        "render": "sfx/sword_swing.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "for a normal attack this has too much volume, needs to be quick, tearing the air",
+          "at": "2026-10-24T12:33:22+00:00",
+          "render": "sfx/sword_swing.wav"
+        }
+      ]
     },
     "sfx/dash": {
       "category": "sfx",
@@ -546,7 +768,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.343281+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:27:32+00:00",
+        "render": "sfx/dash.wav"
+      }
     },
     "sfx/punch_hitting": {
       "category": "sfx",
@@ -561,7 +788,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.427793+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:03:27+00:00",
+        "render": "sfx/punch_hitting.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "again too much like a drum that gets hit, needs to be more organic/natural",
+          "at": "2026-10-24T12:32:05+00:00",
+          "render": "sfx/punch_hitting.wav"
+        }
+      ]
     },
     "sfx/burst": {
       "category": "sfx",
@@ -576,7 +816,26 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.511762+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:01:34+00:00",
+        "render": "sfx/burst.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "too bright and dominant ",
+          "at": "2026-10-24T12:24:06+00:00",
+          "render": "sfx/burst.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T18:59:51+00:00",
+          "render": "sfx/burst.wav"
+        }
+      ]
     },
     "sfx/shield_clang": {
       "category": "sfx",
@@ -596,7 +855,20 @@
         }
       },
       "delivered": "2026-10-23T21:06:12.979071+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:03:32+00:00",
+        "render": "sfx/shield_clang.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "too much swing it is not a gong, it quickly absorbs the hit",
+          "at": "2026-10-24T12:32:33+00:00",
+          "render": "sfx/shield_clang.wav"
+        }
+      ]
     },
     "sfx/shield_break": {
       "category": "sfx",
@@ -611,7 +883,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.681062+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:32:13+00:00",
+        "render": "sfx/shield_break.wav"
+      }
     },
     "sfx/shield_empty": {
       "category": "sfx",
@@ -626,7 +903,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.766721+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:32:41+00:00",
+        "render": "sfx/shield_empty.wav"
+      }
     },
     "sfx/knight_hurt": {
       "category": "sfx",
@@ -641,7 +923,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.853388+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:31:24+00:00",
+        "render": "sfx/knight_hurt.wav"
+      }
     },
     "sfx/footstep": {
       "category": "sfx",
@@ -656,7 +943,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.940027+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "revise",
+        "note": "still sounds like a drum not steps with leather shoes on a stone floor",
+        "at": "2026-10-24T19:03:09+00:00",
+        "render": "sfx/footstep.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "sounds like playing a drum, this needs to be more dampered, you know the sounds needs to be swallowed as the shoes with leather hit the stone ground",
+          "at": "2026-10-24T12:31:08+00:00",
+          "render": "sfx/footstep.wav"
+        }
+      ]
     },
     "sfx/spitter": {
       "category": "sfx",
@@ -671,7 +971,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.025496+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:32:47+00:00",
+        "render": "sfx/spitter.wav"
+      }
     },
     "sfx/goblin_scream": {
       "category": "sfx",
@@ -686,7 +991,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.114184+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:31:18+00:00",
+        "render": "sfx/goblin_scream.wav"
+      }
     },
     "sfx/coin_pickup": {
       "category": "sfx",
@@ -701,7 +1011,32 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.201149+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:02:05+00:00",
+        "render": "sfx/coin_pickup.wav"
+      },
+      "history": [
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T12:26:58+00:00",
+          "render": "sfx/coin_pickup.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T12:26:59+00:00",
+          "render": "sfx/coin_pickup.wav"
+        },
+        {
+          "is": "revise",
+          "note": "this is too much mario pick up, think more putting gold in a bag where there is already gold",
+          "at": "2026-10-24T12:27:27+00:00",
+          "render": "sfx/coin_pickup.wav"
+        }
+      ]
     },
     "sfx/menu_change": {
       "category": "sfx",
@@ -716,7 +1051,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.288594+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:31:30+00:00",
+        "render": "sfx/menu_change.wav"
+      }
     },
     "sfx/menu_confirm": {
       "category": "sfx",
@@ -731,7 +1071,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.374679+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T12:31:33+00:00",
+        "render": "sfx/menu_confirm.wav"
+      }
     },
     "ambience/dungeon": {
       "category": "ambience",
@@ -746,7 +1091,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.461422+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T18:59:18+00:00",
+        "render": "ambience/dungeon.wav"
+      },
+      "history": [
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T12:21:45+00:00",
+          "render": "ambience/dungeon.wav"
+        }
+      ]
     },
     "ambience/village": {
       "category": "ambience",
@@ -761,7 +1119,20 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.548519+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "",
+        "at": "2026-10-24T19:01:28+00:00",
+        "render": "ambience/village.wav"
+      },
+      "history": [
+        {
+          "is": "revise",
+          "note": "the noise is too dominant and bright as if there would be an ocean or something",
+          "at": "2026-10-24T12:22:17+00:00",
+          "render": "ambience/village.wav"
+        }
+      ]
     }
   }
 }

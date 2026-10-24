@@ -6,14 +6,19 @@
     "version": 1
   },
   "macros": {
-    "amount": 0.6,
-    "duration": 0.5,
-    "coarse": 0,
+    "amount": 0.75,
+    "duration": 0.8,
+    "coarse": 0.85,
     "fade": 0.5,
-    "rumble": 0
+    "rumble": 1
   },
   "overrides": {
-    "layers[grit].gain": 7.5
+    "layers[grit].gain": 11,
+    "layers[rumble].filter.cutoff": 95,
+    "layers[rumble].filter.resonance": 0.45,
+    "layers[rumble].drive": 9,
+    "layers[rumble].length": 1100,
+    "layers[rumble].envelope.decay": 1050
   },
   "locks": []
 }
