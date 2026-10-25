@@ -4,7 +4,8 @@ import QtQuick
 // Title. Alone the game is paused under it; in a session the world goes
 // on, since a pause would stop every other player's enemies, and only this
 // knight stops taking input. W/S or the arrows pick, A/D or the arrows turn
-// a volume down or up a tenth, Enter or Space confirms, Esc resumes. Takes
+// a volume down or up a tenth, Enter or Space confirms, Esc resumes; a
+// gamepad does the same with its stick or D-pad, A, and B or Start. Takes
 // the keyboard focus and every click; M still reaches the game and mutes.
 Item {
     id: pauseMenu
@@ -40,6 +41,14 @@ Item {
         let next = Math.round(Math.max(0, Math.min(1, v + by)) * 10) / 10
         if (next !== v) volumeSet(index === 1 ? "music" : "sound", next)
     }
+    // The gamepad (MenuPad): up and down pick, left and right set a
+    // volume, A selects, B and Start resume
+    function padMove(dx, dy) {
+        if (dy !== 0) selectedIndex = Math.max(0, Math.min(choices.length - 1, selectedIndex - dy))
+        else turn(selectedIndex, dx * 0.1)
+    }
+    function padConfirm() { choose(selectedIndex) }
+    function padBack() { resume() }
 
     MouseArea {
         anchors.fill: parent
