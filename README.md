@@ -200,6 +200,29 @@ the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
 ```
 
+A gamepad plays the knight too, through Clayground's `GameController` in its
+`full` layout (`src/KnightPad.qml`): the left stick or the D-pad moves, the
+right stick aims - at rest the knight faces the way it walks - R1 strikes
+(hold to charge, at a vein dig, at a pond cast), L1 shields, B dashes, A
+talks, X drinks a potion, Y a draught, R2 whirls, L2 locks on and Select
+opens the knight panel. In a dialogue A goes on, the stick picks a ware, X
+buys it and B closes it. A physical pad becomes the source when one of its
+buttons or sticks moves, the keyboard again when a key goes down; the
+controls hint, the talk prompts and the dialogue name the pad's buttons from
+its first input to the next key press - A, B, X and Y as printed on the pad,
+Cross on a PlayStation pad. Moving the mouse gives the aim back to the mouse. Buttons
+count by position, so the bottom face button is A whatever it is labelled.
+On iOS and Android the touch pad stays the controller. The pad knight bench
+plays the dojo's `dungeon` scenario in Clayground's live loader with the
+dojo's synthetic pad alone - the inspector's gamepad input, no key and no
+click - then hands it to the mouse and the keyboard, plugs in a virtual SDL
+pad to check the physical source, and buys a ware in the `village`; it
+prints a PASS or FAIL line per check and exits with the number of failures:
+
+```
+python3 tests/padknight/run_padknight.py
+```
+
 At 0 HP the knight falls: the enemies stop and a screen shows how deep the
 run got, counted in dungeons from depth 0, its kills, the secret rooms
 the party found and its time. Enter starts a new run from depth

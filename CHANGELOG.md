@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Gamepad:** the knight plays with a gamepad, through Clayground's `GameController` in its `full` layout: the left stick moves, the right stick aims, R1 strikes and charges, L1 shields, B dashes, A talks, X and Y drink a potion and a draught, R2 whirls, L2 locks on and Select opens the knight panel; in a dialogue the stick picks a ware and X buys it. A pad takes over when it is used and the keyboard when a key goes down, the mouse takes the aim back when it moves, and while a pad is in use the controls hint, the talk prompts and the dialogue name its buttons. The pad bench plays it with the dojo's synthetic pad alone. (#200)
+
 ## [0.3.0] - 2026-10-12
 
 Dungeons fight back and hide things: spike plates and arrow slits you learn to read, doors you shut and enemies bash, loops and secret rooms to find, urns, barrels, crates and crystals to break for gold, and a Dungeon Master panel to tune the next dungeon before you enter it. Built on Clayground v2026.9.
