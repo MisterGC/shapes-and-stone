@@ -26,6 +26,79 @@ Item {
     property bool lanMode: false
     function looksLikeLanCode(code) { return code.startsWith("L") && code.indexOf("-") > 0 }
 
+    function hostGame() {
+        menuConfirmSound.play()
+        network.signalingMode = lobby.lanMode
+            ? Network.SignalingMode.Local : Network.SignalingMode.Cloud
+        network.host()
+    }
+    function joinGame() {
+        menuConfirmSound.play()
+        let code = codeInput.text.trim()
+        if (code.length === 0) return
+        if (isBrowser && looksLikeLanCode(code)) {
+            statusText.text = "LAN codes only work in the native game"
+            return
+        }
+        network.join(code)
+    }
+
+    // The gamepad (MenuPad, issue #201): up and down move the focus over
+    // what the lobby offers now, left and right turn Internet/LAN over and
+    // go between Host and Join, A presses, B goes back. Join takes the
+    // code typed or pasted; the pad cannot type one. The focus shows once
+    // the pad moved it.
+    readonly property bool _picking: !network.connected && network.status !== 1
+    readonly property var padChoices: {
+        let c = []
+        if (_picking) {
+            if (!isBrowser) c.push("mode")
+            c.push("host", "join")
+        }
+        if (network.isHost && network.nodeCount >= 2) c.push("start")
+        c.push("back")
+        return c
+    }
+    property int padIndex: 0
+    property bool padUsed: false
+    readonly property string padChoice: padChoices[Math.min(padIndex, padChoices.length - 1)]
+    function padShown(choice) { return padUsed && padChoice === choice }
+    function padMove(dx, dy) {
+        padUsed = true
+        let i = Math.min(padIndex, padChoices.length - 1)
+        if (dy !== 0) {
+            // Host and Join share a row
+            let next = i - dy
+            if (dy < 0 && padChoices[i] === "host") next++
+            if (dy > 0 && padChoices[i] === "join" && padChoices[i - 1] === "host") next--
+            next = Math.max(0, Math.min(padChoices.length - 1, next))
+            if (next !== i) menuHoverSound.play()
+            padIndex = next
+        } else if (padChoice === "mode") {
+            if (lanMode !== (dx > 0)) menuHoverSound.play()
+            lanMode = dx > 0
+        } else if (padChoice === "host" && dx > 0 || padChoice === "join" && dx < 0) {
+            menuHoverSound.play()
+            padIndex = i + dx
+        }
+    }
+    function padConfirm() {
+        padUsed = true
+        let c = padChoice
+        if (c === "mode") {
+            menuHoverSound.play()
+            lanMode = !lanMode
+        }
+        else if (c === "host") hostGame()
+        else if (c === "join") joinGame()
+        else if (c === "start") {
+            menuConfirmSound.play()
+            startGame()
+        }
+        else back()
+    }
+    function padBack() { back() }
+
     Sound {
         id: menuHoverSound
         source: "assets/menu_change.wav"
@@ -113,7 +186,9 @@ Item {
                 delegate: Rectangle {
                     width: 100; height: 28; radius: 4
                     color: lobby.lanMode === modelData.lan ? "#444A90A4" : "#22FFFFFF"
-                    border.color: lobby.lanMode === modelData.lan ? "#4A90A4" : "#555555"
+                    border.color: lobby.padShown("mode") && lobby.lanMode === modelData.lan ? "#FFFFFF"
+                                  : lobby.lanMode === modelData.lan ? "#4A90A4" : "#555555"
+                    border.width: lobby.padShown("mode") && lobby.lanMode === modelData.lan ? 2 : 1
 
                     Text {
                         anchors.centerIn: parent
@@ -150,9 +225,11 @@ Item {
             spacing: 12
 
             Rectangle {
+                objectName: "lobbyHost"
                 width: 150; height: 40; radius: 6
                 color: "#44FFFFFF"
-                border.color: "#AAAAAA"
+                border.color: lobby.padShown("host") ? "#FFFFFF" : "#AAAAAA"
+                border.width: lobby.padShown("host") ? 2 : 1
 
                 Text {
                     anchors.centerIn: parent
@@ -164,19 +241,16 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        menuConfirmSound.play()
-                        network.signalingMode = lobby.lanMode
-                            ? Network.SignalingMode.Local : Network.SignalingMode.Cloud
-                        network.host()
-                    }
+                    onClicked: lobby.hostGame()
                 }
             }
 
             Rectangle {
+                objectName: "lobbyJoin"
                 width: 150; height: 40; radius: 6
                 color: "#44FFFFFF"
-                border.color: "#AAAAAA"
+                border.color: lobby.padShown("join") ? "#FFFFFF" : "#AAAAAA"
+                border.width: lobby.padShown("join") ? 2 : 1
 
                 Text {
                     anchors.centerIn: parent
@@ -188,16 +262,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        menuConfirmSound.play()
-                        let code = codeInput.text.trim()
-                        if (code.length === 0) return
-                        if (isBrowser && looksLikeLanCode(code)) {
-                            statusText.text = "LAN codes only work in the native game"
-                            return
-                        }
-                        network.join(code)
-                    }
+                    onClicked: lobby.joinGame()
                 }
             }
         }
@@ -291,8 +356,9 @@ Item {
             visible: network.isHost && network.nodeCount >= 2
             anchors.horizontalCenter: parent.horizontalCenter
             width: 200; height: 44; radius: 6
+            objectName: "lobbyStart"
             color: "#44CC4444"
-            border.color: "#44CC44"
+            border.color: lobby.padShown("start") ? "#FFFFFF" : "#44CC44"
             border.width: 2
 
             Text {
@@ -315,9 +381,11 @@ Item {
         // Back button
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
+            objectName: "lobbyBack"
             width: 120; height: 32; radius: 4
             color: "#22FFFFFF"
-            border.color: "#555555"
+            border.color: lobby.padShown("back") ? "#FFFFFF" : "#555555"
+            border.width: lobby.padShown("back") ? 2 : 1
 
             Text {
                 anchors.centerIn: parent

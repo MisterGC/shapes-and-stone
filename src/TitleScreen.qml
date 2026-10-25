@@ -209,6 +209,17 @@ Item {
         }
     }
 
+    // The gamepad (MenuPad): up and down pick, A or Start selects
+    function padMove(dx, dy) {
+        _startMusic()
+        let next = Math.max(0, Math.min(2, _selectedIndex - dy))
+        if (next !== _selectedIndex) { _selectedIndex = next; menuHoverSound.play() }
+    }
+    function padConfirm() {
+        _startMusic()
+        _confirm()
+    }
+
     // Fade-out overlay
     Rectangle {
         id: fadeOut

@@ -7,8 +7,10 @@ import QtQuick
 // breakables and traps. W/S or the arrows pick a row, A/D or the arrows
 // turn it a step (and set it), Backspace gives it back to the game, G
 // generates (again: a new dungeon), Enter or Space goes, C copies the
-// settings set as JSON and V pastes them. Takes the keyboard focus and
-// every click; M still reaches the game and mutes.
+// settings set as JSON and V pastes them. A gamepad picks and turns with
+// its stick or D-pad, gives back with B, generates with X and goes with A
+// or Start. Takes the keyboard focus and every click; M still reaches the
+// game and mutes.
 Item {
     id: panel
     objectName: "dungeonMasterPanel"
@@ -53,6 +55,19 @@ Item {
         clip.text = ""
         pasted(t)
     }
+
+    // The gamepad (MenuPad): up and down pick a row, left and right turn
+    // it, B gives it back to the game, X generates, A or Start goes
+    function padMove(dx, dy) {
+        if (dy !== 0) selectedIndex = Math.max(0, Math.min(rows.length - 1, selectedIndex - dy))
+        else turn(dx)
+    }
+    function padConfirm() { go() }
+    function padBack() {
+        let r = rows[selectedIndex]
+        if (r) unset(r.key)
+    }
+    function padExtra() { generate() }
 
     // What Generate showed, counted
     readonly property var counts: {

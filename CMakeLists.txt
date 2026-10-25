@@ -87,6 +87,7 @@ clay_app(shapes_and_stone
         src/TitleScreen.qml
         src/FallenScreen.qml
         src/PauseMenu.qml
+        src/MenuPad.qml
         src/KnightPanel.qml
         src/LoopMusic.qml
         src/MultiplayerLobby.qml
