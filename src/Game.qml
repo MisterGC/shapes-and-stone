@@ -1815,7 +1815,11 @@ ClayWorld2d {
             return
         }
     }
-    Keys.forwardTo: gameCtrl
+    // Under a menu, the title or the fallen screen no key reaches the
+    // controller: the pad there is the menus' (MenuPad), and Space or Shift
+    // let through by the title or the fallen screen must not press its B
+    // or A as well
+    Keys.forwardTo: overlayUp ? [] : [gameCtrl]
     function openMenu() {
         // The menu takes the keys, and the keyboard gamepad lets go of what
         // is held when the focus moves (clayground#413); the shield and the
@@ -1832,20 +1836,26 @@ ClayWorld2d {
     // Where the keys or the touch pad steer the knight, -1..1 on each axis;
     // every level binds its knight to these. While a dialogue is open the
     // knight stands, so it cannot walk off and leave the panel up, and a
-    // key still held moves it again once the panel closes
+    // key still held moves it again once the panel closes. Under the menu
+    // the stick is the menu's, so the knight stands there too
     readonly property bool talking: dialoguePanel.visible
     // Locked on an enemy (toggleLock), the keys turn with it: W and S
     // walk towards it and away, A and D circle it
     readonly property real _lockRad: player && player.lockedOn ? player.facingAngle * Math.PI / 180 : 0
     readonly property bool _lockSteer: !!player && player.lockedOn
-    readonly property real knightMoveX: talking ? 0 : !_lockSteer ? gameCtrl.axisX
+    readonly property real knightMoveX: talking || menuOpen ? 0 : !_lockSteer ? gameCtrl.axisX
         : gameCtrl.axisY * Math.cos(_lockRad) + gameCtrl.axisX * Math.sin(_lockRad)
-    readonly property real knightMoveY: talking ? 0 : !_lockSteer ? -gameCtrl.axisY
+    readonly property real knightMoveY: talking || menuOpen ? 0 : !_lockSteer ? -gameCtrl.axisY
         : -gameCtrl.axisY * Math.sin(_lockRad) + gameCtrl.axisX * Math.cos(_lockRad)
+    // The one controller of the game: the keys, the touch pad or a
+    // gamepad. Full has Start, which pauses; on touch it stays nes, one
+    // stick and A/B on the screen
+    readonly property alias gameController: gameCtrl
     GameController {
         id: gameCtrl
         anchors.fill: parent
         showDebugOverlay: false
+        layout: world.touchControls ? "nes" : "full"
 
         Component.onCompleted: {
             console.log("[Game] GameController.onCompleted - os:", Qt.platform.os)
@@ -1861,9 +1871,52 @@ ClayWorld2d {
         }
 
         onButtonBPressedChanged: {
-            if (buttonBPressed && player && !world.talking) {
+            if (buttonBPressed && player && !world.talking && !world.overlayUp) {
                 player.dash()
             }
+        }
+    }
+
+    // A gamepad in the menus (issue #201): the stick or D-pad, A, B, X and
+    // Start reach the menu on top - the dungeon master's panel, the title,
+    // the lobby, the fallen screen or the pause menu - and in the game
+    // Start does what Esc does
+    function _padMenu() {
+        if (masterOpen) return masterLoader.item
+        if (screen === "title") return titleLoader.item
+        if (screen === "lobby") return session.lobby
+        if (screen === "game" && fallen) return fallenLoader.item
+        if (screen === "game" && menuOpen) return pauseLoader.item
+        return null
+    }
+    MenuPad {
+        controller: gameCtrl
+        onMoved: (dx, dy) => {
+            let m = world._padMenu()
+            if (m && m.padMove) m.padMove(dx, dy)
+        }
+        onConfirmed: {
+            let m = world._padMenu()
+            if (m && m.padConfirm) m.padConfirm()
+        }
+        onBacked: {
+            let m = world._padMenu()
+            if (m && m.padBack) m.padBack()
+        }
+        onExtra: {
+            let m = world._padMenu()
+            if (m && m.padExtra) m.padExtra()
+        }
+        onStarted: {
+            let m = world._padMenu()
+            if (m) {
+                // Start resumes from the pause menu, elsewhere it confirms
+                if (m === pauseLoader.item) m.padBack()
+                else if (m !== fallenLoader.item && m.padConfirm) m.padConfirm()
+            }
+            else if (talking) dialoguePanel.close()
+            else if (knightPanelOpen) knightPanelOpen = false
+            else if (screen === "game" && player && !fallen) openMenu()
         }
     }
 
@@ -8233,6 +8286,7 @@ ClayWorld2d {
 
     // Esc menu (over the dungeon, under the fallen screen)
     Loader {
+        id: pauseLoader
         anchors.fill: parent
         z: 4400
         active: menuOpen && screen === "game" && !fallen
@@ -8250,6 +8304,7 @@ ClayWorld2d {
 
     // Fallen screen (over the dungeon, under the title)
     Loader {
+        id: fallenLoader
         anchors.fill: parent
         z: 4500
         active: fallen && screen === "game"
@@ -8276,6 +8331,7 @@ ClayWorld2d {
 
     // Title screen (covers everything when active)
     Loader {
+        id: titleLoader
         anchors.fill: parent
         z: 5000
         active: screen === "title"
@@ -8323,6 +8379,7 @@ ClayWorld2d {
 
     // The dungeon master's panel (over the lobby and the fallen screen)
     Loader {
+        id: masterLoader
         anchors.fill: parent
         z: 5600
         active: world.masterOpen
