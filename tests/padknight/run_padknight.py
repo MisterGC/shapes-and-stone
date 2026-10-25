@@ -140,6 +140,8 @@ def play(b):
     b.pad(axisX=1)
     b.step(20)
     k = b.knight()
+    # A pad's button and what it does are joined by a no-break space
+    k["hint"] = k["hint"].replace("\u00a0", " ")
     b.check(k["x"] - x0 > 0.5, f"the left stick right walks the knight right ({k['x'] - x0:+.2f} wu)")
     b.check(k["padInUse"], "the pad is in use from its first input")
     b.check("L stick move" in k["hint"] and "R1 strike" in k["hint"] and "L1 shield" in k["hint"]

@@ -2316,14 +2316,19 @@ ClayWorld2d {
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: 12
+        // A narrow window breaks it into lines rather than cut its ends off
+        width: Math.min(implicitWidth, parent.width - 24)
+        wrapMode: Text.WordWrap
+        horizontalAlignment: Text.AlignHCenter
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
+        // A pad's button stays on the line of what it does, each item whole
         text: knightPad.inUse
-              ? "L stick move  •  R stick aim  •  R1 strike, hold to charge, at a vein dig  •  L1 shield  •  "
-                + knightPad.label("buttonB") + " dash  •  R2 whirlwind  •  " + knightPad.label("buttonA") + " talk  •  "
-                + knightPad.label("buttonX") + " potion  •  " + knightPad.label("buttonY") + " draught  •  "
-                + "L2 lock on  •  Select knight"
+              ? ["L stick move", "R stick aim", "R1 strike, hold to charge, at a vein dig", "L1 shield",
+                 knightPad.label("buttonB") + " dash", "R2 whirlwind", knightPad.label("buttonA") + " talk",
+                 knightPad.label("buttonX") + " potion", knightPad.label("buttonY") + " draught",
+                 "L2 lock on", "Select knight"].map(t => t.replace(/ /g, "\u00A0")).join("  •  ")
               : "WASD move  •  LMB strike, hold to charge, at a vein dig  •  RMB shield  •  Space dash  •  "
                 + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
         color: "#BBBBBB"
