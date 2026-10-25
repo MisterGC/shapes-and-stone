@@ -67,6 +67,9 @@ Canvas {
         let dx = (x - p.x) / (p.rx * k), dy = (y - p.y) / (p.ry * k)
         return dx * dx + dy * dy <= 1
     }
+    // The same for the game: a pad's aim stops at the water (Game.padAimWu)
+    function ponds() { return _ponds() }
+    function inside(p, x, y, k) { return _inside(p, x, y, k) }
     // The point of p's water edge nearest (x, y), close enough for a walk
     // round its ellipse
     function _edge(p, x, y) {
@@ -322,7 +325,7 @@ Canvas {
             // What the button does here, small beside it
             ctx.font = Math.round(Math.max(10, 0.32 * u)) + "px sans-serif"
             ctx.fillStyle = bitesLeft > 0 ? "rgba(230, 240, 235, 0.6)" : "rgba(160, 170, 165, 0.45)"
-            ctx.fillText(bitesLeft > 0 ? "LMB cast" : "still water", _px(aim.x) + 0.32 * u, _py(aim.y) + 0.1 * u)
+            ctx.fillText(bitesLeft > 0 ? (game.padInUse ? "R1 cast" : "LMB cast") : "still water", _px(aim.x) + 0.32 * u, _py(aim.y) + 0.1 * u)
             return
         }
         if (phase === "") return

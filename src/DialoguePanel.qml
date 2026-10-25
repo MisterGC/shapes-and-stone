@@ -23,6 +23,12 @@ Item {
     property int gold: 0
     // The speaker's answer to a purchase, shown instead of the line
     property string note: ""
+    // On a pad (Game.padInUse) the stick picks a ware, selected, and
+    // buyKey buys it; talkKey goes on
+    property bool pad: false
+    property int selected: 0
+    property string talkKey: "E"
+    property string buyKey: "X"
 
     function open(name, color, dialogueLines, offered, who) {
         speakerName = name
@@ -31,6 +37,7 @@ Item {
         lines = dialogueLines
         wares = offered || []
         note = ""
+        selected = 0
         _lineIndex = 0
         visible = true
     }
@@ -97,7 +104,7 @@ Item {
         wrapMode: Text.WordWrap
     }
 
-    // The wares, one per number key
+    // The wares, one per number key, or picked on a pad
     Column {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
@@ -108,8 +115,8 @@ Item {
             Text {
                 required property var modelData
                 required property int index
-                text: "[" + (index + 1) + "] " + modelData.label + (modelData.sell ? " + " : " - ")
-                      + modelData.price + " gold"
+                text: (!panel.pad ? "[" + (index + 1) + "] " : index === panel.selected ? "▶ " : "   ")
+                      + modelData.label + (modelData.sell ? " + " : " - ") + modelData.price + " gold"
                 color: modelData.sell || panel.gold >= modelData.price ? "#E8B83A" : "#776644"
                 font.pixelSize: 12
                 font.bold: true
@@ -122,7 +129,8 @@ Item {
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         anchors.margins: 10
-        text: _lineIndex < lines.length - 1 ? "[E] continue" : "[E] close"
+        text: (pad && wares.length > 0 ? "[" + buyKey + "] buy  " : "")
+              + "[" + talkKey + "] " + (_lineIndex < lines.length - 1 ? "continue" : "close")
         color: "#888888"
         font.pixelSize: 10
         font.italic: true
