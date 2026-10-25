@@ -1638,26 +1638,14 @@ ClayWorld2d {
         onPressed: (mouse) => {
             world.forceActiveFocus()
             if (!player) return
-            // The left button strikes with the pickaxe while it aims at a
-            // vein in reach (pressPick), else swings on release, or
-            // charges while held
-            if (mouse.button === Qt.LeftButton) {
-                // At a camp's pond the left button fishes (Fishing)
-                _fishingPress = fishing.press()
-                if (_fishingPress) return
-                _picking = pressPick()
-                if (!_picking) player.pressSwing(mouse)
-            }
+            if (mouse.button === Qt.LeftButton) strikePress(mouse)
             if (mouse.button === Qt.RightButton) player.raiseShield()
             if (mouse.button === Qt.MiddleButton) toggleLock()
         }
 
         onReleased: (mouse) => {
             if (!player) return
-            if (mouse.button === Qt.LeftButton && _fishingPress) {
-                fishing.release()
-                _fishingPress = false
-            } else if (mouse.button === Qt.LeftButton && !_picking) player.releaseSwing(mouse)
+            if (mouse.button === Qt.LeftButton) strikeRelease(mouse)
             if (mouse.button === Qt.RightButton) player.lowerShield()
         }
         onCanceled: if (player) {
@@ -1667,6 +1655,24 @@ ClayWorld2d {
             player.dropSwing()
             player.lowerShield()
         }
+    }
+
+    // The left button: it strikes with the pickaxe while it aims at a vein in reach
+    // (pressPick), else swings on release, or charges while held
+    function strikePress(mouse) {
+        if (!player) return
+        // At a camp's pond it fishes (Fishing)
+        _fishingPress = fishing.press()
+        if (_fishingPress) return
+        _picking = pressPick()
+        if (!_picking) player.pressSwing(mouse)
+    }
+    function strikeRelease(mouse) {
+        if (!player) return
+        if (_fishingPress) {
+            fishing.release()
+            _fishingPress = false
+        } else if (!_picking) player.releaseSwing(mouse)
     }
 
     // Target lock: F or the middle button locks the knight's facing on
@@ -1789,31 +1795,32 @@ ClayWorld2d {
             return
         }
         if (event.key === Qt.Key_E) {
-            if (dialoguePanel.visible) {
-                dialoguePanel.advance()
-            } else if (player) {
-                // Find nearby NPC to interact with, else a traveller of
-                // the deep (issue #176), else a door; a vein is the left
-                // button's (issue #169)
-                let items = world.room.children
-                let talked = false
-                for (let i = 0; i < items.length; i++) {
-                    let npc = items[i]
-                    if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
-                        npc.interact()
-                        talked = true
-                        break
-                    }
-                }
-                if (!talked && !fallen) talked = feedCat()
-                if (!talked && !fallen) talked = talkToDeepTraveller()
-                if (!talked && !fallen)
-                    useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
-                                        Balance.dungeon.doorReach))
-            }
+            if (dialoguePanel.visible) dialoguePanel.advance()
+            else interact()
             event.accepted = true
             return
         }
+    }
+    // E: a nearby NPC to talk to, else the cat, else a
+    // traveller of the deep (issue #176), else a door; a vein is the left
+    // button's (issue #169)
+    function interact() {
+        if (!player) return
+        let items = world.room.children
+        let talked = false
+        for (let i = 0; i < items.length; i++) {
+            let npc = items[i]
+            if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
+                npc.interact()
+                talked = true
+                break
+            }
+        }
+        if (!talked && !fallen) talked = feedCat()
+        if (!talked && !fallen) talked = talkToDeepTraveller()
+        if (!talked && !fallen)
+            useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
+                                Balance.dungeon.doorReach))
     }
     Keys.forwardTo: gameCtrl
     function openMenu() {
