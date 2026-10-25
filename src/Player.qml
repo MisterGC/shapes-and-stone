@@ -37,15 +37,21 @@ PhysicsItem {
     property real playerScreenX: 0
     property real playerScreenY: 0
 
+    // Where a gamepad aims, in degrees up from the right, while padAim
+    // (Game.qml, KnightPad)
+    property bool padAim: false
+    property real padAimAngle: 0
+
     // Facing direction (calculated in screen space)
     // Screen Y is flipped (down = positive), so we use (playerScreenY - mouseScreenY)
     // Locked on (Game.toggleLock), it faces that enemy, centre to centre;
-    // else the mouse
+    // else the gamepad's aim or the mouse
     property var lockTarget: null
     readonly property bool lockedOn: !!lockTarget && lockTarget.destroyed === false
     property real facingAngle: lockedOn
         ? Math.atan2(lockTarget.centreYWu - (yWu - heightWu / 2),
                      lockTarget.centreXWu - (xWu + widthWu / 2)) * 180 / Math.PI
+        : padAim ? padAimAngle
         : Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats, from the balance table

@@ -60,6 +60,8 @@ Item {
     property int digs: 0
     // This node's knight is near enough to talk to it
     property bool talkable: false
+    // The key or pad button that talks (Game.talkKey)
+    property string talkKey: "E"
     // What it says, in a bubble over its head
     property string saying: ""
 
@@ -299,7 +301,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.top
             anchors.bottomMargin: 2
-            text: "[E] Talk"
+            text: "[" + traveller.talkKey + "] Talk"
             color: "#FFFFFF"
             font.pixelSize: 10
             font.bold: true

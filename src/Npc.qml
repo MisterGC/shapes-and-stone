@@ -245,7 +245,7 @@ PhysicsItem {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: npc.saying !== "" ? bubble.top : activityLabel.top
         anchors.bottomMargin: 2
-        text: "[E] Talk"
+        text: "[" + (gameWorld ? gameWorld.talkKey : "E") + "] Talk"
         color: "#FFFFFF"
         font.pixelSize: 10
         font.bold: true
