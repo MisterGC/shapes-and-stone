@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "name": "camp_crackle",
+  "variation": { "seed": 147, "pool": 1 },
+  "layers": [
+    { "name": "breath", "role": "body", "source": "noise", "length": 450, "gain": -10.4,
+      "envelope": { "attack": 225, "decay": 225, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 400 } },
+    { "name": "pop1", "role": "transient", "source": "noise", "offset": 149.9, "length": 6.5,
+      "gain": -4.6, "envelope": { "attack": 0, "decay": 2.7, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 900 } },
+    { "name": "pop2", "role": "transient", "source": "noise", "offset": 159.4, "length": 3.5,
+      "gain": -1.2, "envelope": { "attack": 0, "decay": 1.4, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 900 } },
+    { "name": "pop3", "role": "transient", "source": "noise", "offset": 235.4, "length": 4.6,
+      "gain": -1.5, "envelope": { "attack": 0, "decay": 1.9, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 900 } },
+    { "name": "pop4", "role": "transient", "source": "noise", "offset": 342.5, "length": 8.3,
+      "gain": -4, "envelope": { "attack": 0, "decay": 3.5, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 900 } },
+    { "name": "pop5", "role": "transient", "source": "noise", "offset": 201.2, "length": 4.6,
+      "gain": -4.2, "envelope": { "attack": 0, "decay": 1.9, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 900 } }
+  ]
+}

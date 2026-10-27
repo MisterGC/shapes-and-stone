@@ -1,0 +1,240 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.45,
+  "time_span_s": 0.5,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -25.081615,
+    "lufs_block_s": 0.4,
+    "true_peak_dbtp": -1.178907,
+    "peak_dbfs": -1.911818,
+    "rms_dbfs": -28.298606,
+    "crest_factor_db": 26.386788
+  },
+  "envelope": {
+    "silence_start_s": 0.005079,
+    "silence_end_s": 0.004921,
+    "attack_s": 0.142086,
+    "peak_at_s": 0.231973,
+    "peak_db": -17.921816,
+    "fall_20db_at_s": 0.351701,
+    "fall_60db_at_s": null
+  },
+  "spectrum": {
+    "centroid_hz": 9379.127867,
+    "rolloff_hz": 16462.133789,
+    "flatness": 0.79993,
+    "band_shares": {
+      "20_60": 0.008781,
+      "60_250": 0.059112,
+      "250_500": 0.060663,
+      "500_2k": 0.049242,
+      "2k_5k": 0.126624,
+      "5k_10k": 0.230116,
+      "10k_20k": 0.465463
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.01161,
+        null
+      ],
+      [
+        0.02322,
+        null
+      ],
+      [
+        0.03483,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ],
+      [
+        0.05805,
+        null
+      ],
+      [
+        0.06966,
+        null
+      ],
+      [
+        0.08127,
+        null
+      ],
+      [
+        0.09288,
+        null
+      ],
+      [
+        0.10449,
+        null
+      ],
+      [
+        0.1161,
+        null
+      ],
+      [
+        0.12771,
+        null
+      ],
+      [
+        0.13932,
+        null
+      ],
+      [
+        0.15093,
+        null
+      ],
+      [
+        0.16254,
+        null
+      ],
+      [
+        0.17415,
+        null
+      ],
+      [
+        0.18576,
+        null
+      ],
+      [
+        0.19737,
+        null
+      ],
+      [
+        0.20898,
+        null
+      ],
+      [
+        0.22059,
+        null
+      ],
+      [
+        0.2322,
+        null
+      ],
+      [
+        0.24381,
+        null
+      ],
+      [
+        0.25542,
+        null
+      ],
+      [
+        0.267029,
+        null
+      ],
+      [
+        0.278639,
+        null
+      ],
+      [
+        0.290249,
+        null
+      ],
+      [
+        0.301859,
+        null
+      ],
+      [
+        0.313469,
+        null
+      ],
+      [
+        0.325079,
+        null
+      ],
+      [
+        0.336689,
+        null
+      ],
+      [
+        0.348299,
+        null
+      ],
+      [
+        0.359909,
+        null
+      ],
+      [
+        0.371519,
+        null
+      ],
+      [
+        0.383129,
+        null
+      ],
+      [
+        0.394739,
+        null
+      ],
+      [
+        0.406349,
+        null
+      ],
+      [
+        0.417959,
+        null
+      ],
+      [
+        0.429569,
+        null
+      ],
+      [
+        0.441179,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 2.510368,
+    "roughness_asper": 3.042128,
+    "roughness_max_asper": 3.2463
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": -0.001503,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "too_quiet_vs_target",
+    "shrill",
+    "rough"
+  ],
+  "file": "camp_crackle.wav",
+  "pictures": {
+    "spectrogram": "camp_crackle.spec.png",
+    "waveform": "camp_crackle.wave.png"
+  }
+}

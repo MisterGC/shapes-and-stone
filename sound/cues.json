@@ -1,0 +1,201 @@
+{
+  "format": 1,
+  "game": "shapes-and-stone",
+  "cues": {
+    "sfx/deep_chink": {
+      "category": "sfx",
+      "brief": "the pickaxe on stone: a heavy thud under an iron click; played a step lower or higher per strike",
+      "mode": "live",
+      "source": "sfx/deep_chink.sfx.json",
+      "render": "sfx/deep_chink.wav",
+      "report": "sfx/deep_chink.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:04.098349+00:00",
+      "verdict": null
+    },
+    "sfx/deep_tink": {
+      "category": "sfx",
+      "brief": "a clean strike's bright tink on the gem, a glassy bell; played a pentatonic step higher per clean strike and three times as the gem's chime",
+      "mode": "live",
+      "source": "sfx/deep_tink.sfx.json",
+      "render": "sfx/deep_tink.wav",
+      "report": "sfx/deep_tink.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:14.000094+00:00",
+      "verdict": null
+    },
+    "sfx/deep_crumble": {
+      "category": "sfx",
+      "brief": "the stone's crumble as the vein splits, and a spawn hole closing: grit falling off it",
+      "mode": "live",
+      "source": "sfx/deep_crumble.sfx.json",
+      "render": "sfx/deep_crumble.wav",
+      "report": "sfx/deep_crumble.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:05.808559+00:00",
+      "verdict": null
+    },
+    "sfx/deep_rumble": {
+      "category": "sfx",
+      "brief": "a spawn hole waking, and a creature crawling out: a low rumble in the rock",
+      "mode": "live",
+      "source": "sfx/deep_rumble.sfx.json",
+      "render": "sfx/deep_rumble.wav",
+      "report": "sfx/deep_rumble.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:12.493526+00:00",
+      "verdict": null
+    },
+    "sfx/deep_groan": {
+      "category": "sfx",
+      "brief": "a spawn hole's eyes opening: a drawn-out groan from inside",
+      "mode": "live",
+      "source": "sfx/deep_groan.sfx.json",
+      "render": "sfx/deep_groan.wav",
+      "report": "sfx/deep_groan.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:10.436469+00:00",
+      "verdict": null
+    },
+    "sfx/deep_freed": {
+      "category": "sfx",
+      "brief": "a traveller of the deep sent up: a warm low major chord, the only one in the dungeon's sounds",
+      "mode": "live",
+      "source": "sfx/deep_freed.sfx.json",
+      "render": "sfx/deep_freed.wav",
+      "report": "sfx/deep_freed.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:07.835716+00:00",
+      "verdict": null
+    },
+    "sfx/camp_crackle": {
+      "category": "sfx",
+      "brief": "the campfire: a few dry pops over a soft breath; played at its source, pitched a little each time",
+      "mode": "rendered",
+      "source": "sfx/camp_crackle.sfx.json",
+      "render": "sfx/camp_crackle.wav",
+      "report": "sfx/camp_crackle.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:36:55.790658+00:00",
+      "verdict": null
+    },
+    "sfx/camp_anvil": {
+      "category": "sfx",
+      "brief": "the smith's hammer on the anvil: a short metal ring; played at its source, pitched a little each time",
+      "mode": "live",
+      "source": "sfx/camp_anvil.sfx.json",
+      "render": "sfx/camp_anvil.wav",
+      "report": "sfx/camp_anvil.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:36:54.016620+00:00",
+      "verdict": null
+    },
+    "sfx/camp_drip": {
+      "category": "sfx",
+      "brief": "water dripping in the grotto: a plink rising in pitch; played at its source, pitched a little each time",
+      "mode": "live",
+      "source": "sfx/camp_drip.sfx.json",
+      "render": "sfx/camp_drip.wav",
+      "report": "sfx/camp_drip.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:36:59.269580+00:00",
+      "verdict": null
+    },
+    "sfx/camp_creak": {
+      "category": "sfx",
+      "brief": "a cart's wheel in the miners' hall: wood on wood; played at its source, pitched a little each time",
+      "mode": "rendered",
+      "source": "sfx/camp_creak.sfx.json",
+      "render": "sfx/camp_creak.wav",
+      "report": "sfx/camp_creak.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:36:57.901272+00:00",
+      "verdict": null
+    },
+    "sfx/camp_hiss": {
+      "category": "sfx",
+      "brief": "embers in the ember camp: a swell of hiss with sparks; played at its source, pitched a little each time",
+      "mode": "rendered",
+      "source": "sfx/camp_hiss.sfx.json",
+      "render": "sfx/camp_hiss.wav",
+      "report": "sfx/camp_hiss.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:02.664106+00:00",
+      "verdict": null
+    },
+    "sfx/potion_drink": {
+      "category": "sfx",
+      "brief": "a health potion drunk: the cork pulled, three gulps and a breath let out",
+      "mode": "live",
+      "source": "sfx/potion_drink.sfx.json",
+      "render": "sfx/potion_drink.wav",
+      "report": "sfx/potion_drink.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:17.958359+00:00",
+      "verdict": null
+    },
+    "sfx/heartbeat": {
+      "category": "sfx",
+      "brief": "the knight low on health: one beat of its heart, a deep lub and a softer dub",
+      "mode": "live",
+      "source": "sfx/heartbeat.sfx.json",
+      "render": "sfx/heartbeat.wav",
+      "report": "sfx/heartbeat.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T16:37:15.414052+00:00",
+      "verdict": null
+    }
+  }
+}

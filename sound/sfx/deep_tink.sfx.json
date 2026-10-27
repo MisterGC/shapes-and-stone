@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "deep_tink",
+  "variation": { "seed": 156, "pool": 1 },
+  "layers": [
+    { "name": "bell1", "role": "body", "source": "sine", "freq": 1046.5, "length": 702,
+      "gain": -7.7, "envelope": { "attack": 1.5, "decay": 700, "sustain": 0, "release": 0 } },
+    { "name": "bell2", "role": "tail", "source": "sine", "freq": 2427.88, "length": 302,
+      "gain": -16.8, "envelope": { "attack": 1.5, "decay": 300, "sustain": 0, "release": 0 } },
+    { "name": "bell3", "role": "tail", "source": "sine", "freq": 4447.62, "length": 127,
+      "gain": -24.2, "envelope": { "attack": 1.5, "decay": 125, "sustain": 0, "release": 0 } }
+  ]
+}
