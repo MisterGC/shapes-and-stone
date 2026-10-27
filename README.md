@@ -183,17 +183,38 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
-The deep's, the camp's and the knight's sound effects come from the sound
-factory (github.com/MisterGC/sound-productions): each is a recipe,
-`sound/sfx/<name>.sfx.json`, an entry in the cue sheet `sound/cues.json`
-with its sound report beside it, and a person's verdict once it has been
-heard. A live cue plays its recipe through Clayground's `SfxPlayer`, a
-little different each time and, where the game pitches it, transposed by
-`play(velocity, detune)`; a rendered cue plays the factory's render,
-`sound/sfx/<name>.wav`, through a `Sound` at another rate. The crackle,
-the hiss and the creak stay rendered: their pitch is in noise and in
-filters, which a recipe's detune does not move. The build ships what the
-sheet names: a live cue's recipe, a rendered cue's render. A changed recipe is
+All of the game's sound comes from the sound factory
+(github.com/MisterGC/sound-productions): each sound is an entry in the cue
+sheet `sound/cues.json`, with its source, its render and sound report beside
+it, where it came from, and a person's verdict once it has been heard.
+
+- **Effects** are recipes, `sound/sfx/<name>.sfx.json`. A live cue plays
+  its recipe through Clayground's `SfxPlayer`, a little different each time
+  and, where the game pitches it, transposed by `play(velocity, detune)`; a
+  rendered cue plays the factory's render, `sound/sfx/<name>.wav`, through a
+  `Sound` at another rate. The crackle, the hiss, the creak, the sword's
+  swing, the footstep and the spitter stay rendered: their pitch is in noise
+  and in filters, which a recipe's detune does not move.
+- **Ambience** beds are recipes too, `sound/ambience/<name>.sfx.json`, of
+  10 s each that fade in and out; `AmbienceBed.qml` plays the next take
+  8.5 s after the last, so they cross.
+- **Music** is three songs, `sound/music/<name>.score` in the factory's note
+  notation, compiled by `sp compose` to `<name>.song.json`, which
+  `SongPlayer` plays live (`SongMusic.qml`): the title's, the camp's and the
+  dungeon's. The dungeon's song follows the fight: its intensity is how many
+  enemies within reach are after the knight, out of three
+  (`Balance.music`), eased up fast and down slowly. A pulse of kick and
+  snare comes in from 0.15 to 0.5, a horn's counter-line and brushes from
+  0.5 to 1.
+- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
+  the knight's whirlwind shout are lines of the voice scripts
+  `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
+  to -18 LUFS and lip-synced by Rhubarb. A greeting plays its render, and the
+  dialogue panel moves the speaker's mouth from the line's viseme cues,
+  `<line>.visemes.json` beside the render.
+
+The build ships what the sheet names: a live cue's recipe or song, a
+rendered cue's render, and a voiced line's viseme cues. A changed recipe is
 rendered and delivered again with the factory's `sp`:
 
 ```
@@ -203,13 +224,32 @@ sp deliver /tmp/deep_tink.wav sfx/deep_tink --game . --source sound/sfx/deep_tin
 sp cues --game .
 ```
 
+A song is changed in its score and compiled again
+(`sp compose sound/music/dungeon.score`); a voiced line is changed in its
+voice script and voiced again (`sp say sound/voice/npc_greetings.voice.json
+witch_greeting --takes 3`, with `vocli serve` running), then delivered with
+`--source` the script.
+
 The cue bench checks that the game has a player for every cue of the
-sheet - an `SfxPlayer` of the recipe for a live one, a `Sound` of the render
-for a rendered one - loaded, that the live ones play and render, that the
-game's own calls reach them, and that M silences them:
+sheet - an `SfxPlayer` of the recipe or a `SongPlayer` of the song for a
+live one, a `Sound` of the render for a rendered one - loaded, that the
+live ones play and render, that the game's own calls reach them, and that
+M silences them:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cues/cues.qml
+```
+
+The lip-sync bench talks to the innkeeper, the blacksmith and the witch and
+checks that each greeting moves its speaker's mouth by the cues of its
+visemes file and rests it on X once the line is over; the fight music bench
+puts enemies after the knight and away again and checks that the dungeon
+song's intensity rises fast, falls slowly, ignores enemies out of reach and
+is 0 in the camp:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fightmusic/fightmusic.qml
 ```
 
 At depth 0 a line at the bottom of the screen names the controls: WASD,
@@ -575,9 +615,9 @@ glowing glimmerfin, each with its size, gold and fight. The pond gives
 a few gold a fish, so it eases the purse without changing the descent -
 and a knight beside the cave cat gives it the smallest fish with E: it
 eats it, purrs and lies content a while. The rod, the line and the fish
-are drawn on the fishing knight's own screen only. `tools/fishing_sounds.py`
-makes the cast, the plop, the nibble, the bite, the reel's ratchet, the
-splash, the landing, the snap and the purr. The fishing bench checks
+are drawn on the fishing knight's own screen only. The cast, the plop, the
+nibble, the bite, the reel's ratchet, the splash, the landing, the snap and
+the purr are recipes in `sound/sfx/`, played live. The fishing bench checks
 where it may cast, the cast, a click too soon, a bite missed and hooked,
 the reel into the creel, the snap and the slack, walking off, the still
 water, the sale, the cat and the bites filled again on a new level:

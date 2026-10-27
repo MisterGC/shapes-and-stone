@@ -15,7 +15,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:04.098349+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_chink.wav"
+      }
     },
     "sfx/deep_tink": {
       "category": "sfx",
@@ -30,7 +35,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:14.000094+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_tink.wav"
+      }
     },
     "sfx/deep_crumble": {
       "category": "sfx",
@@ -45,7 +55,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:05.808559+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_crumble.wav"
+      }
     },
     "sfx/deep_rumble": {
       "category": "sfx",
@@ -60,7 +75,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:12.493526+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_rumble.wav"
+      }
     },
     "sfx/deep_groan": {
       "category": "sfx",
@@ -75,7 +95,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:10.436469+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_groan.wav"
+      }
     },
     "sfx/deep_freed": {
       "category": "sfx",
@@ -90,7 +115,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:07.835716+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_freed.wav"
+      }
     },
     "sfx/camp_crackle": {
       "category": "sfx",
@@ -105,7 +135,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:55.790658+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/camp_crackle.wav"
+      }
     },
     "sfx/camp_anvil": {
       "category": "sfx",
@@ -120,7 +155,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:54.016620+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/camp_anvil.wav"
+      }
     },
     "sfx/camp_drip": {
       "category": "sfx",
@@ -135,7 +175,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:59.269580+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/camp_drip.wav"
+      }
     },
     "sfx/camp_creak": {
       "category": "sfx",
@@ -150,7 +195,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:57.901272+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/camp_creak.wav"
+      }
     },
     "sfx/camp_hiss": {
       "category": "sfx",
@@ -165,7 +215,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:02.664106+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/camp_hiss.wav"
+      }
     },
     "sfx/potion_drink": {
       "category": "sfx",
@@ -180,7 +235,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:17.958359+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/potion_drink.wav"
+      }
     },
     "sfx/heartbeat": {
       "category": "sfx",
@@ -195,7 +255,723 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:15.414052+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/heartbeat.wav"
+      }
+    },
+    "voice/npc_greetings/innkeeper_greeting": {
+      "category": "voice",
+      "brief": "the innkeeper, to the knight who walks up to her in the camp: warm and hearty, glad of a guest, a little teasing; conversational pace; her first line when the knight talks to her",
+      "mode": "rendered",
+      "source": "voice/npc_greetings.voice.json",
+      "render": "voice/npc_greetings/innkeeper_greeting.wav",
+      "report": "voice/npc_greetings/innkeeper_greeting.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "innkeeper_warm",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 9
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.205547+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/npc_greetings/innkeeper_greeting.wav"
+      }
+    },
+    "voice/npc_greetings/blacksmith_greeting": {
+      "category": "voice",
+      "brief": "the blacksmith, to the knight back from the dungeon: gruff and dry, a craftsman's appraising look at the knight's blade, unhurried; his first line when the knight talks to him",
+      "mode": "rendered",
+      "source": "voice/npc_greetings.voice.json",
+      "render": "voice/npc_greetings/blacksmith_greeting.wav",
+      "report": "voice/npc_greetings/blacksmith_greeting.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "blacksmith",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 7
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.301840+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/npc_greetings/blacksmith_greeting.wav"
+      }
+    },
+    "voice/npc_greetings/witch_greeting": {
+      "category": "voice",
+      "brief": "the witch, fortune teller by the tree, to the knight: slow and hushed, ominous, trailing off at the end; she says it as the knight asks for her reading of the next dungeon",
+      "mode": "rendered",
+      "source": "voice/npc_greetings.voice.json",
+      "render": "voice/npc_greetings/witch_greeting.wav",
+      "report": "voice/npc_greetings/witch_greeting.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "witch_hushed",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 9
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.398163+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/npc_greetings/witch_greeting.wav"
+      }
+    },
+    "voice/knight/whirl_shout": {
+      "category": "voice",
+      "brief": "the knight, mid-fight, as the charged whirlwind spins out: one short battle cry, forceful and clipped, over in well under a second; the game plays it pitched down under the spin, so it is heard many times a fight",
+      "mode": "rendered",
+      "source": "voice/knight.voice.json",
+      "render": "voice/knight/whirl_shout.wav",
+      "report": "voice/knight/whirl_shout.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "knight_shout",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 8
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-10-18T17:12:27.494135+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/knight/whirl_shout.wav"
+      }
+    },
+    "music/dungeon": {
+      "category": "music",
+      "brief": "the dungeon below, A minor: a reed tune over strings, harp and bass; a pulse of kick and snare grows in as enemies give chase (intensity 0.15-0.5) and a horn counter-line with brushes at full fight (0.5-1); the delivered render is the full fight",
+      "mode": "live",
+      "source": "music/dungeon.song.json",
+      "render": "music/dungeon.wav",
+      "report": "music/dungeon.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:19:57.656533+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "music/dungeon.wav"
+      }
+    },
+    "music/village": {
+      "category": "music",
+      "brief": "the camp by night between two dungeons, F major: a flute tune over a plucked harp, a round bass and soft brushes; quiet under the fire",
+      "mode": "live",
+      "source": "music/village.song.json",
+      "render": "music/village.wav",
+      "report": "music/village.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:19:57.742909+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "music/village.wav"
+      }
+    },
+    "music/title": {
+      "category": "music",
+      "brief": "the title screen's theme, D minor, heroic and a little sad: a horn tune over dark strings, harp, bass and a far drum",
+      "mode": "live",
+      "source": "music/title.song.json",
+      "render": "music/title.wav",
+      "report": "music/title.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:19:57.827181+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "music/title.wav"
+      }
+    },
+    "sfx/fish_cast": {
+      "category": "sfx",
+      "brief": "the rod swung and the line whipping out, the reel letting line run",
+      "mode": "live",
+      "source": "sfx/fish_cast.sfx.json",
+      "render": "sfx/fish_cast.wav",
+      "report": "sfx/fish_cast.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.493753+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_cast.wav"
+      }
+    },
+    "sfx/fish_plop": {
+      "category": "sfx",
+      "brief": "the bobber landing on the water",
+      "mode": "live",
+      "source": "sfx/fish_plop.sfx.json",
+      "render": "sfx/fish_plop.wav",
+      "report": "sfx/fish_plop.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.576952+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_plop.wav"
+      }
+    },
+    "sfx/fish_plip": {
+      "category": "sfx",
+      "brief": "a nibble: a tiny tug at the bobber",
+      "mode": "live",
+      "source": "sfx/fish_plip.sfx.json",
+      "render": "sfx/fish_plip.wav",
+      "report": "sfx/fish_plip.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.662229+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_plip.wav"
+      }
+    },
+    "sfx/fish_bite": {
+      "category": "sfx",
+      "brief": "the bite: the bobber pulled under, a deep plop",
+      "mode": "live",
+      "source": "sfx/fish_bite.sfx.json",
+      "render": "sfx/fish_bite.wav",
+      "report": "sfx/fish_bite.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.750296+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_bite.wav"
+      }
+    },
+    "sfx/fish_click": {
+      "category": "sfx",
+      "brief": "one tick of the reel's ratchet",
+      "mode": "live",
+      "source": "sfx/fish_click.sfx.json",
+      "render": "sfx/fish_click.wav",
+      "report": "sfx/fish_click.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.833659+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_click.wav"
+      }
+    },
+    "sfx/fish_splash": {
+      "category": "sfx",
+      "brief": "the fish thrashing at the surface",
+      "mode": "live",
+      "source": "sfx/fish_splash.sfx.json",
+      "render": "sfx/fish_splash.wav",
+      "report": "sfx/fish_splash.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:57.917538+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_splash.wav"
+      }
+    },
+    "sfx/fish_land": {
+      "category": "sfx",
+      "brief": "the fish lifted out: a splash and a wet flop on the bank",
+      "mode": "live",
+      "source": "sfx/fish_land.sfx.json",
+      "render": "sfx/fish_land.wav",
+      "report": "sfx/fish_land.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.001341+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_land.wav"
+      }
+    },
+    "sfx/fish_snap": {
+      "category": "sfx",
+      "brief": "the line snapping: a crack and the slack line's falling twang",
+      "mode": "live",
+      "source": "sfx/fish_snap.sfx.json",
+      "render": "sfx/fish_snap.wav",
+      "report": "sfx/fish_snap.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.086560+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_snap.wav"
+      }
+    },
+    "sfx/cat_purr": {
+      "category": "sfx",
+      "brief": "the cave cat purring over its fish: 25 pulses a second, in and out on the breath",
+      "mode": "live",
+      "source": "sfx/cat_purr.sfx.json",
+      "render": "sfx/cat_purr.wav",
+      "report": "sfx/cat_purr.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.172234+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/cat_purr.wav"
+      }
+    },
+    "sfx/sword_swing": {
+      "category": "sfx",
+      "brief": "a light blade cutting air: a whoosh of band noise sweeping up and back; played pitched down for the heavy swing and the whirlwind, up for the spikes",
+      "mode": "rendered",
+      "source": "sfx/sword_swing.sfx.json",
+      "render": "sfx/sword_swing.wav",
+      "report": "sfx/sword_swing.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.256733+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/sword_swing.wav"
+      }
+    },
+    "sfx/dash": {
+      "category": "sfx",
+      "brief": "the knight's dash: a low rush of air with a soft push under it",
+      "mode": "live",
+      "source": "sfx/dash.sfx.json",
+      "render": "sfx/dash.wav",
+      "report": "sfx/dash.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.343281+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/dash.wav"
+      }
+    },
+    "sfx/punch_hitting": {
+      "category": "sfx",
+      "brief": "the knight's sword hitting a creature: a sharp crack, a heavy low thump and a short dull body",
+      "mode": "live",
+      "source": "sfx/punch_hitting.sfx.json",
+      "render": "sfx/punch_hitting.wav",
+      "report": "sfx/punch_hitting.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.427793+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/punch_hitting.wav"
+      }
+    },
+    "sfx/burst": {
+      "category": "sfx",
+      "brief": "a creature bursting as it dies: a bright pop over a falling thud and a spray of debris",
+      "mode": "live",
+      "source": "sfx/burst.sfx.json",
+      "render": "sfx/burst.wav",
+      "report": "sfx/burst.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.511762+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/burst.wav"
+      }
+    },
+    "sfx/shield_clang": {
+      "category": "sfx",
+      "brief": "the shield blocking: a metal clang, never the thud of a hit; played higher for a perfect block",
+      "mode": "live",
+      "source": "sfx/shield_clang.sfx.json",
+      "render": "sfx/shield_clang.wav",
+      "report": "sfx/shield_clang.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.595239+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/shield_clang.wav"
+      }
+    },
+    "sfx/shield_break": {
+      "category": "sfx",
+      "brief": "the shield breaking at no mana: a crack and metal shards scattering",
+      "mode": "live",
+      "source": "sfx/shield_break.sfx.json",
+      "render": "sfx/shield_break.wav",
+      "report": "sfx/shield_break.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.681062+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/shield_break.wav"
+      }
+    },
+    "sfx/shield_empty": {
+      "category": "sfx",
+      "brief": "the right button with no mana: a short dull thunk, the shield won't come up",
+      "mode": "live",
+      "source": "sfx/shield_empty.sfx.json",
+      "render": "sfx/shield_empty.wav",
+      "report": "sfx/shield_empty.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.766721+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/shield_empty.wav"
+      }
+    },
+    "sfx/knight_hurt": {
+      "category": "sfx",
+      "brief": "the knight hurt: a low heavy thud and a grunt of breath, never the punch of a sword",
+      "mode": "live",
+      "source": "sfx/knight_hurt.sfx.json",
+      "render": "sfx/knight_hurt.wav",
+      "report": "sfx/knight_hurt.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.853388+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/knight_hurt.wav"
+      }
+    },
+    "sfx/footstep": {
+      "category": "sfx",
+      "brief": "the knight's footstep on stone: a short soft heel and a scuff; played on a few pitches in turn",
+      "mode": "rendered",
+      "source": "sfx/footstep.sfx.json",
+      "render": "sfx/footstep.wav",
+      "report": "sfx/footstep.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:58.940027+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/footstep.wav"
+      }
+    },
+    "sfx/spitter": {
+      "category": "sfx",
+      "brief": "a spitter's shot: a wet gurgle that builds and a spit; played lower as a tough enemy's growl",
+      "mode": "rendered",
+      "source": "sfx/spitter.sfx.json",
+      "render": "sfx/spitter.wav",
+      "report": "sfx/spitter.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.025496+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/spitter.wav"
+      }
+    },
+    "sfx/goblin_scream": {
+      "category": "sfx",
+      "brief": "a grunt or a guardian winding up its lunge: a goblin's short rasping scream, falling; pitched by its tier",
+      "mode": "live",
+      "source": "sfx/goblin_scream.sfx.json",
+      "render": "sfx/goblin_scream.wav",
+      "report": "sfx/goblin_scream.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.114184+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/goblin_scream.wav"
+      }
+    },
+    "sfx/coin_pickup": {
+      "category": "sfx",
+      "brief": "gold picked up: a coin's bright two-note clink",
+      "mode": "live",
+      "source": "sfx/coin_pickup.sfx.json",
+      "render": "sfx/coin_pickup.wav",
+      "report": "sfx/coin_pickup.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.201149+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/coin_pickup.wav"
+      }
+    },
+    "sfx/menu_change": {
+      "category": "sfx",
+      "brief": "a menu step: a soft short tick; also the full charge's high tick and a spike plate's low click, pitched",
+      "mode": "live",
+      "source": "sfx/menu_change.sfx.json",
+      "render": "sfx/menu_change.wav",
+      "report": "sfx/menu_change.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.288594+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/menu_change.wav"
+      }
+    },
+    "sfx/menu_confirm": {
+      "category": "sfx",
+      "brief": "a menu choice confirmed: a warm rising two-note chime",
+      "mode": "live",
+      "source": "sfx/menu_confirm.sfx.json",
+      "render": "sfx/menu_confirm.wav",
+      "report": "sfx/menu_confirm.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.374679+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/menu_confirm.wav"
+      }
+    },
+    "ambience/dungeon": {
+      "category": "ambience",
+      "brief": "the dungeon's air: a low rumbling draught, a far moan of wind and a drip now and then; a bed under the music, crossfaded into itself",
+      "mode": "live",
+      "source": "ambience/dungeon.sfx.json",
+      "render": "ambience/dungeon.wav",
+      "report": "ambience/dungeon.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.461422+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "ambience/dungeon.wav"
+      }
+    },
+    "ambience/village": {
+      "category": "ambience",
+      "brief": "the camp's night outside: a soft breeze through grass and crickets far off; a bed under the music and the fire, crossfaded into itself",
+      "mode": "live",
+      "source": "ambience/village.sfx.json",
+      "render": "ambience/village.wav",
+      "report": "ambience/village.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.9 (clayground 8574700)",
+        "license": "MIT"
+      },
+      "delivered": "2026-10-18T17:25:59.548519+00:00",
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "ambience/village.wav"
+      }
     }
   }
 }

@@ -20,7 +20,12 @@ PhysicsItem {
     property var speak: null
     // What it sells through the dialogue panel: [{id, label, price}]
     property var wares: []
+    // The cue of its voiced greeting in sound/cues.json, "" for none
     property string greetingSound: ""
+    // Its mouth while the dialogue it opened is up (issue #191): a
+    // Rhubarb mouth shape, "A" to "H", "X" at rest, and "" with no voiced
+    // line; the dialogue panel sets it from the line's viseme cues
+    property string mouth: ""
 
     // Routine: [{x, y, duration, text, sound, via}, ...]; sound names
     // what the camp hears while it is at that spot (CampSounds, issue
@@ -172,6 +177,25 @@ PhysicsItem {
                 }
             }
         }
+    }
+
+    // The mouth, upright on any shape, sized by its shape: A closed, B to
+    // D opening wider, E rounded, F puckered, G the lip on the teeth, H
+    // the tongue up, X at rest
+    Rectangle {
+        id: mouthShape
+        objectName: "mouth"
+        readonly property var _sizes: ({ X: [0.3, 0.03], A: [0.3, 0.035], B: [0.32, 0.08],
+                                         C: [0.34, 0.14], D: [0.36, 0.22], E: [0.26, 0.16],
+                                         F: [0.16, 0.12], G: [0.3, 0.06], H: [0.3, 0.12] })
+        readonly property var _size: _sizes[npc.mouth] || _sizes.X
+        visible: npc.mouth !== ""
+        width: npc.width * _size[0]
+        height: Math.max(1, npc.height * _size[1])
+        radius: height / 2
+        x: (npc.width - width) / 2
+        y: npc.height * 0.8 - height / 2
+        color: Qt.darker(npc.npcColor, 2.6)
     }
 
     // Idle bobbing
@@ -352,9 +376,9 @@ PhysicsItem {
                 // What it was saying to the others it leaves unsaid
                 saying = ""
             }
+            gameWorld.openDialogue(npcName, npcColor, lines, wares, npc)
             if (greetingSound !== "" && gameWorld.playNpcGreeting)
                 gameWorld.playNpcGreeting(greetingSound)
-            gameWorld.openDialogue(npcName, npcColor, lines, wares, npc)
         }
     }
 }

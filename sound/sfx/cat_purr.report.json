@@ -1,0 +1,264 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 1.6,
+  "time_span_s": 2.0,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -21.844008,
+    "lufs_block_s": 0.4,
+    "true_peak_dbtp": -4.442258,
+    "peak_dbfs": -4.447785,
+    "rms_dbfs": -20.48125,
+    "crest_factor_db": 16.033465
+  },
+  "envelope": {
+    "silence_start_s": 0.001587,
+    "silence_end_s": 0.001474,
+    "attack_s": 0.160544,
+    "peak_at_s": 0.488889,
+    "peak_db": -11.320615,
+    "fall_20db_at_s": 1.519048,
+    "fall_60db_at_s": null
+  },
+  "spectrum": {
+    "centroid_hz": 229.144805,
+    "rolloff_hz": 376.831055,
+    "flatness": 4e-05,
+    "band_shares": {
+      "20_60": 0.119562,
+      "60_250": 0.560144,
+      "250_500": 0.248706,
+      "500_2k": 0.070592,
+      "2k_5k": 0.00095,
+      "5k_10k": 4.4e-05,
+      "10k_20k": 2e-06
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.03483,
+        null
+      ],
+      [
+        0.06966,
+        null
+      ],
+      [
+        0.10449,
+        null
+      ],
+      [
+        0.13932,
+        null
+      ],
+      [
+        0.17415,
+        null
+      ],
+      [
+        0.20898,
+        null
+      ],
+      [
+        0.24381,
+        null
+      ],
+      [
+        0.278639,
+        null
+      ],
+      [
+        0.313469,
+        null
+      ],
+      [
+        0.348299,
+        null
+      ],
+      [
+        0.383129,
+        null
+      ],
+      [
+        0.417959,
+        null
+      ],
+      [
+        0.452789,
+        null
+      ],
+      [
+        0.487619,
+        null
+      ],
+      [
+        0.522449,
+        null
+      ],
+      [
+        0.557279,
+        null
+      ],
+      [
+        0.592109,
+        null
+      ],
+      [
+        0.626939,
+        null
+      ],
+      [
+        0.661769,
+        null
+      ],
+      [
+        0.696599,
+        null
+      ],
+      [
+        0.731429,
+        null
+      ],
+      [
+        0.766259,
+        null
+      ],
+      [
+        0.801088,
+        null
+      ],
+      [
+        0.835918,
+        null
+      ],
+      [
+        0.870748,
+        null
+      ],
+      [
+        0.905578,
+        null
+      ],
+      [
+        0.940408,
+        null
+      ],
+      [
+        0.975238,
+        null
+      ],
+      [
+        1.010068,
+        null
+      ],
+      [
+        1.044898,
+        null
+      ],
+      [
+        1.079728,
+        null
+      ],
+      [
+        1.114558,
+        null
+      ],
+      [
+        1.149388,
+        null
+      ],
+      [
+        1.184218,
+        null
+      ],
+      [
+        1.219048,
+        null
+      ],
+      [
+        1.253878,
+        null
+      ],
+      [
+        1.288707,
+        null
+      ],
+      [
+        1.323537,
+        null
+      ],
+      [
+        1.358367,
+        null
+      ],
+      [
+        1.393197,
+        null
+      ],
+      [
+        1.428027,
+        null
+      ],
+      [
+        1.462857,
+        null
+      ],
+      [
+        1.497687,
+        null
+      ],
+      [
+        1.532517,
+        null
+      ],
+      [
+        1.567347,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 0.82407,
+    "roughness_asper": 0.316883,
+    "roughness_max_asper": 0.501978
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.002925,
+    "loop_seam_jump": 1.3e-05,
+    "loop_seam_jump_ratio": 0.000838
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "cat_purr.wav",
+  "pictures": {
+    "spectrogram": "cat_purr.spec.png",
+    "waveform": "cat_purr.wave.png"
+  }
+}
