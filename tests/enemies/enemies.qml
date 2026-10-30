@@ -45,6 +45,12 @@ Window {
     readonly property real maxErrorWu: 0.5
     readonly property int slackMs: 20
     readonly property int stateLagMs: 300
+    // How far behind the host's a joiner may render an enemy at most: the
+    // delay is the joiner's own (autoDelay), and a joiner that replays the
+    // host's path faithfully but far too late would pass the position
+    // check. 100 ms was the game's own cap before the auto delay (issue
+    // #64, docs/multiplayer-sync.md); one process on LAN renders 35 to 87
+    readonly property int maxDelayMs: 100
     // How long the host's positions are kept to look the delay up in
     readonly property int keepMs: 1000
     readonly property int sampleMs: 5000
@@ -284,6 +290,9 @@ Window {
                   + Math.min(...delays) + "-" + Math.max(...delays) + " ms +-" + slackMs + " ms (max "
                   + st.maxErr.toFixed(3) + " at " + st.maxErrId + ", mean "
                   + (st.sumErr / Math.max(1, st.n)).toFixed(3) + ", " + st.n + " samples)")
+            check(delays.length > 0 && Math.max(...delays) <= maxDelayMs,
+                  "the joiner renders every enemy at most " + maxDelayMs + " ms behind the host's ("
+                  + (delays.length > 0 ? Math.min(...delays) + "-" + Math.max(...delays) + " ms" : "no delay seen") + ")")
             check(st.judged > 0 && st.stateMiss === 0,
                   "every enemy's AI state on the joiner is the host's of the last " + stateLagMs
                   + " ms (" + st.stateMiss + " misses in " + st.judged + " samples"
