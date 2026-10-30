@@ -187,8 +187,8 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "W/S to navigate \u2022 Enter to select"
-            color: "#555555"
-            font.pixelSize: 10
+            color: "#888888"
+            font.pixelSize: 12
             font.italic: true
         }
     }

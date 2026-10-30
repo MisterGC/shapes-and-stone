@@ -142,7 +142,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "This session"
                 color: "#888888"
-                font.pixelSize: 11
+                font.pixelSize: 12
                 font.letterSpacing: 1
             }
             Repeater {

@@ -171,7 +171,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Name"
                 color: "#555555"
-                font.pixelSize: 10
+                font.pixelSize: 12
             }
         }
 
@@ -215,7 +215,7 @@ Item {
             text: lobby.lanMode ? "Same network, no internet needed, native players only"
                                 : "Works across the internet and with browser players"
             color: "#777777"
-            font.pixelSize: 10
+            font.pixelSize: 12
         }
 
         // Host / Join buttons (pre-connection)
@@ -336,7 +336,7 @@ Item {
             Text {
                 text: "Players:"
                 color: "#888888"
-                font.pixelSize: 11
+                font.pixelSize: 12
             }
 
             Repeater {

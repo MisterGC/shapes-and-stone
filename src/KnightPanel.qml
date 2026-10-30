@@ -123,7 +123,7 @@ Item {
             topPadding: 6
             text: "C or Esc closes"
             color: "#777777"
-            font.pixelSize: 11
+            font.pixelSize: 12
             font.italic: true
         }
     }

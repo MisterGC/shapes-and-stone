@@ -190,7 +190,7 @@ PhysicsItem {
         anchors.bottomMargin: 8
         text: _activityText
         color: "#CCCCAA"
-        font.pixelSize: 9
+        font.pixelSize: 12
         font.italic: true
         style: Text.Outline
         styleColor: "#000000"
@@ -227,7 +227,7 @@ PhysicsItem {
             text: npc.saying
             wrapMode: Text.WordWrap
             color: "#2A2420"
-            font.pixelSize: 10
+            font.pixelSize: 12
         }
         // The tail, down to the speaker
         Rectangle {
@@ -247,7 +247,7 @@ PhysicsItem {
         anchors.bottomMargin: 2
         text: "[" + (gameWorld ? gameWorld.talkKey : "E") + "] Talk"
         color: "#FFFFFF"
-        font.pixelSize: 10
+        font.pixelSize: 12
         font.bold: true
         style: Text.Outline
         styleColor: "#000000"

@@ -283,7 +283,7 @@ Item {
                 text: traveller.saying
                 wrapMode: Text.WordWrap
                 color: "#2A2420"
-                font.pixelSize: 10
+                font.pixelSize: 12
             }
             Rectangle {
                 width: 7
@@ -303,7 +303,7 @@ Item {
             anchors.bottomMargin: 2
             text: "[" + traveller.talkKey + "] Talk"
             color: "#FFFFFF"
-            font.pixelSize: 10
+            font.pixelSize: 12
             font.bold: true
             style: Text.Outline
             styleColor: "#000000"

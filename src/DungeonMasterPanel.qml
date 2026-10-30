@@ -287,7 +287,7 @@ Item {
                         delegate: Row {
                             spacing: 3
                             Rectangle { width: 8; height: 8; radius: 4; color: modelData.c; anchors.verticalCenter: parent.verticalCenter }
-                            Text { text: modelData.t; color: "#888888"; font.pixelSize: 11 }
+                            Text { text: modelData.t; color: "#888888"; font.pixelSize: 12 }
                         }
                     }
                 }

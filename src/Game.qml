@@ -2139,7 +2139,7 @@ ClayWorld2d {
             anchors.centerIn: parent
             text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
             color: "white"
-            font.pixelSize: 10
+            font.pixelSize: 12
             font.bold: true
         }
     }

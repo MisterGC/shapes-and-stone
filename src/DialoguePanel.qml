@@ -132,7 +132,7 @@ Item {
         text: (pad && wares.length > 0 ? "[" + buyKey + "] buy  " : "")
               + "[" + talkKey + "] " + (_lineIndex < lines.length - 1 ? "continue" : "close")
         color: "#888888"
-        font.pixelSize: 10
+        font.pixelSize: 12
         font.italic: true
     }
 
