@@ -167,10 +167,13 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/wallpush/wallpush.qml
 
 The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
-connected over Local (LAN) or Cloud signaling and started on a fixed seed.
+connected over Local (LAN) or Cloud signaling and started on a fixed seed
+(2027), whose first dungeon needs at least one spitter and two grunts or
+guardians; a seed without them stops the bench with the lineup it needed
+and the one it has.
 The joiner's knight answers one of the host's enemies: it stands until the
 enemy walks into its reach and swings, parries it, blocks, blocks
-perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
+perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it as it closes in and
 kills it while the host's knight kills another. Each answer counts once,
 on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its

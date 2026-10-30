@@ -6,8 +6,10 @@ screen (issue #18).
 
 Starts tests/sameworld/Sandbox.qml twice in Clayground's live loader, as two
 processes (a host and a joiner), connects them over Local or Cloud signaling
-and starts the game on a fixed seed. Then the joiner's knight answers one
-enemy of the host's, and each answer is checked on both screens:
+and starts the game on a fixed seed, whose first dungeon needs at least one
+spitter and two grunts or guardians: a seed without them stops the bench
+with the lineup it needed and the one it has. Then the joiner's knight
+answers one enemy of the host's, and each answer is checked on both screens:
 
 - it stands until it sleeps, the enemy walks into its reach, and its one
   swing lowers the enemy's HP by the same amount on both screens
@@ -28,8 +30,8 @@ enemy of the host's, and each answer is checked on both screens:
   its id goes on the host's screen when the result arrives
 - the other way round, the host's knight blocks a shot of that spitter: the
   joiner receives the result, and its shot of that id goes then
-- it stands in the open, raises its shield and dashes into the enemy
-  right after the host killed a third enemy in its reach: the host receives the push and its
+- it stands in the open, raises its shield and dashes into the enemy as
+  it closes in, right after the host killed a third enemy in its reach: the host receives the push and its
   enemy is shoved at least 1 Wu along the direction the push carries
 - it kills that enemy while the host's knight kills another: each dies on
   both screens, counts once for its killer, and leaves one stain on both
@@ -51,7 +53,7 @@ records are stamped with.
 
 Usage:
   run_sameworld.py [--loader <clayliveloader>] [--mode local|cloud]
-                   [--seed 2026] [--seconds 8] [--lag 300] [--slack 20]
+                   [--seed 2027] [--seconds 8] [--lag 300] [--slack 20]
                    [--tolerance 0.25] [--fault stale] [--json out.json]
                    [--dump records.json]
   run_sameworld.py --judge records.json [--late-ms 200]
@@ -789,8 +791,9 @@ def main():
     ap.add_argument("--loader", help="path to clayliveloader")
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
-    ap.add_argument("--seed", type=int, default=2026,
-                    help="the game's seed; its first dungeon has the lineup the script needs")
+    ap.add_argument("--seed", type=int, default=2027,
+                    help="the game's seed; its first dungeon needs at least 1 spitter "
+                         "and 2 grunts or guardians")
     ap.add_argument("--seconds", type=float, default=8.0, help="how long the knights fight")
     ap.add_argument("--lag", type=int, default=300,
                     help="ms the joiner may show an id, HP or AI state after the host")
@@ -915,11 +918,24 @@ def run(args, loader, tmp, procs, result, check):
         check(all(not v[4] for v in he.values()) and all(v[4] for v in je.values()),
               "the host runs every enemy, the joiner shows them")
 
-        # The host's knight at one enemy, the joiner's in sight of the one
-        # farthest from it that walks up to a knight (not a spitter)
+        # The checks need the dungeon's lineup: a spitter for the shots, and
+        # two enemies that walk up to a knight (grunts or guardians), one for
+        # each knight. A seed whose first dungeon has no such lineup says so
+        # and stops: every check on it would fail for want of an enemy
         ids = sorted(he)
-        walkers = [i for i in ids if H.eval1(f"typeOf('{i}')") != "spitter"] or ids
-        a, b = max(((x, y) for x in ids for y in walkers if x != y),
+        types = {i: H.eval1(f"typeOf('{i}')") for i in ids}
+        walkers = [i for i in ids if types[i] != "spitter"]
+        result["lineup"] = {t: sum(v == t for v in types.values()) for t in sorted(set(types.values()))}
+        has = ", ".join(f"{n} {t}" for t, n in result["lineup"].items())
+        if len(walkers) < 2 or len(walkers) == len(ids):
+            return abort(f"seed {args.seed}'s first dungeon has the lineup the bench needs: "
+                         f"at least 1 spitter and 2 grunts or guardians (it has {has}; "
+                         f"pass a --seed whose first dungeon has them)")
+        check(True, f"seed {args.seed}'s first dungeon has the lineup the bench needs: "
+              f"at least 1 spitter and 2 grunts or guardians ({has})")
+        # The host's knight at one enemy that walks up to a knight, the
+        # joiner's in sight of the one farthest from it
+        a, b = max(((x, y) for x in walkers for y in walkers if x != y),
                    key=lambda p: dist(he[p[0]], he[p[1]]))
         # The answers are timed on b's parry window, which a crushing blow
         # does not open: b winds up none
