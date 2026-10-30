@@ -224,6 +224,14 @@ sp deliver /tmp/deep_tink.wav sfx/deep_tink --game . --source sound/sfx/deep_tin
 sp cues --game .
 ```
 
+The recipes need Clayground `issue-452` (`7e93c11`, the submodule's
+commit), not `issue-450`: the village's ambience moves its volume with an
+LFO's `shape`, and the anvil, the creak, the crumble and the sword's hit
+drive a layer (`drive`). Clayground `issue-450` refuses those five
+(`unknown field`), so the `clay-sound` that `sp render` and `sp deliver`
+run, and the studio, are built against `issue-452` or later, e.g. against
+this repository's submodule (`-DCLAYGROUND_DIR=<shapes-and-stone>/clayground`).
+
 Three effects are design files: `sound/sfx/<name>.sfx.design.json` names
 one of the factory's stock templates, sets its macro knobs and overrides
 single values, and Clayground's compiler turns it into the recipe beside
