@@ -89,11 +89,12 @@ Item {
             aimAngle = Math.atan2(c.axisY, c.axisX) * 180 / Math.PI
     }
 
-    // In the game, with no menu over it
+    // In the game, with no menu, title or fallen screen over it: those own
+    // the pad then (MenuPad, issue #201)
     function _playing() {
-        return !!game && !!game.player && game.screen === "game" && !game.menuOpen && !game.masterOpen
+        return !!game && !!game.player && !game.overlayUp && !game.masterOpen
     }
-    function _free() { return _playing() && !game.fallen && !game.talking }
+    function _free() { return _playing() && !game.talking }
 
     // The press of R1 or L1 that began a strike or a raised shield, ended
     // by its release wherever the game is by then
@@ -125,8 +126,7 @@ Item {
             }
             return
         }
-        // Fallen, the face buttons are the fallen screen's
-        if (!down || !_playing() || game.fallen) return
+        if (!down || !_playing()) return
         let panel = dialogue
         if (name === "buttonA") {
             if (game.talking) panel.advance()

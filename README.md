@@ -247,6 +247,25 @@ of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/focus/focus.qml
 ```
 
+Every menu works with a gamepad: the title, the lobby, the dungeon
+master's panel, the pause menu and the fallen screen. The stick or the
+D-pad moves the focus (held, it moves on after a moment), A confirms, B
+goes back - it resumes from the pause menu, leaves the lobby and the
+fallen screen, and on the dungeon master's panel gives the row back to the
+game - and X generates there. Start pauses and resumes, and confirms on
+the title and the panel. Under the menu the stick gives the knight no
+motion and B no dash. In the lobby the pad cannot type a code: Join Game
+takes the one typed or pasted. Off touch the game's controller has the
+full layout, for Start; on touch it keeps one stick and A/B. The gamepad
+bench goes from the title through the dungeon master's panel into a game,
+pauses, resumes and returns to the title, through the lobby and the fallen
+screen, with Clayground's synthetic pad alone, and exits with the number
+of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gamepad/gamepad.qml
+```
+
 In a session a knight at 0 HP is down, drawn slumped and dark on every
 screen, and the run goes on while another knight stands: the downed
 player's screen says "You are down" and offers only Esc, which leaves the

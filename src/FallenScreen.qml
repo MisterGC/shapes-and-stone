@@ -181,6 +181,11 @@ Item {
         return Math.floor(seconds / 60) + ":" + String(Math.floor(seconds % 60)).padStart(2, "0")
     }
 
+    // The gamepad (MenuPad): A goes again where Enter does, B leaves for
+    // the title as Esc does
+    function padConfirm() { if (canGoAgain) goAgain() }
+    function padBack() { backToTitle() }
+
     Keys.onPressed: (event) => {
         // Other keys go on to the game: M still mutes, and the fallen
         // knight ignores the rest
