@@ -790,7 +790,8 @@ def main():
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
     ap.add_argument("--seed", type=int, default=2026,
-                    help="the game's seed; its first dungeon has the lineup the script needs")
+                    help="the game's seed; its first dungeon needs at least 1 spitter "
+                         "and 2 grunts or guardians")
     ap.add_argument("--seconds", type=float, default=8.0, help="how long the knights fight")
     ap.add_argument("--lag", type=int, default=300,
                     help="ms the joiner may show an id, HP or AI state after the host")
@@ -915,11 +916,24 @@ def run(args, loader, tmp, procs, result, check):
         check(all(not v[4] for v in he.values()) and all(v[4] for v in je.values()),
               "the host runs every enemy, the joiner shows them")
 
-        # The host's knight at one enemy, the joiner's in sight of the one
-        # farthest from it that walks up to a knight (not a spitter)
+        # The checks need the dungeon's lineup: a spitter for the shots, and
+        # two enemies that walk up to a knight (grunts or guardians), one for
+        # each knight. A seed whose first dungeon has no such lineup says so
+        # and stops: every check on it would fail for want of an enemy
         ids = sorted(he)
-        walkers = [i for i in ids if H.eval1(f"typeOf('{i}')") != "spitter"] or ids
-        a, b = max(((x, y) for x in ids for y in walkers if x != y),
+        types = {i: H.eval1(f"typeOf('{i}')") for i in ids}
+        walkers = [i for i in ids if types[i] != "spitter"]
+        result["lineup"] = {t: sum(v == t for v in types.values()) for t in sorted(set(types.values()))}
+        has = ", ".join(f"{n} {t}" for t, n in result["lineup"].items())
+        if len(walkers) < 2 or len(walkers) == len(ids):
+            return abort(f"seed {args.seed}'s first dungeon has the lineup the bench needs: "
+                         f"at least 1 spitter and 2 grunts or guardians (it has {has}; "
+                         f"pass a --seed whose first dungeon has them)")
+        check(True, f"seed {args.seed}'s first dungeon has the lineup the bench needs: "
+              f"at least 1 spitter and 2 grunts or guardians ({has})")
+        # The host's knight at one enemy that walks up to a knight, the
+        # joiner's in sight of the one farthest from it
+        a, b = max(((x, y) for x in walkers for y in walkers if x != y),
                    key=lambda p: dist(he[p[0]], he[p[1]]))
         # The answers are timed on b's parry window, which a crushing blow
         # does not open: b winds up none
