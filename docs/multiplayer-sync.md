@@ -246,6 +246,13 @@ enemy with, give or take 20 ms, still within 0.5 Wu. Ten runs on
 0.019 to 0.083 Wu; a joiner that applies none of the host's enemy states
 from the sampling on fails it at 3.109 Wu.
 
+That delay is the joiner's own, so a joiner that replays the host's path
+faithfully but far too late passes it: one at a fixed 300 ms did, at
+0.054 Wu. The bench therefore also checks that the joiner renders every
+enemy at most 100 ms behind, the cap the game had before the auto delay
+(issue #64). That joiner fails it; five runs on b82836f passed it at 35
+to 86 ms.
+
 ## The same world on both screens (issue #14)
 
 `tests/sameworld/run_sameworld.py` runs a session as it is played: two

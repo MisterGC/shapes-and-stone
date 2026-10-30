@@ -140,7 +140,8 @@ it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
 five seconds, its position against the host's at the joiner's render
-delay (the joiner shows the parry ring of the host's enemies),
+delay, which may be at most 100 ms (the joiner shows the parry ring of
+the host's enemies),
 has one of the host's enemies wind up a crushing blow (the joiner shows
 its `"crush"` state white-hot with the doubled ring, and its lunge with no
 parry window) and the joiner's knight judge one on its held shield,
