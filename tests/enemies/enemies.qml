@@ -4,7 +4,9 @@
 //
 // The host's knight stands at one enemy, the joiner's at the one farthest
 // from it. For five seconds every frame compares each enemy on the two
-// screens: its position, its AI state and the knight it goes for, and
+// screens: its position against the host's at the joiner's render delay
+// (the joiner shows the host's enemies that far in the past, issue #210),
+// its AI state and the knight it goes for, and
 // that the joiner shows the parry ring of a host's enemy winding up. A
 // host's enemy winds up a crushing blow: the joiner shows its state
 // "crush", white-hot with the doubled ring, and its lunge with no parry
@@ -35,11 +37,24 @@ Window {
     property int failures: 0
 
     readonly property int seed: 424242
-    // How far a joiner's enemy may be from the host's, and how far behind
-    // the host's its state may be: the joiner shows the host's enemies a
-    // few frames in the past
+    // How far a joiner's enemy may be from the host's at the delay the
+    // joiner renders it with, give or take slackMs (the transit and the
+    // frames between), as the same-world bench judges it; and how far
+    // behind the host's its state may be. Compared at the same moment, a
+    // lunge of 8 to 11 Wu/s is its speed times the delay apart
     readonly property real maxErrorWu: 0.5
+    readonly property int slackMs: 20
     readonly property int stateLagMs: 300
+    // How far behind the host's a joiner may render an enemy at most: the
+    // delay is the joiner's own (autoDelay), and a joiner that replays the
+    // host's path faithfully but far too late would pass the position
+    // check. 100 ms is this bench's ceiling for one process on loopback,
+    // where the joiner renders at 35 to 87 ms; the game allows more: the
+    // auto delay goes up to StateInterpolator's maxDelayMs (400), and the
+    // fixed delay before issue #64 reached 50 + 100 ms of round trip
+    readonly property int maxDelayMs: 100
+    // How long the host's positions are kept to look the delay up in
+    readonly property int keepMs: 1000
     readonly property int sampleMs: 5000
 
     function check(ok, what) {
@@ -98,6 +113,18 @@ Window {
         let dx = a.xWu - b.xWu, dy = a.yWu - b.yWu
         return Math.sqrt(dx * dx + dy * dy)
     }
+    // The host's position in track (its samples, oldest first) at time t,
+    // between its two samples around t; null outside them
+    function hostAt(track, t) {
+        for (let i = 1; i < track.length; i++) {
+            let a = track[i - 1], b = track[i]
+            if (b.t < t) continue
+            if (a.t > t) return null
+            let f = (t - a.t) / Math.max(1, b.t - a.t)
+            return {xWu: a.xWu + (b.xWu - a.xWu) * f, yWu: a.yWu + (b.yWu - a.yWu) * f}
+        }
+        return null
+    }
     // The host's view of the two knights, by node
     function knights() {
         let k = {}
@@ -110,7 +137,7 @@ Window {
     property var stats: null
     function startSampling() {
         stats = {n: 0, maxErr: 0, maxErrId: "", sumErr: 0, judged: 0, stateMiss: 0, targetMiss: 0,
-                 missNote: "", history: {}, states: {}, startMs: Date.now(),
+                 missNote: "", history: {}, tracks: {}, delays: {}, states: {}, startMs: Date.now(),
                  windUps: 0, ringShown: 0, ringMax: 0, windows: 0, windowsClosed: 0}
         sampler.start()
     }
@@ -127,6 +154,9 @@ Window {
                 let hist = st.history[id] || (st.history[id] = [])
                 hist.push({t: now, s: he.aiState, target: he.targetId})
                 while (hist.length > 0 && hist[0].t < now - bench.stateLagMs) hist.shift()
+                let track = st.tracks[id] || (st.tracks[id] = [])
+                track.push({t: now, xWu: he.xWu, yWu: he.yWu})
+                while (track.length > 0 && track[0].t < now - bench.keepMs) track.shift()
                 st.states[he.aiState] = true
                 let je = j[id]
                 if (!je) continue
@@ -141,10 +171,21 @@ Window {
                     st.windows++
                     if (je.ringProgress === 1) st.windowsClosed++
                 }
-                let err = bench.dist(he, je)
-                st.n++
-                st.sumErr += err
-                if (err > st.maxErr) { st.maxErr = err; st.maxErrId = id + " (" + he.aiState + ")" }
+                // The host's position at the delay the joiner renders this
+                // enemy with, give or take slackMs; judged once the host's
+                // samples reach back that far
+                let d = Math.round(je.renderDelayMs)
+                st.delays[d] = true
+                let err = -1
+                for (let sh = d - bench.slackMs; sh <= d + bench.slackMs; sh += 4) {
+                    let p = bench.hostAt(track, now - sh)
+                    if (p) err = err < 0 ? bench.dist(je, p) : Math.min(err, bench.dist(je, p))
+                }
+                if (err >= 0) {
+                    st.n++
+                    st.sumErr += err
+                    if (err > st.maxErr) { st.maxErr = err; st.maxErrId = id + " (" + he.aiState + ")" }
+                }
                 // The window has to be full before the joiner's state can
                 // be judged by it
                 if (now - st.startMs < bench.stateLagMs) continue
@@ -245,10 +286,15 @@ Window {
         [sampleMs, () => {
             sampler.stop()
             let st = stats
+            let delays = Object.keys(st.delays).map(Number)
             check(st.n > 0 && st.maxErr < maxErrorWu,
-                  "every enemy's position agrees within " + maxErrorWu + " Wu (max "
+                  "every enemy's position agrees within " + maxErrorWu + " Wu with the host's at the joiner's render delay, "
+                  + Math.min(...delays) + "-" + Math.max(...delays) + " ms +-" + slackMs + " ms (max "
                   + st.maxErr.toFixed(3) + " at " + st.maxErrId + ", mean "
                   + (st.sumErr / Math.max(1, st.n)).toFixed(3) + ", " + st.n + " samples)")
+            check(delays.length > 0 && Math.max(...delays) <= maxDelayMs,
+                  "the joiner renders every enemy at most " + maxDelayMs + " ms behind the host's ("
+                  + (delays.length > 0 ? Math.min(...delays) + "-" + Math.max(...delays) + " ms" : "no delay seen") + ")")
             check(st.judged > 0 && st.stateMiss === 0,
                   "every enemy's AI state on the joiner is the host's of the last " + stateLagMs
                   + " ms (" + st.stateMiss + " misses in " + st.judged + " samples"
