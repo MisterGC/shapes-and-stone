@@ -232,7 +232,7 @@ to 6.5. At seed 424242 the bench went red there, 4 of 4 runs at
 55240c9 (max 0.509 to 0.612 Wu, HOST:7 lunging at 7.8 to 8.8 Wu/s)
 against 2 of 4 at its parent f42ecdd (0.450 to 0.537 Wu, 6.3 to 6.5
 Wu/s) and none of 3 at 30cb13a, the bench's last change (0.405 to 0.435
-Wu, 5.5 Wu/s). The render delay was the same at all three, 41 to 44 ms
+Wu, 5.5 Wu/s). The render delay was the same at all three, 41 to 42 ms
 on average. On 46780f4 it exits 1 in 4 of 5 runs, max 0.498 to 0.605
 Wu, every one HOST:7 in a lunge, while the same-world bench, which
 judges the joiner against the host at the joiner's delay, passes with a
