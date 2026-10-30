@@ -18,6 +18,10 @@ Item {
 
     // In a session: the world runs on under the menu
     property bool inSession: false
+    // A pad in use (Game.padInUse): the hint names its buttons, as printed
+    // on it (Game.padLabels)
+    property bool pad: false
+    property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
     property int selectedIndex: 0
     readonly property var choices: ["Resume", "Music", "Sound", "Title"]
     property real musicVolume: 1
@@ -165,7 +169,10 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "W/S to pick • A/D to set a volume • Enter to select • Esc to resume"
+            text: pauseMenu.pad
+                  ? "Up/down to pick • left/right to set a volume • " + pauseMenu.padLabels.A + " to select • "
+                    + pauseMenu.padLabels.B + " or Start to resume"
+                  : "W/S to pick • A/D to set a volume • Enter to select • Esc to resume"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true

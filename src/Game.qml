@@ -1905,6 +1905,10 @@ ClayWorld2d {
     // The key or pad button that talks, for the prompts over NPCs and
     // travellers and the dialogue panel's
     readonly property string talkKey: padInUse ? knightPad.label("buttonA") : "E"
+    // The pad's face buttons as printed on it, for the hints of the HUD and
+    // the menus while a pad is in use (issue #202)
+    readonly property var padLabels: ({ A: knightPad.label("buttonA"), B: knightPad.label("buttonB"),
+                                        X: knightPad.label("buttonX"), Y: knightPad.label("buttonY") })
 
     // A gamepad in the menus (issue #201): the stick or D-pad, A, B, X and
     // Start reach the menu on top - the dungeon master's panel, the title,
@@ -2312,7 +2316,7 @@ ClayWorld2d {
         anchors.topMargin: 2
         z: 1000
         visible: player !== null && player.potions > 0
-        text: "Potions " + (player ? player.potions : 0) + "  [1]"
+        text: "Potions " + (player ? player.potions : 0) + "  [" + (padInUse ? padLabels.X : "1") + "]"
         color: "#66CC66"
         style: Text.Outline
         styleColor: "#000000"
@@ -2348,7 +2352,7 @@ ClayWorld2d {
         anchors.topMargin: player && player.potions > 0 ? 20 : 2
         z: 1000
         visible: player !== null && player.draughts > 0
-        text: "Draughts " + (player ? player.draughts : 0) + "  [2]"
+        text: "Draughts " + (player ? player.draughts : 0) + "  [" + (padInUse ? padLabels.Y : "2") + "]"
         color: "#B080E0"
         style: Text.Outline
         styleColor: "#000000"
@@ -8366,6 +8370,8 @@ ClayWorld2d {
         sourceComponent: Component {
             PauseMenu {
                 inSession: session.connected
+                pad: world.padInUse
+                padLabels: world.padLabels
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
                 onVolumeSet: (which, value) => world.setVolume(which, value)
@@ -8383,6 +8389,8 @@ ClayWorld2d {
         active: fallen && screen === "game"
         sourceComponent: Component {
             FallenScreen {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 depth: world.depth
                 kills: world.runKills
                 secrets: world.runSecrets
@@ -8410,6 +8418,8 @@ ClayWorld2d {
         active: screen === "title"
         sourceComponent: Component {
             TitleScreen {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 muted: world.muted
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
@@ -8458,6 +8468,8 @@ ClayWorld2d {
         active: world.masterOpen
         sourceComponent: Component {
             DungeonMasterPanel {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 depth: world.masterAsk ? world.depthOf(world.masterAsk.index) : 0
                 rows: world.masterAsk ? world.masterRows() : []
                 preview: world.masterPreview

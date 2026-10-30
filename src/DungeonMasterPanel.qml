@@ -22,6 +22,10 @@ Item {
     signal copied()
     signal pasted(string text)
 
+    // A pad in use (Game.padInUse): the hint names its buttons, as printed
+    // on it (Game.padLabels)
+    property bool pad: false
+    property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
     // The depth of the dungeon the panel is up for
     property int depth: 0
     // [{key, label, value, set, text}] (Game.masterRows)
@@ -191,10 +195,11 @@ Item {
                     columns: 2
                     spacing: 8
                     Repeater {
-                        model: [{ label: "Generate  (G)", act: "generate" },
-                                { label: "Go  (Enter)", act: "go" },
-                                { label: "Copy settings  (C)", act: "copy" },
-                                { label: "Paste settings  (V)", act: "paste" }]
+                        // The pad copies and pastes nothing: those name no button
+                        model: [{ label: "Generate  (" + (panel.pad ? panel.padLabels.X : "G") + ")", act: "generate" },
+                                { label: "Go  (" + (panel.pad ? panel.padLabels.A : "Enter") + ")", act: "go" },
+                                { label: "Copy settings" + (panel.pad ? "" : "  (C)"), act: "copy" },
+                                { label: "Paste settings" + (panel.pad ? "" : "  (V)"), act: "paste" }]
                         delegate: Rectangle {
                             objectName: "masterButton_" + modelData.act
                             width: 166; height: 38; radius: 6
@@ -296,7 +301,10 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "W/S to pick • A/D to set • Backspace for the game's value • G to generate • Enter to go"
+            text: panel.pad
+                  ? "Up/down to pick • left/right to set • " + panel.padLabels.B + " for the game's value • "
+                    + panel.padLabels.X + " to generate • " + panel.padLabels.A + " or Start to go"
+                  : "W/S to pick • A/D to set • Backspace for the game's value • G to generate • Enter to go"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
