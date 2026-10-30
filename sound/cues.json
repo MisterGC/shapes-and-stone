@@ -31,14 +31,14 @@
       "report": "sfx/deep_tink.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:37:14.000094+00:00",
+      "delivered": "2026-10-30T14:21:33.381111+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:02:37+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/deep_tink.wav"
       },
       "history": [
@@ -46,6 +46,12 @@
           "is": "revise",
           "note": "again a little too much swinging, I think the pick hitting the stone would be audible but stops more aprubtly",
           "at": "2026-10-24T12:29:50+00:00",
+          "render": "sfx/deep_tink.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:02:37+00:00",
           "render": "sfx/deep_tink.wav"
         }
       ]
@@ -67,11 +73,11 @@
           "design": "sfx/deep_crumble.sfx.design.json"
         }
       },
-      "delivered": "2026-10-23T21:06:14.674466+00:00",
+      "delivered": "2026-10-30T14:21:36.956122+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:02:15+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/deep_crumble.wav"
       },
       "history": [
@@ -79,6 +85,12 @@
           "is": "revise",
           "note": "too high, to hollow, needs more volume, the stones grumble and we hear the sound from the deep resonating",
           "at": "2026-10-24T12:28:22+00:00",
+          "render": "sfx/deep_crumble.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:02:15+00:00",
           "render": "sfx/deep_crumble.wav"
         }
       ]
@@ -132,14 +144,14 @@
       "report": "sfx/deep_freed.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:37:07.835716+00:00",
+      "delivered": "2026-10-30T14:21:31.950121+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:02:20+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/deep_freed.wav"
       },
       "history": [
@@ -147,6 +159,12 @@
           "is": "revise",
           "note": "generally I like it but maybe a little bit more uplifting it reminds me of a church organ at the moment",
           "at": "2026-10-24T12:28:59+00:00",
+          "render": "sfx/deep_freed.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:02:20+00:00",
           "render": "sfx/deep_freed.wav"
         }
       ]
@@ -160,14 +178,14 @@
       "report": "sfx/camp_crackle.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:36:55.790658+00:00",
+      "delivered": "2026-10-30T14:21:22.593192+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:01:42+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/camp_crackle.wav"
       },
       "history": [
@@ -175,6 +193,12 @@
           "is": "revise",
           "note": "a little calmer, and a little deeper inviting to sit at the fire maybe also longer!?",
           "at": "2026-10-24T12:25:46+00:00",
+          "render": "sfx/camp_crackle.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:01:42+00:00",
           "render": "sfx/camp_crackle.wav"
         }
       ]
@@ -188,14 +212,14 @@
       "report": "sfx/camp_anvil.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:36:54.016620+00:00",
+      "delivered": "2026-10-30T14:21:20.170129+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:01:39+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/camp_anvil.wav"
       },
       "history": [
@@ -203,6 +227,12 @@
           "is": "revise",
           "note": "sounds too much like a little gong and not like an anvil, I think it is the swinging afterwards, an anvil gives the same basic sound but it gets absorbed by the body of the heavy anvil",
           "at": "2026-10-24T12:25:05+00:00",
+          "render": "sfx/camp_anvil.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:01:39+00:00",
           "render": "sfx/camp_anvil.wav"
         }
       ]
@@ -236,14 +266,14 @@
       "report": "sfx/camp_creak.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:36:57.901272+00:00",
+      "delivered": "2026-10-30T14:21:25.038101+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:01:44+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/camp_creak.wav"
       },
       "history": [
@@ -251,6 +281,12 @@
           "is": "revise",
           "note": "goes to much in the direction of a frog making a sound not the wood on wood",
           "at": "2026-10-24T12:26:26+00:00",
+          "render": "sfx/camp_creak.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:01:44+00:00",
           "render": "sfx/camp_creak.wav"
         }
       ]
@@ -264,14 +300,14 @@
       "report": "sfx/camp_hiss.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T16:37:02.664106+00:00",
+      "delivered": "2026-10-30T14:21:28.352329+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:01:56+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/camp_hiss.wav"
       },
       "history": [
@@ -279,6 +315,12 @@
           "is": "revise",
           "note": "a little deeper",
           "at": "2026-10-24T12:26:52+00:00",
+          "render": "sfx/camp_hiss.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:01:56+00:00",
           "render": "sfx/camp_hiss.wav"
         }
       ]
@@ -739,11 +781,11 @@
           "design": "sfx/sword_swing.sfx.design.json"
         }
       },
-      "delivered": "2026-10-23T21:06:11.484803+00:00",
+      "delivered": "2026-10-30T14:21:40.284300+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:03:43+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/sword_swing.wav"
       },
       "history": [
@@ -751,6 +793,12 @@
           "is": "revise",
           "note": "for a normal attack this has too much volume, needs to be quick, tearing the air",
           "at": "2026-10-24T12:33:22+00:00",
+          "render": "sfx/sword_swing.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:03:43+00:00",
           "render": "sfx/sword_swing.wav"
         }
       ]
@@ -784,14 +832,14 @@
       "report": "sfx/punch_hitting.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T17:25:58.427793+00:00",
+      "delivered": "2026-10-30T14:21:34.854179+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:03:27+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/punch_hitting.wav"
       },
       "history": [
@@ -799,6 +847,12 @@
           "is": "revise",
           "note": "again too much like a drum that gets hit, needs to be more organic/natural",
           "at": "2026-10-24T12:32:05+00:00",
+          "render": "sfx/punch_hitting.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:03:27+00:00",
           "render": "sfx/punch_hitting.wav"
         }
       ]
@@ -812,14 +866,14 @@
       "report": "sfx/burst.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T17:25:58.511762+00:00",
+      "delivered": "2026-10-30T14:21:18.662323+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:01:34+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/burst.wav"
       },
       "history": [
@@ -833,6 +887,12 @@
           "is": "approved",
           "note": "",
           "at": "2026-10-24T18:59:51+00:00",
+          "render": "sfx/burst.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:01:34+00:00",
           "render": "sfx/burst.wav"
         }
       ]
@@ -854,11 +914,11 @@
           "design": "sfx/shield_clang.sfx.design.json"
         }
       },
-      "delivered": "2026-10-23T21:06:12.979071+00:00",
+      "delivered": "2026-10-30T14:21:38.631007+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:03:32+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/shield_clang.wav"
       },
       "history": [
@@ -866,6 +926,12 @@
           "is": "revise",
           "note": "too much swing it is not a gong, it quickly absorbs the hit",
           "at": "2026-10-24T12:32:33+00:00",
+          "render": "sfx/shield_clang.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:03:32+00:00",
           "render": "sfx/shield_clang.wav"
         }
       ]
@@ -1013,14 +1079,14 @@
       "report": "sfx/coin_pickup.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T17:25:59.201149+00:00",
+      "delivered": "2026-10-30T14:21:29.883457+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:02:05+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:54+00:00",
         "render": "sfx/coin_pickup.wav"
       },
       "history": [
@@ -1040,6 +1106,12 @@
           "is": "revise",
           "note": "this is too much mario pick up, think more putting gold in a bag where there is already gold",
           "at": "2026-10-24T12:27:27+00:00",
+          "render": "sfx/coin_pickup.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:02:05+00:00",
           "render": "sfx/coin_pickup.wav"
         }
       ]
@@ -1121,14 +1193,14 @@
       "report": "ambience/village.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T17:25:59.548519+00:00",
+      "delivered": "2026-10-30T14:21:16.940481+00:00",
       "verdict": {
         "is": "approved",
-        "note": "",
-        "at": "2026-10-24T19:01:28+00:00",
+        "note": "approved in the studio on 2026-10-24; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:21:53+00:00",
         "render": "ambience/village.wav"
       },
       "history": [
@@ -1136,6 +1208,12 @@
           "is": "revise",
           "note": "the noise is too dominant and bright as if there would be an ocean or something",
           "at": "2026-10-24T12:22:17+00:00",
+          "render": "ambience/village.wav"
+        },
+        {
+          "is": "approved",
+          "note": "",
+          "at": "2026-10-24T19:01:28+00:00",
           "render": "ambience/village.wav"
         }
       ]

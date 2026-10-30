@@ -2,46 +2,46 @@
   "format": 1,
   "sample_rate": 44100,
   "channels": 1,
-  "duration_s": 0.42,
+  "duration_s": 0.311995,
   "time_span_s": 0.5,
   "loop": false,
   "loudness": {
-    "lufs_integrated": -15.547355,
-    "lufs_block_s": 0.4,
-    "true_peak_dbtp": -1.389995,
-    "peak_dbfs": -1.518618,
-    "rms_dbfs": -15.536935,
-    "crest_factor_db": 14.018317
+    "lufs_integrated": -20.183576,
+    "lufs_block_s": 0.311995,
+    "true_peak_dbtp": -6.108284,
+    "peak_dbfs": -6.174151,
+    "rms_dbfs": -20.748232,
+    "crest_factor_db": 14.574081
   },
   "envelope": {
-    "silence_start_s": 0.000454,
-    "silence_end_s": 0.001179,
-    "attack_s": 0.076871,
-    "peak_at_s": 0.097279,
-    "peak_db": -9.687894,
-    "fall_20db_at_s": 0.356689,
+    "silence_start_s": 0.000295,
+    "silence_end_s": 0.002925,
+    "attack_s": 0.05458,
+    "peak_at_s": 0.077324,
+    "peak_db": -13.42265,
+    "fall_20db_at_s": 0.249433,
     "fall_60db_at_s": null
   },
   "spectrum": {
-    "centroid_hz": 641.765842,
-    "rolloff_hz": 1388.891602,
-    "flatness": 0.008072,
+    "centroid_hz": 1141.922564,
+    "rolloff_hz": 2045.654297,
+    "flatness": 0.018982,
     "band_shares": {
-      "20_60": 0.000135,
-      "60_250": 0.647963,
-      "250_500": 0.015864,
-      "500_2k": 0.277398,
-      "2k_5k": 0.053227,
-      "5k_10k": 0.004609,
-      "10k_20k": 0.000804
+      "20_60": 0.000197,
+      "60_250": 0.354549,
+      "250_500": 0.024645,
+      "500_2k": 0.458922,
+      "2k_5k": 0.14703,
+      "5k_10k": 0.012583,
+      "10k_20k": 0.002073
     }
   },
   "pitch": {
-    "voiced_share": 0.594595,
-    "median_hz": 184.466316,
-    "start_hz": 262.381621,
-    "end_hz": 149.830708,
-    "sweep_semitones": -9.7,
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
     "track": [
       [
         0.0,
@@ -53,91 +53,91 @@
       ],
       [
         0.02322,
-        262.381621
+        null
       ],
       [
         0.03483,
-        262.381621
+        null
       ],
       [
         0.04644,
-        250.532888
+        null
       ],
       [
         0.05805,
-        262.381621
+        null
       ],
       [
         0.06966,
-        228.416468
+        null
       ],
       [
         0.08127,
-        220.635764
+        null
       ],
       [
         0.09288,
-        214.354693
+        null
       ],
       [
         0.10449,
-        209.458825
+        null
       ],
       [
         0.1161,
-        202.323888
+        null
       ],
       [
         0.12771,
-        186.606598
+        null
       ],
       [
         0.13932,
-        185.531823
+        null
       ],
       [
         0.15093,
-        183.400809
+        null
       ],
       [
         0.16254,
-        168.179283
+        null
       ],
       [
         0.17415,
-        167.210642
+        null
       ],
       [
         0.18576,
-        167.210642
+        null
       ],
       [
         0.19737,
-        164.338063
+        null
       ],
       [
         0.20898,
-        160.584576
+        null
       ],
       [
         0.22059,
-        149.830708
+        null
       ],
       [
         0.2322,
-        159.659677
+        null
       ],
       [
         0.24381,
-        149.830708
+        null
       ],
       [
         0.25542,
-        151.571657
+        null
       ],
       [
         0.267029,
-        133.483985
+        null
       ],
       [
         0.278639,
@@ -150,60 +150,20 @@
       [
         0.301859,
         null
-      ],
-      [
-        0.313469,
-        null
-      ],
-      [
-        0.325079,
-        null
-      ],
-      [
-        0.336689,
-        null
-      ],
-      [
-        0.348299,
-        null
-      ],
-      [
-        0.359909,
-        null
-      ],
-      [
-        0.371519,
-        null
-      ],
-      [
-        0.383129,
-        null
-      ],
-      [
-        0.394739,
-        null
-      ],
-      [
-        0.406349,
-        null
-      ],
-      [
-        0.417959,
-        null
       ]
     ]
   },
   "psychoacoustics": {
-    "sharpness_acum": 1.414512,
-    "roughness_asper": 0.032356,
-    "roughness_max_asper": 0.082658
+    "sharpness_acum": 1.565955,
+    "roughness_asper": 0.029994,
+    "roughness_max_asper": 0.039182
   },
   "defects": {
     "clipped_samples": 0,
     "clipped_share": 0.0,
-    "dc_offset": 2.7e-05,
-    "loop_seam_jump": 1e-05,
-    "loop_seam_jump_ratio": 0.00011
+    "dc_offset": 1.5e-05,
+    "loop_seam_jump": 0.000332,
+    "loop_seam_jump_ratio": 0.003948
   },
   "provenance": {
     "tool": "sp analyze",

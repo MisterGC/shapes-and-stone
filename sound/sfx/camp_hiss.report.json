@@ -6,38 +6,38 @@
   "time_span_s": 2.0,
   "loop": false,
   "loudness": {
-    "lufs_integrated": -17.296608,
+    "lufs_integrated": -18.878384,
     "lufs_block_s": 0.4,
-    "true_peak_dbtp": -4.120498,
-    "peak_dbfs": -4.399499,
-    "rms_dbfs": -21.329852,
-    "crest_factor_db": 16.930353
+    "true_peak_dbtp": -4.787407,
+    "peak_dbfs": -4.792934,
+    "rms_dbfs": -20.36796,
+    "crest_factor_db": 15.575026
   },
   "envelope": {
-    "silence_start_s": 0.001769,
-    "silence_end_s": 0.005079,
-    "attack_s": 0.24517,
-    "peak_at_s": 0.429025,
-    "peak_db": -16.268433,
-    "fall_20db_at_s": 1.391837,
+    "silence_start_s": 0.001088,
+    "silence_end_s": 0.005601,
+    "attack_s": 0.278277,
+    "peak_at_s": 0.458957,
+    "peak_db": -14.135981,
+    "fall_20db_at_s": 1.379365,
     "fall_60db_at_s": null
   },
   "spectrum": {
-    "centroid_hz": 11282.036238,
-    "rolloff_hz": 17420.361328,
-    "flatness": 0.662209,
+    "centroid_hz": 1296.745715,
+    "rolloff_hz": 2131.787109,
+    "flatness": 0.027867,
     "band_shares": {
-      "20_60": 0.0,
-      "60_250": 0.0,
-      "250_500": 8e-06,
-      "500_2k": 0.00757,
-      "2k_5k": 0.12806,
-      "5k_10k": 0.293497,
-      "10k_20k": 0.570865
+      "20_60": 0.008362,
+      "60_250": 0.116765,
+      "250_500": 0.13391,
+      "500_2k": 0.572272,
+      "2k_5k": 0.148338,
+      "5k_10k": 0.017962,
+      "10k_20k": 0.002391
     }
   },
   "pitch": {
-    "voiced_share": 0.123077,
+    "voiced_share": 0.092308,
     "median_hz": null,
     "start_hz": null,
     "end_hz": null,
@@ -173,19 +173,19 @@
       ],
       [
         1.114558,
-        null
+        57.767635
       ],
       [
         1.149388,
-        null
+        51.763246
       ],
       [
         1.184218,
-        null
+        54.525387
       ],
       [
         1.219048,
-        null
+        53.588673
       ],
       [
         1.253878,
@@ -193,27 +193,27 @@
       ],
       [
         1.288707,
-        51.465112
+        null
       ],
       [
         1.323537,
-        53.280025
+        null
       ],
       [
         1.358367,
-        50.873985
+        null
       ],
       [
         1.393197,
-        57.434918
+        null
       ],
       [
         1.428027,
-        62.272481
+        null
       ],
       [
         1.462857,
-        54.525387
+        null
       ],
       [
         1.497687,
@@ -222,16 +222,16 @@
     ]
   },
   "psychoacoustics": {
-    "sharpness_acum": 3.433793,
-    "roughness_asper": 0.009726,
-    "roughness_max_asper": 0.074159
+    "sharpness_acum": 1.594978,
+    "roughness_asper": 0.031427,
+    "roughness_max_asper": 0.078792
   },
   "defects": {
     "clipped_samples": 0,
     "clipped_share": 0.0,
-    "dc_offset": -0.0,
-    "loop_seam_jump": 2e-06,
-    "loop_seam_jump_ratio": 5e-06
+    "dc_offset": -1.2e-05,
+    "loop_seam_jump": 1e-06,
+    "loop_seam_jump_ratio": 1.2e-05
   },
   "provenance": {
     "tool": "sp analyze",
@@ -247,9 +247,7 @@
     },
     "thresholds": "default"
   },
-  "flags": [
-    "shrill"
-  ],
+  "flags": [],
   "file": "camp_hiss.wav",
   "pictures": {
     "spectrogram": "camp_hiss.spec.png",
