@@ -9,6 +9,11 @@ uses [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Gamepad:** the knight plays with a gamepad, through Clayground's `GameController` in its `full` layout: the left stick moves, the right stick aims, R1 strikes and charges, L1 shields, B dashes, A talks, X and Y drink a potion and a draught, R2 whirls, L2 locks on and Select opens the knight panel; in a dialogue the stick picks a ware and X buys it. A pad takes over when it is used and the keyboard when a key goes down, the mouse takes the aim back when it moves, and while a pad is in use the controls hint, the talk prompts and the dialogue name its buttons. The pad bench plays it with the dojo's synthetic pad alone. (#200)
+- **Steam Deck:** the README says how to add the Linux AppImage to Steam as a non-Steam game and play it in Game Mode on the Deck's built-in controls. While a pad is in use the hints of the title, the pause menu, the fallen screen, the dungeon master's panel and the knight panel, and the HUD's potions, name its buttons instead of keys. The Deck bench renders the HUD and every menu at 1280x800, with the keyboard and with a pad, and checks the size and fit of every text on screen. (#202)
+
+### Changed
+
+- **Text size:** every text a player reads is at least 12 px, the size Valve recommends for the Steam Deck's 1280x800 - the mana, the depth gauge, the dialogue's and the menus' hints, the lobby's notes, the talk prompts and the speech bubbles were 9 to 11 px. (#202)
 
 ## [0.3.0] - 2026-10-12
 
