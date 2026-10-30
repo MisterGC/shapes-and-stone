@@ -1005,14 +1005,14 @@
       "report": "sfx/footstep.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
+        "version": "2026.9 (clayground 7e93c11)",
         "license": "MIT"
       },
-      "delivered": "2026-10-18T17:25:58.940027+00:00",
+      "delivered": "2026-10-30T14:31:57.042407+00:00",
       "verdict": {
         "is": "approved",
-        "note": "accepted for now; the dry heel tap of round 2",
-        "at": "2026-10-30T11:57:05+00:00",
+        "note": "accepted for now in the studio on 2026-10-30, round 2's dry heel tap; this render is of the same recipe, on clayground 7e93c11 (issue-452)",
+        "at": "2026-10-30T14:31:57+00:00",
         "render": "sfx/footstep.wav"
       },
       "history": [
@@ -1026,6 +1026,12 @@
           "is": "revise",
           "note": "still sounds like a drum not steps with leather shoes on a stone floor",
           "at": "2026-10-24T19:03:09+00:00",
+          "render": "sfx/footstep.wav"
+        },
+        {
+          "is": "approved",
+          "note": "accepted for now; the dry heel tap of round 2",
+          "at": "2026-10-30T11:57:05+00:00",
           "render": "sfx/footstep.wav"
         }
       ]
