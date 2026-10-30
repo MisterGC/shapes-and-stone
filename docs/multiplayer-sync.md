@@ -221,6 +221,23 @@ Five runs against clayground `issue-306` @ 6eefb29: max error 0.375 to
 0.397 Wu (during a lunge), mean 0.070 Wu, no AI state or target on the
 joiner that the host had not had in the 300 ms before.
 
+It compares the two screens at the same moment, so a lunge's error is its
+speed times the joiner's render delay plus the transit, 60 to 80 ms on
+the loopback. A lunge goes from where the wind-up ends to the knight in
+`enemy.lungeDuration` (0.35 s), and the wind-up backs off at
+`enemy.windUpSpeed` (4 Wu/s) for `enemy.windUp`. Since 55240c9, the
+grunt that circles before it commits, that wind-up is 0.5 s, not 0.3 s: an
+enemy backs off 2.0 Wu, not 1.2 Wu, and lunges at 8 to 11 Wu/s, not 5.5
+to 6.5. At seed 424242 the bench went red there, 4 of 4 runs at
+55240c9 (max 0.509 to 0.612 Wu, HOST:7 lunging at 7.8 to 8.8 Wu/s)
+against 2 of 4 at its parent f42ecdd (0.450 to 0.537 Wu, 6.3 to 6.5
+Wu/s) and none of 3 at 30cb13a, the bench's last change (0.405 to 0.435
+Wu, 5.5 Wu/s). The render delay was the same at all three, 41 to 44 ms
+on average. On 46780f4 it exits 1 in 4 of 5 runs, max 0.498 to 0.605
+Wu, every one HOST:7 in a lunge, while the same-world bench, which
+judges the joiner against the host at the joiner's delay, passes with a
+worst position error of 0.042 to 0.050 Wu.
+
 ## The same world on both screens (issue #14)
 
 `tests/sameworld/run_sameworld.py` runs a session as it is played: two
