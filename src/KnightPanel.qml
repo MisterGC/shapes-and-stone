@@ -14,6 +14,8 @@ Item {
     // wording
     property var knight: null
     property var game: null
+    // A pad in use: the panel names its buttons
+    readonly property bool _pad: !!game && game.padInUse
 
     readonly property var _upgrades: {
         if (!knight || !game) return []
@@ -85,12 +87,12 @@ Item {
         Stat {
             objectName: "knightPotions"
             label: "Potions"
-            value: panel.knight ? panel.knight.potions + "   [1] drinks one" : ""
+            value: panel.knight ? panel.knight.potions + "   [" + (panel._pad ? panel.game.padLabels.X : "1") + "] drinks one" : ""
             valueColor: "#66CC66"
         }
         Stat {
             label: "Draughts"
-            value: panel.knight ? panel.knight.draughts + "   [2] drinks one" : ""
+            value: panel.knight ? panel.knight.draughts + "   [" + (panel._pad ? panel.game.padLabels.Y : "2") + "] drinks one" : ""
             valueColor: "#B080E0"
         }
 
@@ -121,9 +123,9 @@ Item {
 
         Text {
             topPadding: 6
-            text: "C or Esc closes"
+            text: panel._pad ? "Select or Start closes" : "C or Esc closes"
             color: "#777777"
-            font.pixelSize: 11
+            font.pixelSize: 12
             font.italic: true
         }
     }

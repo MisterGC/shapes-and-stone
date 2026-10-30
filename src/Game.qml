@@ -1828,9 +1828,12 @@ ClayWorld2d {
             useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
                                 Balance.dungeon.doorReach))
     }
-    // knightPad first: a key press makes the keyboard the controller's
-    // source again before the controller reads it
-    Keys.forwardTo: [knightPad, gameCtrl]
+    // Under a menu, the title or the fallen screen no key reaches the
+    // controller: the pad there is the menus' (MenuPad), and Space or Shift
+    // let through by the title or the fallen screen must not press its B
+    // or A as well. knightPad first: a key press makes the keyboard the
+    // controller's source again before the controller reads it
+    Keys.forwardTo: overlayUp ? [] : [knightPad, gameCtrl]
     function openMenu() {
         // The menu takes the keys, and the keyboard gamepad lets go of what
         // is held when the focus moves (clayground#413); the shield and the
@@ -1847,16 +1850,21 @@ ClayWorld2d {
     // Where the keys or the touch pad steer the knight, -1..1 on each axis;
     // every level binds its knight to these. While a dialogue is open the
     // knight stands, so it cannot walk off and leave the panel up, and a
-    // key still held moves it again once the panel closes
+    // key still held moves it again once the panel closes. Under the menu
+    // the stick is the menu's, so the knight stands there too
     readonly property bool talking: dialoguePanel.visible
     // Locked on an enemy (toggleLock), the keys turn with it: W and S
     // walk towards it and away, A and D circle it
     readonly property real _lockRad: player && player.lockedOn ? player.facingAngle * Math.PI / 180 : 0
     readonly property bool _lockSteer: !!player && player.lockedOn
-    readonly property real knightMoveX: talking ? 0 : !_lockSteer ? gameCtrl.axisX
+    readonly property real knightMoveX: talking || menuOpen ? 0 : !_lockSteer ? gameCtrl.axisX
         : gameCtrl.axisY * Math.cos(_lockRad) + gameCtrl.axisX * Math.sin(_lockRad)
-    readonly property real knightMoveY: talking ? 0 : !_lockSteer ? -gameCtrl.axisY
+    readonly property real knightMoveY: talking || menuOpen ? 0 : !_lockSteer ? -gameCtrl.axisY
         : -gameCtrl.axisY * Math.sin(_lockRad) + gameCtrl.axisX * Math.cos(_lockRad)
+    // The one controller of the game: the keys, the touch pad or a
+    // gamepad. Full has Start, which pauses; on touch it stays nes, one
+    // stick and A/B on the screen
+    readonly property alias gameController: gameCtrl
     GameController {
         id: gameCtrl
         anchors.fill: parent
@@ -1877,7 +1885,7 @@ ClayWorld2d {
 
         // B dashes; on a pad in a dialogue it closes it, as Esc does
         onButtonBPressedChanged: {
-            if (!buttonBPressed || !player) return
+            if (!buttonBPressed || !player || world.overlayUp) return
             if (!world.talking) player.dash()
             else if (knightPad.inUse) dialoguePanel.close()
         }
@@ -1897,6 +1905,53 @@ ClayWorld2d {
     // The key or pad button that talks, for the prompts over NPCs and
     // travellers and the dialogue panel's
     readonly property string talkKey: padInUse ? knightPad.label("buttonA") : "E"
+    // The pad's face buttons as printed on it, for the hints of the HUD and
+    // the menus while a pad is in use (issue #202)
+    readonly property var padLabels: ({ A: knightPad.label("buttonA"), B: knightPad.label("buttonB"),
+                                        X: knightPad.label("buttonX"), Y: knightPad.label("buttonY") })
+
+    // A gamepad in the menus (issue #201): the stick or D-pad, A, B, X and
+    // Start reach the menu on top - the dungeon master's panel, the title,
+    // the lobby, the fallen screen or the pause menu - and in the game
+    // Start does what Esc does
+    function _padMenu() {
+        if (masterOpen) return masterLoader.item
+        if (screen === "title") return titleLoader.item
+        if (screen === "lobby") return session.lobby
+        if (screen === "game" && fallen) return fallenLoader.item
+        if (screen === "game" && menuOpen) return pauseLoader.item
+        return null
+    }
+    MenuPad {
+        controller: gameCtrl
+        onMoved: (dx, dy) => {
+            let m = world._padMenu()
+            if (m && m.padMove) m.padMove(dx, dy)
+        }
+        onConfirmed: {
+            let m = world._padMenu()
+            if (m && m.padConfirm) m.padConfirm()
+        }
+        onBacked: {
+            let m = world._padMenu()
+            if (m && m.padBack) m.padBack()
+        }
+        onExtra: {
+            let m = world._padMenu()
+            if (m && m.padExtra) m.padExtra()
+        }
+        onStarted: {
+            let m = world._padMenu()
+            if (m) {
+                // Start resumes from the pause menu, elsewhere it confirms
+                if (m === pauseLoader.item) m.padBack()
+                else if (m !== fallenLoader.item && m.padConfirm) m.padConfirm()
+            }
+            else if (talking) dialoguePanel.close()
+            else if (knightPanelOpen) knightPanelOpen = false
+            else if (screen === "game" && player && !fallen) openMenu()
+        }
+    }
 
     // Locked on (toggleLock), the world narrows: the screen's edges darken
     Canvas {
@@ -2088,7 +2143,7 @@ ClayWorld2d {
             anchors.centerIn: parent
             text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
             color: "white"
-            font.pixelSize: 10
+            font.pixelSize: 12
             font.bold: true
         }
     }
@@ -2261,7 +2316,7 @@ ClayWorld2d {
         anchors.topMargin: 2
         z: 1000
         visible: player !== null && player.potions > 0
-        text: "Potions " + (player ? player.potions : 0) + "  [1]"
+        text: "Potions " + (player ? player.potions : 0) + "  [" + (padInUse ? padLabels.X : "1") + "]"
         color: "#66CC66"
         style: Text.Outline
         styleColor: "#000000"
@@ -2297,7 +2352,7 @@ ClayWorld2d {
         anchors.topMargin: player && player.potions > 0 ? 20 : 2
         z: 1000
         visible: player !== null && player.draughts > 0
-        text: "Draughts " + (player ? player.draughts : 0) + "  [2]"
+        text: "Draughts " + (player ? player.draughts : 0) + "  [" + (padInUse ? padLabels.Y : "2") + "]"
         color: "#B080E0"
         style: Text.Outline
         styleColor: "#000000"
@@ -2457,6 +2512,7 @@ ClayWorld2d {
     // DEV menu (sandbox only)
     Column {
         id: devMenu
+        objectName: "devMenu"
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.margins: 10
@@ -8308,12 +8364,15 @@ ClayWorld2d {
 
     // Esc menu (over the dungeon, under the fallen screen)
     Loader {
+        id: pauseLoader
         anchors.fill: parent
         z: 4400
         active: menuOpen && screen === "game" && !fallen
         sourceComponent: Component {
             PauseMenu {
                 inSession: session.connected
+                pad: world.padInUse
+                padLabels: world.padLabels
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
                 onVolumeSet: (which, value) => world.setVolume(which, value)
@@ -8325,11 +8384,14 @@ ClayWorld2d {
 
     // Fallen screen (over the dungeon, under the title)
     Loader {
+        id: fallenLoader
         anchors.fill: parent
         z: 4500
         active: fallen && screen === "game"
         sourceComponent: Component {
             FallenScreen {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 depth: world.depth
                 kills: world.runKills
                 secrets: world.runSecrets
@@ -8351,11 +8413,14 @@ ClayWorld2d {
 
     // Title screen (covers everything when active)
     Loader {
+        id: titleLoader
         anchors.fill: parent
         z: 5000
         active: screen === "title"
         sourceComponent: Component {
             TitleScreen {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 muted: world.muted
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
@@ -8398,11 +8463,14 @@ ClayWorld2d {
 
     // The dungeon master's panel (over the lobby and the fallen screen)
     Loader {
+        id: masterLoader
         anchors.fill: parent
         z: 5600
         active: world.masterOpen
         sourceComponent: Component {
             DungeonMasterPanel {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 depth: world.masterAsk ? world.depthOf(world.masterAsk.index) : 0
                 rows: world.masterAsk ? world.masterRows() : []
                 preview: world.masterPreview

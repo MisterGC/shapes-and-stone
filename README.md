@@ -34,6 +34,25 @@ Ubuntu, Debian: `libopengl0`). If it says it needs
 FUSE, install `libfuse2` (Ubuntu, Debian:
 `sudo apt install libfuse2`), or start it with `--appimage-extract-and-run`.
 
+**Steam Deck:** the Linux AppImage plays on the Deck in Game Mode, on its
+built-in controls. Set it up once in Desktop Mode (Steam button > *Power* >
+*Switch to Desktop*):
+
+1. Download `ShapesAndStone-linux-x86_64.AppImage`, right-click it in the
+   file manager, open *Properties > Permissions* and tick *Is executable*.
+2. Open Steam, choose *Games > Add a Non-Steam Game to My Library...*, click
+   *Browse...*, pick the AppImage (set the file type to *All Files* if it is
+   not listed) and click *Add Selected Programs*.
+3. Return to Game Mode with the *Return to Gaming Mode* icon on the desktop.
+
+The game is then in the library under *Non-Steam*. Steam hands the Deck's
+controls to it as a gamepad: the left stick moves, the right stick aims, R1
+strikes, L1 shields, B dashes and A talks - the controls hint at the bottom
+names them all - and the stick, A and B work every menu. If the knight does
+not answer the sticks, set the game's controller layout to Steam's
+*Gamepad* template (Steam button > *Controller settings*). The lobby's code
+is typed with the on-screen keyboard (Steam + X).
+
 **Playing together over LAN:** all players are on the same network. One
 player chooses *Multiplayer*, picks *LAN*, clicks *Host Game* and tells the
 others the LAN code shown. Each of them chooses *Multiplayer*, types the code
@@ -245,6 +264,43 @@ of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/focus/focus.qml
+```
+
+Every menu works with a gamepad: the title, the lobby, the dungeon
+master's panel, the pause menu and the fallen screen. The stick or the
+D-pad moves the focus (held, it moves on after a moment), A confirms, B
+goes back - it resumes from the pause menu, leaves the lobby and the
+fallen screen, and on the dungeon master's panel gives the row back to the
+game - and X generates there. Start pauses and resumes, and confirms on
+the title and the panel. Under the menu the stick gives the knight no
+motion and B no dash. In the lobby the pad cannot type a code: Join Game
+takes the one typed or pasted. While a pad is in use the hints of the
+title, the pause menu, the fallen screen, the dungeon master's panel and
+the knight panel name its buttons instead of keys. Off touch the game's
+controller has the full layout, for Start; on touch it keeps one stick and
+A/B. The gamepad
+bench goes from the title through the dungeon master's panel into a game,
+pauses, resumes and returns to the title, through the lobby and the fallen
+screen, with Clayground's synthetic pad alone, and exits with the number
+of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gamepad/gamepad.qml
+```
+
+The Steam Deck's screen is 1280x800, and every text a player reads is at
+least 12 px, the size Valve recommends for it. The Deck bench renders the
+HUD and every menu at 1280x800 with Clayground's `clayrender` - the title,
+the lobby, the dungeon master's panel, the dungeon's HUD, the knight panel,
+the pause menu, the fallen screen and a seller's dialogue - once with the
+keyboard and once with a pad in use, and saves a PNG of each. On each it
+checks that no text on screen is smaller than 12 px, none is elided, none
+of the HUD's or a menu's reaches past the window's edge and, with the pad,
+that no text names a key. It renders through the GPU, so it needs a
+graphics session, and exits with the number of failed checks:
+
+```
+python3 tests/deck/run_deck.py --out <dir>
 ```
 
 In a session a knight at 0 HP is down, drawn slumped and dark on every

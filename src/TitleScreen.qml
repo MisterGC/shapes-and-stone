@@ -10,6 +10,10 @@ Item {
     // or off (Game.dungeonMaster); Enter or a click turns it over
     signal dungeonMasterToggled()
     property bool dungeonMaster: false
+    // A pad in use (Game.padInUse): the hint names its buttons, as printed
+    // on it (Game.padLabels)
+    property bool pad: false
+    property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
 
     property bool muted: false
     // The player's Music and Sound settings (Game.musicVolume, soundVolume)
@@ -186,9 +190,11 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "W/S to navigate \u2022 Enter to select"
-            color: "#555555"
-            font.pixelSize: 10
+            text: titleScreen.pad
+                  ? "Up/down to navigate \u2022 " + titleScreen.padLabels.A + " to select"
+                  : "W/S to navigate \u2022 Enter to select"
+            color: "#888888"
+            font.pixelSize: 12
             font.italic: true
         }
     }
@@ -207,6 +213,17 @@ Item {
             _confirm()
             event.accepted = true
         }
+    }
+
+    // The gamepad (MenuPad): up and down pick, A or Start selects
+    function padMove(dx, dy) {
+        _startMusic()
+        let next = Math.max(0, Math.min(2, _selectedIndex - dy))
+        if (next !== _selectedIndex) { _selectedIndex = next; menuHoverSound.play() }
+    }
+    function padConfirm() {
+        _startMusic()
+        _confirm()
     }
 
     // Fade-out overlay

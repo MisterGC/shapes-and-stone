@@ -4,7 +4,8 @@ import QtQuick
 // Title. Alone the game is paused under it; in a session the world goes
 // on, since a pause would stop every other player's enemies, and only this
 // knight stops taking input. W/S or the arrows pick, A/D or the arrows turn
-// a volume down or up a tenth, Enter or Space confirms, Esc resumes. Takes
+// a volume down or up a tenth, Enter or Space confirms, Esc resumes; a
+// gamepad does the same with its stick or D-pad, A, and B or Start. Takes
 // the keyboard focus and every click; M still reaches the game and mutes.
 Item {
     id: pauseMenu
@@ -17,6 +18,10 @@ Item {
 
     // In a session: the world runs on under the menu
     property bool inSession: false
+    // A pad in use (Game.padInUse): the hint names its buttons, as printed
+    // on it (Game.padLabels)
+    property bool pad: false
+    property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
     property int selectedIndex: 0
     readonly property var choices: ["Resume", "Music", "Sound", "Title"]
     property real musicVolume: 1
@@ -40,6 +45,14 @@ Item {
         let next = Math.round(Math.max(0, Math.min(1, v + by)) * 10) / 10
         if (next !== v) volumeSet(index === 1 ? "music" : "sound", next)
     }
+    // The gamepad (MenuPad): up and down pick, left and right set a
+    // volume, A selects, B and Start resume
+    function padMove(dx, dy) {
+        if (dy !== 0) selectedIndex = Math.max(0, Math.min(choices.length - 1, selectedIndex - dy))
+        else turn(selectedIndex, dx * 0.1)
+    }
+    function padConfirm() { choose(selectedIndex) }
+    function padBack() { resume() }
 
     MouseArea {
         anchors.fill: parent
@@ -156,7 +169,10 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "W/S to pick • A/D to set a volume • Enter to select • Esc to resume"
+            text: pauseMenu.pad
+                  ? "Up/down to pick • left/right to set a volume • " + pauseMenu.padLabels.A + " to select • "
+                    + pauseMenu.padLabels.B + " or Start to resume"
+                  : "W/S to pick • A/D to set a volume • Enter to select • Esc to resume"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
