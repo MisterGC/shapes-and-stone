@@ -221,9 +221,9 @@ Five runs against clayground `issue-306` @ 6eefb29: max error 0.375 to
 0.397 Wu (during a lunge), mean 0.070 Wu, no AI state or target on the
 joiner that the host had not had in the 300 ms before.
 
-It compares the two screens at the same moment, so a lunge's error is its
-speed times the joiner's render delay plus the transit, 60 to 80 ms on
-the loopback. A lunge goes from where the wind-up ends to the knight in
+Until issue #210 it compared the two screens at the same moment, so a
+lunge's error was its speed times the joiner's render delay plus the
+transit, 60 to 80 ms on the loopback. A lunge goes from where the wind-up ends to the knight in
 `enemy.lungeDuration` (0.35 s), and the wind-up backs off at
 `enemy.windUpSpeed` (4 Wu/s) for `enemy.windUp`. Since 55240c9, the
 grunt that circles before it commits, that wind-up is 0.5 s, not 0.3 s: an
@@ -237,6 +237,14 @@ on average. On 46780f4 it exits 1 in 4 of 5 runs, max 0.498 to 0.605
 Wu, every one HOST:7 in a lunge, while the same-world bench, which
 judges the joiner against the host at the joiner's delay, passes with a
 worst position error of 0.042 to 0.050 Wu.
+
+The joiner shows the host's past on purpose, and judges a lunge's blow
+by it (issue #18), so the bench now judges the same way: each joiner's
+enemy against the host's position at the delay the joiner renders that
+enemy with, give or take 20 ms, still within 0.5 Wu. Ten runs on
+6654b46 all exited 0, the delay 35 to 87 ms, the worst position error
+0.019 to 0.083 Wu; a joiner that applies none of the host's enemy states
+from the sampling on fails it at 3.109 Wu.
 
 ## The same world on both screens (issue #14)
 
