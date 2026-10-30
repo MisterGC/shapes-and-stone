@@ -2512,6 +2512,7 @@ ClayWorld2d {
     // DEV menu (sandbox only)
     Column {
         id: devMenu
+        objectName: "devMenu"
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.margins: 10
