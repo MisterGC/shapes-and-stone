@@ -15,7 +15,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:04.098349+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_chink.wav"
+      }
     },
     "sfx/deep_tink": {
       "category": "sfx",
@@ -30,7 +35,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:14.000094+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_tink.wav"
+      }
     },
     "sfx/deep_crumble": {
       "category": "sfx",
@@ -65,7 +75,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:12.493526+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_rumble.wav"
+      }
     },
     "sfx/deep_groan": {
       "category": "sfx",
@@ -80,7 +95,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:10.436469+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_groan.wav"
+      }
     },
     "sfx/deep_freed": {
       "category": "sfx",
@@ -95,7 +115,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:07.835716+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/deep_freed.wav"
+      }
     },
     "sfx/camp_crackle": {
       "category": "sfx",
@@ -110,7 +135,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:55.790658+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/camp_crackle.wav"
+      }
     },
     "sfx/camp_anvil": {
       "category": "sfx",
@@ -125,7 +155,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:54.016620+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/camp_anvil.wav"
+      }
     },
     "sfx/camp_drip": {
       "category": "sfx",
@@ -140,7 +175,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:59.269580+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:50+00:00",
+        "render": "sfx/camp_drip.wav"
+      }
     },
     "sfx/camp_creak": {
       "category": "sfx",
@@ -155,7 +195,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:36:57.901272+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/camp_creak.wav"
+      }
     },
     "sfx/camp_hiss": {
       "category": "sfx",
@@ -170,7 +215,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:02.664106+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/camp_hiss.wav"
+      }
     },
     "sfx/potion_drink": {
       "category": "sfx",
@@ -185,7 +235,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:17.958359+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/potion_drink.wav"
+      }
     },
     "sfx/heartbeat": {
       "category": "sfx",
@@ -200,7 +255,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T16:37:15.414052+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/heartbeat.wav"
+      }
     },
     "voice/npc_greetings/innkeeper_greeting": {
       "category": "voice",
@@ -232,7 +292,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.205547+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/npc_greetings/innkeeper_greeting.wav"
+      }
     },
     "voice/npc_greetings/blacksmith_greeting": {
       "category": "voice",
@@ -264,7 +329,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.301840+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/npc_greetings/blacksmith_greeting.wav"
+      }
     },
     "voice/npc_greetings/witch_greeting": {
       "category": "voice",
@@ -296,7 +366,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.398163+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/npc_greetings/witch_greeting.wav"
+      }
     },
     "voice/knight/whirl_shout": {
       "category": "voice",
@@ -328,7 +403,12 @@
         }
       },
       "delivered": "2026-10-18T17:12:27.494135+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "voice/knight/whirl_shout.wav"
+      }
     },
     "music/dungeon": {
       "category": "music",
@@ -344,7 +424,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:19:57.656533+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "music/dungeon.wav"
+      }
     },
     "music/village": {
       "category": "music",
@@ -360,7 +445,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:19:57.742909+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "music/village.wav"
+      }
     },
     "music/title": {
       "category": "music",
@@ -376,7 +466,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:19:57.827181+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "music/title.wav"
+      }
     },
     "sfx/fish_cast": {
       "category": "sfx",
@@ -391,7 +486,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.493753+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_cast.wav"
+      }
     },
     "sfx/fish_plop": {
       "category": "sfx",
@@ -406,7 +506,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.576952+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_plop.wav"
+      }
     },
     "sfx/fish_plip": {
       "category": "sfx",
@@ -421,7 +526,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.662229+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_plip.wav"
+      }
     },
     "sfx/fish_bite": {
       "category": "sfx",
@@ -436,7 +546,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.750296+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:51+00:00",
+        "render": "sfx/fish_bite.wav"
+      }
     },
     "sfx/fish_click": {
       "category": "sfx",
@@ -451,7 +566,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.833659+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_click.wav"
+      }
     },
     "sfx/fish_splash": {
       "category": "sfx",
@@ -466,7 +586,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:57.917538+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_splash.wav"
+      }
     },
     "sfx/fish_land": {
       "category": "sfx",
@@ -481,7 +606,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.001341+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_land.wav"
+      }
     },
     "sfx/fish_snap": {
       "category": "sfx",
@@ -496,7 +626,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.086560+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/fish_snap.wav"
+      }
     },
     "sfx/cat_purr": {
       "category": "sfx",
@@ -511,7 +646,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.172234+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/cat_purr.wav"
+      }
     },
     "sfx/sword_swing": {
       "category": "sfx",
@@ -546,7 +686,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.343281+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/dash.wav"
+      }
     },
     "sfx/punch_hitting": {
       "category": "sfx",
@@ -561,7 +706,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.427793+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/punch_hitting.wav"
+      }
     },
     "sfx/burst": {
       "category": "sfx",
@@ -576,7 +726,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.511762+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/burst.wav"
+      }
     },
     "sfx/shield_clang": {
       "category": "sfx",
@@ -611,7 +766,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.681062+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/shield_break.wav"
+      }
     },
     "sfx/shield_empty": {
       "category": "sfx",
@@ -626,7 +786,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.766721+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/shield_empty.wav"
+      }
     },
     "sfx/knight_hurt": {
       "category": "sfx",
@@ -641,7 +806,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.853388+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/knight_hurt.wav"
+      }
     },
     "sfx/footstep": {
       "category": "sfx",
@@ -656,7 +826,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:58.940027+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:52+00:00",
+        "render": "sfx/footstep.wav"
+      }
     },
     "sfx/spitter": {
       "category": "sfx",
@@ -671,7 +846,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.025496+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/spitter.wav"
+      }
     },
     "sfx/goblin_scream": {
       "category": "sfx",
@@ -686,7 +866,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.114184+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/goblin_scream.wav"
+      }
     },
     "sfx/coin_pickup": {
       "category": "sfx",
@@ -701,7 +886,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.201149+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/coin_pickup.wav"
+      }
     },
     "sfx/menu_change": {
       "category": "sfx",
@@ -716,7 +906,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.288594+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/menu_change.wav"
+      }
     },
     "sfx/menu_confirm": {
       "category": "sfx",
@@ -731,7 +926,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.374679+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "sfx/menu_confirm.wav"
+      }
     },
     "ambience/dungeon": {
       "category": "ambience",
@@ -746,7 +946,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.461422+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "ambience/dungeon.wav"
+      }
     },
     "ambience/village": {
       "category": "ambience",
@@ -761,7 +966,12 @@
         "license": "MIT"
       },
       "delivered": "2026-10-18T17:25:59.548519+00:00",
-      "verdict": null
+      "verdict": {
+        "is": "approved",
+        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
+        "at": "2026-10-27T14:34:53+00:00",
+        "render": "ambience/village.wav"
+      }
     }
   }
 }
