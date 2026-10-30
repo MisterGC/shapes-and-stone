@@ -249,9 +249,12 @@ from the sampling on fails it at 3.109 Wu.
 That delay is the joiner's own, so a joiner that replays the host's path
 faithfully but far too late passes it: one at a fixed 300 ms did, at
 0.054 Wu. The bench therefore also checks that the joiner renders every
-enemy at most 100 ms behind, the cap the game had before the auto delay
-(issue #64). That joiner fails it; five runs on b82836f passed it at 35
-to 86 ms.
+enemy at most 100 ms behind. That is the bench's own ceiling for one
+process on loopback, where the joiner renders at 35 to 87 ms, not the
+game's: the auto delay may go up to `StateInterpolator.maxDelayMs`, 400
+ms by default, and the fixed delay before issue #64 was 50 ms plus a
+round trip capped at 100 ms. That joiner fails it; five runs on b82836f
+passed it at 35 to 86 ms.
 
 ## The same world on both screens (issue #14)
 

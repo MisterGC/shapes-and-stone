@@ -48,8 +48,10 @@ Window {
     // How far behind the host's a joiner may render an enemy at most: the
     // delay is the joiner's own (autoDelay), and a joiner that replays the
     // host's path faithfully but far too late would pass the position
-    // check. 100 ms was the game's own cap before the auto delay (issue
-    // #64, docs/multiplayer-sync.md); one process on LAN renders 35 to 87
+    // check. 100 ms is this bench's ceiling for one process on loopback,
+    // where the joiner renders at 35 to 87 ms; the game allows more: the
+    // auto delay goes up to StateInterpolator's maxDelayMs (400), and the
+    // fixed delay before issue #64 reached 50 + 100 ms of round trip
     readonly property int maxDelayMs: 100
     // How long the host's positions are kept to look the delay up in
     readonly property int keepMs: 1000
