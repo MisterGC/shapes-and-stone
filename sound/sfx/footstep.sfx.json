@@ -8,70 +8,119 @@
   "layers": [
     {
       "name": "heel",
-      "role": "body",
+      "role": "transient",
       "source": "noise",
       "noise": {
-        "color": "brown"
+        "color": "pink"
       },
-      "length": 90,
-      "gain": 12,
+      "length": 14,
+      "gain": 11,
       "envelope": {
-        "attack": 1.5,
-        "decay": 90,
+        "attack": 0.3,
+        "decay": 14,
         "sustain": 0,
         "release": 0,
         "decayCurve": 1
       },
       "filter": {
         "type": "bandpass",
-        "cutoff": 220,
-        "resonance": 0
+        "cutoff": 1500,
+        "resonance": 0.1
       }
     },
     {
-      "name": "sole",
+      "name": "leather",
       "role": "body",
       "source": "noise",
       "noise": {
         "color": "pink"
       },
-      "length": 60,
-      "gain": 1.5,
-      "offset": 8,
+      "length": 28,
+      "gain": 8,
       "envelope": {
-        "attack": 3,
-        "decay": 55,
+        "attack": 1,
+        "decay": 28,
         "sustain": 0,
         "release": 0,
         "decayCurve": 1
       },
       "filter": {
         "type": "bandpass",
-        "cutoff": 650,
+        "cutoff": 700,
         "resonance": 0.05
       }
     },
     {
-      "name": "scuff",
+      "name": "weight",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 22,
+      "gain": 1,
+      "envelope": {
+        "attack": 1,
+        "decay": 22,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 300
+      }
+    },
+    {
+      "name": "sole",
       "role": "tail",
       "source": "noise",
       "noise": {
         "color": "pink"
       },
-      "length": 90,
-      "gain": -12.5,
-      "offset": 20,
+      "offset": 38,
+      "length": 20,
+      "gain": 0,
       "envelope": {
-        "attack": 12,
-        "decay": 75,
+        "attack": 1,
+        "decay": 20,
         "sustain": 0,
         "release": 0,
-        "decayCurve": 0.6
+        "decayCurve": 1
       },
       "filter": {
         "type": "bandpass",
-        "cutoff": 1500,
+        "cutoff": 1100,
         "resonance": 0.05
+      }
+    },
+    {
+      "name": "grit",
+      "role": "tail",
+      "source": "noise",
+      "offset": 4,
+      "length": 2,
+      "gain": -11,
+      "envelope": {
+        "attack": 0,
+        "decay": 2,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 3200,
+        "resonance": 0.1
+      },
+      "burst": {
+        "count": 3,
+        "duration": 60,
+        "jitter": {
+          "time": 0.8,
+          "gain": 4,
+          "cutoff": 0.3
+        }
       }
     }
   ]

@@ -944,9 +944,9 @@
       },
       "delivered": "2026-10-18T17:25:58.940027+00:00",
       "verdict": {
-        "is": "revise",
-        "note": "still sounds like a drum not steps with leather shoes on a stone floor",
-        "at": "2026-10-24T19:03:09+00:00",
+        "is": "approved",
+        "note": "accepted for now; the dry heel tap of round 2",
+        "at": "2026-10-30T11:57:05+00:00",
         "render": "sfx/footstep.wav"
       },
       "history": [
@@ -954,6 +954,12 @@
           "is": "revise",
           "note": "sounds like playing a drum, this needs to be more dampered, you know the sounds needs to be swallowed as the shoes with leather hit the stone ground",
           "at": "2026-10-24T12:31:08+00:00",
+          "render": "sfx/footstep.wav"
+        },
+        {
+          "is": "revise",
+          "note": "still sounds like a drum not steps with leather shoes on a stone floor",
+          "at": "2026-10-24T19:03:09+00:00",
           "render": "sfx/footstep.wav"
         }
       ]
