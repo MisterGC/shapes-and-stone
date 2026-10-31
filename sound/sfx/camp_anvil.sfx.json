@@ -1,18 +1,130 @@
 {
   "version": 1,
   "name": "camp_anvil",
-  "variation": { "seed": 148, "pool": 1 },
+  "variation": {
+    "seed": 148,
+    "pool": 1
+  },
   "layers": [
-    { "name": "ring1", "role": "body", "source": "sine", "freq": 830, "length": 1125,
-      "gain": -10.2, "envelope": { "attack": 0, "decay": 1125, "sustain": 0, "release": 0 } },
-    { "name": "ring2", "role": "tail", "source": "sine", "freq": 2290.8, "length": 625,
-      "gain": -15.4, "envelope": { "attack": 0, "decay": 625, "sustain": 0, "release": 0 } },
-    { "name": "ring3", "role": "tail", "source": "sine", "freq": 4482, "length": 300,
-      "gain": -19.3, "envelope": { "attack": 0, "decay": 300, "sustain": 0, "release": 0 } },
-    { "name": "ring4", "role": "tail", "source": "sine", "freq": 7411.9, "length": 150,
-      "gain": -24.2, "envelope": { "attack": 0, "decay": 150, "sustain": 0, "release": 0 } },
-    { "name": "strike", "role": "transient", "source": "noise", "length": 6, "gain": -8.6,
-      "envelope": { "attack": 0, "decay": 6, "sustain": 0, "release": 0 },
-      "filter": { "type": "highpass", "cutoff": 2000 } }
+    {
+      "name": "ring1",
+      "role": "body",
+      "source": "sine",
+      "freq": 830,
+      "length": 520,
+      "gain": -10.2,
+      "envelope": {
+        "attack": 0,
+        "decay": 520,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "ring2",
+      "role": "tail",
+      "source": "sine",
+      "freq": 2290.8,
+      "length": 300,
+      "gain": -16.7,
+      "envelope": {
+        "attack": 0,
+        "decay": 300,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "ring3",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4482,
+      "length": 140,
+      "gain": -22.7,
+      "envelope": {
+        "attack": 0,
+        "decay": 140,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "ring4",
+      "role": "tail",
+      "source": "sine",
+      "freq": 7411.9,
+      "length": 70,
+      "gain": -28.7,
+      "envelope": {
+        "attack": 0,
+        "decay": 70,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "mass",
+      "role": "body",
+      "source": "sine",
+      "freq": 150,
+      "length": 110,
+      "gain": -15.7,
+      "drive": 6,
+      "envelope": {
+        "attack": 0.5,
+        "decay": 110,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "pitch": {
+        "start": 7,
+        "time": 40,
+        "curve": 1
+      }
+    },
+    {
+      "name": "thunk",
+      "role": "body",
+      "source": "noise",
+      "length": 45,
+      "gain": -20.7,
+      "noise": {
+        "color": "brown"
+      },
+      "envelope": {
+        "attack": 0.3,
+        "decay": 45,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 900,
+        "resonance": 0.1
+      }
+    },
+    {
+      "name": "strike",
+      "role": "transient",
+      "source": "noise",
+      "length": 6,
+      "gain": -12.7,
+      "envelope": {
+        "attack": 0,
+        "decay": 6,
+        "sustain": 0,
+        "release": 0
+      },
+      "filter": {
+        "type": "highpass",
+        "cutoff": 2000
+      }
+    }
   ]
 }

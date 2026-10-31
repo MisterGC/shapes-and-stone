@@ -8,27 +8,27 @@
       "role": "transient",
       "source": "noise",
       "gain": -14,
-      "length": 8,
-      "envelope": { "attack": 0.5, "decay": 6, "sustain": 0, "decayCurve": 1 },
-      "filter": { "type": "bandpass", "cutoff": 3200, "resonance": 0.3 }
+      "length": 12,
+      "envelope": { "attack": 0.5, "decay": 12, "sustain": 0, "decayCurve": 1 },
+      "filter": { "type": "bandpass", "cutoff": 1800, "resonance": 0.3 }
     },
     {
       "name": "plate",
       "role": "body",
       "source": "triangle",
       "freq": 212,
-      "gain": -6.2,
-      "length": 682.982,
-      "envelope": { "attack": 1, "decay": 682.982, "sustain": 0, "decayCurve": 0 }
+      "gain": -2.5,
+      "length": 330,
+      "envelope": { "attack": 1, "decay": 330, "sustain": 0, "decayCurve": 1 }
     },
     {
       "name": "mode2",
       "role": "body",
       "source": "sine",
       "freq": 585,
-      "gain": -12.2,
-      "length": 531.208,
-      "envelope": { "attack": 1, "decay": 531.208, "sustain": 0, "decayCurve": 0 }
+      "gain": -8.5,
+      "length": 230,
+      "envelope": { "attack": 1, "decay": 230, "sustain": 0, "decayCurve": 1 }
     },
     {
       "name": "mode3",
@@ -36,8 +36,8 @@
       "source": "sine",
       "freq": 1146,
       "gain": -21,
-      "length": 379.435,
-      "envelope": { "attack": 1, "decay": 379.435, "sustain": 0, "decayCurve": 0.5 }
+      "length": 110,
+      "envelope": { "attack": 1, "decay": 110, "sustain": 0, "decayCurve": 1 }
     },
     {
       "name": "mode4",
@@ -45,8 +45,8 @@
       "source": "sine",
       "freq": 1871,
       "gain": -27,
-      "length": 265.604,
-      "envelope": { "attack": 1, "decay": 265.604, "sustain": 0, "decayCurve": 0.5 }
+      "length": 70,
+      "envelope": { "attack": 1, "decay": 70, "sustain": 0, "decayCurve": 1 }
     },
     {
       "name": "shimmer",
@@ -54,8 +54,8 @@
       "source": "sine",
       "freq": 424,
       "gain": -34,
-      "length": 455.321,
-      "envelope": { "attack": 1, "decay": 455.321, "sustain": 0, "decayCurve": 1 },
+      "length": 120,
+      "envelope": { "attack": 1, "decay": 120, "sustain": 0, "decayCurve": 1 },
       "fm": { "ratio": 1.11, "index": 3, "decay": 300, "sustain": 0, "decayCurve": 1 }
     }
   ]

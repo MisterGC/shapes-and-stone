@@ -8,31 +8,31 @@
       "role": "body",
       "source": "noise",
       "gain": 6,
-      "length": 420,
-      "envelope": { "attack": 90, "decay": 330, "sustain": 0, "decayCurve": 0 },
-      "filter": { "type": "bandpass", "cutoff": 500, "resonance": 0.35, "attack": 120, "decay": 260, "sustain": 0, "amount": 1.8, "decayCurve": 0 },
+      "length": 312,
+      "envelope": { "attack": 66.8572, "decay": 245.143, "sustain": 0, "decayCurve": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 542.236, "resonance": 0.35, "attack": 89.1429, "decay": 193.143, "sustain": 0, "amount": 2.04, "decayCurve": 0.5 },
       "noise": { "color": "pink" }
     },
     {
       "name": "air",
       "role": "body",
       "source": "sine",
-      "freq": 180,
-      "gain": -8.3,
-      "offset": 40,
-      "length": 300,
-      "envelope": { "attack": 60, "decay": 240, "sustain": 0, "decayCurve": 0 },
-      "pitch": { "start": 7.4, "end": -7, "time": 300, "curve": 0.3 }
+      "freq": 197.741,
+      "gain": -13.5,
+      "offset": 29.7143,
+      "length": 222.858,
+      "envelope": { "attack": 44.5714, "decay": 178.286, "sustain": 0, "decayCurve": 0.5 },
+      "pitch": { "start": 3.5, "end": -7, "time": 222.858, "curve": 0.3 }
     },
     {
       "name": "edge",
       "role": "tail",
       "source": "noise",
-      "gain": -5.4,
-      "offset": 80,
-      "length": 200,
-      "envelope": { "attack": 40, "decay": 160, "sustain": 0, "decayCurve": 0.5 },
-      "filter": { "type": "bandpass", "cutoff": 2000, "resonance": 0.35 }
+      "gain": -9,
+      "offset": 59.4286,
+      "length": 148.571,
+      "envelope": { "attack": 29.7143, "decay": 118.857, "sustain": 0, "decayCurve": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 2091.28, "resonance": 0.26 }
     }
   ]
 }

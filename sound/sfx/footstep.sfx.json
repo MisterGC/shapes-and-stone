@@ -1,10 +1,127 @@
 {
   "version": 1,
   "name": "footstep",
-  "variation": {"seed": 1, "pool": 1},
+  "variation": {
+    "seed": 1,
+    "pool": 1
+  },
   "layers": [
-    {"name": "heel", "role": "body", "source": "sine", "freq": 120, "length": 90, "gain": -3.4, "envelope": {"attack": 1, "decay": 80, "sustain": 0, "release": 0}, "pitch": {"start": 5, "end": 0, "time": 25}},
-    {"name": "stone", "role": "body", "source": "noise", "length": 70, "gain": 0.6, "envelope": {"attack": 1, "decay": 60, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 700}},
-    {"name": "scuff", "role": "tail", "source": "noise", "length": 110, "gain": -15.4, "offset": 25, "envelope": {"attack": 10, "decay": 95, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 1300, "resonance": 0.1}}
+    {
+      "name": "heel",
+      "role": "transient",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 14,
+      "gain": 11,
+      "envelope": {
+        "attack": 0.3,
+        "decay": 14,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1500,
+        "resonance": 0.1
+      }
+    },
+    {
+      "name": "leather",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 28,
+      "gain": 8,
+      "envelope": {
+        "attack": 1,
+        "decay": 28,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 700,
+        "resonance": 0.05
+      }
+    },
+    {
+      "name": "weight",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 22,
+      "gain": 1,
+      "envelope": {
+        "attack": 1,
+        "decay": 22,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 300
+      }
+    },
+    {
+      "name": "sole",
+      "role": "tail",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "offset": 38,
+      "length": 20,
+      "gain": 0,
+      "envelope": {
+        "attack": 1,
+        "decay": 20,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1100,
+        "resonance": 0.05
+      }
+    },
+    {
+      "name": "grit",
+      "role": "tail",
+      "source": "noise",
+      "offset": 4,
+      "length": 2,
+      "gain": -11,
+      "envelope": {
+        "attack": 0,
+        "decay": 2,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 3200,
+        "resonance": 0.1
+      },
+      "burst": {
+        "count": 3,
+        "duration": 60,
+        "jitter": {
+          "time": 0.8,
+          "gain": 4,
+          "cutoff": 0.3
+        }
+      }
+    }
   ]
 }

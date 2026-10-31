@@ -6,38 +6,38 @@
   "time_span_s": 16.0,
   "loop": true,
   "loudness": {
-    "lufs_integrated": -30.433071,
+    "lufs_integrated": -32.278953,
     "lufs_block_s": 0.4,
-    "true_peak_dbtp": -15.962245,
-    "peak_dbfs": -15.991257,
-    "rms_dbfs": -31.450422,
-    "crest_factor_db": 15.459165
+    "true_peak_dbtp": -14.294468,
+    "peak_dbfs": -14.299995,
+    "rms_dbfs": -27.993449,
+    "crest_factor_db": 13.693454
   },
   "envelope": {
-    "silence_start_s": 0.020136,
-    "silence_end_s": 0.018594,
-    "attack_s": 1.227029,
-    "peak_at_s": 1.568934,
-    "peak_db": -25.638981,
-    "fall_20db_at_s": 9.812698,
-    "fall_60db_at_s": 9.999773
+    "silence_start_s": 0.024966,
+    "silence_end_s": 0.028549,
+    "attack_s": 1.152358,
+    "peak_at_s": 4.686848,
+    "peak_db": -18.338475,
+    "fall_20db_at_s": 9.720408,
+    "fall_60db_at_s": 9.994785
   },
   "spectrum": {
-    "centroid_hz": 3165.399026,
-    "rolloff_hz": 8914.746094,
-    "flatness": 0.337735,
+    "centroid_hz": 279.872555,
+    "rolloff_hz": 279.931641,
+    "flatness": 0.000437,
     "band_shares": {
-      "20_60": 0.048439,
-      "60_250": 0.211221,
-      "250_500": 0.231892,
-      "500_2k": 0.220503,
-      "2k_5k": 0.085807,
-      "5k_10k": 0.066598,
-      "10k_20k": 0.13554
+      "20_60": 0.401932,
+      "60_250": 0.425984,
+      "250_500": 0.111289,
+      "500_2k": 0.023571,
+      "2k_5k": 0.036967,
+      "5k_10k": 0.000227,
+      "10k_20k": 3e-05
     }
   },
   "pitch": {
-    "voiced_share": 0.029002,
+    "voiced_share": 0.038283,
     "median_hz": null,
     "start_hz": null,
     "end_hz": null,
@@ -141,7 +141,7 @@
       ],
       [
         3.900952,
-        50.580972
+        null
       ],
       [
         4.063492,
@@ -189,7 +189,7 @@
       ],
       [
         5.851429,
-        null
+        50.0
       ],
       [
         6.013968,
@@ -294,16 +294,16 @@
     ]
   },
   "psychoacoustics": {
-    "sharpness_acum": 1.966716,
-    "roughness_asper": 0.028948,
-    "roughness_max_asper": 0.12609
+    "sharpness_acum": 1.28605,
+    "roughness_asper": 0.028886,
+    "roughness_max_asper": 0.236365
   },
   "defects": {
     "clipped_samples": 0,
     "clipped_share": 0.0,
-    "dc_offset": -0.000323,
-    "loop_seam_jump": 1e-06,
-    "loop_seam_jump_ratio": 1e-05
+    "dc_offset": -0.002976,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 7e-06
   },
   "provenance": {
     "tool": "sp analyze",

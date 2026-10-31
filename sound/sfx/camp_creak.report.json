@@ -2,46 +2,46 @@
   "format": 1,
   "sample_rate": 44100,
   "channels": 1,
-  "duration_s": 0.9,
+  "duration_s": 0.85,
   "time_span_s": 1.0,
   "loop": false,
   "loudness": {
-    "lufs_integrated": -22.764324,
+    "lufs_integrated": -23.95946,
     "lufs_block_s": 0.4,
-    "true_peak_dbtp": -3.095746,
-    "peak_dbfs": -3.139888,
-    "rms_dbfs": -23.977822,
-    "crest_factor_db": 20.837934
+    "true_peak_dbtp": -4.297274,
+    "peak_dbfs": -4.302802,
+    "rms_dbfs": -24.856672,
+    "crest_factor_db": 20.55387
   },
   "envelope": {
-    "silence_start_s": 0.021655,
-    "silence_end_s": 0.014172,
-    "attack_s": 0.310091,
-    "peak_at_s": 0.441497,
-    "peak_db": -15.866244,
-    "fall_20db_at_s": 0.843084,
-    "fall_60db_at_s": 0.892971
+    "silence_start_s": 0.003424,
+    "silence_end_s": 0.001701,
+    "attack_s": 0.171179,
+    "peak_at_s": 0.221995,
+    "peak_db": -20.167653,
+    "fall_20db_at_s": null,
+    "fall_60db_at_s": null
   },
   "spectrum": {
-    "centroid_hz": 940.445689,
-    "rolloff_hz": 1851.855469,
-    "flatness": 0.00115,
+    "centroid_hz": 1433.831221,
+    "rolloff_hz": 2540.917969,
+    "flatness": 0.078187,
     "band_shares": {
-      "20_60": 0.007354,
-      "60_250": 0.036925,
-      "250_500": 0.074688,
-      "500_2k": 0.813881,
-      "2k_5k": 0.066387,
-      "5k_10k": 0.000709,
-      "10k_20k": 5.5e-05
+      "20_60": 0.008945,
+      "60_250": 0.132419,
+      "250_500": 0.233876,
+      "500_2k": 0.415669,
+      "2k_5k": 0.160281,
+      "5k_10k": 0.038689,
+      "10k_20k": 0.010121
     }
   },
   "pitch": {
-    "voiced_share": 0.320513,
-    "median_hz": 55.799857,
-    "start_hz": 55.478474,
-    "end_hz": 51.168695,
-    "sweep_semitones": -1.4,
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
     "track": [
       [
         0.0,
@@ -61,23 +61,23 @@
       ],
       [
         0.09288,
-        54.525387
+        null
       ],
       [
         0.1161,
-        56.123102
+        null
       ],
       [
         0.13932,
-        56.44822
+        null
       ],
       [
         0.16254,
-        56.44822
+        null
       ],
       [
         0.18576,
-        54.841249
+        null
       ],
       [
         0.20898,
@@ -165,53 +165,45 @@
       ],
       [
         0.696599,
-        55.478474
-      ],
-      [
-        0.719819,
-        56.44822
-      ],
-      [
-        0.743039,
-        56.44822
-      ],
-      [
-        0.766259,
-        56.123102
-      ],
-      [
-        0.789478,
-        54.525387
-      ],
-      [
-        0.812698,
-        53.280025
-      ],
-      [
-        0.835918,
-        51.168695
-      ],
-      [
-        0.859138,
         null
       ],
       [
-        0.882358,
+        0.719819,
+        null
+      ],
+      [
+        0.743039,
+        null
+      ],
+      [
+        0.766259,
+        null
+      ],
+      [
+        0.789478,
+        null
+      ],
+      [
+        0.812698,
+        null
+      ],
+      [
+        0.835918,
         null
       ]
     ]
   },
   "psychoacoustics": {
-    "sharpness_acum": 1.235346,
-    "roughness_asper": 5.156457,
-    "roughness_max_asper": 5.224463
+    "sharpness_acum": 1.71618,
+    "roughness_asper": 3.504669,
+    "roughness_max_asper": 3.958488
   },
   "defects": {
     "clipped_samples": 0,
     "clipped_share": 0.0,
-    "dc_offset": 2e-06,
-    "loop_seam_jump": 0.0,
-    "loop_seam_jump_ratio": 7e-06
+    "dc_offset": -0.000136,
+    "loop_seam_jump": 3e-06,
+    "loop_seam_jump_ratio": 3.3e-05
   },
   "provenance": {
     "tool": "sp analyze",
@@ -229,8 +221,7 @@
   },
   "flags": [
     "too_quiet_vs_target",
-    "rough",
-    "late_start"
+    "rough"
   ],
   "file": "camp_creak.wav",
   "pictures": {
