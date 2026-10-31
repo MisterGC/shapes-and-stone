@@ -92,6 +92,35 @@ check every PR runs (`.github/workflows/build.yml`):
 ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 ```
 
+Every push and PR also runs the quick benches: each bench that finishes in
+about 30 s offscreen, one after the other. A bench that fails a check, does
+not load or runs past 120 s fails the job. They are `impacts`, `enemies`,
+`wallpush`, `sound`, `pause`, `fallen`, `focus`, `gamepad`, `downed`,
+`joinleave`, `gold`, `dialogue`, `camp`, `camps`, `sit`, `campsound`,
+`moths`, `cat`, `fishing`, `depth` (twice, `first` and `second`), `record`,
+`balance`, `partysize`, `danger`, `loops`, `spikes`, `deep`,
+`dungeonmaster`, `clock`, `hitstop`, `answer` and `settings`; the list is
+`QUICK` in `tests/run_quick.py`. To run them, or some of them, the same way:
+
+```
+python3 tests/run_quick.py [--qml <Qt>/bin/qml] [--only gold camp]
+```
+
+The other benches run by hand, each with the command in its section below:
+
+- Offscreen, but over 30 s: `features`, `secrets`, `veins`, `holes`, `talks`,
+  `freed`, `travellers`, `campsolid`, `breakables`, `slits`, `doors` and
+  `cave`.
+- With a window and an out dir, for the screenshots: `knights`, `gauge`,
+  `looks`, `ring`, and the `-- <out dir>` runs of the offscreen ones.
+- Two processes over the network, or the dojo's synthetic pad, through the
+  live loader (`-DCLAYGROUND_WITH_TOOLS=ON`): `sameworld`, `revive`,
+  `goagain`, `recordparty`, `dangerparty`, `breakparty`, `spikeparty`,
+  `slitparty`, `doorparty`, `secretparty`, `veinparty`, `holeparty`,
+  `talkparty`, `masterparty`, `padknight`, `netbench` and the fight bench
+  (`run_fightbench.py`, `run_reload.py`); `--mode cloud` needs the internet.
+- `deck`, through `clayrender` in a graphics session.
+
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
 block, parry, get hurt, run their shields low and dry and dash at the same

@@ -129,9 +129,9 @@ Window {
         return game.rooms.findIndex(r => gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h)
     }
 
-    // One seed's dungeon against the rules: [broken, short, features]
+    // One seed's dungeon against the rules: [broken, shortRooms, features]
     function walk(seed) {
-        let broken = [], short = [], cells = {}
+        let broken = [], shortRooms = [], cells = {}
         for (let f of game.features) {
             let why = ruleBroken(f.gx, f.gy)
             if (cells[f.gx + "," + f.gy]) why = "on a cell taken"
@@ -159,9 +159,9 @@ Window {
             let excused = (slitsShort > 0 && edgeLeft < slitsShort ? slitsShort : 0)
                 + (veinsShort > 0 && northLeft === 0 ? veinsShort : 0)
             if (got !== want && !(excused > 0 && got + excused === want))
-                short.push("seed " + seed + " room " + r + " holds " + got + ", asked " + want)
+                shortRooms.push("seed " + seed + " room " + r + " holds " + got + ", asked " + want)
         }
-        return [broken, short, game.features.length]
+        return [broken, shortRooms, game.features.length]
     }
 
     property var steps: [
@@ -273,9 +273,9 @@ Window {
                   + "doorway, corridor, entrance and exit distance, one a cell)"
                   + (walked.broken.length ? ": " + walked.broken.length + ", e.g. "
                      + walked.broken.slice(0, 3).join("; ") : ""))
-            check(walked.short.length === 0, "every room on " + seeds + " seeds holds its showcase count or "
-                  + "all it has free" + (walked.short.length ? ": " + walked.short.length + " do not, e.g. "
-                                         + walked.short.slice(0, 3).join("; ") : ""))
+            check(walked.shortRooms.length === 0, "every room on " + seeds + " seeds holds its showcase count or "
+                  + "all it has free" + (walked.shortRooms.length ? ": " + walked.shortRooms.length + " do not, e.g. "
+                                         + walked.shortRooms.slice(0, 3).join("; ") : ""))
             // The next level is built without the showcase
             game.applyScenario("features")
             game.resetDungeon()
@@ -296,7 +296,7 @@ Window {
 
     // The rules on 50 seeds, at dangers across the bands: one dungeon a
     // step, so the last one's objects are gone before the next is built
-    property var walked: ({ broken: [], short: [], total: 0, least: 1e9 })
+    property var walked: ({ broken: [], shortRooms: [], total: 0, least: 1e9 })
     function seedSteps() {
         let out = []
         for (let i = 0; i < seeds; i++) {
@@ -305,7 +305,7 @@ Window {
                 game.applyScenario("features", (i % 10) * 0.55, seed)
                 let w = walk(seed)
                 walked.broken = walked.broken.concat(w[0])
-                walked.short = walked.short.concat(w[1])
+                walked.shortRooms = walked.shortRooms.concat(w[1])
                 walked.total += w[2]
                 walked.least = Math.min(walked.least, w[2])
             }])
