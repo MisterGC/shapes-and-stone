@@ -64,6 +64,9 @@ QUICK = [
     ("hitstop", "hitstop/hitstop.qml", []),
     ("answer", "answer/answer.qml", []),
     ("settings", "settings/settings.qml", []),
+    ("cues", "cues/cues.qml", []),
+    ("lipsync", "lipsync/lipsync.qml", []),
+    ("fightmusic", "fightmusic/fightmusic.qml", []),
 ]
 
 
@@ -81,7 +84,9 @@ def main():
         print("FAIL no qml: pass --qml or put Qt's bin dir on PATH", file=sys.stderr)
         sys.exit(100)
     benches = [b for b in QUICK if not args.only or b[0] in args.only]
-    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    # The game reads sound/*.json through XMLHttpRequest, which Qt refuses
+    # for local files unless allowed
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QML_XHR_ALLOW_FILE_READ="1")
 
     failed = []
     began = time.time()
