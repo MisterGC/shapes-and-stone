@@ -28,6 +28,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # (name, QML file under tests/, arguments after --). The depth bench runs
 # twice so its record crosses a restart: "second" needs "first" before it.
+# A bench that takes over 30 s offscreen is not here: the README's
+# "Benches" section lists those and the rest that run by hand.
 QUICK = [
     ("impacts", "impacts/impacts.qml", []),
     ("enemies", "enemies/enemies.qml", []),
@@ -48,8 +50,6 @@ QUICK = [
     ("moths", "moths/moths.qml", []),
     ("cat", "cat/cat.qml", []),
     ("fishing", "fishing/fishing.qml", []),
-    ("travellers", "travellers/travellers.qml", []),
-    ("campsolid", "campsolid/campsolid.qml", []),
     ("depth first", "depth/depth.qml", ["first"]),
     ("depth second", "depth/depth.qml", ["second"]),
     ("record", "record/record.qml", []),
@@ -57,17 +57,8 @@ QUICK = [
     ("partysize", "partysize/partysize.qml", []),
     ("danger", "danger/danger.qml", []),
     ("loops", "loops/loops.qml", []),
-    ("features", "features/features.qml", []),
-    ("breakables", "breakables/breakables.qml", []),
     ("spikes", "spikes/spikes.qml", []),
-    ("slits", "slits/slits.qml", []),
-    ("doors", "doors/doors.qml", []),
-    ("secrets", "secrets/secrets.qml", []),
     ("deep", "deep/deep.qml", []),
-    ("veins", "veins/veins.qml", []),
-    ("holes", "holes/holes.qml", []),
-    ("talks", "talks/talks.qml", []),
-    ("freed", "freed/freed.qml", []),
     ("dungeonmaster", "dungeonmaster/dungeonmaster.qml", []),
     ("clock", "clock/clock.qml", []),
     ("hitstop", "hitstop/hitstop.qml", []),
