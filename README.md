@@ -99,8 +99,10 @@ not load or runs past 120 s fails the job. They are `impacts`, `enemies`,
 `joinleave`, `gold`, `dialogue`, `camp`, `camps`, `sit`, `campsound`,
 `moths`, `cat`, `fishing`, `depth` (twice, `first` and `second`), `record`,
 `balance`, `partysize`, `danger`, `loops`, `spikes`, `deep`,
-`dungeonmaster`, `clock`, `hitstop`, `answer` and `settings`; the list is
-`QUICK` in `tests/run_quick.py`. To run them, or some of them, the same way:
+`dungeonmaster`, `clock`, `hitstop`, `answer`, `settings`, `cues`,
+`lipsync` and `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
+runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
+through `XMLHttpRequest`. To run them, or some of them, the same way:
 
 ```
 python3 tests/run_quick.py [--qml <Qt>/bin/qml] [--only gold camp]
