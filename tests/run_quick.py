@@ -31,8 +31,6 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # A bench that takes over 30 s offscreen is not here: the README's
 # "Benches" section lists those and the rest that run by hand.
 QUICK = [
-    ("impacts", "impacts/impacts.qml", []),
-    ("enemies", "enemies/enemies.qml", []),
     ("wallpush", "wallpush/wallpush.qml", []),
     ("sound", "sound/sound.qml", []),
     ("pause", "pause/pause.qml", []),
@@ -78,6 +76,10 @@ HELD = [
     ("partysize", "partysize/partysize.qml", []),
     # 31.3 s on the runner
     ("camps", "camps/camps.qml", []),
+    # host-and-joiner timing in one process, flaky on ubuntu-latest (passed
+    # in run 41241728960, failed in 41243071117)
+    ("impacts", "impacts/impacts.qml", []),
+    ("enemies", "enemies/enemies.qml", []),
 ]
 
 
