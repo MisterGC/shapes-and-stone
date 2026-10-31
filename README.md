@@ -94,12 +94,12 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 
 Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
-not load or runs past 120 s fails the job. They are `impacts`, `enemies`,
-`wallpush`, `sound`, `pause`, `fallen`, `focus`, `gamepad`, `downed`,
-`joinleave`, `gold`, `dialogue`, `camp`, `sit`, `campsound`, `moths`,
-`fishing`, `depth` (twice, `first` and `second`), `record`, `danger`,
-`spikes`, `deep`, `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`,
-`lipsync` and `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
+not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
+`pause`, `fallen`, `focus`, `gamepad`, `downed`, `joinleave`, `gold`,
+`dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
+`first` and `second`), `record`, `danger`, `spikes`, `deep`,
+`dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
 
@@ -107,7 +107,7 @@ through `XMLHttpRequest`. To run them, or some of them, the same way:
 python3 tests/run_quick.py [--qml <Qt>/bin/qml] [--held] [--only gold camp]
 ```
 
-Six are quick here but not in CI yet, run by hand (`--held` adds them, the
+Eight are quick here but not in CI yet, run by hand (`--held` adds them, the
 list is `HELD`):
 
 - `balance`: on CI's runner the next level does not keep the knight's HP and
@@ -115,6 +115,8 @@ list is `HELD`):
 - `settings`: CI's runner has no audio output device, and step 12 times out.
 - `cat`, `loops`, `partysize`, `camps`: 55.9, 72.1, 39.4 and 31.3 s on CI's
   runner, over 30 s.
+- `impacts`, `enemies`: a host and a joiner in one process whose timing checks
+  pass on one CI run and fail on the next.
 
 The other benches run by hand, each with the command in its section below:
 
