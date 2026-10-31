@@ -96,17 +96,25 @@ Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
 not load or runs past 120 s fails the job. They are `impacts`, `enemies`,
 `wallpush`, `sound`, `pause`, `fallen`, `focus`, `gamepad`, `downed`,
-`joinleave`, `gold`, `dialogue`, `camp`, `camps`, `sit`, `campsound`,
-`moths`, `cat`, `fishing`, `depth` (twice, `first` and `second`), `record`,
-`balance`, `partysize`, `danger`, `loops`, `spikes`, `deep`,
-`dungeonmaster`, `clock`, `hitstop`, `answer`, `settings`, `cues`,
+`joinleave`, `gold`, `dialogue`, `camp`, `sit`, `campsound`, `moths`,
+`fishing`, `depth` (twice, `first` and `second`), `record`, `danger`,
+`spikes`, `deep`, `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`,
 `lipsync` and `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
 
 ```
-python3 tests/run_quick.py [--qml <Qt>/bin/qml] [--only gold camp]
+python3 tests/run_quick.py [--qml <Qt>/bin/qml] [--held] [--only gold camp]
 ```
+
+Six are quick here but not in CI yet, run by hand (`--held` adds them, the
+list is `HELD`):
+
+- `balance`: on CI's runner the next level does not keep the knight's HP and
+  mana.
+- `settings`: CI's runner has no audio output device, and step 12 times out.
+- `cat`, `loops`, `partysize`, `camps`: 55.9, 72.1, 39.4 and 31.3 s on CI's
+  runner, over 30 s.
 
 The other benches run by hand, each with the command in its section below:
 
