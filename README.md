@@ -224,6 +224,29 @@ sp deliver /tmp/deep_tink.wav sfx/deep_tink --game . --source sound/sfx/deep_tin
 sp cues --game .
 ```
 
+Three effects are design files: `sound/sfx/<name>.sfx.design.json` names
+one of the factory's stock templates, sets its macro knobs and overrides
+single values, and Clayground's compiler turns it into the recipe beside
+it. The sword's swing is on the `swing` template, the shield's clang on
+`metal-hit` and the deep's crumble on `crumble`; the game plays the
+compiled recipe, or for the swing its render, and never reads the design.
+A design is changed with `sp tweak` and delivered as itself:
+
+```
+sp design explain sound/sfx/sword_swing.sfx.design.json
+sp tweak sound/sfx/sword_swing.sfx.design.json --macro pitch=0.3
+sp deliver sound/sfx/sword_swing.sfx.design.json sfx/sword_swing --game .
+```
+
+The dojo reloads on a change in `src/` only, the sandbox's own folder.
+Until it watches the folders a sandbox loads from (clayground#461), start
+it with `sound/` as an import dir as well, and a delivered sound is
+playing in the running game a moment later, without a restart:
+
+```
+build/bin/claydojo --sbx src/Game.qml --import $PWD/sound
+```
+
 A song is changed in its score and compiled again
 (`sp compose sound/music/dungeon.score`); a voiced line is changed in its
 voice script and voiced again (`sp say sound/voice/npc_greetings.voice.json
@@ -233,8 +256,9 @@ witch_greeting --takes 3`, with `vocli serve` running), then delivered with
 The cue bench checks that the game has a player for every cue of the
 sheet - an `SfxPlayer` of the recipe or a `SongPlayer` of the song for a
 live one, a `Sound` of the render for a rendered one - loaded, that the
-live ones play and render, that the game's own calls reach them, and that
-M silences them:
+live ones play and render, that the game's own calls reach them, that a
+designed cue's design file is on the template its provenance names, beside
+its recipe, and that M silences them:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cues/cues.qml

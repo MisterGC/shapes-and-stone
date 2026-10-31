@@ -51,16 +51,16 @@
       "report": "sfx/deep_crumble.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
-        "license": "MIT"
+        "version": "2026.9 (clayground 7e93c11)",
+        "license": "MIT",
+        "template": {
+          "id": "crumble",
+          "version": 1,
+          "design": "sfx/deep_crumble.sfx.design.json"
+        }
       },
-      "delivered": "2026-10-18T16:37:05.808559+00:00",
-      "verdict": {
-        "is": "approved",
-        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
-        "at": "2026-10-27T14:34:50+00:00",
-        "render": "sfx/deep_crumble.wav"
-      }
+      "delivered": "2026-10-23T21:06:14.674466+00:00",
+      "verdict": null
     },
     "sfx/deep_rumble": {
       "category": "sfx",
@@ -662,16 +662,16 @@
       "report": "sfx/sword_swing.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
-        "license": "MIT"
+        "version": "2026.9 (clayground 7e93c11)",
+        "license": "MIT",
+        "template": {
+          "id": "swing",
+          "version": 1,
+          "design": "sfx/sword_swing.sfx.design.json"
+        }
       },
-      "delivered": "2026-10-18T17:25:58.256733+00:00",
-      "verdict": {
-        "is": "approved",
-        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
-        "at": "2026-10-27T14:34:52+00:00",
-        "render": "sfx/sword_swing.wav"
-      }
+      "delivered": "2026-10-23T21:06:11.484803+00:00",
+      "verdict": null
     },
     "sfx/dash": {
       "category": "sfx",
@@ -742,16 +742,16 @@
       "report": "sfx/shield_clang.report.json",
       "provenance": {
         "engine": "clay_sound",
-        "version": "2026.9 (clayground 8574700)",
-        "license": "MIT"
+        "version": "2026.9 (clayground 7e93c11)",
+        "license": "MIT",
+        "template": {
+          "id": "metal-hit",
+          "version": 1,
+          "design": "sfx/shield_clang.sfx.design.json"
+        }
       },
-      "delivered": "2026-10-18T17:25:58.595239+00:00",
-      "verdict": {
-        "is": "approved",
-        "note": "accepted to settle the integration plan, not listened to cue by cue; fine-tuning follows in its own plan",
-        "at": "2026-10-27T14:34:52+00:00",
-        "render": "sfx/shield_clang.wav"
-      }
+      "delivered": "2026-10-23T21:06:12.979071+00:00",
+      "verdict": null
     },
     "sfx/shield_break": {
       "category": "sfx",

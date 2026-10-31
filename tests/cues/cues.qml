@@ -35,11 +35,16 @@ Window {
     TestEvent { id: keys }
     function pressM() { keys.keyClick(Qt.Key_M, Qt.NoModifier, -1) }
 
-    Component.onCompleted: {
+    // A JSON file under sound/, null when it does not read
+    function readSound(path) {
         let xhr = new XMLHttpRequest()
-        xhr.open("GET", Qt.resolvedUrl("../../sound/cues.json"), false)
+        xhr.open("GET", Qt.resolvedUrl("../../sound/" + path), false)
         xhr.send()
-        try { sheet = JSON.parse(xhr.responseText) } catch (e) { sheet = null }
+        try { return JSON.parse(xhr.responseText) } catch (e) { return null }
+    }
+
+    Component.onCompleted: {
+        sheet = readSound("cues.json")
         if (!sheet) {
             console.log("[Cues] FAIL sound/cues.json does not read (QML_XHR_ALLOW_FILE_READ=1?)")
             Qt.exit(1)
@@ -98,6 +103,17 @@ Window {
                     check(pl.lastSeed === seed && mono.length > 0,
                           c + " plays seed " + seed + " of its " + pl.pool + " and renders " + mono.length + " samples")
                 }
+            }
+            // A designed cue (issue #195): its design file, the template
+            // its provenance names, sits beside the recipe it compiles to
+            let designed = cues().filter(c => sheet.cues[c].provenance && sheet.cues[c].provenance.template)
+            check(designed.length > 0, designed.length + " cues come from design files: " + designed.join(", "))
+            for (let c of designed) {
+                let t = sheet.cues[c].provenance.template, d = readSound(t.design)
+                check(d && d.template.id === t.id && d.template.version === t.version
+                      && t.design.replace(/\.sfx\.design\.json$/, ".sfx.json") === sheet.cues[c].source,
+                      c + "'s design " + t.design + " is on the template " + t.id + " " + t.version
+                      + ", beside its recipe " + sheet.cues[c].source)
             }
             game.screen = "game"
             game.forceActiveFocus()
