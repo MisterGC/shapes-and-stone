@@ -1,0 +1,158 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.214785,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -20.006474,
+    "lufs_block_s": 0.214785,
+    "true_peak_dbtp": -5.989476,
+    "peak_dbfs": -5.995003,
+    "rms_dbfs": -21.556162,
+    "crest_factor_db": 15.561159
+  },
+  "envelope": {
+    "silence_start_s": 4.5e-05,
+    "silence_end_s": 0.00195,
+    "attack_s": 0.0,
+    "peak_at_s": 0.004989,
+    "peak_db": -14.084533,
+    "fall_20db_at_s": 0.172109,
+    "fall_60db_at_s": null
+  },
+  "spectrum": {
+    "centroid_hz": 1643.818039,
+    "rolloff_hz": 2056.420898,
+    "flatness": 0.000578,
+    "band_shares": {
+      "20_60": 0.001466,
+      "60_250": 0.010109,
+      "250_500": 0.016437,
+      "500_2k": 0.726827,
+      "2k_5k": 0.241549,
+      "5k_10k": 0.003596,
+      "10k_20k": 1.4e-05
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.526316,
+    "median_hz": 781.727975,
+    "start_hz": 1007.93684,
+    "end_hz": 781.727975,
+    "sweep_semitones": -4.4,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.01161,
+        null
+      ],
+      [
+        0.02322,
+        null
+      ],
+      [
+        0.03483,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ],
+      [
+        0.05805,
+        null
+      ],
+      [
+        0.06966,
+        null
+      ],
+      [
+        0.08127,
+        1007.93684
+      ],
+      [
+        0.09288,
+        1007.93684
+      ],
+      [
+        0.10449,
+        984.915531
+      ],
+      [
+        0.1161,
+        984.915531
+      ],
+      [
+        0.12771,
+        null
+      ],
+      [
+        0.13932,
+        772.749063
+      ],
+      [
+        0.15093,
+        772.749063
+      ],
+      [
+        0.16254,
+        772.749063
+      ],
+      [
+        0.17415,
+        781.727975
+      ],
+      [
+        0.18576,
+        781.727975
+      ],
+      [
+        0.19737,
+        781.727975
+      ],
+      [
+        0.20898,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.46749,
+    "roughness_asper": 3.318455,
+    "roughness_max_asper": 3.318455
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.000868,
+    "loop_seam_jump": 5e-06,
+    "loop_seam_jump_ratio": 5.8e-05
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "rough"
+  ],
+  "file": "coin_pickup.wav",
+  "pictures": {
+    "spectrogram": "coin_pickup.spec.png",
+    "waveform": "coin_pickup.wave.png"
+  }
+}

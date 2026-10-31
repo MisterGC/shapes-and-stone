@@ -99,14 +99,14 @@ Item {
     }
     function padBack() { back() }
 
-    Sound {
+    SfxPlayer {
         id: menuHoverSound
-        source: "assets/menu_change.wav"
+        source: "../sound/sfx/menu_change.sfx.json"
         volume: muted ? 0 : 0.5 * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: menuConfirmSound
-        source: "assets/menu_confirm.wav"
+        source: "../sound/sfx/menu_confirm.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
 

@@ -30,7 +30,47 @@ Item {
     property string talkKey: "E"
     property string buyKey: "X"
 
+    // The voiced line it plays (issue #191): the mouthCues of its Rhubarb
+    // visemes file, [{start, end, value}] in seconds from the line's
+    // start. While they run the speaker's mouth takes each shape, then
+    // rests on "X" until the panel closes; mouth is the shape now, "" with
+    // no voiced line
+    property var mouthCues: []
+    readonly property string mouth: _mouth
+    property string _mouth: ""
+    property real _voiceStart: 0
+    function _setMouth(shape) {
+        _mouth = shape
+        if (speaker) speaker.mouth = shape
+    }
+    function lipSync(visemesUrl) {
+        let xhr = new XMLHttpRequest()
+        xhr.open("GET", visemesUrl, false)
+        xhr.send()
+        let cues = []
+        try { cues = JSON.parse(xhr.responseText).mouthCues || [] } catch (e) { cues = [] }
+        if (cues.length === 0) console.warn("[Dialogue] no mouth cues in", visemesUrl)
+        mouthCues = cues
+        _voiceStart = Date.now()
+        _setMouth(cues.length > 0 ? cues[0].value : "")
+        if (cues.length > 0) lipTimer.restart()
+    }
+    Timer {
+        id: lipTimer
+        interval: 16
+        repeat: true
+        onTriggered: {
+            let t = (Date.now() - panel._voiceStart) / 1000
+            let cue = panel.mouthCues.find(c => t >= c.start && t < c.end)
+            panel._setMouth(cue ? cue.value : "X")
+            if (!cue) stop()
+        }
+    }
+
     function open(name, color, dialogueLines, offered, who) {
+        lipTimer.stop()
+        _setMouth("")
+        mouthCues = []
         speakerName = name
         speaker = who || null
         speakerColor = color
@@ -50,6 +90,9 @@ Item {
     }
 
     function close() {
+        lipTimer.stop()
+        _setMouth("")
+        mouthCues = []
         visible = false
         speaker = null
         lines = []

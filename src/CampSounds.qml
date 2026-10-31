@@ -37,27 +37,27 @@ Item {
 
     Sound {
         id: crackle
-        source: "assets/" + cfg.fire.sample
+        source: "../sound/sfx/" + cfg.fire.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
-    Sound {
+    SfxPlayer {
         id: anvil
-        source: "assets/" + cfg.anvil.sample
+        source: "../sound/sfx/" + cfg.anvil.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
-    Sound {
+    SfxPlayer {
         id: drip
-        source: "assets/" + cfg.looks.grotto.sample
+        source: "../sound/sfx/" + cfg.looks.grotto.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     Sound {
         id: creak
-        source: "assets/" + cfg.looks.hall.sample
+        source: "../sound/sfx/" + cfg.looks.hall.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     Sound {
         id: hiss
-        source: "assets/" + cfg.looks.ember.sample
+        source: "../sound/sfx/" + cfg.looks.ember.sample
         volume: game && !game.muted ? game.soundVolume : 0
     }
     readonly property var _byLook: ({ grotto: drip, hall: creak, ember: hiss })
@@ -134,7 +134,10 @@ Item {
             let g = _gain(s)
             if (g <= 0) continue
             let pitch = s.pitch[0] + Math.floor(Math.random() * (s.pitch[1] - s.pitch[0] + 1))
-            s.sound.triggerNote(s.sound.rootNote + pitch, g)
+            // A live cue's recipe is transposed, a rendered one's sample
+            // played at another rate (sound/cues.json)
+            if (s.sound.layers !== undefined) s.sound.play(g, pitch)
+            else s.sound.triggerNote(s.sound.rootNote + pitch, g)
             played[s.name] = (played[s.name] || 0) + 1
             lastGain[s.name] = g
         }

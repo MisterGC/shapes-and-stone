@@ -1,0 +1,154 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.2,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -15.687587,
+    "lufs_block_s": 0.2,
+    "true_peak_dbtp": -3.059795,
+    "peak_dbfs": -3.065323,
+    "rms_dbfs": -14.936027,
+    "crest_factor_db": 11.870704
+  },
+  "envelope": {
+    "silence_start_s": 4.5e-05,
+    "silence_end_s": 0.028458,
+    "attack_s": 0.002449,
+    "peak_at_s": 0.007483,
+    "peak_db": -6.865373,
+    "fall_20db_at_s": 0.152154,
+    "fall_60db_at_s": 0.177098
+  },
+  "spectrum": {
+    "centroid_hz": 942.418837,
+    "rolloff_hz": 1152.026367,
+    "flatness": 0.0,
+    "band_shares": {
+      "20_60": 1e-06,
+      "60_250": 3e-06,
+      "250_500": 0.000739,
+      "500_2k": 0.999256,
+      "2k_5k": 1e-06,
+      "5k_10k": 0.0,
+      "10k_20k": 0.0
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.777778,
+    "median_hz": 911.034707,
+    "start_hz": 908.403543,
+    "end_hz": 1501.500795,
+    "sweep_semitones": 8.7,
+    "track": [
+      [
+        0.0,
+        852.480401
+      ],
+      [
+        0.01161,
+        908.403543
+      ],
+      [
+        0.02322,
+        913.665871
+      ],
+      [
+        0.03483,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ],
+      [
+        0.05805,
+        null
+      ],
+      [
+        0.06966,
+        790.811216
+      ],
+      [
+        0.08127,
+        804.634353
+      ],
+      [
+        0.09288,
+        750.750397
+      ],
+      [
+        0.10449,
+        818.699114
+      ],
+      [
+        0.1161,
+        882.543058
+      ],
+      [
+        0.12771,
+        918.958684
+      ],
+      [
+        0.13932,
+        null
+      ],
+      [
+        0.15093,
+        1151.146864
+      ],
+      [
+        0.16254,
+        1322.320509
+      ],
+      [
+        0.17415,
+        1501.500795
+      ],
+      [
+        0.18576,
+        1600.0
+      ],
+      [
+        0.19737,
+        1384.858498
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 0.987434,
+    "roughness_asper": 1.131086,
+    "roughness_max_asper": 1.131086
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 5.4e-05,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "rough"
+  ],
+  "file": "camp_drip.wav",
+  "pictures": {
+    "spectrogram": "camp_drip.spec.png",
+    "waveform": "camp_drip.wave.png"
+  }
+}

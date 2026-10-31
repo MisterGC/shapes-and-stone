@@ -271,6 +271,20 @@ QtObject {
         pitches: [0, -2]
     })
 
+    // The dungeon music (sound/music/dungeon.song.json) follows the fight:
+    // its intensity is how many enemies within reach world units of the
+    // knight are after it - chasing, winding up or striking - out of
+    // fullAt, eased up at rise and down at fall per second, so the pulse
+    // layer (0.15..0.5) comes in with the first enemy and the battle layer
+    // (0.5..1) with the second and third
+    readonly property var music: ({
+        fullAt: 3,
+        reach: 14,
+        rise: 1.5,
+        fall: 0.2,
+        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash"]
+    })
+
     // A grunt or a guardian winding up its lunge screams like a goblin,
     // fading with the distance as the crushing blow's growl does: the
     // sample pitched by tierPitch semitones (weak, normal, tough) at volume
@@ -1142,9 +1156,9 @@ QtObject {
         // their volume; a knight that moves brings both back in fadeUp
         sounds: {
             fire: { sample: "camp_crackle.wav", volume: 0.55, reach: 16, every: [0.12, 0.45], pitch: [-3, 2] },
-            anvil: { sample: "camp_anvil.wav", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
+            anvil: { sample: "camp_anvil.sfx.json", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
             looks: {
-                grotto: { sample: "camp_drip.wav", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
+                grotto: { sample: "camp_drip.sfx.json", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
                 hall: { sample: "camp_creak.wav", props: ["cart"], volume: 0.45, reach: 14, every: [3.0, 7.0], pitch: [-2, 2] },
                 ember: { sample: "camp_hiss.wav", props: ["coals", "cracks"], volume: 0.35, reach: 12, every: [1.5, 4.5], pitch: [-3, 1] }
             },

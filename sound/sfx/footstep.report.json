@@ -1,0 +1,103 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.058005,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -22.897938,
+    "lufs_block_s": 0.058005,
+    "true_peak_dbtp": -3.026639,
+    "peak_dbfs": -3.086292,
+    "rms_dbfs": -22.758444,
+    "crest_factor_db": 19.672151
+  },
+  "envelope": {
+    "silence_start_s": 2.3e-05,
+    "silence_end_s": 0.004127,
+    "attack_s": 0.0,
+    "peak_at_s": 0.004989,
+    "peak_db": -15.638329,
+    "fall_20db_at_s": 0.047392,
+    "fall_60db_at_s": null
+  },
+  "spectrum": {
+    "centroid_hz": 1115.989295,
+    "rolloff_hz": 1905.688477,
+    "flatness": 0.023214,
+    "band_shares": {
+      "20_60": 0.059561,
+      "60_250": 0.223577,
+      "250_500": 0.084667,
+      "500_2k": 0.490629,
+      "2k_5k": 0.114615,
+      "5k_10k": 0.024083,
+      "10k_20k": 0.002866
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.01161,
+        null
+      ],
+      [
+        0.02322,
+        null
+      ],
+      [
+        0.03483,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.58362,
+    "roughness_asper": 2.730839,
+    "roughness_max_asper": 2.730839
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.00636,
+    "loop_seam_jump": 1e-05,
+    "loop_seam_jump_ratio": 0.000106
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "too_quiet_vs_target",
+    "rough"
+  ],
+  "file": "footstep.wav",
+  "pictures": {
+    "spectrogram": "footstep.spec.png",
+    "waveform": "footstep.wave.png"
+  }
+}

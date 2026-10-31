@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "name": "punch_hitting",
+  "variation": {
+    "seed": 7,
+    "pool": 4
+  },
+  "layers": [
+    {
+      "name": "slap",
+      "role": "transient",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 18,
+      "gain": -2.5,
+      "envelope": {
+        "attack": 0.3,
+        "decay": 18,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1700,
+        "resonance": 0.15
+      },
+      "vary": {
+        "filter.cutoff": [
+          -250,
+          250
+        ]
+      }
+    },
+    {
+      "name": "flesh",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 110,
+      "gain": 4.5,
+      "envelope": {
+        "attack": 1,
+        "decay": 110,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 330,
+        "resonance": 0.05
+      },
+      "drive": 4,
+      "vary": {
+        "filter.cutoff": [
+          -90,
+          90
+        ]
+      }
+    },
+    {
+      "name": "weight",
+      "role": "body",
+      "source": "sine",
+      "freq": 68,
+      "length": 120,
+      "gain": -5.5,
+      "envelope": {
+        "attack": 6,
+        "decay": 120,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "pitch": {
+        "start": 3,
+        "end": 0,
+        "time": 30
+      },
+      "vary": {
+        "detune": [
+          -1.5,
+          1.5
+        ]
+      }
+    },
+    {
+      "name": "give",
+      "role": "tail",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 6,
+      "gain": -11.5,
+      "offset": 10,
+      "envelope": {
+        "attack": 0,
+        "decay": 6,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 1200
+      },
+      "burst": {
+        "count": 3,
+        "duration": 50,
+        "density": 0.5,
+        "jitter": {
+          "time": 0.7,
+          "gain": 4
+        }
+      }
+    }
+  ]
+}

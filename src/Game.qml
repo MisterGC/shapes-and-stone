@@ -62,33 +62,64 @@ ClayWorld2d {
     // V toggles it for a before/after comparison.
     property bool fx: true
 
-    // Audio — switches based on levelType
-    LoopMusic {
+    // Audio — switches based on levelType. The music and the ambience
+    // are the sound factory's cues (sound/cues.json), played live: the
+    // songs by SongPlayer, the beds as recipes that cross into themselves
+    AmbienceBed {
         id: dungeonAmbience
-        source: "assets/dungeon_ambience.mp3"
+        source: "../sound/ambience/dungeon.sfx.json"
         level: muted ? 0 : 0.4 * musicVolume
-        loop: true
     }
 
-    LoopMusic {
+    // The dungeon's song follows the fight: its intensity is fightIntensity
+    SongMusic {
         id: dungeonMusic
-        source: "assets/dungeon_music.mp3"
+        source: "../sound/music/dungeon.song.json"
         level: muted ? 0 : 0.3 * musicVolume
-        loop: true
+        intensity: world.fightIntensity
     }
 
-    LoopMusic {
+    AmbienceBed {
         id: villageAmbience
-        source: "assets/village_ambience.mp3"
+        source: "../sound/ambience/village.sfx.json"
         level: muted ? 0 : 0.4 * musicVolume
-        loop: true
     }
 
-    LoopMusic {
+    SongMusic {
         id: villageMusic
-        source: "assets/village_music.mp3"
+        source: "../sound/music/village.song.json"
         level: muted ? 0 : 0.35 * musicVolume * campSounds.musicShare
-        loop: true
+    }
+
+    // --- The fight's intensity (Balance.music) ---
+    // fightersNear counts the enemies within reach of this knight that
+    // are after a knight, from their replicated aiState, so a joined
+    // knight hears its own fight; fightIntensity eases towards
+    // fightersNear / fullAt, up at rise and down at fall per second, and
+    // is 0 out of a dungeon
+    property int fightersNear: 0
+    property real fightIntensity: 0
+    Timer {
+        id: fightTimer
+        interval: 100
+        repeat: true
+        running: world.levelType === "dungeon" && world.player !== null
+        onTriggered: world._followFight(interval / 1000)
+        onRunningChanged: if (!running) { world.fightersNear = 0; world.fightIntensity = 0 }
+    }
+    function _followFight(dt) {
+        let cfg = Balance.music, near = 0
+        if (player) {
+            for (let e of enemies) {
+                if (!e || e.destroyed || cfg.engaged.indexOf(e.aiState) < 0) continue
+                if (Math.hypot(e.xWu - player.xWu, e.yWu - player.yWu) <= cfg.reach) near++
+            }
+        }
+        fightersNear = near
+        let goal = Math.min(1, near / cfg.fullAt)
+        let step = (goal > fightIntensity ? cfg.rise : cfg.fall) * dt
+        fightIntensity = goal > fightIntensity ? Math.min(goal, fightIntensity + step)
+                                               : Math.max(goal, fightIntensity - step)
     }
 
     // The camp's near sounds, each at its source, and the music stepping
@@ -112,50 +143,54 @@ ClayWorld2d {
 
 
 
-    Sound {
+    // The knight's and the creatures' sounds are the sound factory's cues
+    // (sound/cues.json): a live cue plays from its recipe through an
+    // SfxPlayer, transposed per play where it is pitched; a rendered one,
+    // whose noise a transposition would not move, plays its render
+    // through a Sound pitched as before
+    SfxPlayer {
         id: impactSound
-        source: "assets/punch_hitting.wav"
+        source: "../sound/sfx/punch_hitting.sfx.json"
         volume: muted ? 0 : 0.7 * soundVolume
     }
 
-    Sound {
+    SfxPlayer {
         id: dashSound
-        source: "assets/dash.wav"
+        source: "../sound/sfx/dash.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
 
     // gain (0..1) is for sounds of another player's knight, see remoteGain()
     function playImpact(gain) {
-        impactSound.triggerOneShot(gain === undefined ? 1 : gain)
+        impactSound.play(gain === undefined ? 1 : gain)
     }
 
-    Sound {
+    SfxPlayer {
         id: deathBurstSound
-        source: "assets/burst.wav"
+        source: "../sound/sfx/burst.sfx.json"
         volume: muted ? 0 : 0.7 * soundVolume
     }
 
     Sound {
         id: swordSwingSound
-        source: "assets/sword_swing.wav"
+        source: "../sound/sfx/sword_swing.wav"
         volume: muted ? 0 : 0.5 * soundVolume
     }
 
     function playDash(gain) {
-        dashSound.triggerOneShot(gain === undefined ? 1 : gain)
+        dashSound.play(gain === undefined ? 1 : gain)
     }
 
     // The shield's own sound: a metal clang, so a block never sounds like
     // a hit, and a perfect block brighter
-    Sound {
+    SfxPlayer {
         id: shieldClangSound
-        source: "assets/shield_clang.wav"
+        source: "../sound/sfx/shield_clang.sfx.json"
         volume: muted ? 0 : 0.7 * soundVolume
     }
     function playBlock(gain, perfect) {
-        shieldClangSound.triggerNote(shieldClangSound.rootNote
-                                     + (perfect ? Balance.perfectBlock.pitch : Balance.block.pitch),
-                                     gain === undefined ? 1 : gain)
+        shieldClangSound.play(gain === undefined ? 1 : gain,
+                              perfect ? Balance.perfectBlock.pitch : Balance.block.pitch)
     }
 
     function playSwordSwing(gain) {
@@ -170,7 +205,7 @@ ClayWorld2d {
     // The knight's footsteps (Balance.steps), only this node's own
     Sound {
         id: footstepSound
-        source: "assets/footstep.wav"
+        source: "../sound/sfx/footstep.wav"
         volume: muted ? 0 : Balance.steps.volume * soundVolume
     }
     property int _foot: 0
@@ -178,10 +213,10 @@ ClayWorld2d {
         let p = Balance.steps.pitches
         footstepSound.triggerNote(footstepSound.rootNote + p[_foot++ % p.length], 1)
     }
-    // and the knight's shout of a special move
+    // and the knight's shout of a special move, a voiced line
     Sound {
         id: whirlShoutSound
-        source: "assets/knight_whirl_shout.wav"
+        source: "../sound/voice/knight/whirl_shout.wav"
         volume: muted ? 0 : Balance.whirl.shoutVolume * soundVolume
     }
     function playWhirlwind(gain) {
@@ -191,61 +226,60 @@ ClayWorld2d {
                                     gain === undefined ? 1 : gain)
     }
     // The charge is full: a high tick
-    Sound {
+    SfxPlayer {
         id: chargeTickSound
-        source: "assets/menu_change.wav"
+        source: "../sound/sfx/menu_change.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
     function playChargeFull(gain) {
-        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.heavy.tickPitch,
-                                    gain === undefined ? 1 : gain)
+        chargeTickSound.play(gain === undefined ? 1 : gain, Balance.heavy.tickPitch)
     }
 
     // A Sound step in the Esc menu: the menu's tick at the new share
-    Sound {
+    SfxPlayer {
         id: volumeTick
-        source: "assets/menu_change.wav"
+        source: "../sound/sfx/menu_change.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
     // Gold picked up: a coin's clink, once however many drops it was
-    Sound {
+    SfxPlayer {
         id: coinSound
-        source: "assets/coin_pickup.wav"
+        source: "../sound/sfx/coin_pickup.sfx.json"
         volume: muted ? 0 : 0.5 * soundVolume
     }
     function _clink() { coinSound.play() }
 
     // The knight's own hurt: a low thud, never the punch of a sword
-    Sound {
+    SfxPlayer {
         id: hurtSound
-        source: "assets/knight_hurt.wav"
+        source: "../sound/sfx/knight_hurt.sfx.json"
         volume: muted ? 0 : 0.8 * soundVolume
     }
     function playHurt(gain) {
-        hurtSound.triggerOneShot(gain === undefined ? 1 : gain)
+        hurtSound.play(gain === undefined ? 1 : gain)
     }
 
     // The shield breaking at 0 mana, and the right button with no mana
-    Sound {
+    SfxPlayer {
         id: shieldBreakSound
-        source: "assets/shield_break.wav"
+        source: "../sound/sfx/shield_break.sfx.json"
         volume: muted ? 0 : 0.7 * soundVolume
     }
     function playShieldBreak(gain) {
-        shieldBreakSound.triggerOneShot(gain === undefined ? 1 : gain)
+        shieldBreakSound.play(gain === undefined ? 1 : gain)
     }
-    Sound {
+    SfxPlayer {
         id: shieldEmptySound
-        source: "assets/shield_empty.wav"
+        source: "../sound/sfx/shield_empty.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
     function playShieldEmpty() {
-        shieldEmptySound.triggerOneShot(1)
+        shieldEmptySound.play(1)
     }
     // A spike plate: its click is the menu's tick pitched down, its
     // spikes the swing pitched up (Balance.dungeon.spike...Pitch)
     function playPlateClick() {
-        chargeTickSound.triggerNote(chargeTickSound.rootNote + Balance.dungeon.spikeClickPitch, 1)
+        chargeTickSound.play(1, Balance.dungeon.spikeClickPitch)
     }
     function playSpikesRise() {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
@@ -255,20 +289,22 @@ ClayWorld2d {
     // the tink once for each of its notes. veinSounds lists the last
     // veinSoundsKept of them as they play, "chink", "tink+4" or
     // "crumble", muted too, and veinSoundCount counts them all, for the
-    // benches; a new level starts the list over
-    Sound {
+    // benches; a new level starts the list over. They are the sound
+    // factory's cues (sound/cues.json), played live from their recipes,
+    // the chink and the tink transposed per play
+    SfxPlayer {
         id: chinkSound
-        source: "assets/deep_chink.wav"
+        source: "../sound/sfx/deep_chink.sfx.json"
         volume: muted ? 0 : Balance.deep.chinkVolume * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: tinkSound
-        source: "assets/deep_tink.wav"
+        source: "../sound/sfx/deep_tink.sfx.json"
         volume: muted ? 0 : Balance.deep.tinkVolume * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: crumbleSound
-        source: "assets/deep_crumble.wav"
+        source: "../sound/sfx/deep_crumble.sfx.json"
         volume: muted ? 0 : Balance.deep.crumbleVolume * soundVolume
     }
     property var veinSounds: []
@@ -279,18 +315,18 @@ ClayWorld2d {
         veinSoundCount++
     }
     function playChink(pitch) {
-        chinkSound.triggerNote(chinkSound.rootNote + pitch, 1)
+        chinkSound.play(1, pitch)
         _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
     }
     function playTink(pitch, gain) {
-        tinkSound.triggerNote(tinkSound.rootNote + pitch, gain === undefined ? 1 : gain)
+        tinkSound.play(gain === undefined ? 1 : gain, pitch)
         _heard("tink+" + pitch)
     }
     // gain 1 when left out; the last one played is crumbleGain
     property real crumbleGain: 0
     function playCrumble(gain) {
         crumbleGain = gain === undefined ? 1 : gain
-        crumbleSound.triggerOneShot(crumbleGain)
+        crumbleSound.play(crumbleGain)
         _heard("crumble")
     }
     property var _chimeLeft: []
@@ -314,15 +350,16 @@ ClayWorld2d {
     // closes, quieter the further it is from the knight. holeSounds lists
     // the last veinSoundsKept of them as they play, "rumble", "groan" or
     // "crumble", muted too, and holeSoundCount counts them all, for the
-    // benches; a new level starts the list over
-    Sound {
+    // benches; a new level starts the list over. All three play live from
+    // their recipes (sound/cues.json)
+    SfxPlayer {
         id: rumbleSound
-        source: "assets/deep_rumble.wav"
+        source: "../sound/sfx/deep_rumble.sfx.json"
         volume: muted ? 0 : Balance.deep.hole.rumbleVolume * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: groanSound
-        source: "assets/deep_groan.wav"
+        source: "../sound/sfx/deep_groan.sfx.json"
         volume: muted ? 0 : Balance.deep.hole.groanVolume * soundVolume
     }
     property var holeSounds: []
@@ -333,9 +370,9 @@ ClayWorld2d {
             let c = _knightCentre()
             gain = Math.max(cfg.quietest, 1 - Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y) / cfg.hearReach)
         }
-        if (name === "rumble") rumbleSound.triggerOneShot(gain)
-        else if (name === "groan") groanSound.triggerOneShot(gain)
-        else crumbleSound.triggerOneShot(gain)
+        if (name === "rumble") rumbleSound.play(gain)
+        else if (name === "groan") groanSound.play(gain)
+        else crumbleSound.play(gain)
         holeSounds = holeSounds.slice(1 - veinSoundsKept).concat([name])
         holeSoundCount++
     }
@@ -357,7 +394,7 @@ ClayWorld2d {
 
     Sound {
         id: spitterSound
-        source: "assets/spitter.wav"
+        source: "../sound/sfx/spitter.wav"
         volume: muted ? 0 : 0.6 * soundVolume
     }
 
@@ -369,7 +406,7 @@ ClayWorld2d {
     // sample pitched down, fading with the distance from this knight
     Sound {
         id: growlSound
-        source: "assets/spitter.wav"
+        source: "../sound/sfx/spitter.wav"
         volume: muted ? 0 : 0.8 * soundVolume
     }
     function playCrushGrowl(xWu, yWu) {
@@ -383,9 +420,9 @@ ClayWorld2d {
 
     // A grunt or a guardian winds up its lunge: a goblin's scream, pitched
     // by its tier (Balance.scream), fading as the growl does
-    Sound {
+    SfxPlayer {
         id: screamSound
-        source: "assets/goblin_scream.wav"
+        source: "../sound/sfx/goblin_scream.sfx.json"
         volume: muted ? 0 : Balance.scream.volume * soundVolume
     }
     function playScream(xWu, yWu, tier) {
@@ -395,29 +432,41 @@ ClayWorld2d {
             gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
         }
         let pitch = Balance.scream.tierPitch[Math.max(0, Math.min(2, tier))] || 0
-        if (gain > 0) screamSound.triggerNote(screamSound.rootNote + pitch, gain)
+        if (gain > 0) screamSound.play(gain, pitch)
     }
 
+    // The NPCs' greetings are voiced lines of the sound factory
+    // (sound/voice/npc_greetings.voice.json), each a cue of
+    // sound/cues.json: an NPC's greetingSound names it,
+    // "voice/npc_greetings/innkeeper_greeting". Its render plays and the
+    // dialogue panel moves the speaker's mouth from the line's viseme cues
+    // beside the render
     Sound {
         id: innkeeperGreeting
-        source: "assets/innkeeper_greeting.wav"
+        source: "../sound/voice/npc_greetings/innkeeper_greeting.wav"
         volume: muted ? 0 : 0.8 * soundVolume
     }
     Sound {
         id: blacksmithGreeting
-        source: "assets/blacksmith_greeting.wav"
+        source: "../sound/voice/npc_greetings/blacksmith_greeting.wav"
         volume: muted ? 0 : 0.8 * soundVolume
     }
     Sound {
         id: witchGreeting
-        source: "assets/witch_greeting.wav"
+        source: "../sound/voice/npc_greetings/witch_greeting.wav"
         volume: muted ? 0 : 0.8 * soundVolume
     }
+    readonly property var _greetings: ({
+        "voice/npc_greetings/innkeeper_greeting": innkeeperGreeting,
+        "voice/npc_greetings/blacksmith_greeting": blacksmithGreeting,
+        "voice/npc_greetings/witch_greeting": witchGreeting
+    })
 
-    function playNpcGreeting(soundFile) {
-        if (soundFile.indexOf("innkeeper") >= 0) innkeeperGreeting.play()
-        else if (soundFile.indexOf("blacksmith") >= 0) blacksmithGreeting.play()
-        else if (soundFile.indexOf("witch") >= 0) witchGreeting.play()
+    function playNpcGreeting(cue) {
+        let greeting = _greetings[cue]
+        if (!greeting) return
+        greeting.play()
+        dialoguePanel.lipSync(Qt.resolvedUrl("../sound/" + cue + ".visemes.json"))
     }
 
     // Apply screen shake via transform on room
@@ -2492,9 +2541,9 @@ ClayWorld2d {
         PauseAnimation { duration: Math.max(0, Balance.record.banner - 2 * Balance.record.fade) * 1000 }
         NumberAnimation { target: recordBannerText; property: "opacity"; to: 0; duration: Balance.record.fade * 1000 }
     }
-    Sound {
+    SfxPlayer {
         id: recordChimeSound
-        source: "assets/menu_confirm.wav"
+        source: "../sound/sfx/menu_confirm.sfx.json"
         volume: muted ? 0 : Balance.record.volume * soundVolume
     }
     Timer {
@@ -2504,7 +2553,7 @@ ClayWorld2d {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            recordChimeSound.triggerNote(recordChimeSound.rootNote + Balance.record.chime[step], 1)
+            recordChimeSound.play(1, Balance.record.chime[step])
             if (++step >= Balance.record.chime.length) stop()
         }
     }
@@ -3017,18 +3066,19 @@ ClayWorld2d {
         NumberAnimation { target: world; property: "heartPulse"; to: 0.75; duration: 50 }
         NumberAnimation { target: world; property: "heartPulse"; to: 0; duration: 420; easing.type: Easing.OutQuad }
     }
-    Sound {
+    // Played live from its recipe (sound/cues.json), as the potion is
+    SfxPlayer {
         id: heartSound
-        source: "assets/heartbeat.wav"
+        source: "../sound/sfx/heartbeat.sfx.json"
         volume: muted ? 0 : 0.9 * world.lowHealthLevel * soundVolume
     }
     // A potion's heal fills the health bar slowly, so it is seen
     property bool _healing: false
     Timer { id: healingTimer; interval: 1000; onTriggered: world._healing = false }
     // The potion drunk: the cork, three gulps and a breath let out
-    Sound {
+    SfxPlayer {
         id: drinkSound
-        source: "assets/potion_drink.wav"
+        source: "../sound/sfx/potion_drink.sfx.json"
         volume: muted ? 0 : 0.8 * soundVolume
     }
 
@@ -4072,7 +4122,7 @@ ClayWorld2d {
         bonePiles.splice(i, 1)
         spawnShards(pile.xWu, pile.yWu, nx, ny, 9, "#D8D0BC", 0.14)
         spawnShards(pile.xWu, pile.yWu, nx, ny, 3, "#DDD5C2", 0.22)
-        impactSound.triggerOneShot(0.35)
+        impactSound.play(0.35)
         pile.destroy()
     }
 
@@ -4267,7 +4317,7 @@ ClayWorld2d {
     // A blow too weak for it: a crystal glances a swing off with sparks
     function glanceThing(b, nx, ny) {
         spawnSparks(b.cxWu, b.cyWu, -nx, -ny, 6, "#BFF4FF")
-        impactSound.triggerOneShot(0.25)
+        impactSound.play(0.25)
     }
     // Alone, or the host: b broke for good, its gold drops where it stood
     // and, in a session, every screen is told
@@ -4312,15 +4362,15 @@ ClayWorld2d {
         if (b.kind === "urn") {
             spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
             spawnShards(x, y, nx, ny, 4, Qt.lighter(b._clay, 1.3), 0.28)
-            impactSound.triggerOneShot(0.5)
+            impactSound.play(0.5)
         } else if (b.kind === "crate") {
             spawnShards(x, y, nx, ny, 9, b._wood, 0.24)
             spawnShards(x, y, nx, ny, 5, Qt.lighter(b._wood, 1.3), 0.14)
-            impactSound.triggerOneShot(0.6)
+            impactSound.play(0.6)
         } else {
             spawnShards(x, y, nx, ny, 12, "#7FE6FF", 0.18)
             spawnSparks(x, y, nx, ny, 10, "#E8FBFF")
-            impactSound.triggerOneShot(0.7)
+            impactSound.play(0.7)
         }
         if (b.glow) b.glow.destroy()
         b.destroy()
@@ -4905,9 +4955,9 @@ ClayWorld2d {
             let nx = d.across ? -d.roomSide : 0, ny = d.across ? 0 : -d.roomSide
             spawnShards(d.cxWu, d.cyWu, nx, ny, 10, d._wood, 0.26)
             spawnShards(d.cxWu, d.cyWu, nx, ny, 6, Qt.lighter(d._wood, 1.35), 0.16)
-            impactSound.triggerOneShot(0.8)
+            impactSound.play(0.8)
         } else {
-            impactSound.triggerOneShot(0.2)
+            impactSound.play(0.2)
         }
     }
     // The host's doors not closed in the level: every door here as they say
@@ -5207,7 +5257,7 @@ ClayWorld2d {
         let cx = (s.gx + 0.5) * cellSize, cy = (s.gy + 0.5) * cellSize
         spawnShards(cx, cy, s.nx, s.ny, 12, "#5A6272", 0.28)
         spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
-        impactSound.triggerOneShot(0.7)
+        impactSound.play(0.7)
         shake(0.4)
         runSecrets++
         minimap.requestPaint()
@@ -5242,7 +5292,7 @@ ClayWorld2d {
             _glancedBy = s
             let cx = (s.gx + 0.5 + s.nx * 0.5) * cellSize, cy = (s.gy + 0.5 + s.ny * 0.5) * cellSize
             spawnShards(cx, cy, s.nx, s.ny, 6, "#D8CDB6", 0.1)
-            impactSound.triggerOneShot(0.25)
+            impactSound.play(0.25)
             secretGlanced(s.cell)
         }
     }
@@ -5884,7 +5934,7 @@ ClayWorld2d {
             "Rest by the campfire — it'll patch you right up.",
             "For the road, a potion or a mana draught. Coin first, mind.",
             "The deeper floors have nastier creatures. Be careful."
-        ], "assets/innkeeper_greeting.wav", [
+        ], "voice/npc_greetings/innkeeper_greeting", [
             { id: "fish" },
             { id: "potion", label: "Health potion", price: Balance.shop.potionPrice },
             { id: "draught", label: "Mana draught (+" + Balance.shop.draughtMana + " mana)",
@@ -5908,7 +5958,7 @@ ClayWorld2d {
             "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
             "The deeper you've been, the finer I can make it. Bring gold from below.",
             "Cut stones from the veins down there? I'll buy every one."
-        ], "assets/blacksmith_greeting.wav", [{ id: "gems" }].concat(smithLines.map(line => ({ id: line }))))
+        ], "voice/npc_greetings/blacksmith_greeting", [{ id: "gems" }].concat(smithLines.map(line => ({ id: line }))))
 
         // Tree at village edge (dark green static object)
         let tree = wallComponent.createObject(world.room, {
@@ -5928,7 +5978,7 @@ ClayWorld2d {
             { x: cx - 6, y: cy - 4.5, duration: 4, text: "*gazing into crystal*" },
             { x: cx - 4, y: cy - 5, duration: 3, text: "*muttering softly*" },
             { x: cx - 5, y: cy - 5.5, duration: 2, text: "*reading the stars*" }
-        ], witchReading, "assets/witch_greeting.wav")
+        ], witchReading, "voice/npc_greetings/witch_greeting")
         let spots = [Qt.point(tree.xWu, tree.yWu)]
         _placeCampProps(camp, levelSeed, spots)
         _spawnMoths(_breatheLights(levelSeed, [cf].concat(torches)), cf, torches)
@@ -7463,9 +7513,10 @@ ClayWorld2d {
     // deepTravellerSounds the last veinSoundsKept of their sounds, "dig"
     // or "chord", muted too, deepTravellerSoundCount all of them
     Component { id: deepTravellerComponent; DeepTraveller { talkKey: world.talkKey } }
-    Sound {
+    // The chord plays live from its recipe (sound/cues.json)
+    SfxPlayer {
         id: travellerChord
-        source: "assets/deep_freed.wav"
+        source: "../sound/sfx/deep_freed.sfx.json"
         volume: muted ? 0 : Balance.deep.traveller.chordVolume * soundVolume
     }
     property var deepTravellers: []
@@ -7745,7 +7796,7 @@ ClayWorld2d {
         spawnShards(s.pickXWu, s.pickYWu, -s.facing, 0.4, 2, Balance.deep.chipColor, 0.06)
         let gain = _deepGain(s, cfg.digVolume, cfg.hearReach)
         if (gain > 0.005) {
-            tinkSound.triggerNote(tinkSound.rootNote + cfg.digPitch, gain / Balance.deep.tinkVolume)
+            tinkSound.play(gain / Balance.deep.tinkVolume, cfg.digPitch)
             _deepSound("dig")
         }
         if (!_decidesDeep()) return
@@ -7801,7 +7852,7 @@ ClayWorld2d {
             if (run.chord >= 0) {
                 run.chord -= dt
                 if (run.chord < 0) {
-                    travellerChord.triggerOneShot(Math.max(Balance.deep.hole.quietest,
+                    travellerChord.play(Math.max(Balance.deep.hole.quietest,
                                                            _deepGain(s, 1, Balance.deep.hole.hearReach)))
                     _deepSound("chord")
                 }
@@ -7930,9 +7981,9 @@ ClayWorld2d {
         purrSound.play()
         return true
     }
-    Sound {
+    SfxPlayer {
         id: purrSound
-        source: "assets/cat_purr.wav"
+        source: "../sound/sfx/cat_purr.sfx.json"
         volume: muted ? 0 : 0.8 * soundVolume
     }
     function sellGems() {

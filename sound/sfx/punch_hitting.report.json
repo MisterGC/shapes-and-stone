@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.12,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -19.678207,
+    "lufs_block_s": 0.12,
+    "true_peak_dbtp": -3.529689,
+    "peak_dbfs": -3.537256,
+    "rms_dbfs": -17.50428,
+    "crest_factor_db": 13.967024
+  },
+  "envelope": {
+    "silence_start_s": 2.3e-05,
+    "silence_end_s": 0.008481,
+    "attack_s": 0.004966,
+    "peak_at_s": 0.004989,
+    "peak_db": -9.345102,
+    "fall_20db_at_s": 0.052381,
+    "fall_60db_at_s": null
+  },
+  "spectrum": {
+    "centroid_hz": 183.13502,
+    "rolloff_hz": 258.398438,
+    "flatness": 0.000568,
+    "band_shares": {
+      "20_60": 0.041114,
+      "60_250": 0.797842,
+      "250_500": 0.097122,
+      "500_2k": 0.059997,
+      "2k_5k": 0.003327,
+      "5k_10k": 0.000541,
+      "10k_20k": 5.8e-05
+    }
+  },
+  "pitch": {
+    "voiced_share": 1.0,
+    "median_hz": 76.666417,
+    "start_hz": 83.605321,
+    "end_hz": 76.666417,
+    "sweep_semitones": -1.5,
+    "track": [
+      [
+        0.0,
+        84.089642
+      ],
+      [
+        0.01161,
+        83.605321
+      ],
+      [
+        0.02322,
+        83.605321
+      ],
+      [
+        0.03483,
+        80.757417
+      ],
+      [
+        0.04644,
+        71.946679
+      ],
+      [
+        0.05805,
+        77.557238
+      ],
+      [
+        0.06966,
+        71.532297
+      ],
+      [
+        0.08127,
+        75.349334
+      ],
+      [
+        0.09288,
+        76.666417
+      ],
+      [
+        0.10449,
+        76.666417
+      ],
+      [
+        0.1161,
+        73.628353
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.107467,
+    "roughness_asper": 0.046173,
+    "roughness_max_asper": 0.046173
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.00197,
+    "loop_seam_jump": 0.00016,
+    "loop_seam_jump_ratio": 0.005087
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "punch_hitting.wav",
+  "pictures": {
+    "spectrogram": "punch_hitting.spec.png",
+    "waveform": "punch_hitting.wave.png"
+  }
+}

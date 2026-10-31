@@ -63,11 +63,11 @@ Window {
     function steps(seconds) { return Math.round(seconds / stepS) }
     function run(seconds) { Clayground.physicsStep(steps(seconds)) }
 
-    // Every Music and Sound in the item tree under root, by file name
+    // Every song, Sound and SfxPlayer in the item tree under root, by file name
     function tracks(root, out) {
         out = out || {}
         let src = root.source !== undefined ? String(root.source) : ""
-        if (src.endsWith(".mp3") || src.endsWith(".wav"))
+        if (src.endsWith(".song.json") || src.endsWith(".wav") || src.endsWith(".sfx.json"))
             out[src.substring(src.lastIndexOf("/") + 1)] = root
         let kids = root.data || []
         for (let i = 0; i < kids.length; i++) tracks(kids[i], out)
@@ -92,7 +92,7 @@ Window {
             }
         return best
     }
-    function music() { return tracks(game)["village_music.mp3"] }
+    function music() { return tracks(game)["village.song.json"] }
     function campReady() { return game.player && game.levelType === "village" && game.campfire && !game.resetting }
     function looks() { return cs.sources.filter(s => s.name === game.campLook.name) }
 
@@ -201,12 +201,13 @@ Window {
             put(fire.xWu - 1.5, fire.yWu)
             keys.keyClick(Qt.Key_M, Qt.NoModifier, -1)
             let t = tracks(game)
-            let camp = ["camp_crackle.wav", "camp_anvil.wav", "camp_drip.wav", "camp_creak.wav", "camp_hiss.wav"]
+            let camp = ["camp_crackle.wav", "camp_anvil.sfx.json", "camp_drip.sfx.json", "camp_creak.wav", "camp_hiss.wav"]
             check(game.muted && camp.every(n => t[n] && t[n].volume === 0)
-                  && t["village_music.mp3"].volume === 0 && t["village_ambience.mp3"].volume === 0,
+                  && t["village.song.json"].volume === 0 && t["village.sfx.json"].volume === 0,
                   "M silences the camp's near sounds, its music and its ambience")
             keys.keyClick(Qt.Key_M, Qt.NoModifier, -1)
-            check(!game.muted && camp.every(n => t[n].volume > 0) && t["village_music.mp3"].volume > 0,
+            check(!game.muted && camp.every(n => t[n].volume > 0) && t["village.song.json"].volume > 0
+                  && t["village.sfx.json"].volume > 0,
                   "M again brings them back")
             game.player.sitAfter = 1e9
             Clayground.paused = false

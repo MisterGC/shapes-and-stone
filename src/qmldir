@@ -43,7 +43,8 @@ PauseMenu 1.0 PauseMenu.qml
 MenuPad 1.0 MenuPad.qml
 KnightPanel 1.0 KnightPanel.qml
 KnightPad 1.0 KnightPad.qml
-LoopMusic 1.0 LoopMusic.qml
+SongMusic 1.0 SongMusic.qml
+AmbienceBed 1.0 AmbienceBed.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
 Session 1.0 Session.qml

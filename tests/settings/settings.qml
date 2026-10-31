@@ -67,11 +67,12 @@ Window {
         script.start()
     }
 
-    // Every Music and Sound in the item tree under `root`, by file name
+    // Every song, recipe and Sound in the item tree under `root`, by file
+    // name: "dungeon.song.json", "coin_pickup.sfx.json", "footstep.wav"
     function tracks(root, out) {
         out = out || {}
         let src = root.source !== undefined ? String(root.source) : ""
-        if (src.endsWith(".mp3") || src.endsWith(".wav"))
+        if (src.endsWith(".song.json") || src.endsWith(".sfx.json") || src.endsWith(".wav"))
             out[src.substring(src.lastIndexOf("/") + 1)] = root
         let kids = root.data || []
         for (let i = 0; i < kids.length; i++) tracks(kids[i], out)
@@ -113,7 +114,7 @@ Window {
             game.screen = "game"
             game.forceActiveFocus()
         }],
-        [() => game.player !== null && tracks(game)["dungeon_music.mp3"].playing, () => {
+        [() => game.player !== null && tracks(game)["dungeon.song.json"].playing, () => {
             press(Qt.Key_Escape)
         }],
         [() => shown("pauseMenu") !== null && shown("pauseMenu").activeFocus, () => {
@@ -127,10 +128,10 @@ Window {
             let t = tracks(game)
             check(near(game.musicVolume, 0.9), "S then A turns the music to 90%")
             check(find(shown("pauseMenu"), "pauseVolumeMusic").text === "90%", "the row shows 90%")
-            check(near(t["village_music.mp3"].volume, 0.35 * 0.9) && near(t["dungeon_music.mp3"].volume, 0.3 * 0.9)
-                  && near(t["village_ambience.mp3"].volume, 0.4 * 0.9),
+            check(near(t["village.song.json"].volume, 0.35 * 0.9) && near(t["dungeon.song.json"].volume, 0.3 * 0.9)
+                  && near(t["village.sfx.json"].level, 0.4 * 0.9),
                   "the music and the ambience play at their own volume times 0.9")
-            check(near(t["punch_hitting.wav"].volume, 0.7), "the sounds keep their volume")
+            check(near(t["punch_hitting.sfx.json"].volume, 0.7), "the sounds keep their volume")
             check(kept.get("musicVolume", "") === "0.9", "the music volume is kept (" + kept.get("musicVolume", "") + ")")
             press(Qt.Key_S)
             press(Qt.Key_A)
@@ -139,9 +140,9 @@ Window {
         [100, () => {
             let t = tracks(game)
             check(near(game.soundVolume, 0.8), "S then A twice turns the sound to 80%")
-            check(near(t["punch_hitting.wav"].volume, 0.7 * 0.8) && near(t["coin_pickup.wav"].volume, 0.5 * 0.8),
+            check(near(t["punch_hitting.sfx.json"].volume, 0.7 * 0.8) && near(t["coin_pickup.sfx.json"].volume, 0.5 * 0.8),
                   "the sounds play at their own volume times 0.8")
-            check(near(t["village_music.mp3"].volume, 0.35 * 0.9), "the music stays at 90%")
+            check(near(t["village.song.json"].volume, 0.35 * 0.9), "the music stays at 90%")
             check(kept.get("soundVolume", "") === "0.8", "the sound volume is kept")
             press(Qt.Key_D)
         }],
@@ -155,7 +156,8 @@ Window {
             check(true, "W twice and Enter resume")
             game._collectGold(5, game.player.xWu, game.player.yWu)
         }],
-        [() => tracks(game)["coin_pickup.wav"].playing, () => {
+        // A recipe's player has played once its lastSeed is set
+        [() => tracks(game)["coin_pickup.sfx.json"].lastSeed !== -1, () => {
             check(true, "gold picked up plays the coin sound")
             let p = game.player
             p.gold = 200

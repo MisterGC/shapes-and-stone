@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "fish_bite",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "plunge", "role": "body", "source": "sine", "freq": 230, "length": 200, "gain": -3.2, "offset": 0, "envelope": {"attack": 2, "decay": 150, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 16.54, "time": 200}},
+    {"name": "water", "role": "body", "source": "noise", "length": 350, "gain": -10.1, "offset": 10, "envelope": {"attack": 2, "decay": 225, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 700, "resonance": 0.09}},
+    {"name": "spray0", "role": "tail", "source": "sine", "freq": 1095.1, "length": 50, "gain": -15.2, "offset": 189, "envelope": {"attack": 2, "decay": 30, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 50}},
+    {"name": "spray1", "role": "tail", "source": "sine", "freq": 969.0, "length": 50, "gain": -15.2, "offset": 112, "envelope": {"attack": 2, "decay": 30, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 50}},
+    {"name": "spray2", "role": "tail", "source": "sine", "freq": 1049.2, "length": 50, "gain": -15.2, "offset": 164, "envelope": {"attack": 2, "decay": 30, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 50}},
+    {"name": "spray3", "role": "tail", "source": "sine", "freq": 1482.7, "length": 50, "gain": -15.2, "offset": 119, "envelope": {"attack": 2, "decay": 30, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 50}}
+  ]
+}

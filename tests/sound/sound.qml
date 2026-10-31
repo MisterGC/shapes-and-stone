@@ -43,11 +43,12 @@ Window {
         script.start()
     }
 
-    // Every Music and Sound in the item tree under `root`, by file name
+    // Every song, recipe and Sound in the item tree under `root`, by file
+    // name: "dungeon.song.json", "coin_pickup.sfx.json", "footstep.wav"
     function tracks(root, out) {
         out = out || {}
         let src = root.source !== undefined ? String(root.source) : ""
-        if (src.endsWith(".mp3") || src.endsWith(".wav"))
+        if (src.endsWith(".song.json") || src.endsWith(".sfx.json") || src.endsWith(".wav"))
             out[src.substring(src.lastIndexOf("/") + 1)] = root
         let kids = root.data || []
         for (let i = 0; i < kids.length; i++) tracks(kids[i], out)
@@ -72,16 +73,16 @@ Window {
         [() => game.screen === "title", () => {
             let t = tracks(game)
             check(!game.muted, "a start outside the dojo is not muted")
-            check(t["title_music.mp3"] && t["title_music.mp3"].playing && heard(t["title_music.mp3"]),
+            check(t["title.song.json"] && t["title.song.json"].playing && heard(t["title.song.json"]),
                   "the title music plays and is heard")
             game.screen = "game"
             game.forceActiveFocus()
         }],
-        [() => game.player && tracks(game)["dungeon_music.mp3"].playing, () => {
+        [() => game.player && tracks(game)["dungeon.song.json"].playing, () => {
             let t = tracks(game)
-            check(heard(t["dungeon_music.mp3"]), "the dungeon music plays and is heard (volume "
-                  + t["dungeon_music.mp3"].volume + ")")
-            check(t["dungeon_ambience.mp3"].playing && heard(t["dungeon_ambience.mp3"]),
+            check(heard(t["dungeon.song.json"]), "the dungeon music plays and is heard (volume "
+                  + t["dungeon.song.json"].volume + ")")
+            check(t["dungeon.sfx.json"].wanted && heard(t["dungeon.sfx.json"]),
                   "the dungeon ambience plays and is heard")
             check(!find(game, "muteIcon").visible, "no mute icon while the sound is on")
             pressM()
@@ -95,7 +96,7 @@ Window {
         [100, () => {
             let t = tracks(game)
             check(!game.muted, "M again unmutes the game")
-            check(heard(t["dungeon_music.mp3"]), "the dungeon music is heard again")
+            check(heard(t["dungeon.song.json"]), "the dungeon music is heard again")
             check(!find(game, "muteIcon").visible, "the mute icon goes away again")
             console.log("[Sound] done,", failures, "failed")
         }],

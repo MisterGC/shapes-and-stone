@@ -451,12 +451,13 @@ Canvas {
         ctx.restore()
     }
 
-    Sound { id: castSound; source: "assets/fish_cast.wav"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
-    Sound { id: plopSound; source: "assets/fish_plop.wav"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
-    Sound { id: plipSound; source: "assets/fish_plip.wav"; volume: game && !game.muted ? 0.5 * game.soundVolume : 0 }
-    Sound { id: biteSound; source: "assets/fish_bite.wav"; volume: game && !game.muted ? 0.8 * game.soundVolume : 0 }
-    Sound { id: clickSound; source: "assets/fish_click.wav"; volume: game && !game.muted ? 0.35 * game.soundVolume : 0 }
-    Sound { id: splashSound; source: "assets/fish_splash.wav"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
-    Sound { id: landSound; source: "assets/fish_land.wav"; volume: game && !game.muted ? 0.7 * game.soundVolume : 0 }
-    Sound { id: snapSound; source: "assets/fish_snap.wav"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
+    // The sound factory's cues (sound/cues.json), live from their recipes
+    SfxPlayer { id: castSound; source: "../sound/sfx/fish_cast.sfx.json"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
+    SfxPlayer { id: plopSound; source: "../sound/sfx/fish_plop.sfx.json"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
+    SfxPlayer { id: plipSound; source: "../sound/sfx/fish_plip.sfx.json"; volume: game && !game.muted ? 0.5 * game.soundVolume : 0 }
+    SfxPlayer { id: biteSound; source: "../sound/sfx/fish_bite.sfx.json"; volume: game && !game.muted ? 0.8 * game.soundVolume : 0 }
+    SfxPlayer { id: clickSound; source: "../sound/sfx/fish_click.sfx.json"; volume: game && !game.muted ? 0.35 * game.soundVolume : 0 }
+    SfxPlayer { id: splashSound; source: "../sound/sfx/fish_splash.sfx.json"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
+    SfxPlayer { id: landSound; source: "../sound/sfx/fish_land.sfx.json"; volume: game && !game.muted ? 0.7 * game.soundVolume : 0 }
+    SfxPlayer { id: snapSound; source: "../sound/sfx/fish_snap.sfx.json"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
 }

@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "shield_clang",
+  "variation": { "seed": 1, "pool": 1 },
+  "layers": [
+    {
+      "name": "strike",
+      "role": "transient",
+      "source": "noise",
+      "gain": -14,
+      "length": 12,
+      "envelope": { "attack": 0.5, "decay": 12, "sustain": 0, "decayCurve": 1 },
+      "filter": { "type": "bandpass", "cutoff": 1800, "resonance": 0.3 }
+    },
+    {
+      "name": "plate",
+      "role": "body",
+      "source": "triangle",
+      "freq": 212,
+      "gain": -2.5,
+      "length": 330,
+      "envelope": { "attack": 1, "decay": 330, "sustain": 0, "decayCurve": 1 }
+    },
+    {
+      "name": "mode2",
+      "role": "body",
+      "source": "sine",
+      "freq": 585,
+      "gain": -8.5,
+      "length": 230,
+      "envelope": { "attack": 1, "decay": 230, "sustain": 0, "decayCurve": 1 }
+    },
+    {
+      "name": "mode3",
+      "role": "tail",
+      "source": "sine",
+      "freq": 1146,
+      "gain": -21,
+      "length": 110,
+      "envelope": { "attack": 1, "decay": 110, "sustain": 0, "decayCurve": 1 }
+    },
+    {
+      "name": "mode4",
+      "role": "tail",
+      "source": "sine",
+      "freq": 1871,
+      "gain": -27,
+      "length": 70,
+      "envelope": { "attack": 1, "decay": 70, "sustain": 0, "decayCurve": 1 }
+    },
+    {
+      "name": "shimmer",
+      "role": "tail",
+      "source": "sine",
+      "freq": 424,
+      "gain": -34,
+      "length": 120,
+      "envelope": { "attack": 1, "decay": 120, "sustain": 0, "decayCurve": 1 },
+      "fm": { "ratio": 1.11, "index": 3, "decay": 300, "sustain": 0, "decayCurve": 1 }
+    }
+  ]
+}

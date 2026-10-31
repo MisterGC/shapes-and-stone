@@ -236,6 +236,107 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
+All of the game's sound comes from the sound factory
+(github.com/MisterGC/sound-productions): each sound is an entry in the cue
+sheet `sound/cues.json`, with its source, its render and sound report beside
+it, where it came from, and a person's verdict once it has been heard.
+
+- **Effects** are recipes, `sound/sfx/<name>.sfx.json`. A live cue plays
+  its recipe through Clayground's `SfxPlayer`, a little different each time
+  and, where the game pitches it, transposed by `play(velocity, detune)`; a
+  rendered cue plays the factory's render, `sound/sfx/<name>.wav`, through a
+  `Sound` at another rate. The crackle, the hiss, the creak, the sword's
+  swing, the footstep and the spitter stay rendered: their pitch is in noise
+  and in filters, which a recipe's detune does not move.
+- **Ambience** beds are recipes too, `sound/ambience/<name>.sfx.json`, of
+  10 s each that fade in and out; `AmbienceBed.qml` plays the next take
+  8.5 s after the last, so they cross.
+- **Music** is three songs, `sound/music/<name>.score` in the factory's note
+  notation, compiled by `sp compose` to `<name>.song.json`, which
+  `SongPlayer` plays live (`SongMusic.qml`): the title's, the camp's and the
+  dungeon's. The dungeon's song follows the fight: its intensity is how many
+  enemies within reach are after the knight, out of three
+  (`Balance.music`), eased up fast and down slowly. A pulse of kick and
+  snare comes in from 0.15 to 0.5, a horn's counter-line and brushes from
+  0.5 to 1.
+- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
+  the knight's whirlwind shout are lines of the voice scripts
+  `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
+  to -18 LUFS and lip-synced by Rhubarb. A greeting plays its render, and the
+  dialogue panel moves the speaker's mouth from the line's viseme cues,
+  `<line>.visemes.json` beside the render.
+
+The build ships what the sheet names: a live cue's recipe or song, a
+rendered cue's render, and a voiced line's viseme cues. A changed recipe is
+rendered and delivered again with the factory's `sp`:
+
+```
+sp render sound/sfx/deep_tink.sfx.json -o /tmp/deep_tink.wav
+sp analyze /tmp/deep_tink.wav
+sp deliver /tmp/deep_tink.wav sfx/deep_tink --game . --source sound/sfx/deep_tink.sfx.json
+sp cues --game .
+```
+
+The recipes need Clayground `issue-452` (`7e93c11`, the submodule's
+commit), not `issue-450`: the village's ambience moves its volume with an
+LFO's `shape`, and the anvil, the creak, the crumble and the sword's hit
+drive a layer (`drive`). Clayground `issue-450` refuses those five
+(`unknown field`), so the `clay-sound` that `sp render` and `sp deliver`
+run, and the studio, are built against `issue-452` or later, e.g. against
+this repository's submodule (`-DCLAYGROUND_DIR=<shapes-and-stone>/clayground`).
+
+Three effects are design files: `sound/sfx/<name>.sfx.design.json` names
+one of the factory's stock templates, sets its macro knobs and overrides
+single values, and Clayground's compiler turns it into the recipe beside
+it. The sword's swing is on the `swing` template, the shield's clang on
+`metal-hit` and the deep's crumble on `crumble`; the game plays the
+compiled recipe, or for the swing its render, and never reads the design.
+A design is changed with `sp tweak` and delivered as itself:
+
+```
+sp design explain sound/sfx/sword_swing.sfx.design.json
+sp tweak sound/sfx/sword_swing.sfx.design.json --macro pitch=0.3
+sp deliver sound/sfx/sword_swing.sfx.design.json sfx/sword_swing --game .
+```
+
+The dojo reloads on a change in `src/` only, the sandbox's own folder.
+Until it watches the folders a sandbox loads from (clayground#461), start
+it with `sound/` as an import dir as well, and a delivered sound is
+playing in the running game a moment later, without a restart:
+
+```
+build/bin/claydojo --sbx src/Game.qml --import $PWD/sound
+```
+
+A song is changed in its score and compiled again
+(`sp compose sound/music/dungeon.score`); a voiced line is changed in its
+voice script and voiced again (`sp say sound/voice/npc_greetings.voice.json
+witch_greeting --takes 3`, with `vocli serve` running), then delivered with
+`--source` the script.
+
+The cue bench checks that the game has a player for every cue of the
+sheet - an `SfxPlayer` of the recipe or a `SongPlayer` of the song for a
+live one, a `Sound` of the render for a rendered one - loaded, that the
+live ones play and render, that the game's own calls reach them, that a
+designed cue's design file is on the template its provenance names, beside
+its recipe, and that M silences them:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cues/cues.qml
+```
+
+The lip-sync bench talks to the innkeeper, the blacksmith and the witch and
+checks that each greeting moves its speaker's mouth by the cues of its
+visemes file and rests it on X once the line is over; the fight music bench
+puts enemies after the knight and away again and checks that the dungeon
+song's intensity rises fast, falls slowly, ignores enemies out of reach and
+is 0 in the camp:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fightmusic/fightmusic.qml
+```
+
 At depth 0 a line at the bottom of the screen names the controls: WASD,
 LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
 potion, 2 draught, M mute and Esc menu. F or the middle button locks on an
@@ -422,13 +523,13 @@ buy what the panel offers, each ware named with its effect. Outside the
 panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
 mana back, up to the knight's max - at today's 40 it refills the bar; a
 knight with full mana drinks none. The campfire stays the healer.
-A potion drunk plays `potion_drink.wav` - the cork, three gulps and a
+A potion drunk plays the cue `sfx/potion_drink` - the cork, three gulps and a
 breath let out - swells an amber ring out from the knight with embers
 rising round it, and fills the health bar over a second. Below
 `lowHealthAt` (Game.qml, 35%) of max HP the screen's edge beats blood red
-with a heartbeat (`heartbeat.wav`), quicker and louder the lower the
+with a heartbeat (`sfx/heartbeat`), quicker and louder the lower the
 health, over Clayground's faded colours (`ScreenFx2d.lowHealth`); a potion
-lifts it off over a second. `tools/knight_sounds.py` makes both sounds.
+lifts it off over a second. Both play live from their recipes in `sound/`.
 
 The smith's upgrades have levels, I to III: the sharpened sword adds
 `shop.swordAtk` to the knight's attack and shows a brighter, wider blade
@@ -582,8 +683,8 @@ knight in the camp has stood still `camp.restQuiet` seconds (10) - all of
 them seated by the fire - the camp music steps down to `restMusic` of its
 level and the near sounds come forward; a knight that moves brings the
 music back. M mutes all of it. Every number is in `Balance.camp.sounds`;
-the samples are made by `tools/camp_sounds.py`. The camp sound bench
-steps the world: the crackle's gain falls from beside the fire to the
+the anvil and the drip play live from their recipes in `sound/`, the
+crackle, the creak and the hiss their renders there. The camp sound bench steps the world: the crackle's gain falls from beside the fire to the
 cave's far edge, the music holds until restQuiet, steps down and comes
 back on a press of D, the anvil rings only while the smith hammers, each
 look has its own sound on 12 seeds, and M silences it all. The danger
@@ -659,9 +760,9 @@ glowing glimmerfin, each with its size, gold and fight. The pond gives
 a few gold a fish, so it eases the purse without changing the descent -
 and a knight beside the cave cat gives it the smallest fish with E: it
 eats it, purrs and lies content a while. The rod, the line and the fish
-are drawn on the fishing knight's own screen only. `tools/fishing_sounds.py`
-makes the cast, the plop, the nibble, the bite, the reel's ratchet, the
-splash, the landing, the snap and the purr. The fishing bench checks
+are drawn on the fishing knight's own screen only. The cast, the plop, the
+nibble, the bite, the reel's ratchet, the splash, the landing, the snap and
+the purr are recipes in `sound/sfx/`, played live. The fishing bench checks
 where it may cast, the cast, a click too soon, a bite missed and hooked,
 the reel into the creel, the snap and the slack, walking off, the still
 water, the sale, the cat and the bites filled again on a new level:
@@ -1231,7 +1332,8 @@ physics steps, so a pause or a hit stop holds them. The gem's shape and
 colour come with the depth (`shapes`): an amber tetrahedron from depth 0,
 a jade cube from 2, a sapphire octahedron from 4, an amethyst
 dodecahedron from 6 and an ember icosahedron from 8. Every number is
-`Balance.deep`; the samples are synthesised by `tools/deep_sounds.py`.
+`Balance.deep`; the chink, the tink and the crumble play live from their
+recipes in `sound/`, the chink and the tink transposed per play.
 The dojo's `applyScenario("deep")` lands the knight in front of one in a
 walled room, its spawn hole in the same wall (#157), and
 `applyScenario("deep", 4)` shows depth 4's gem. The deep
@@ -1345,8 +1447,8 @@ crawl out of its mouth, each with the rumble: `waves` waves of
 `perWave`, `waveGap` seconds apart. `closeAfter` seconds after the last
 one its rim crumbles shut, a heap of rubble, and it never wakes again.
 The hole's sounds are quieter the further it is from the knight. Every
-number is `Balance.deep.hole`; the rumble and the groan are synthesised
-by `tools/deep_sounds.py`. In a session the host, which decides every
+number is `Balance.deep.hole`; the rumble and the groan play live from
+their recipes in `sound/`. In a session the host, which decides every
 cut gem, rolls the wake, runs every hole, sends its creatures as it
 sends every enemy, and publishes the holes' stages and waves (the
 session property `holes`), which every screen shows and hears in order,
@@ -1408,8 +1510,8 @@ fading out of sight, while a warm low major chord plays - the only one
 in the dungeon's sounds. Talking never wakes the hole. A miner still
 there when its hole's first wave comes flees the same way, without the
 chord. The pickaxe is the veins' alone: aimed at a traveller it starts
-no dig. Every number and line is `Balance.deep.traveller`; the chord is
-synthesised by `tools/deep_sounds.py`. In a session the node whose
+no dig. Every number and line is `Balance.deep.traveller`; the chord
+plays live from its recipe in `sound/`. In a session the node whose
 knight talked to one shows its line at once and tells the host; the
 host decides how it goes on and publishes every traveller that goes on
 (the session property `deepTravellers`), which every screen shows, a
