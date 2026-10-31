@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "dash",
+  "variation": {"seed": 1, "pool": 4},
+  "layers": [
+    {"name": "rush", "role": "body", "source": "noise", "length": 450, "gain": 0.3, "envelope": {"attack": 60, "decay": 390, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 350, "resonance": 0.2, "attack": 80, "decay": 300, "sustain": 0, "amount": 1.5}, "vary": {"filter.cutoff": [-60, 60]}},
+    {"name": "push", "role": "body", "source": "sine", "freq": 70, "length": 260, "gain": -3.7, "envelope": {"attack": 20, "decay": 240, "sustain": 0, "release": 0}, "pitch": {"start": 7, "end": -5, "time": 260}, "vary": {"detune": [-1, 1]}},
+    {"name": "flutter", "role": "tail", "source": "noise", "length": 300, "gain": -17.7, "offset": 60, "envelope": {"attack": 40, "decay": 260, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 2200, "resonance": 0.1}}
+  ]
+}

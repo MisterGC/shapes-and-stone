@@ -68,14 +68,13 @@ QtObject {
         // and a release swings a heavy blow: heavySwing times atk, within
         // heavyArc and heavyRange times attackRange, through a guardian's
         // shield (it staggers), knocking back heavyKnockback times as far.
-        // Released before full, a normal swing. Held chargeHold past full,
-        // the knight lets it go at normal strength. A hit cancels it
+        // Released before full, a normal swing; full, the charge is kept
+        // until the button is let go. A hit cancels it
         chargeStart: 0.2,
         chargeTime: 0.6,
-        chargeHold: 1.0,
-        chargeSpeed: 0.7,
+        chargeSpeed: 0.55,
         heavySwing: 2.5,
-        heavyArc: 90,
+        heavyArc: 180,
         heavyRange: 1.25,
         heavyKnockback: 2,
         // Whirlwind: Q with full momentum (Balance.momentum) spins the
@@ -144,7 +143,8 @@ QtObject {
     })
 
     // The charged heavy swing (knight.charge...) reads as a commitment: the
-    // blade glows from the knight's blade colour to glow as it charges;
+    // sword, held out the way the knight faces, goes from the knight's
+    // blade colour to glow as it charges, a shine running along it;
     // when full a ring of ringColor flashes out to ringScale times the
     // knight's size over ring seconds with a tick pitch semitones up. The
     // heavy swing plays the swing sample swingPitch semitones; its hit
@@ -271,6 +271,20 @@ QtObject {
         pitches: [0, -2]
     })
 
+    // The dungeon music (sound/music/dungeon.song.json) follows the fight:
+    // its intensity is how many enemies within reach world units of the
+    // knight are after it - chasing, winding up or striking - out of
+    // fullAt, eased up at rise and down at fall per second, so the pulse
+    // layer (0.15..0.5) comes in with the first enemy and the battle layer
+    // (0.5..1) with the second and third
+    readonly property var music: ({
+        fullAt: 3,
+        reach: 14,
+        rise: 1.5,
+        fall: 0.2,
+        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash"]
+    })
+
     // A grunt or a guardian winding up its lunge screams like a goblin,
     // fading with the distance as the crushing blow's growl does: the
     // sample pitched by tierPitch semitones (weak, normal, tough) at volume
@@ -305,7 +319,7 @@ QtObject {
         // Base HP by tier: weak, normal, tough
         tierHp: [22, 36, 50],
         // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        grunt: { hpBonus: 24, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 10, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -6, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // How often an enemy decides, and how often a chase re-plans its path
@@ -322,8 +336,17 @@ QtObject {
         // Lunge: wind up backwards, then dash at the knight
         lungeRange: 2.0,
         windUpSpeed: 4.0,
-        windUp: 0.3,
+        windUp: 0.5,
         lungeDuration: 0.35,
+        // A grunt closing in circles the knight first, circleDist wu off at
+        // circleSpeed, from circleRange on, for circleTime seconds (rolled
+        // from the pair), then commits: it goes in and lunges. A knight
+        // stepping inside lungeRange * circleStrikeIn meanwhile is struck
+        circleRange: 3.6,
+        circleDist: 2.8,
+        circleSpeed: 2.2,
+        circleTime: [0.8, 2.2],
+        circleStrikeIn: 0.8,
         // A lunge hits when it ends this close to the knight
         lungeHitRange: 1.2,
         // The last physics steps (1/60 s each) of a lunge in which a swing
@@ -473,7 +496,17 @@ QtObject {
     // breakables: a clay "urn", a wooden "crate" (or barrel) and a
     // "crystal" cluster, rarer the shallower; then the traps: a "spike"
     // plate, more often the higher the danger, and an arrow "slit" in a
-    // room's wall, the more and the faster the higher the danger
+    // room's wall, the more and the faster the higher the danger; last a
+    // "vein" of gems (Balance.deep, issue #156) in the face of the wall
+    // north of its cell, a room's cell with that wall beside it.
+    // travellers: a room but the start room that holds a vein holds a
+    // traveller of the deep (Balance.deep.traveller, issue #176) with
+    // chance at low, middle and high danger, on the floor in front of its
+    // vein's rock face beside the vein, a miner with minerShare's chance,
+    // else a lost one. With specialShare's chance it is one of
+    // Balance.deep.specials (issue #159), of that special's kind, rolled
+    // from the whole table: one already with the camps is there as an
+    // ordinary traveller
     readonly property var dungeon: ({
         // Loops: the rooms are joined in a chain, and extraCorridors more
         // corridors at low, middle and high danger (as danger.looks) join
@@ -505,12 +538,14 @@ QtObject {
         doorPathCost: 6,
         clearOfEntrance: 8,
         clearOfExit: 8,
+        travellers: { chance: [0.35, 0.45, 0.55], minerShare: 0.5, specialShare: 0.1 },
         kinds: {
             urn: { perRoom: [0.8, 0.6, 0.5], showcase: 1 },
             crate: { perRoom: [0.6, 0.7, 0.6], showcase: 1 },
             crystal: { perRoom: [0.1, 0.25, 0.45], showcase: 1 },
             spike: { perRoom: [0.3, 0.5, 0.8], showcase: 1 },
-            slit: { perRoom: [0.25, 0.5, 0.6], showcase: 1 }
+            slit: { perRoom: [0.25, 0.5, 0.6], showcase: 1 },
+            vein: { perRoom: [0.3, 0.4, 0.5], showcase: 1 }
         },
         // A breakable blocks like a small wall: a square of sizeWu on its
         // cell's centre. A swing breaks the nearest one in its arc, a
@@ -618,12 +653,262 @@ QtObject {
         }
     })
 
+    // Greed in the deep (issue #154): a vein of gems in a wall's face, cut
+    // with the pickaxe the sword turns into while digging (issue #155).
+    // The mouse aiming at a vein's cell, or within aimPad wu of it, with
+    // the knight's centre within reach wu of its face starts the dig, the
+    // sword folding into the pickaxe in morph seconds (issue #169); the
+    // aim moving further than aimHold wu off the cell, walking further
+    // than leave wu off, raising the shield, swinging or dashing ends it,
+    // and the pickaxe folds back. While it digs a ring closes on the vein
+    // from ringFrom times ringSize wu to ringSize, once every ringTime
+    // seconds, counted on the physics steps, and the left button strikes
+    // instead of swinging the sword: within window seconds of a close,
+    // before or after it, a clean strike, once a close; any other chips. A vein takes strikes[0] to strikes[1]
+    // strikes, clean or chipped, by its seed; the last one splits the
+    // stone and the gem pops out, its size in wu from gemSize[0] with no
+    // clean strike to gemSize[1] with all of them clean, by their share.
+    // A clean strike throws sparks in the gem's colour and plays the tink
+    // a step of phrase higher (semitones above the sample) for each clean
+    // strike before it; a chip throws chips grey chips and plays the
+    // chink alone, chipPitch semitones down. The gem coming free plays the
+    // tink at each of chime, chimeGap seconds apart, and the crumble.
+    // Within glintReach wu of the knight a vein glints, brighter the
+    // nearer in litLevels steps; coming within shimmerReach it shimmers once, the tink at
+    // shimmerPitch and shimmerVolume times its volume, and a faint
+    // shimmer of its colour shows round it while the knight is that near.
+    // The lantern of any knight lights it, the nearest one. shapes: the
+    // gem by depth, the last whose from is at most the depth: the five
+    // Platonic solids, a selfLit one glowing in the dark on its own. A
+    // gem cut goes into the knight's pouch, worth value[0] gold with no
+    // clean strike to value[1] with all of them clean, by their share,
+    // rounded; the smith buys every gem in the pouch at once for that.
+    // A knight that falls drops its pouch where it fell: any other knight
+    // whose centre comes within pouchReach wu of it, or that lifts the
+    // fallen one up, takes it. A gem won (issue #169) rises off the face
+    // in wonRise seconds, flies up to wonAbove wu above the knight's
+    // centre in wonFly, growing to wonScale times its size and at least
+    // wonMin wu across, holds there
+    // wonHold seconds and drops into the pouch in wonDrop. The wall face
+    // round a vein is rough rock in rockColor, rockCells cells to each
+    // side as far as the face runs, its ends breaking off over up to
+    // rockRagged wu where the bricks go on.
+    // hole: a room that holds a vein has one spawn hole (issue #157), low
+    // in the face of its north wall, at least gap cells from each of its
+    // veins where the wall allows, off the veins' rock face, a torch, a
+    // slit, a secret, a feature's cell and a doorway; a small room whose
+    // wall leaves no such cell lets go of the rock face, then the
+    // feature, then the doorway. Each gem cut from a vein of its room
+    // wakes it by chance (issue #175): wakeChance and wakePerGold for each
+    // gold the gem is worth and wakePerDig for each strike a miner of its
+    // room made while it rested (issue #176), times wakePerKnight more for
+    // each knight past the first the level was built for, at most
+    // wakeMost. Woken, dust
+    // puffs from its rim every puffEvery seconds and the rumble plays at
+    // rumbleVolume; eyesAfter seconds later two eyes open in its dark and
+    // the groan plays at groanVolume. telegraph seconds after the eyes
+    // opened (never less than enemy.minTelegraph)
+    // the first creature crawls out of its mouth, then waves waves of
+    // perWave creatures of the depth's kinds, waveGap seconds apart, each
+    // creature crawlGap after the one before it, each with the rumble.
+    // closeAfter seconds after the last one its rim crumbles shut and it
+    // never wakes again. A sound of the hole plays at its volume down to
+    // quietest of it at hearReach wu from the knight.
+    // traveller: a traveller of the deep (issue #176) is on the floor of
+    // a vein's room, in front of the rock face beside its vein. A lost one
+    // sits huddled there, sit wu out from the face, trembling by tremble
+    // of its width. A miner stands stand wu out from it, toVein wu toward
+    // the vein, facing it, and while a knight is within digReach wu of it
+    // swings its own pick at the rock every digEvery seconds, raising it
+    // over raise seconds: the tink
+    // digPitch semitones off at digVolume, quieter down to nothing at
+    // hearReach wu from the knight, a few chips of Balance.deep.chipColor,
+    // and each strike while its room's spawn hole rests adds to the
+    // chance the next gem cut there wakes it (hole.wakePerDig). E within
+    // talkReach wu of either talks to it: it says a line for say seconds,
+    // a lost one one of lostLines, a miner one of minerLines, talked into
+    // leaving because the deep is too dangerous, and walks off toward its
+    // room's way to the exit at leaveSpeed wu/s, fading out over fade
+    // seconds after fadeAfter; chordDelay after it sets off the warm chord
+    // plays at chordVolume. A miner still there when its hole's first wave
+    // comes says one of fleeLines and flees the same way, without the
+    // chord.
+    // specials (issue #159): the few special travellers of the whole
+    // game, each its id, name, title, kind ("miner" or "lost"), the line
+    // it says when talked to (line) and at the camp to a knight within
+    // camp.sayReach wu (campLine), and its comfort at the campfire, never
+    // fight power: heal times the fire's healing, mana times its mana, light
+    // times its light's reach. One waits in the deep with an edge of
+    // specialEdge, talked to it leaves toward the exit and joins the camps
+    // for good: kept with this machine's record (key "specials"), in a
+    // session the host's.
+    // camp: the travellers of this run that left toward the exit sit in
+    // the next camp of the run only, the one after their dungeon (issue
+    // #159, #177), the specials with the camps in every camp, round the fire: at one of angles spots ring wu from the
+    // fire's centre, on the floor, at least clear wu off the camp's
+    // travellers, its cat and each other, the specials first, most of
+    // them in all; their spots start at an angle from the level's seed ^
+    // salt
+    readonly property var deep: ({
+        reach: 1.6,
+        leave: 2.4,
+        aimPad: 0.3,
+        aimHold: 0.9,
+        morph: 0.16,
+        ringTime: 0.75,
+        ringSize: 1.1,
+        ringFrom: 2.4,
+        window: 0.12,
+        strikes: [3, 5],
+        gemSize: [0.34, 0.74],
+        sparks: 8,
+        chips: 7,
+        chipColor: "#8C8A86",
+        chinkVolume: 0.8,
+        chipPitch: -3,
+        tinkVolume: 0.5,
+        phrase: [0, 2, 4, 7, 9, 12],
+        chime: [12, 19, 24],
+        chimeGap: 0.12,
+        crumbleVolume: 0.5,
+        glintReach: 5.5,
+        litLevels: 4,
+        shimmerReach: 3.5,
+        shimmerPitch: 19,
+        shimmerVolume: 0.12,
+        pouchReach: 0.9,
+        wonRise: 0.45,
+        wonFly: 0.35,
+        wonHold: 0.9,
+        wonDrop: 0.25,
+        wonScale: 1.8,
+        wonMin: 1.1,
+        wonAbove: 1.3,
+        rockCells: 1,
+        rockRagged: 0.45,
+        rockColor: "#5E564C",
+        hole: {
+            gap: 3,
+            wakeChance: 0.25,
+            wakePerGold: 0.01,
+            wakePerKnight: 0.3,
+            wakePerDig: 0.02,
+            wakeMost: 0.95,
+            eyesAfter: 1.2,
+            puffEvery: 0.45,
+            telegraph: 1.5,
+            waves: 2,
+            perWave: 2,
+            waveGap: 4,
+            crawlGap: 0.4,
+            closeAfter: 1.2,
+            dustColor: "#8A8070",
+            rumbleVolume: 0.9,
+            groanVolume: 0.8,
+            hearReach: 22,
+            quietest: 0.2
+        },
+        traveller: {
+            sit: 1.0,
+            stand: 0.55,
+            toVein: 0.15,
+            tremble: 0.035,
+            digReach: 6,
+            digEvery: 1.4,
+            raise: 0.3,
+            digPitch: -7,
+            digVolume: 0.22,
+            hearReach: 14,
+            talkReach: 1.8,
+            say: 2.6,
+            leaveSpeed: 1.5,
+            fadeAfter: 0.8,
+            fade: 1.6,
+            chordDelay: 0.25,
+            chordVolume: 0.75,
+            lostLines: ["...how long was I down here?", "Thank you - I'll find the way up now.",
+                        "Light! I thought I'd never see it again."],
+            minerLines: ["Too dangerous, you say? ...Aye, I've pushed my luck.",
+                         "That hole's been stirring. Fine - I'm off.",
+                         "Not worth my neck, is it? I'll go up."],
+            fleeLines: ["Those things again - I'm off!", "Not worth it with them about!"]
+        },
+        specialEdge: "#E8C35A",
+        specials: [
+            { id: "healer", name: "Maren", title: "the healer", kind: "lost",
+              line: "Free... Then let me mend you, as you mended me.",
+              campLine: "Sit close. The fire and I will see to those cuts.", heal: 2 },
+            { id: "cook", name: "Brannoc", title: "the cook", kind: "miner",
+              line: "Stone's no place for a cook. I'll have a pot on at the camp.",
+              campLine: "Eat. Steady hands come from a full belly.", mana: 2 },
+            { id: "lamplighter", name: "Tamsin", title: "the lamplighter", kind: "lost",
+              line: "The dark had me. I'll keep it off the camps from now on.",
+              campLine: "I keep the fire bright. Rest easy.", light: 1.35 }
+        ],
+        camp: {
+            ring: 3.7,
+            angles: 20,
+            clear: 1.1,
+            most: 10,
+            sayReach: 3.2,
+            salt: 0x66726565
+        },
+        shapes: [
+            { from: 0, shape: "tetrahedron", color: "#F2B33D", value: [5, 12] },
+            { from: 2, shape: "cube", color: "#4FC48A", value: [8, 18] },
+            { from: 4, shape: "octahedron", color: "#4A86F0", value: [12, 26] },
+            { from: 6, shape: "dodecahedron", color: "#B072E8", value: [17, 36] },
+            { from: 8, shape: "icosahedron", color: "#FF4A2A", value: [24, 50], selfLit: true }
+        ]
+    })
+
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
     readonly property var loot: ({
         // By tier: weak, normal, tough. The fight room drops none
         goldByTier: [3, 5, 8],
         // A knight this close to a drop picks it up
         pickupRange: 0.8
+    })
+
+    // Fishing at a camp's pond, to come down between the dungeons: the
+    // left button, the knight within reach wu of the water and the mouse
+    // on it, casts the bobber there, at most castMax wu off. After wait
+    // seconds (rolled from the pair), with nibbles twitches before,
+    // nibbleGap seconds apart, a fish bites: the bobber goes under for
+    // biteWindow seconds and a click hooks it; a click before the bite
+    // reels in empty. Hooked, the button held reels it in at reelSpeed wu
+    // a second; now and then, every thrashEvery seconds (divided by the
+    // kind's fight), it thrashes for thrash seconds (times fight), a tell
+    // of tell seconds before: held through a thrash the line's tension
+    // rises by tensionRise a second and snaps at 1, let go it falls by
+    // tensionFall and the fish pulls slack wu a second back out. The pond
+    // gives bites bites a camp; the innkeeper buys the fish for their
+    // gold, the cave cat takes one from a knight within catReach wu (E).
+    // kinds: weight of the bites, size in cm, gold, fight
+    readonly property var fishing: ({
+        reach: 2.0,
+        castMax: 4.5,
+        leave: 0.9,
+        wait: [3.5, 9.0],
+        nibbles: [0, 2],
+        nibbleGap: [0.7, 1.8],
+        biteWindow: 0.55,
+        reelSpeed: 1.1,
+        thrashEvery: [1.2, 2.8],
+        thrash: [0.5, 1.0],
+        tell: 0.3,
+        tensionRise: 1.4,
+        tensionFall: 0.8,
+        slack: 0.5,
+        bites: 5,
+        catReach: 1.6,
+        kinds: [
+            { name: "Cave minnow", color: "#9FB8B0", weight: 40, size: [6, 11], gold: 1, fight: 0.6 },
+            { name: "Pale perch", color: "#C8C2A0", weight: 30, size: [14, 26], gold: 3, fight: 1.0 },
+            { name: "Stone carp", color: "#8A7A5A", weight: 18, size: [25, 48], gold: 5, fight: 1.4 },
+            { name: "Blind eel", color: "#6A6A80", weight: 9, size: [40, 80], gold: 8, fight: 1.8, eel: true },
+            { name: "Glimmerfin", color: "#7FE0D0", weight: 3, size: [18, 30], gold: 15, fight: 1.2, glows: true }
+        ]
     })
 
     // The village's wares, in gold: the innkeeper's potions, drunk with
@@ -678,7 +963,9 @@ QtObject {
             { key: "depth", label: "Base depth", step: 1, min: 0, max: 30, decimals: 0 },
             { key: "position", label: "Relative difficulty", step: 0.05, min: 0, max: 0.999, decimals: 2 },
             { key: "breakables", label: "Breakables per room", step: 0.1, min: 0, max: 6, decimals: 2,
-              kinds: ["urn", "crate", "crystal"] }
+              kinds: ["urn", "crate", "crystal"] },
+            { key: "veins", label: "Veins per room", step: 0.1, min: 0, max: 3, decimals: 2,
+              kinds: ["vein"] }
         ]
     })
 
@@ -750,5 +1037,387 @@ QtObject {
         manaPerSecond: 5.0,
         healRadius: 3.0,
         healTick: 0.2
+    })
+
+    // The camp (issue #145): a cave, not a box. Sizes in grid cells (2 wu)
+    // unless named in wu. The cave fills a box of width x height cells
+    // whose top sits exitTunnel rows below the top of the map, where the
+    // stairs are. Its edge runs bay cells inside the box, and along each
+    // side it moves out by up to bay cells (a bay) or in by up to outcrop
+    // cells (an outcrop), stepping by one or two cells every stretch[0] to
+    // stretch[1] cells;
+    // each corner of the box is cut off diagonally by corner[0] to
+    // corner[1] cells. The entrance and the exit open in a bay. The
+    // outline draws from its own stream, the level's seed ^ seedSalt, so
+    // every screen of a session builds the same cave
+    readonly property var camp: ({
+        width: 32,
+        height: 26,
+        exitTunnel: 3,
+        bay: 2,
+        outcrop: 2,
+        stretch: [3, 6],
+        corner: [4, 7],
+        seedSalt: 0x63617665,
+        // The walk from where the knights come in to the stairs, at
+        // knight.moveSpeed, takes at most this many seconds
+        maxWalk: 8,
+        // The tavern and the smithy: walls of whole cells, open to the
+        // south, width x height cells each, building cells to either side
+        // of the camp's middle column and raised cells above its middle row
+        building: { width: 5, height: 4, side: 4, raised: 2 },
+        // The campfire's light, in wu: it reaches the buildings, which
+        // cast shadows from it
+        fireLight: 16,
+        // The rock overhangs the cave's north-facing edges: a lip of lip wu
+        // hangs over the top of the face, stalactites of up to stalactite
+        // wu below it, one in about every tooth wu along the edge, and
+        // their shadows fall up to shadow wu onto the floor
+        overhang: { lip: 0.3, stalactite: 0.55, tooth: 0.7, shadow: 1.6 },
+        // The camp's look follows the depth (issue #146): a camp takes the
+        // last of looks whose from is at most its depth, the depth of the
+        // dungeon before it. Each look has its rock (the walls' tops and
+        // the overhang), its faces in faceStyle ("bricks", "moss",
+        // "strata" or "basalt") with their rims, the tavern's and the
+        // smithy's walls and faces, the lanterns at their fronts, the
+        // witch's tree (or what stands in its place); its floor in style
+        // ("stone", "earth" or "basalt") with grass over that share of
+        // earth, moss over that share of stone and that share of the
+        // stones cracked; its air (motes of that colour, density and
+        // size, drifting that far, blinking like fireflies or not, glowing
+        // on their own or seen in the light); its moths (see moths below);
+        // and its screen grade: the darkness's ambient, the temperature,
+        // the saturation and the vignette. Its props are one of layouts,
+        // picked from the level's seed ^ propSalt, each a list of props:
+        // a kind of shaders/prop.frag centred x, y wu from the camp's
+        // centre (east, north), w x h wu.
+        // A prop that would not lie whole on the cave's floor, clear of
+        // the paths, the fire and the people, is left out. Props are drawn
+        // only, nothing hurts; the knights walk over the flat ones
+        propSalt: 0x70726f70,
+        // What stands up from the camp's floor is solid (issue #178): the
+        // knights cannot walk on a prop of one of solid's kinds, inside its
+        // shape ("oval", the ellipse in its rectangle, or "box") at fill
+        // of its size about its middle, nor on the campfire within fire wu
+        // of its middle. The rails, the cracks, the coals and the
+        // mushrooms stay underfoot. The villagers and the travellers walk
+        // round them, clear wu off
+        solid: {
+            kinds: {
+                pond: { shape: "oval", fill: 0.9 },
+                ferns: { shape: "oval", fill: 0.8 },
+                stones: { shape: "oval", fill: 0.85 },
+                ore: { shape: "oval", fill: 0.85 },
+                basalt: { shape: "oval", fill: 0.85 },
+                slag: { shape: "oval", fill: 0.85 },
+                cart: { shape: "box", fill: 1 },
+                crates: { shape: "box", fill: 0.95 },
+                timber: { shape: "box", fill: 0.95 }
+            },
+            fire: 0.6,
+            clear: 0.45
+        },
+        // Props stay this far, in wu, off the middle column (the way from
+        // the entrance to the stairs), off the campfire's centre, off the
+        // fronts of the buildings, and off the innkeeper, the smith, the
+        // witch, her tree and every spot of their routines
+        clearOfPath: 3,
+        clearOfFire: 5,
+        clearOfFront: 3,
+        clearOfPeople: 2.5,
+        // A prop whose place the cave's edge cuts moves up to propShift wu
+        // toward the middle, on its side and then on the other
+        propShift: 4,
+        // A knight that stands still sitAfter seconds within the
+        // campfire's healRadius sits down facing the fire (issue #148):
+        // no key, no button, no knockback. Any of them stands it up at
+        // once. It is the look only: the fire heals and refills the same.
+        // The pose sinks in down seconds and rises in up seconds, squash
+        // of the knight's height lower; seated it breathes breath radians
+        // a second, breathDepth of its height deep, and its shield lies
+        // on the floor beside it
+        sitAfter: 3,
+        sit: { down: 0.45, up: 0.12, squash: 0.2, breath: 1.3, breathDepth: 0.05 },
+        // The camp rests (issue #147) once every knight in it has stood
+        // still restQuiet seconds: every knight seated, the last of them
+        // standing still since restQuiet - sitAfter before it sat
+        restQuiet: 10,
+        // The camp's near sounds (issue #147), each played at its source:
+        // the listening knight hears it at volume times (1 - d / reach)
+        // squared, d its distance in wu, and not at all from reach on. It
+        // plays again every every[0] to every[1] seconds, pitched by
+        // pitch[0] to pitch[1] semitones. The campfire crackles in every
+        // camp, the anvil rings while the smith stands at it hammering,
+        // and each look has its own at the props of its kinds: drips at
+        // the grotto's pond, the cart creaking in the miners' hall, the
+        // embers hissing at the ember camp's coals and cracks. While the
+        // camp rests the music falls to restMusic of its level in
+        // fadeDown seconds and the near sounds rise to restNear times
+        // their volume; a knight that moves brings both back in fadeUp
+        sounds: {
+            fire: { sample: "camp_crackle.wav", volume: 0.55, reach: 16, every: [0.12, 0.45], pitch: [-3, 2] },
+            anvil: { sample: "camp_anvil.sfx.json", volume: 0.45, reach: 18, every: [0.8, 1.1], pitch: [-1, 0] },
+            looks: {
+                grotto: { sample: "camp_drip.sfx.json", props: ["pond"], volume: 0.5, reach: 14, every: [0.9, 3.0], pitch: [-4, 5] },
+                hall: { sample: "camp_creak.wav", props: ["cart"], volume: 0.45, reach: 14, every: [3.0, 7.0], pitch: [-2, 2] },
+                ember: { sample: "camp_hiss.wav", props: ["coals", "cracks"], volume: 0.35, reach: 12, every: [1.5, 4.5], pitch: [-3, 1] }
+            },
+            restMusic: 0.3,
+            restNear: 1.5,
+            fadeDown: 3,
+            fadeUp: 0.8
+        },
+        // The camp's lights breathe (issue #149): on top of its flicker the
+        // campfire's and each lantern's intensity swells and sinks by up
+        // to depth of itself, one breath every seconds[0] to seconds[1]
+        // seconds, each light on its own breath. Only the intensity
+        // breathes, never the radius; the fire stays the brightest light.
+        // The breaths and the moths draw from the level's seed ^
+        // lightSalt, so every screen of a session sees the same
+        lightSalt: 0x6d6f7468,
+        breath: { seconds: [5, 8], depth: 0.1 },
+        // Moths circle the campfire and every lantern in slow, uneven
+        // loops (issue #149), as many as the look's moths says (fire,
+        // lantern: moths at each, at most 8), in its colour, drawn in one
+        // pass by shaders/moths.frag for up to 6 lights. A moth's loop is
+        // orbit wu around its light (fire or lantern), flattened to
+        // squash of that north to south, swelling and shrinking by swell
+        // of itself; it goes round at speed[0] to speed[1] radians a
+        // second, either way, wavering by waver, and darts aside up to
+        // dart wu. Its wings, size wu across, beat flutter times a second
+        moths: {
+            lantern: { orbit: 0.8 },
+            fire: { orbit: 1.6 },
+            squash: 0.6,
+            swell: 0.35,
+            speed: [0.5, 1.1],
+            waver: 0.6,
+            dart: 0.12,
+            size: 0.24,
+            flutter: 9
+        },
+        // A cave cat sleeps curled by the campfire (issue #150) in share
+        // of the camps, drawn from the level's seed ^ catSalt, so every
+        // screen of a session sees the same cat or none. It lies ring[0]
+        // to ring[1] wu from the fire's centre, out of the warmth where
+        // the knights sit, at one of angles spots round it that lies
+        // whole on the floor, clearOfPath, clearOfPeople and clearOfProps
+        // wu off the way to the stairs, the people's spots and the props;
+        // with none it is not there. It is size wu across and breathes
+        // once every breath seconds. Every tick seconds it looks for a
+        // standing knight: one within notice wu lifts its head in rise
+        // seconds, and once none is within forget wu for settle seconds it
+        // tucks it back in fall seconds. Asleep it stretches every
+        // act.every[0] to [1] seconds, for act.seconds
+        catSalt: 0x63617421,
+        cat: {
+            share: 0.8,
+            ring: [4.5, 5],
+            angles: 24,
+            clearOfProps: 0.5,
+            size: 1.1,
+            breath: 4,
+            tick: 0.1,
+            notice: 3,
+            forget: 4,
+            settle: 1.5,
+            rise: 0.4,
+            fall: 1.2,
+            act: { every: [20, 45], seconds: 2.5 },
+            fur: "#6E5E52",
+            light: "#A89380",
+            eyes: "#E8D27A"
+        },
+        // Travellers rest at the camp (issue #151): count[0] to count[1]
+        // of kinds, other adventurers on their way, each its own name,
+        // shape, colour and icon, drawn from the level's seed ^
+        // travellerSalt, so every screen of a session sees the same. Each
+        // sits at one of angles spots ring[0] to ring[1] wu from the
+        // fire's centre, on the floor, for rest[0] to rest[1] seconds,
+        // then wanders to one of the look's wander props - off wu off its
+        // edge toward the camp's middle, apart wu aside of the traveller
+        // before it, doing its text - for wander[0]
+        // to wander[1] seconds, and back; without such a prop it moves to
+        // another seat. They walk at walk wu a second and the knights walk
+        // through them. Talked to (E) one gives hearsayLines of hearsay,
+        // and sells nothing. Two of them standing within reach wu of each
+        // other exchange one of exchanges, the first after first[0] to
+        // first[1] seconds in the camp, then every every[0] to every[1]
+        // seconds: one says the first line, the other answers after answer
+        // seconds, each bubble up for show seconds. A dog follows one of
+        // them (dog below). The lines are tables: more are written here
+        travellerSalt: 0x74726176,
+        travellers: {
+            count: [1, 3],
+            kinds: [
+                { name: "Wanderer", shape: "square", color: "#5E8CB8", icon: "pack" },
+                { name: "Pilgrim", shape: "diamond", color: "#9AB85E", icon: "staff" },
+                { name: "Minstrel", shape: "circle", color: "#C8607A", icon: "lute" },
+                { name: "Prospector", shape: "square", color: "#B89A5E", icon: "pack" },
+                { name: "Hermit", shape: "diamond", color: "#8A7AA8", icon: "staff" }
+            ],
+            ring: [2.2, 2.8],
+            angles: 16,
+            rest: [16, 26],
+            wander: [7, 11],
+            walk: 1.2,
+            off: 1.2,
+            apart: 1.4,
+            props: {
+                grotto: [ { kind: "pond", text: "*watching the water*" } ],
+                hall: [ { kind: "cart", text: "*peering into the cart*" } ],
+                ember: [ { kind: "coals", text: "*warming hands*" }, { kind: "cracks", text: "*staring into the glow*" } ]
+            },
+            seatText: "*resting*",
+            hearsayLines: 2,
+            reach: 9,
+            first: [4, 8],
+            every: [10, 18],
+            answer: 2.5,
+            show: 4,
+            // A dog follows one traveller: it trots after it, stays follow
+            // wu beside it, runs at speed wu a second, closing gain times
+            // the way left each second, every step seconds; it sets out
+            // once its place is start wu away and rests within rest wu of
+            // it (issue #178). It is a Creature
+            // like the cat: it looks up at a standing knight within notice
+            // wu and settles once none is within forget wu for settle
+            // seconds; at rest it scratches every act.every[0] to [1]
+            // seconds, for act.seconds
+            dog: {
+                size: 0.75,
+                follow: 0.9,
+                speed: 2.4,
+                gain: 4,
+                step: 0.02,
+                start: 0.3,
+                rest: 0.05,
+                breath: 1.6,
+                tick: 0.1,
+                notice: 3,
+                forget: 4,
+                settle: 1.5,
+                rise: 0.3,
+                fall: 0.8,
+                act: { every: [12, 25], seconds: 1.4 },
+                fur: "#8A6A44",
+                light: "#C9A878",
+                eyes: "#2A1E14"
+            },
+            exchanges: [
+                [ "Heard the slits on four fire in threes.", "Then dash on the third." ],
+                [ "The big ones swing slow.", "Slow, but you only get to be wrong once." ],
+                [ "Lost my lantern two floors down.", "Lost my brother three floors down. Keep the lantern." ],
+                [ "Some walls down there sound hollow.", "Hit them. Gold likes to hide." ],
+                [ "This fire's the best thing I've seen all week.", "Week's not over." ],
+                [ "Spitters keep their distance.", "So close it for them." ],
+                [ "Any of you been past the embers?", "Once. Came back with less eyebrow." ],
+                [ "Smith says the blade gets better deeper down.", "So does the trouble." ],
+                [ "Hold the shield too long and it runs dry.", "Like my purse." ],
+                [ "The plates on the floor click before they bite.", "Then listen for the click." ]
+            ],
+            hearsay: [
+                "They say the deeper camps keep warmer fires. Something down there keeps them lit.",
+                "A guardian shoves you back when you stand in its way. Step aside, then strike.",
+                "Folk say the witch reads the next dungeon true. I've never caught her wrong.",
+                "Heard of a knight who parried a crushing blow. Heard it from him, mind.",
+                "The arrow slits fire in rhythm. Count, then walk.",
+                "Down past the miners' hall the rock gets hot enough to cook on.",
+                "Some hollow walls hide a whole chamber. Look for the cracked ones.",
+                "Rest a while by the fire. It mends more than skin.",
+                "Tough ones carry more gold. Weak ones carry their friends.",
+                "A dash takes you through a blow if you time it. Most don't."
+            ]
+        },
+        looks: [
+            { name: "grotto", from: 0,
+              rock: "#1E2826", face: "#3E5446", faceStyle: "moss", rim: "#6A8A6A",
+              buildingWall: "#4A4232", buildingFace: "#5E5440", lantern: "#E8F0A0", tree: "#2A4A2A",
+              floor: { style: "earth", color: "#34402E", grass: 0.8, moss: 0, crackShare: 0 },
+              air: { color: "#BFFF73", alpha: 0.9, density: 0.06, size: 0.06, drift: 0.9, blink: true, glows: true },
+              moths: { color: "#F0F6E0", alpha: 0.95, fire: 4, lantern: 4 },
+              grade: { ambient: "#3E5248", temperature: -0.1, saturation: 1.2, vignette: 0.35 },
+              layouts: [
+                  [ { kind: "pond", x: -20, y: -3, w: 7, h: 5 },
+                    { kind: "stones", x: -13, y: -14, w: 4, h: 3 },
+                    { kind: "mushrooms", x: -21, y: 6, w: 3, h: 2 },
+                    { kind: "ferns", x: 13, y: -14, w: 4, h: 3 },
+                    { kind: "stones", x: 20, y: -2, w: 4, h: 3 },
+                    { kind: "mushrooms", x: 12, y: 15, w: 3, h: 2 },
+                    { kind: "ferns", x: -12, y: 15, w: 4, h: 2 } ],
+                  [ { kind: "pond", x: 20, y: -3, w: 7, h: 5 },
+                    { kind: "ferns", x: -20, y: 0, w: 4, h: 3 },
+                    { kind: "stones", x: 13, y: -14, w: 5, h: 3 },
+                    { kind: "mushrooms", x: -14, y: -13, w: 3, h: 2 },
+                    { kind: "stones", x: -12, y: 15, w: 4, h: 2 },
+                    { kind: "ferns", x: 13, y: 15, w: 4, h: 2 },
+                    { kind: "mushrooms", x: 21, y: 6, w: 3, h: 2 } ],
+                  [ { kind: "pond", x: -13, y: -13, w: 8, h: 5 },
+                    { kind: "stones", x: 13, y: -13, w: 4, h: 3 },
+                    { kind: "ferns", x: -20, y: 1, w: 4, h: 3 },
+                    { kind: "mushrooms", x: 20, y: 0, w: 3, h: 2 },
+                    { kind: "ferns", x: 12, y: 15, w: 4, h: 2 },
+                    { kind: "stones", x: -12, y: 15, w: 4, h: 2 },
+                    { kind: "mushrooms", x: 8, y: -9, w: 2, h: 2 } ]
+              ] },
+            { name: "hall", from: 3,
+              rock: "#2A221C", face: "#7A6040", faceStyle: "strata", rim: "#A08860",
+              buildingWall: "#5A3E22", buildingFace: "#8A6232", lantern: "#FFC870", tree: "#5A4128",
+              floor: { style: "earth", color: "#4A3D2C", grass: 0, moss: 0, crackShare: 0 },
+              air: { color: "#FFD99A", alpha: 0.35, density: 0.35, size: 0.045, drift: 0.35, blink: false, glows: false },
+              moths: { color: "#F2E2C4", alpha: 0.9, fire: 5, lantern: 3 },
+              grade: { ambient: "#5A4E3E", temperature: 0.12, saturation: 1.1, vignette: 0.4 },
+              layouts: [
+                  [ { kind: "rails", x: -14, y: -15, w: 14, h: 1.4 },
+                    { kind: "cart", x: -10, y: -15, w: 2.4, h: 1.8 },
+                    { kind: "timber", x: -20, y: 0, w: 3, h: 4 },
+                    { kind: "ore", x: 13, y: -13, w: 4, h: 3 },
+                    { kind: "crates", x: 20, y: -2, w: 3, h: 3 },
+                    { kind: "crates", x: 12, y: 15, w: 3, h: 2 },
+                    { kind: "ore", x: -12, y: 15, w: 4, h: 2 } ],
+                  [ { kind: "rails", x: 20, y: -3, w: 1.4, h: 12 },
+                    { kind: "cart", x: 20, y: 1, w: 1.8, h: 2.4 },
+                    { kind: "crates", x: -20, y: -1, w: 3, h: 3 },
+                    { kind: "ore", x: -13, y: -13, w: 4, h: 3 },
+                    { kind: "timber", x: 13, y: -14, w: 4, h: 3 },
+                    { kind: "ore", x: 12, y: 15, w: 4, h: 2 },
+                    { kind: "crates", x: -12, y: 15, w: 3, h: 2 } ],
+                  [ { kind: "rails", x: 12, y: 15, w: 12, h: 1.4 },
+                    { kind: "cart", x: 15, y: 15, w: 2.4, h: 1.8 },
+                    { kind: "ore", x: -20, y: 0, w: 4, h: 4 },
+                    { kind: "crates", x: 13, y: -13, w: 3, h: 3 },
+                    { kind: "timber", x: -13, y: -14, w: 4, h: 3 },
+                    { kind: "crates", x: 20, y: -1, w: 3, h: 2 },
+                    { kind: "ore", x: -12, y: 15, w: 4, h: 2 } ]
+              ] },
+            { name: "ember", from: 6,
+              rock: "#181414", face: "#3A302E", faceStyle: "basalt", rim: "#8A4A30",
+              buildingWall: "#3A2A24", buildingFace: "#4E3A30", lantern: "#FF7A3A", tree: "#262022",
+              floor: { style: "basalt", color: "#363030", grass: 0, moss: 0, crackShare: 0 },
+              air: { color: "#FF5414", alpha: 0.9, density: 0.05, size: 0.05, drift: 0.8, blink: false, glows: true },
+              moths: { color: "#E8C4B0", alpha: 0.85, fire: 2, lantern: 2 },
+              grade: { ambient: "#3C2622", temperature: 0.3, saturation: 1.15, vignette: 0.45 },
+              layouts: [
+                  [ { kind: "cracks", x: -20, y: -1, w: 7, h: 5 },
+                    { kind: "basalt", x: -13, y: -14, w: 5, h: 3 },
+                    { kind: "coals", x: 13, y: -13, w: 3, h: 2 },
+                    { kind: "slag", x: 20, y: -2, w: 4, h: 3 },
+                    { kind: "cracks", x: 12, y: 15, w: 8, h: 2 },
+                    { kind: "basalt", x: -12, y: 15, w: 5, h: 2 } ],
+                  [ { kind: "cracks", x: 20, y: -1, w: 7, h: 5 },
+                    { kind: "basalt", x: -20, y: 0, w: 4, h: 4 },
+                    { kind: "slag", x: -13, y: -13, w: 4, h: 3 },
+                    { kind: "coals", x: 8, y: -9, w: 2, h: 2 },
+                    { kind: "basalt", x: 13, y: -14, w: 5, h: 3 },
+                    { kind: "cracks", x: -12, y: 15, w: 8, h: 2 },
+                    { kind: "coals", x: 12, y: 15, w: 3, h: 2 } ],
+                  [ { kind: "cracks", x: -13, y: -13, w: 8, h: 4 },
+                    { kind: "basalt", x: 20, y: 0, w: 4, h: 4 },
+                    { kind: "slag", x: -20, y: 1, w: 4, h: 3 },
+                    { kind: "coals", x: 13, y: -13, w: 3, h: 2 },
+                    { kind: "basalt", x: 12, y: 15, w: 5, h: 2 },
+                    { kind: "slag", x: -12, y: 15, w: 4, h: 2 } ]
+              ] }
+        ]
     })
 }

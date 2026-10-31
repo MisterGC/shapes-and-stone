@@ -20,25 +20,28 @@ Item {
     property string message: ""
     // The deepest descent kept on this machine (Game.recordLine); "" for none
     property string recordLine: ""
+    // Who was freed tonight and the specials with the camps (CampFreed);
+    // "" for none (issue #159)
+    property string freedLine: ""
+    property string joinedLine: ""
 
     // Menu sounds
-    Sound {
+    SfxPlayer {
         id: menuHoverSound
-        source: "assets/menu_change.wav"
+        source: "../sound/sfx/menu_change.sfx.json"
         volume: muted ? 0 : 0.5 * soundVolume
     }
-    Sound {
+    SfxPlayer {
         id: menuConfirmSound
-        source: "assets/menu_confirm.wav"
+        source: "../sound/sfx/menu_confirm.sfx.json"
         volume: muted ? 0 : 0.6 * soundVolume
     }
 
-    // Title music
-    LoopMusic {
+    // Title music, the sound factory's song (sound/cues.json)
+    SongMusic {
         id: titleMusic
-        source: "assets/title_music.mp3"
+        source: "../sound/music/title.song.json"
         level: muted ? 0 : 0.4 * musicVolume
-        loop: true
     }
     // A browser refuses to play before the first key press or click, and the
     // refused play() is not tried again: there the first gesture starts it.
@@ -104,6 +107,28 @@ Item {
             font.pixelSize: 15
             font.bold: true
             font.letterSpacing: 1
+        }
+
+        Text {
+            objectName: "titleFreed"
+            visible: titleScreen.freedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.freedLine
+            color: "#A8D4FF"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 13
+        }
+
+        Text {
+            objectName: "titleJoined"
+            visible: titleScreen.joinedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.joinedLine
+            color: "#E8C35A"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 13
         }
 
         Text {

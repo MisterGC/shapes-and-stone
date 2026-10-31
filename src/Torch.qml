@@ -26,7 +26,7 @@ Item {
         offsetYWu: -0.5
         radius: torch.lightRadius
         color: torch.flameColor
-        intensity: 0.75
+        intensity: 0.75 * torch.breathing
         flicker: 0.45
     }
     // A wall torch lights its own stretch of the corridor; the dark between
@@ -54,6 +54,13 @@ Item {
         from: 0; to: 1000; duration: 1000000
         loops: Animation.Infinite
     }
+    // A camp's lantern breathes (Balance.camp.breath): its light swells
+    // and sinks by breath of itself every breathSeconds, a whole number
+    // of breaths in each round of _t; a dungeon torch does not
+    property real breath: 0
+    property real breathSeconds: 6
+    property real breathPhase: 0
+    readonly property real breathing: 1 + breath * Math.sin(2 * Math.PI * _t / breathSeconds + breathPhase)
     readonly property real flicker: 0.5 + 0.3 * Math.sin((_t + phase) * 17.0)
                                     + 0.2 * Math.sin((_t + phase) * 41.0)
 

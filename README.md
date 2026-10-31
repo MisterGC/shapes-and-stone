@@ -131,6 +131,21 @@ fall, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/enemies/enemies.qml
 ```
 
+An enemy judges its sight and its way from where it stands, the centre
+of its box, to the centre of the knight's: a corner pushed into a wall,
+as a hole's creatures crawl out, does not blind it. Its patrol walks from
+the cell its spawn is in to the cells beside it that it reaches straight,
+and back, each between cell centres; pushed behind a wall from its
+spawn, it patrols round the cell it stands in. The wall push bench
+shoves a grunt into the wall above it until its corner is inside, checks
+that it patrols again with the knight out of sight and that a second one
+spots the knight 4 wu below it and goes for it, and exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/wallpush/wallpush.qml
+```
+
 The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
 connected over Local (LAN) or Cloud signaling and started on a fixed seed.
@@ -168,9 +183,111 @@ checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sound/sound.qml
 ```
 
+All of the game's sound comes from the sound factory
+(github.com/MisterGC/sound-productions): each sound is an entry in the cue
+sheet `sound/cues.json`, with its source, its render and sound report beside
+it, where it came from, and a person's verdict once it has been heard.
+
+- **Effects** are recipes, `sound/sfx/<name>.sfx.json`. A live cue plays
+  its recipe through Clayground's `SfxPlayer`, a little different each time
+  and, where the game pitches it, transposed by `play(velocity, detune)`; a
+  rendered cue plays the factory's render, `sound/sfx/<name>.wav`, through a
+  `Sound` at another rate. The crackle, the hiss, the creak, the sword's
+  swing, the footstep and the spitter stay rendered: their pitch is in noise
+  and in filters, which a recipe's detune does not move.
+- **Ambience** beds are recipes too, `sound/ambience/<name>.sfx.json`, of
+  10 s each that fade in and out; `AmbienceBed.qml` plays the next take
+  8.5 s after the last, so they cross.
+- **Music** is three songs, `sound/music/<name>.score` in the factory's note
+  notation, compiled by `sp compose` to `<name>.song.json`, which
+  `SongPlayer` plays live (`SongMusic.qml`): the title's, the camp's and the
+  dungeon's. The dungeon's song follows the fight: its intensity is how many
+  enemies within reach are after the knight, out of three
+  (`Balance.music`), eased up fast and down slowly. A pulse of kick and
+  snare comes in from 0.15 to 0.5, a horn's counter-line and brushes from
+  0.5 to 1.
+- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
+  the knight's whirlwind shout are lines of the voice scripts
+  `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
+  to -18 LUFS and lip-synced by Rhubarb. A greeting plays its render, and the
+  dialogue panel moves the speaker's mouth from the line's viseme cues,
+  `<line>.visemes.json` beside the render.
+
+The build ships what the sheet names: a live cue's recipe or song, a
+rendered cue's render, and a voiced line's viseme cues. A changed recipe is
+rendered and delivered again with the factory's `sp`:
+
+```
+sp render sound/sfx/deep_tink.sfx.json -o /tmp/deep_tink.wav
+sp analyze /tmp/deep_tink.wav
+sp deliver /tmp/deep_tink.wav sfx/deep_tink --game . --source sound/sfx/deep_tink.sfx.json
+sp cues --game .
+```
+
+The recipes need Clayground `issue-452` (`7e93c11`, the submodule's
+commit), not `issue-450`: the village's ambience moves its volume with an
+LFO's `shape`, and the anvil, the creak, the crumble and the sword's hit
+drive a layer (`drive`). Clayground `issue-450` refuses those five
+(`unknown field`), so the `clay-sound` that `sp render` and `sp deliver`
+run, and the studio, are built against `issue-452` or later, e.g. against
+this repository's submodule (`-DCLAYGROUND_DIR=<shapes-and-stone>/clayground`).
+
+Three effects are design files: `sound/sfx/<name>.sfx.design.json` names
+one of the factory's stock templates, sets its macro knobs and overrides
+single values, and Clayground's compiler turns it into the recipe beside
+it. The sword's swing is on the `swing` template, the shield's clang on
+`metal-hit` and the deep's crumble on `crumble`; the game plays the
+compiled recipe, or for the swing its render, and never reads the design.
+A design is changed with `sp tweak` and delivered as itself:
+
+```
+sp design explain sound/sfx/sword_swing.sfx.design.json
+sp tweak sound/sfx/sword_swing.sfx.design.json --macro pitch=0.3
+sp deliver sound/sfx/sword_swing.sfx.design.json sfx/sword_swing --game .
+```
+
+The dojo reloads on a change in `src/` only, the sandbox's own folder.
+Until it watches the folders a sandbox loads from (clayground#461), start
+it with `sound/` as an import dir as well, and a delivered sound is
+playing in the running game a moment later, without a restart:
+
+```
+build/bin/claydojo --sbx src/Game.qml --import $PWD/sound
+```
+
+A song is changed in its score and compiled again
+(`sp compose sound/music/dungeon.score`); a voiced line is changed in its
+voice script and voiced again (`sp say sound/voice/npc_greetings.voice.json
+witch_greeting --takes 3`, with `vocli serve` running), then delivered with
+`--source` the script.
+
+The cue bench checks that the game has a player for every cue of the
+sheet - an `SfxPlayer` of the recipe or a `SongPlayer` of the song for a
+live one, a `Sound` of the render for a rendered one - loaded, that the
+live ones play and render, that the game's own calls reach them, that a
+designed cue's design file is on the template its provenance names, beside
+its recipe, and that M silences them:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cues/cues.qml
+```
+
+The lip-sync bench talks to the innkeeper, the blacksmith and the witch and
+checks that each greeting moves its speaker's mouth by the cues of its
+visemes file and rests it on X once the line is over; the fight music bench
+puts enemies after the knight and away again and checks that the dungeon
+song's intensity rises fast, falls slowly, ignores enemies out of reach and
+is 0 in the camp:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fightmusic/fightmusic.qml
+```
+
 At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge), RMB shield, Space dash, E talk, 1 potion, 2
-draught, M mute and Esc menu.
+LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
+potion, 2 draught, M mute and Esc menu. F or the middle button locks on an
+enemy (see target lock).
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -293,6 +410,13 @@ buy what the panel offers, each ware named with its effect. Outside the
 panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
 mana back, up to the knight's max - at today's 40 it refills the bar; a
 knight with full mana drinks none. The campfire stays the healer.
+A potion drunk plays the cue `sfx/potion_drink` - the cork, three gulps and a
+breath let out - swells an amber ring out from the knight with embers
+rising round it, and fills the health bar over a second. Below
+`lowHealthAt` (Game.qml, 35%) of max HP the screen's edge beats blood red
+with a heartbeat (`sfx/heartbeat`), quicker and louder the lower the
+health, over Clayground's faded colours (`ScreenFx2d.lowHealth`); a potion
+lifts it off over a second. Both play live from their recipes in `sound/`.
 
 The smith's upgrades have levels, I to III: the sharpened sword adds
 `shop.swordAtk` to the knight's attack and shows a brighter, wider blade
@@ -358,6 +482,248 @@ checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camp/camp.qml
+```
+
+The camp is a cave, not a box: its outline has bays and outcrops and cut
+corners, drawn from a stream of its own (the level's seed ^
+`camp.seedSalt`), so the same seed builds the same cave on every screen
+of a session. It is about 1.5 times the old 20 x 20 cells, and sits
+right under the top of the map, so the walk from where the knights come
+in to the stairs stays at most `camp.maxWalk` seconds. Rock overhangs its
+north-facing edges, with stalactites and their shadows on the floor. The
+tavern and the smithy are walls of whole cells, with faces and rims, and
+cast shadows from the campfire. Every number is in `Balance.camp`. The
+cave bench builds the camp on 20 seeds and checks the outline's size and
+that it is no box, that 20 seeds build 20 outlines and another screen
+the same ones, the walk at move speed - and walks the knight to the
+stairs along it - where the campfire, the innkeeper, the smith and the
+witch stand, and that the buildings block the light and the campfire's
+light reaches them and casts shadows. It exits with the number of failed
+checks; with a window and an output directory it also saves the outline
+and the camp of three seeds and the buildings' shadows as PNGs:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cave/cave.qml
+qml -I build/bin/qml tests/cave/cave.qml -- <out dir>
+```
+
+The camps are the stations of the way down, and their look follows the
+depth: down to depth 2 a mossy grotto (green earth, moss over the rock,
+a pond, ferns, glowing mushrooms, fireflies), from depth 3 a miners' hall
+(ochre ground, rock strata between timber props, a rail track and its
+cart, crates, ore, dust in the lantern light), from depth 6 an ember camp
+(basalt ground and columns, glowing cracks and coals, embers in the
+air). Each look has its own rock, faces, floor, lanterns, air and screen
+grade, and its props are one of two or three layouts, picked from the
+level's seed (`camp.propSalt`), so every screen of a session lays out the
+same. A prop lies whole on the cave's floor, off the way to the stairs,
+the campfire and the people. What stands up from the floor is solid:
+the knights cannot walk into the pond, the ferns, the stones, the ore,
+the basalt, the slag, the cart, the crates, the timber or the campfire;
+the rails, the cracks, the coals and the mushrooms stay underfoot. The
+campfire stays the brightest light, and the campfire, the
+innkeeper, the smith and the witch keep their places at every depth.
+The looks are a table in `Balance.camp.looks`: a fourth is a row with
+its depth, its colours and its layouts. The camps bench lands at every
+depth from 0 to 12, checks each look on 12 seeds and has another screen
+build the same camps; with a window, the copied shaders and an output
+directory it saves each look at two seeds, whole and at the campfire:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/camps/camps.qml
+qml -I build/bin/qml tests/camps/camps.qml -- <out dir>
+```
+
+In the dojo, `applyScenario("village", d)` lands in the camp after depth
+d: 0 the grotto, 4 the hall, 7 the ember camp.
+
+A knight that stands still `camp.sitAfter` seconds (3) in the campfire's
+warmth, its heal radius, sits down facing the fire: it sinks a little,
+breathes slow and deep, and its shield lies on the floor beside it. Any
+movement key, a swing, the shield or a dash stands it up in the physics
+step it comes, and the knight moves in that step, so sitting never holds
+anyone. It is the look only: the fire heals and refills the same, seated
+or not. In a session the knight sends "sit" and "stand" as it sends a
+swing, and every screen shows it seated, facing the fire there. The pose's
+numbers are `camp.sit`. The sit bench steps the world one physics step at
+a time: the knight sits on the step that reaches sitAfter, a press of D,
+Space, the right button or a click each stands it up in the next step,
+out of the fire's warmth it never sits, and five seconds at the fire heal
+and refill the same seated as for a knight that never sits. It exits with
+the number of failed checks; with a window and an output directory it
+saves the knight seated as `sit.png`. The danger party bench below sits
+both knights of a two-process session at the first camp's fire and checks
+both screens show them seated, then one walking off and standing up:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/sit/sit.qml
+qml -I build/bin/qml tests/sit/sit.qml -- <out dir>
+```
+
+The camp's sounds sit where they come from: the campfire crackles in every
+camp, the anvil rings while the smith stands at it hammering, water drips
+at the grotto's pond, the cart creaks in the miners' hall and the embers
+hiss at the ember camp's coals and cracks. Each screen hears them by its
+own knight's distance, quieter the further, silent from a sound's reach
+on; Clayground's sound is mono, so there is no left or right. When every
+knight in the camp has stood still `camp.restQuiet` seconds (10) - all of
+them seated by the fire - the camp music steps down to `restMusic` of its
+level and the near sounds come forward; a knight that moves brings the
+music back. M mutes all of it. Every number is in `Balance.camp.sounds`;
+the anvil and the drip play live from their recipes in `sound/`, the
+crackle, the creak and the hiss their renders there. The camp sound bench steps the world: the crackle's gain falls from beside the fire to the
+cave's far edge, the music holds until restQuiet, steps down and comes
+back on a press of D, the anvil rings only while the smith hammers, each
+look has its own sound on 12 seeds, and M silences it all. The danger
+party bench checks two screens: each hears the crackle by its own knight,
+and the music steps down on both only while both knights rest:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsound/campsound.qml
+```
+
+Moths circle the campfire and every lantern in slow, uneven loops, now
+faster, now slower, the loop swelling and shrinking, their wings beating.
+Each look has its own: pale green-white and many in the grotto, dusty
+and gathered at the fire in the miners' hall, few and ash-coloured in
+the ember camp. All of them are one shader pass (`Moths.qml`,
+`shaders/moths.frag`), as the fireflies are: no item per moth. On top of
+its flicker the camp's light breathes: the fire's and each lantern's
+light swells and sinks over five to eight seconds, each on its own
+breath. Only the brightness breathes, never the reach; the heal radius
+is the fire's own, and the fire stays the brightest light. The moths and
+the breaths come from the level's seed (`camp.lightSalt`), so every
+screen of a session sees the same; their numbers are `camp.moths`,
+`camp.breath` and each look's `moths`. The moths bench checks one moth
+layer per camp at the fire and the four lanterns with its look's moths,
+that more moths add no item, that the light breathes while its radius
+and the heal stay put, that a dungeon's torches do not, and that
+another screen builds the same:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/moths/moths.qml
+```
+
+In most camps a cave cat sleeps curled by the campfire, a few soft
+shapes breathing slowly. When a knight comes within `notice` wu (3) it
+lifts its head and follows the knight with its eyes; once no knight has
+been within `forget` wu (4) for `settle` seconds (1.5) it tucks its head
+back in; now and then, asleep, it stretches. A knight that sits down by
+the fire lets it sleep. It lies on a ring round the fire, out of the
+warmth where the knights sit, on the floor and clear of the way to the
+stairs, the people and the props. It is drawn only: nothing collides with
+it and nothing depends on it; only a knight with a fish gets its
+attention (see fishing). Whether it is there and
+where it lies come from the level's seed (`camp.catSalt`), so every
+screen of a session sees the same cat or none, and each screen sees it
+look up at whichever knight comes near. Its numbers and colours are
+`camp.cat`. The cat bench checks on 20 seeds in each look that most camps
+have a cat and not all, where it lies, that it is no body, npc or prop,
+and that another screen places the same; then that it looks up at a
+knight coming near, follows it round, settles after the knight leaves,
+sleeps by a seated knight, watches the nearer of two knights and stops
+its stretch when woken. The danger party bench checks the same cat on two
+screens, and on both it looks up at the host's knight:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/cat/cat.qml
+```
+
+A camp with a pond (the grotto's) can be fished, to come down between the
+dungeons: calm enough to talk over, with a little timing in it
+(`src/Fishing.qml`, `Balance.fishing`). Within `reach` wu of the water,
+the mouse on it shows a faint ring where the bobber would land; the left
+button casts it there, at most `castMax` wu off. After `wait` seconds,
+with a nibble or two before, a fish bites: the bobber goes under with a
+plop and a wide ring, and a click within `biteWindow` seconds hooks it; a
+click before the bite reels in empty, a bite missed gets away. Hooked,
+the button held reels it in; now and then it thrashes - a plip and a
+ring a moment before, then splashes - and held through a thrash the
+line's tension rises until it snaps, let go the fish pulls some line back
+out. Landed, it leaps to the bank and goes into the knight's creel (Fish
+next to the gold): five kinds, from the common cave minnow to the rare
+glowing glimmerfin, each with its size, gold and fight. The pond gives
+`bites` bites a camp. The innkeeper buys the creel for the kinds' gold -
+a few gold a fish, so it eases the purse without changing the descent -
+and a knight beside the cave cat gives it the smallest fish with E: it
+eats it, purrs and lies content a while. The rod, the line and the fish
+are drawn on the fishing knight's own screen only. The cast, the plop, the
+nibble, the bite, the reel's ratchet, the splash, the landing, the snap and
+the purr are recipes in `sound/sfx/`, played live. The fishing bench checks
+where it may cast, the cast, a click too soon, a bite missed and hooked,
+the reel into the creel, the snap and the slack, walking off, the still
+water, the sale, the cat and the bites filled again on a new level:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fishing/fishing.qml
+```
+
+The cat is made from a creature template, `src/Creature.qml`, for the
+camp's next creatures (bats, fish, a salamander). The template does the
+watching: every `tick` seconds it asks the game for this screen's knights
+(`Game.knightsHere()`), turns `mood` from `"idle"` to `"alert"` when a
+standing knight is within `notice` wu, and back once none has been within
+`forget` wu for `settle` seconds. It hands its shapes a few numbers to
+draw by: `lift` (0 idle to 1 alert, eased over `rise` and `fall`
+seconds), `lookX` and `lookY` (the way to the knight it watches),
+`breathing` (-1 to 1, one breath every `breath` seconds) and `act` (0 to
+1 and back while its idle act plays, every `act.every` seconds, for
+`act.seconds`; a knight coming ends it). A new creature is a QML file
+`Creature { creature: "bat"; numbers: Balance.camp.bat; ... }` with its
+shapes reading those numbers (`src/CaveCat.qml` is the example), a group
+of numbers in `Balance.camp`, and a place in `Game.generateVillage`,
+drawn from its own stream (the level's seed ^ its own salt) like
+`_placeCat`. A creature of a few shapes can be QML items, as the cat is;
+a swarm (bats, a shoal of fish) is one shader pass, as the moths are.
+
+One to three travellers rest at the camp, other adventurers on their
+way: a Wanderer, a Pilgrim, a Minstrel, a Prospector or a Hermit, each a
+shape in its own colour. Each sits at the fire, wanders to a prop of the
+look - the grotto's pond, the hall's cart, the ember camp's coals or
+cracks - and back. Now and then two of them exchange a pair of lines in
+speech bubbles ("Heard the slits on four fire in threes." / "Then dash on
+the third."), and a dog, a creature like the cat, follows one of them.
+E at a traveller gives two lines of hearsay about the depths; they sell
+nothing, and the knights walk through them. Who comes, where each sits
+and wanders, its hearsay and the order of the exchanges come from the
+level's seed (`camp.travellerSalt`), so every screen of a session sees
+and hears the same; when each exchange comes is each screen's own. A
+traveller's `objectName` is `"traveller"`, not `"npc"`, so the benches
+that look for the innkeeper, the smith and the witch never find one. The
+kinds, the lines, the hearsay and the numbers are `camp.travellers`: a
+new line or kind is a row there. The travellers bench checks on 20 seeds
+in each look who comes, where they sit, their hearsay and the dog, that
+another screen picks the same, that two travellers exchange a pair of
+lines within a minute of a knight standing by the fire, that E gives the
+hearsay and no wares, and that the dog follows its traveller:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/travellers/travellers.qml
+```
+
+A solid prop has an invisible static body (`CampSolid.qml`), the ellipse
+in its rectangle or the rectangle, at the share of its size and the
+campfire's core radius in `camp.solid`. The dog closes on its place
+beside its traveller a share of the way each step, so it trots along at
+its traveller's pace instead of stopping and starting, and never steps
+back and forth. A villager talked to - the innkeeper, the smith, the
+witch or a traveller - stops what it is doing and faces the knight until
+the talk ends, then goes on where it left off; a traveller talked to
+leaves its answer in the travellers' talk unsaid. The villagers and the
+travellers walk round the solids: a leg of a routine that would cross
+one passes through points beside it (`camp.solid.clear` wu off). The
+solid camp bench
+walks a knight's middle over the floor of 10 camps of each look with and
+without the solid bodies and checks that nothing but the solids
+themselves is lost and that the stairs, the fire's warmth and the
+people at every spot of their routines stay reachable; it walks a
+knight into the campfire, the pond and the ferns, checks that no
+villager's or traveller's walk crosses a solid, traces the dog as its
+traveller walks there and back, and talks to the smith on its way and
+at its anvil and to a traveller with an answer queued:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/campsolid/campsolid.qml
 ```
 
 A descent gauge under the minimap shows how deep the knight is: a shaft of
@@ -490,8 +856,11 @@ window and the copied shaders, like the knight bench; the danger party
 bench plays four dungeons in a session of two processes, the host
 settling each next one from both knights' records and building it for two,
 and checks that both screens' gauges show the same depth, at each camp and
-in each dungeon (`--shots` saves both screens of the first three camps
-too):
+in each dungeon, that both build the same camp in its depth's look, with
+the same cat or none, and that at the first camp the cat looks up at the
+host's knight on both screens and both show the knights sit down by the
+fire and one stand up again (`--shots` saves both screens of the first three camps and
+of the knights seated too):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/danger/danger.qml
@@ -534,8 +903,10 @@ doorway or on a corridor's cell, at least `dungeon.clearOfEntrance` wu
 from the entrance and `dungeon.clearOfExit` wu from the exit, one to a
 cell. How many of a kind each room but the start room holds is the
 table's `dungeon.kinds`, per danger band as the looks have it. The kinds
-are the breakables, the spike plates and the arrow slits below; a slit stands
-only on a cell on the room's edge with a wall beside it. In
+are the breakables, the spike plates and the arrow slits below, and last
+the veins; a slit stands only on a cell on the room's edge with a wall
+beside it, a vein only on one with a wall north of it, in whose face it
+sits. In
 the dojo `applyScenario("features")` lands in a dungeon with every kind at
 its showcase count, and `applyScenario("features", 2.5, 77)` at a danger
 and on a seed; the next level is built without it. The features bench
@@ -815,13 +1186,323 @@ number of failed checks:
 python3 tests/secretparty/run_secretparty.py --mode local
 ```
 
+**Veins:** the deep keeps gems in its walls (#154). A vein is a cluster of
+small faceted gems half sunk into a wall's face, dim in the stone; where
+the lantern's light reaches it one facet winks a glint, and coming close
+it shimmers once. The wall face round it is rough rock, a miners' face
+of angular chunks in flat facets, a cell to each side of the vein
+(`rockCells`) as far as the face runs, breaking off raggedly where the
+bricks go on. The mouse aiming at a vein with the knight in reach of it
+starts the dig (#169): the sword folds into a pickaxe, held towards the
+vein, and a ring closes on the vein once every `ringTime` seconds, in
+the parry ring's look and white while a strike would be clean. The left
+button aimed at the vein strikes with the pickaxe instead of swinging the
+sword; aimed anywhere else it swings, and E only talks and opens doors.
+A click within `window` seconds of a close, before or after it, strikes
+clean: sparks in the gem's colour, a crack through the stone, the
+pickaxe's chink and a tink a pentatonic step higher with each clean
+strike, so a well-cut gem plays a rising phrase. Any other click, or a
+second one on the same close, chips: grey chips and the chink alone. A
+vein takes three to five strikes (`strikes`, by the level's seed and its
+cell); the last splits the stone with a crumble, and the gem is won: it
+rises off the face spinning once, flies up above the knight with a
+three-note chime and holds there a moment, bigger and lit (`wonAbove`,
+`wonScale`, `wonHold`), the bigger the more of the strikes were clean
+(`gemSize`). A clean cut, every strike clean, holds in a white ring with
+a star turning on it under CLEAN CUT; any chipped strike breaks notches
+out of it, it sheds grey flakes, and says CHIPPED. Then it drops into
+the pouch, and the HUD's count of its shape bumps, bigger and white a
+moment. The aim moving off the vein, walking off, raising the shield,
+swinging or dashing ends the dig, and the pickaxe folds back into the
+sword. The ring and the window count the
+physics steps, so a pause or a hit stop holds them. The gem's shape and
+colour come with the depth (`shapes`): an amber tetrahedron from depth 0,
+a jade cube from 2, a sapphire octahedron from 4, an amethyst
+dodecahedron from 6 and an ember icosahedron from 8. Every number is
+`Balance.deep`; the chink, the tink and the crumble play live from their
+recipes in `sound/`, the chink and the tink transposed per play.
+The dojo's `applyScenario("deep")` lands the knight in front of one in a
+walled room, its spawn hole in the same wall (#157), and
+`applyScenario("deep", 4)` shows depth 4's gem. The deep
+bench checks, with the real mouse, that the scenario lands in reach of
+the vein and shows each shape at its depth, that aiming at the vein
+brings out the pickaxe and the ring, that on single physics steps a
+click on the vein on a close and up to the window before or after it
+strikes clean with the chink and the rising tink while a step outside
+it, or a second click on the same close, chips with the chink alone,
+that a strike held a beat on the wall clock between two steps is judged
+by the steps, that the gem's size grows with each clean strike from
+`gemSize[0]` to `gemSize[1]` and the split crumbles and chimes, that the
+shield, walking off, a swing or a dash ends the dig, that E at the vein
+starts no dig and strikes nothing, that the mouse moving off the vein
+ends the dig and the left button aimed away swings the sword, that a
+clean cut is won ringed and a chipped one notched, held `wonAbove` above
+the knight and grown, then counted on the HUD with a bump, and that the
+vein sits in a rough rock face:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/deep/deep.qml
+```
+
+In a dungeon the veins are features (`dungeon.kinds.vein`, the last kind,
+so no other kind moves for them): each room but the start room holds
+`perRoom` of them at its danger band, each in the face of the wall north
+of its cell, and a torch whose spot a vein takes stands on the nearest
+spot of its wall without one. A vein is nearly invisible in the dark;
+the lantern of any knight within `glintReach` makes it glint, brighter
+the nearer in `litLevels` steps, and while this screen's knight is within
+`shimmerReach` a faint shimmer of its colour breathes round it. The
+deepest gem, the icosahedron, glows on its own (`selfLit`). A gem cut
+goes into the knight's pouch, worth `value[0]` gold with no clean strike
+up to `value[1]` with all of them clean (`Balance.deep.shapes`); the HUD
+shows a gem of each shape the pouch holds and how many, beside the gold.
+The pouch goes with the knight from level to level, and the smith buys
+it: talking to him, his first ware is the gems, 1 sells them all for
+their worth (the keys 1 to 5 pick his wares now). A knight that falls
+drops its pouch where it fell: another knight whose centre comes within
+`pouchReach` of it, or who lifts the fallen one up, takes it; one left on
+the floor is lost with the level. In a session each screen judges its
+own knight's strikes, and the host decides the rest, as it does the
+gold: a node tells it a vein split and how many strikes were clean, the
+host splits it on every screen (the session property `veins`, a node
+that joins later too) and gives the gem of its own vein to the first
+knight that split it. A joiner's knight shows its gem won only once the
+host gave it; a claim the host refuses - another knight split the vein
+first, or the host is on another level - shows a grey gem that rises,
+shakes and crumbles under LOST. A fallen knight's pouch is the host's
+replicated object, given to the first knight that claims it; a joiner's
+pouch leaves its knight once the host laid it down, and one dropped on
+another level than the host's stays with the knight. The dungeon master has a row for the veins per room. The
+veins bench builds 20 seeds at a low, a middle and a high danger twice
+and checks the same veins, gems and strikes on the same cells, each by
+the rules, none in the camp or the fight room; that a vein is dark out
+of every lantern and glints in one, the icosahedron glowing; that two
+cubes cut clean and chipped go into the pouch at the table's values, the
+HUD counts them, the camp keeps them and the smith buys them; that a
+knight falling alone drops its pouch; then a host and a joiner in one
+process: the same veins, a vein cut on either screen split on both with
+the gem the cutter's, a second claim given nothing and shown LOST, both
+knights cutting the same vein with the host's claim first - the joiner's
+gem not shown until the host answered, then LOST, the gem the host's -
+a pouch dropped on another level refused, a fallen host's pouch on both
+screens taken by the joiner lifting it up, and a fallen joiner's, still
+with it until the host answered, taken by the host walking over it. Every
+vein of the 60 dungeons sits in a rough rock face:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/veins/veins.qml
+```
+
+The vein party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on seed 424242. Both show
+the same veins with the same gems and strikes; a vein the joiner cuts is
+split on both screens and its gem is in the joiner's pouch, one the host
+cuts is split on the joiner's screen too, and both show the same veins
+split. It needs the live loader and exits with the number of failed
+checks:
+
+```
+python3 tests/veinparty/run_veinparty.py --mode local
+```
+
+**Spawn holes:** digging is a fight you choose (#157). A room that holds
+a vein has one spawn hole low in the face of its north wall: a small dark
+burrow with a ragged rim, at rest just a detail of the wall. It stands
+`gap` cells or more from the room's veins where the wall allows, off
+their rock face, a torch, a slit, a secret, a feature's cell and a
+doorway; a small room whose wall leaves no such cell lets go of those
+one after the other, last putting out a torch to take its place. Holes
+are laid out after everything else, from their own stream of the
+level's seed, so nothing moves for them. Each gem cut from a vein of
+the room wakes it by chance (#175), likelier the more the gem is worth,
+the more its room's miners dug (#176) and the more knights the level
+was built for: `wakeChance` plus `wakePerGold` for each gold of the
+gem's worth and `wakePerDig` for each strike a miner of the room made
+while the hole rested, times `wakePerKnight` more for each knight past
+the first, at most `wakeMost`. With the
+numbers today, on the holes bench's seeds, one knight wakes it for two
+in five of the shallow tetrahedrons cut clean and three in four of the
+deep icosahedrons, two knights for half of the one and nearly all of
+the other. The roll is the vein's
+own, from the level's seed and its cell, so the same seed and party
+wake the same holes, and a gem worth more, or cut after more digging,
+never wakes fewer; the strikes before the cut wake nothing. Woken, dust puffs from its rim and
+a low rumble plays, `eyesAfter` seconds later two eyes open in its dark
+and a groan comes from inside. `telegraph` seconds after the eyes
+(never less than `enemy.minTelegraph`) creatures of the depth's kinds
+crawl out of its mouth, each with the rumble: `waves` waves of
+`perWave`, `waveGap` seconds apart. `closeAfter` seconds after the last
+one its rim crumbles shut, a heap of rubble, and it never wakes again.
+The hole's sounds are quieter the further it is from the knight. Every
+number is `Balance.deep.hole`; the rumble and the groan play live from
+their recipes in `sound/`. In a session the host, which decides every
+cut gem, rolls the wake, runs every hole, sends its creatures as it
+sends every enemy, and publishes the holes' stages and waves (the
+session property `holes`), which every screen shows and hears in order,
+a node that joins later too. The dojo's deep scenario has the vein's
+hole in the same wall; whether its gem wakes it depends on the seed
+(`eval applyScenario("deep", 3, 424243)` wakes it for a gem cut clean,
+the scenario's own 424242 does not). The holes bench builds 20 seeds at
+a low, a middle and a high danger twice and checks the same holes on the
+same cells, one in each room with a vein and none elsewhere, each on its
+wall's face off the veins, torches, slits and secrets, none in the camp
+or the fight room; that the deep scenario shows one; that on a seed
+whose roll fails the cut gem leaves it at rest, and on one whose roll
+wakes it the cut brings dust with the rumble, then eyes with the groan
+`eyesAfter` later, the first creature `telegraph` after the eyes, the
+waves from the hole's cell, the close with the crumble, and that a gem
+cut after it wakes nothing. Then it rolls the first vein of each hole
+on 40 seeds at a shallow and a deep danger for 1 to 4 knights, its gem
+cut all chipped and all clean, and checks that the share of woken holes
+rises with the gem's worth and with the knights (unless every chance is
+at `wakeMost`) and lies near the mean chance; and on 10 of the seeds,
+built and cut twice for two knights through the game's own cut, that it
+wakes the holes the roll says, the same both times:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/holes/holes.qml
+```
+
+The hole party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on seed 424242. Both show
+the same holes at rest; the knights cut a vein of each hole's room in
+turn, every strike clean, the joiner's first. Where the host's roll says
+the gem wakes the hole, both screens see it go through the same stages
+and show the same creatures at its mouth, the first no sooner than
+`enemy.minTelegraph` after the eyes; where it says not, the hole stays at
+rest on both screens. On that seed the roll wakes two of its three holes.
+It needs the live loader and exits with the number of failed checks:
+
+```
+python3 tests/holeparty/run_holeparty.py --mode local
+```
+
+**Travellers of the deep:** the deep draws people down (#176). A room
+that holds a vein holds, with `Balance.dungeon.travellers.chance` at its
+danger, a traveller on its floor in front of the rock face beside one of
+its veins, off a vein, the hole, a torch, a slit, a secret and a
+feature's cell, laid out after the holes from its own stream of the
+level's seed, so nothing moves for it; no figure stands in a wall. A
+lost traveller sits there huddled, arms round its knees, a pack on its
+back, trembling with fear. A miner came for the treasure: it stands
+beside the vein, a lamp on its cap, and while a knight is within
+`digReach` it swings its own pick at the rock every `digEvery` seconds,
+a quiet tink and a few chips each time. Each of its strikes while the
+room's spawn hole rests makes a gem cut there likelier to wake it
+(`hole.wakePerDig`), so a miner is pressure. E within `talkReach` of
+either talks to it ("[E] Talk" shows over it): a lost one says its
+thanks, a miner is talked into leaving because the deep is too
+dangerous, and either walks off toward the room's way to the exit,
+fading out of sight, while a warm low major chord plays - the only one
+in the dungeon's sounds. Talking never wakes the hole. A miner still
+there when its hole's first wave comes flees the same way, without the
+chord. The pickaxe is the veins' alone: aimed at a traveller it starts
+no dig. Every number and line is `Balance.deep.traveller`; the chord
+plays live from its recipe in `sound/`. In a session the node whose
+knight talked to one shows its line at once and tells the host; the
+host decides how it goes on and publishes every traveller that goes on
+(the session property `deepTravellers`), which every screen shows, a
+node that joins later too, and counts the miners' strikes as it rolls
+the holes. A talk that reaches the host for another level, or for one
+gone already, it refuses, as it refuses a gem: on the talker's screen
+the line stops and the traveller stays, to be talked to again. The dojo's deep scenario has a miner and
+a lost one either side of its vein, and a special beside them. This
+replaces #158's petrified figures freed with the pickaxe.
+
+The talks bench builds 20 seeds at a low, a middle and a high danger
+twice and checks the same travellers on the same spots, at most one in
+a room with a vein and none elsewhere, each with its feet on the room's
+floor in front of its vein's rock face, off the veins, the hole,
+torches, slits, secrets and features, both kinds among them, none in
+the camp or the fight room; then in the deep scenario that the miner,
+the lost one and a special stand on the floor, the lost one trembling,
+and the pickaxe aimed at the miner starts no dig; that the miner digs
+only with a knight near, its strikes counted by its hole and raising
+the wake chance by `wakePerDig` each; that on a seed whose clean gem
+alone leaves the hole asleep the gem cut after the miner dug wakes it,
+and the same gem after the miner was talked off does not; that E talks
+to the lost one, the miner and the special, each says its line, the
+chord plays, each walks off and is gone, the miner digs no more, the
+hole stays asleep and the special joins the camps, kept with the
+record; that a talk the host refuses stops the line and the traveller
+can be talked to again; and that a miner still there flees at the
+hole's first wave:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/talks/talks.qml
+```
+
+The talk party bench checks it over the network: two processes of
+Clayground's live loader, a host and a joiner, on seed 424244, whose
+first dungeon holds a miner and a lost traveller. Both show the same
+travellers on the same spots; a talk of the joiner's for another level
+shows its line on the joiner, the host refuses it, and the traveller
+stays there to be talked to again. With the joiner's knight by the miner it digs on both
+screens and the host counts its strikes toward the hole. The joiner's
+knight talks to the miner and the host's to the lost one: each time
+both screens show the same line, the leaving the host decided, the
+chord, and the traveller gone. Each process keeps a special of its own
+with its record; in the camp after the dungeon both screens seat the
+host's special and the two that left by the fire, both fires heal by
+the host's special alone, and the joiner's own record keeps its own
+special. It needs the live loader and exits with the number of failed
+checks:
+
+```
+python3 tests/talkparty/run_talkparty.py --mode local
+```
+
+**Freed at the camps:** the travellers of the deep that left toward the
+exit in a run, talked off or fled, sit by the fire of the next camp of
+that run only, the one after the dungeon they left (#159, #177). They sit huddled on a ring round the fire
+(`Balance.deep.camp`), off the camp's travellers and its cat, so the
+figures round the fire are the count of those sent up in the dungeon
+just behind; a new run's camps start without them. Rarely a traveller of the deep is
+special (`Balance.dungeon.travellers.specialShare`): one of the few of
+`Balance.deep.specials`, with a faint gold edge and a gold glow. Which
+one, and of which kind, comes from the level's seed alone, whatever the
+record holds; one already with the camps is there as an ordinary
+traveller of its kind. Talked to, it says its own line
+and leaves, and joins the camps for good: it sits by every camp's fire
+after that, across runs, says its camp line to a knight near it, and
+gives the fire a comfort, never fight power - Maren the healer heals
+twice as fast there, Brannoc the cook refills mana twice as fast, Tamsin
+the lamplighter makes the fire's light reach further. The specials with
+the camps are kept with this machine's record (`KeyValueStore`
+"ShapesAndStone", key `specials`). In a session the host's record decides
+which specials sit at the camps, on every screen (the session property
+`specials`), and the host's run decides who of the run sits there (the
+session property `freed`); a joiner keeps a special talked to in the
+party with its own record too. The title and the fallen screen show who was
+freed tonight ("Freed tonight: 2 lost travellers, a miner, Maren") and
+the specials with the camps ("With the camps: Maren the healer"); tonight
+is since the game started, in a session since it was hosted or joined.
+The camp side lives in `src/CampFreed.qml`. The freed bench checks that a seed holds the same travellers with an
+empty and a full record, its special an ordinary one with the full; it
+talks to every traveller of a dungeon at depth 2 and checks that they
+sit at the camp after depth 2, not at the one after depth 3, and are
+gone in a new run; then
+talks to the deep scenario's special and checks it is kept with the
+record, sits at the next run's first camp with its line and the fire
+heals by its comfort; in that run it sends depth 2's travellers off
+again and checks the special and them at the camp after depth 2, the
+special alone at the one after depth 3; then the fallen screen and the title. With an out dir it saves
+`fallen.png` and `title.png` (and `camp.png`, `special.png`, which need a
+window that draws the world):
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/freed/freed.qml
+qml -I build/bin/qml tests/freed/freed.qml -- <out dir>
+```
+
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
 over, kept for the next visit) shows a panel before each dungeon to a solo
 player or the host, never to a joiner. Its rows are the settings of
 `Balance.dungeonMaster` - enemies, spike plates, arrow slits and
-breakables per room, rooms, base depth and relative difficulty (the
-danger's position in its depth's range) - at the values the game would
-use. W/S picks a row, A/D or the arrows turn it a step and set it (gold),
+breakables per room, rooms, base depth, relative difficulty (the
+danger's position in its depth's range) and veins per room - at the
+values the game would use. W/S picks a row, A/D or the arrows turn it a
+step and set it (gold),
 Backspace or a double click gives it back to the game. G shows the
 dungeon Enter then enters, with its enemies by tier, breakables, spike
 plates, arrow slits, doors and secret rooms; G again rolls a new seed for
@@ -875,6 +1556,12 @@ run out after it, and exits with the number of failed checks:
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/hitstop/hitstop.qml
 ```
+
+A grunt does not run straight in: from `enemy.circleRange` on it circles
+the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
+`enemy.circleTime` seconds, then commits, goes in and lunges; a knight
+stepping inside `enemy.lungeRange` times `enemy.circleStrikeIn` meanwhile
+is struck at once.
 
 Every enemy attack can be read and answered. An attack runs on the physics
 steps: no telegraph - a wind-up, a guardian's counter, a spitter's shot -
@@ -943,20 +1630,32 @@ struck enemy in normal play; damage numbers only with the dojo's
 Mechanics debug on.
 The left button swings when it is let go of before `knight.chargeStart`, so
 a click plays as it always did. Held longer, the knight charges a heavy
-swing: it moves at `knight.chargeSpeed` of its speed, its blade, drawn
-back, glows brighter, and at `knight.chargeTime` the charge is full - a
-ring flashes out with a high tick. Let go of then, it swings a wide heavy
+swing: it moves at `knight.chargeSpeed` of its speed, and its sword, held
+out the way it faces, turns gold with a shine running from hilt to tip. At
+`knight.chargeTime` the charge is full - a ring flashes out with a high
+tick, the shine runs faster and a glow breathes round the blade. Let go of then, it swings a wide heavy
 blow: `knight.heavySwing` times atk, within `knight.heavyArc` and
 `knight.heavyRange` times the swing's reach. It goes through a guardian's
 shield, which staggers, and knocks enemies back `knight.heavyKnockback`
-times as far. Let go of before it is full, it is a normal swing; held
-`knight.chargeHold` past full, the knight lets it go at normal strength,
-so no charge is carried around. A hit taken while charging, a raised
+times as far. Let go of before it is full, it is a normal swing; full, the
+charge is kept for as long as the button is held. A hit taken while charging, a raised
 shield or a dash cancels it, and its release swings nothing; behind the
 shield or in a dash the button swings at once, as it always did. The
 charge counts the physics steps (Clayground's `InputAction` on the
 physics world), so a pause or a hit stop holds it. The `heavy` group of the
 table holds its glow, ring, sounds and hit feedback (`impact("heavyHit")`).
+A full charge keeps until the button is let go; the charging sword is the
+swing's sword held out the way the knight faces, a shine running along it.
+With `knight.heavyArc` at 180 the heavy blow spins all round the knight.
+
+Target lock: F or the middle button locks the knight on the standing
+enemy within `lockReach` (Game.qml) nearest the way the mouse points - the
+one it would pick shows four faint arcs. Locked, the knight faces it,
+four arcs with arrowheads close in and out round it, the screen's edge
+darkens, and the keys turn with it: W and S walk towards it and away, A
+and D circle it. F again, the enemy falling or `lockBreak` wu away lets
+go. The fight room's enemies are `fightRoomRoster` (Game.qml), the table's
+`spawn.fightRoom` unless a dojo eval sets another.
 The other screens of a session see the charge in the state's `s` (4
 charging, 5 full) and the heavy swing as `acted("heavy")`.
 A full charge let go right around a dash's start - at most

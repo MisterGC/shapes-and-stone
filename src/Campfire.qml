@@ -19,18 +19,47 @@ RectBoxBody {
     property real healRate: Balance.campfire.healPerSecond  // HP per second
     property real manaRate: Balance.campfire.manaPerSecond  // mana per second
     property real healRadius: Balance.campfire.healRadius
+    // How far its light reaches, in wu
+    property real lightRadius: Balance.camp.fireLight
     property bool _isHealing: false
 
-    // The camp's main light, burning restlessly
+    // A knight whose body has its top-left corner at xWu, yWu stands in
+    // the fire's warmth: within healRadius, measured as the healing
+    // measures it
+    function warms(xWu, yWu) {
+        let dx = xWu - campfire.xWu, dy = yWu - campfire.yWu
+        return dx * dx + dy * dy < healRadius * healRadius
+    }
+    // The way from such a knight's centre to the fire's, in degrees with
+    // y up, the knight's facingAngle: a knight sitting by it faces it
+    function angleFrom(xWu, yWu) {
+        let dx = campfire.xWu + campfire.widthWu / 2 - (xWu + 0.5)
+        let dy = campfire.yWu - campfire.heightWu / 2 - (yWu - 0.5)
+        return Math.atan2(dy, dx) * 180 / Math.PI
+    }
+
+    // The camp's main light, burning restlessly; the tavern and the
+    // smithy cast shadows from it
     Light2d {
         // xWu/yWu of a body are its top-left corner
         offsetXWu: campfire.widthWu / 2
         offsetYWu: -campfire.heightWu / 2
-        radius: 11
+        radius: campfire.lightRadius
         color: "#FF9440"
-        intensity: 1.1
+        intensity: 1.1 * campfire.breathing
         flicker: 0.6
-        castsShadows: false
+    }
+    // On top of its flicker the light breathes (Balance.camp.breath): it
+    // swells and sinks by breath of itself every breathSeconds, a whole
+    // number of breaths in each round of _t
+    property real breath: 0
+    property real breathSeconds: 6
+    property real breathPhase: 0
+    readonly property real breathing: 1 + breath * Math.sin(2 * Math.PI * _t / breathSeconds + breathPhase)
+    property real _t: 0
+    NumberAnimation on _t {
+        from: 0; to: 1000; duration: 1000000
+        loops: Animation.Infinite
     }
 
     // Warm glow with pulse

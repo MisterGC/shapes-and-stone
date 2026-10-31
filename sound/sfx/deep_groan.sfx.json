@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "name": "deep_groan",
+  "variation": { "seed": 159, "pool": 4 },
+  "layers": [
+    { "name": "mouth", "role": "body", "source": "sawtooth", "freq": 96, "length": 1400,
+      "gain": -0.9, "envelope": { "attack": 200, "decay": 850, "sustain": 0.7, "release": 350 },
+      "pitch": { "start": 0, "end": -5.97, "time": 1400 },
+      "lfo": { "target": "pitch", "rate": 5.5, "depth": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 420, "resonance": 0.55 },
+      "vary": { "detune": [-0.5, 0.5] } },
+    { "name": "mouth_breath", "role": "body", "source": "noise", "length": 1400, "gain": -11.4,
+      "envelope": { "attack": 200, "decay": 850, "sustain": 0.7, "release": 350 },
+      "filter": { "type": "bandpass", "cutoff": 420, "resonance": 0.55 } },
+    { "name": "throat", "role": "body", "source": "sawtooth", "freq": 96, "length": 1400,
+      "gain": -5.3, "envelope": { "attack": 200, "decay": 850, "sustain": 0.7, "release": 350 },
+      "pitch": { "start": 0, "end": -5.97, "time": 1400 },
+      "lfo": { "target": "pitch", "rate": 5.5, "depth": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 880, "resonance": 0.65 },
+      "vary": { "detune": [-0.5, 0.5] } },
+    { "name": "throat_breath", "role": "body", "source": "noise", "length": 1400, "gain": -15.8,
+      "envelope": { "attack": 200, "decay": 850, "sustain": 0.7, "release": 350 },
+      "filter": { "type": "bandpass", "cutoff": 880, "resonance": 0.65 } }
+  ]
+}

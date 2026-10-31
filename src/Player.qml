@@ -39,7 +39,14 @@ PhysicsItem {
 
     // Facing direction (calculated in screen space)
     // Screen Y is flipped (down = positive), so we use (playerScreenY - mouseScreenY)
-    property real facingAngle: Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
+    // Locked on (Game.toggleLock), it faces that enemy, centre to centre;
+    // else the mouse
+    property var lockTarget: null
+    readonly property bool lockedOn: !!lockTarget && lockTarget.destroyed === false
+    property real facingAngle: lockedOn
+        ? Math.atan2(lockTarget.centreYWu - (yWu - heightWu / 2),
+                     lockTarget.centreXWu - (xWu + widthWu / 2)) * 180 / Math.PI
+        : Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats, from the balance table
     readonly property real maxSpeed: Balance.knight.moveSpeed
@@ -52,10 +59,16 @@ PhysicsItem {
     property int maxMana: Balance.knight.mana
     // Gold picked up this run, for the village's wares
     property int gold: 0
+    // The gems cut and not yet sold, [{shape, value}] (Balance.deep,
+    // issue #156): kept across levels as the gold is, dropped on a fall
+    property var pouch: []
     // Health potions bought from the innkeeper, drunk with key 1
     property int potions: 0
     // Mana draughts bought from the innkeeper, drunk with key 2
     property int draughts: 0
+    // The fish caught at a camp's pond (Fishing), {kind, size}, sold to the
+    // innkeeper or one given to the cave cat
+    property var creel: []
     // The smith's upgrades of the run, each a level from 0 (none) to the
     // table's last (Balance.shop): the sharpened sword, the reinforced
     // shield, the lighter harness and the balanced blade. Every effect
@@ -107,6 +120,7 @@ PhysicsItem {
     // The right button is held: the shield rises again once a crushing
     // blow's lockout is over
     property bool _shieldWanted: false
+    readonly property bool shieldWanted: _shieldWanted
     // No mana, no shield: it cannot be raised, and drops when it runs dry
     onIsBlockingChanged: {
         if (isBlocking && (mana <= 0 || shieldLock > 0)) {
@@ -292,23 +306,73 @@ PhysicsItem {
                 _breakBones(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
                 _breakThings(attackRange * (isHeavy ? Balance.knight.heavyRange : 1), true)
             }
+            _countStill(dt)
+            _stepPick(dt)
         }
     }
 
     // A moment others should see: "attack", "heavy", "whirlwind", "dash",
-    // "parry", "block", "perfectBlock", "hurt" or "shieldBreak".
+    // "parry", "block", "perfectBlock", "hurt", "shieldBreak", "sit" or
+    // "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
     // Healing state (set by Campfire)
     property bool isHealing: false
 
+    // Digging a vein (Balance.deep, issue #155), set by the game: the
+    // sword shows as a pickaxe held towards the vein at digAngle (as
+    // facingAngle). pickMorph runs to 1 while digging and back to 0
+    // after, over Balance.deep.morph seconds of physics steps
+    property bool digging: false
+    property real digAngle: 0
+    property real pickMorph: 0
+    function _stepPick(dt) {
+        let to = digging ? 1 : 0
+        if (pickMorph === to) return
+        let step = dt / Balance.deep.morph
+        pickMorph = to > pickMorph ? Math.min(1, pickMorph + step) : Math.max(0, pickMorph - step)
+    }
+    // A strike of the pickaxe: it swings down on the stone
+    function pickStrike() { view.pickStrike() }
+
+    // Sitting by the fire (Balance.camp.sitAfter, issue #148): a knight
+    // that stands still sitAfter seconds in the campfire's warmth sits
+    // down facing it; any key or button stands it up in the step it comes,
+    // the knight moving in that step. The look only: nothing the knight
+    // does or gets reads it. A bench sets sitAfter out of reach for a
+    // knight that never sits
+    property real sitAfter: Balance.camp.sitAfter
+    property real _stillFor: 0
+    property bool seated: false
+    // The way to the fire as the knight sat down: seated, it faces it
+    property real sitAngle: 0
+    onSeatedChanged: acted(seated ? "sit" : "stand")
+    function _countStill(dt) {
+        let fire = gameWorld ? gameWorld.campfire : null
+        let still = !!fire && !fallen && moveX === 0 && moveY === 0
+            && !isBlocking && !_shieldWanted && !swingInput.pressed && !isCharging
+            && !isAttacking && !isDashing && _knockT <= 0 && _lungeT <= 0 && gameWorld.talking !== true
+            && fire.warms(xWu, yWu)
+        if (!still) {
+            _stillFor = 0
+            seated = false
+            return
+        }
+        _stillFor += dt
+        if (!seated && _stillFor >= sitAfter - 1e-6) {
+            sitAngle = fire.angleFrom(xWu, yWu)
+            seated = true
+        }
+    }
+
     // How the knight looks: shared with the RemotePlayer
     KnightView {
         id: view
         host: player
         gameWorld: player.gameWorld
-        facingAngle: player.facingAngle
+        facingAngle: player.seated ? player.sitAngle : player.facingAngle
+        seated: player.seated
         moveX: player.moveX
         moveAmount: Math.min(1, Math.sqrt(player.moveX * player.moveX + player.moveY * player.moveY))
         // Up through the bash's lunge too, however short the right-click
@@ -328,6 +392,8 @@ PhysicsItem {
         reviveProgress: player.reviveRing
         swordLevel: player.swordLevel
         shieldLevel: player.shieldLevel
+        pickMorph: player.pickMorph
+        pickAngle: player.digAngle
     }
 
     // DEBUG: Attack damage area visualization (wedge showing hit zone)
@@ -931,6 +997,7 @@ PhysicsItem {
         let healed = Math.min(Balance.shop.potionHeal, maxHp - hp)
         potions--
         hp += healed
+        view.healBurst()
         return healed
     }
 
@@ -1061,8 +1128,8 @@ PhysicsItem {
 
     // The left button. A press is a swing on its release before
     // knight.chargeStart, and a charge when held longer: charging from
-    // chargeStart, full at chargeTime, let go at normal strength
-    // chargeHold after that. Its clock is the physics steps (swingInput), so
+    // chargeStart, full at chargeTime and kept full until the release.
+    // Its clock is the physics steps (swingInput), so
     // a pause or a hit stop holds the charge. Game.qml hands the mouse
     // button's events to pressSwing() and releaseSwing(); a bench can call
     // them without one.
@@ -1117,11 +1184,7 @@ PhysicsItem {
             _charge = "full"
             if (gameWorld) gameWorld.playChargeFull()
         }
-        if (_charge === "full" && held >= (k.chargeTime + k.chargeHold) * 1000) {
-            // Held too long: it goes at normal strength, no charge is carried
-            _charge = "spent"
-            attack()
-        }
+        // Full, the charge is kept until the button is let go
     }
 
     function _onSwingReleased() {

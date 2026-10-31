@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "name": "deep_tink",
+  "variation": {
+    "seed": 156,
+    "pool": 1
+  },
+  "layers": [
+    {
+      "name": "bell1",
+      "role": "body",
+      "source": "sine",
+      "freq": 1046.5,
+      "length": 220,
+      "gain": -4.5,
+      "envelope": {
+        "attack": 0.5,
+        "decay": 220,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "bell2",
+      "role": "tail",
+      "source": "sine",
+      "freq": 2427.88,
+      "length": 90,
+      "gain": -13,
+      "envelope": {
+        "attack": 0.5,
+        "decay": 90,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "bell3",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4447.62,
+      "length": 45,
+      "gain": -20,
+      "envelope": {
+        "attack": 0.5,
+        "decay": 45,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      }
+    },
+    {
+      "name": "click",
+      "role": "transient",
+      "source": "noise",
+      "length": 14,
+      "gain": -7,
+      "envelope": {
+        "attack": 0,
+        "decay": 14,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 3500,
+        "resonance": 0.25
+      }
+    },
+    {
+      "name": "grit",
+      "role": "tail",
+      "source": "noise",
+      "length": 6,
+      "gain": -16,
+      "noise": {
+        "color": "pink"
+      },
+      "envelope": {
+        "attack": 0,
+        "decay": 6,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 2200,
+        "resonance": 0.2
+      },
+      "burst": {
+        "count": 5,
+        "duration": 45,
+        "density": 0.4,
+        "jitter": {
+          "time": 0.6,
+          "gain": 4,
+          "cutoff": 0.6
+        }
+      }
+    }
+  ]
+}

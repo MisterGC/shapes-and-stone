@@ -26,9 +26,33 @@ include(clayapp)
 # declares the singleton goes into the resources beside them.
 set_source_files_properties(src/Balance.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-# Images and sounds, loaded relative to the QML ("assets/...") - without them
-# in the resources the native app has no cover art, no music and no sound.
+# Images, loaded relative to the QML ("assets/...") - without them in the
+# resources the native app has no cover art. Its sound is the cue sheet's.
 file(GLOB SNS_ASSETS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS src/assets/*)
+
+# The sound factory's cues (sound/cues.json, written by its sp tool): a
+# rendered cue ships its render, a live one its recipe or song, which
+# clay_sound synthesizes on the device, and a voiced line also the viseme
+# cues beside its render. The QML finds them at "../sound/...".
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS sound/cues.json)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/sound/cues.json SNS_CUE_SHEET)
+string(JSON SNS_CUE_COUNT LENGTH "${SNS_CUE_SHEET}" cues)
+math(EXPR SNS_CUE_LAST "${SNS_CUE_COUNT} - 1")
+set(SNS_SOUND)
+foreach(i RANGE ${SNS_CUE_LAST})
+    string(JSON cue MEMBER "${SNS_CUE_SHEET}" cues ${i})
+    string(JSON mode GET "${SNS_CUE_SHEET}" cues ${cue} mode)
+    if(mode STREQUAL "live")
+        string(JSON file GET "${SNS_CUE_SHEET}" cues ${cue} source)
+    else()
+        string(JSON file GET "${SNS_CUE_SHEET}" cues ${cue} render)
+        string(REGEX REPLACE "\\.wav$" ".visemes.json" visemes "${file}")
+        if(NOT visemes STREQUAL file AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/sound/${visemes})
+            list(APPEND SNS_SOUND sound/${visemes})
+        endif()
+    endif()
+    list(APPEND SNS_SOUND sound/${file})
+endforeach()
 
 clay_app(shapes_and_stone
 
@@ -50,6 +74,7 @@ clay_app(shapes_and_stone
         src/WallFace.qml
         src/Torch.qml
         src/Motes.qml
+        src/Moths.qml
         src/FxParticle.qml
         src/Stain.qml
         src/Debris.qml
@@ -59,11 +84,27 @@ clay_app(shapes_and_stone
         src/Arrow.qml
         src/Door.qml
         src/SecretWall.qml
+        src/Vein.qml
+        src/Hole.qml
+        src/DeepTraveller.qml
+        src/Gem.qml
         src/GoldDrop.qml
+        src/PouchDrop.qml
+        src/FloorClaims.qml
+        src/CampFreed.qml
         src/BodyShade.qml
         src/ExitStairs.qml
         src/Floor.qml
         src/Campfire.qml
+        src/CaveOverhang.qml
+        src/CampProp.qml
+        src/CampSolid.qml
+        src/Creature.qml
+        src/CaveCat.qml
+        src/Fishing.qml
+        src/CampDog.qml
+        src/CampTalk.qml
+        src/CampSounds.qml
         src/Projectile.qml
         src/Npc.qml
         src/DialoguePanel.qml
@@ -71,7 +112,8 @@ clay_app(shapes_and_stone
         src/FallenScreen.qml
         src/PauseMenu.qml
         src/KnightPanel.qml
-        src/LoopMusic.qml
+        src/SongMusic.qml
+        src/AmbienceBed.qml
         src/MultiplayerLobby.qml
         src/RemotePlayer.qml
         src/Session.qml
@@ -81,6 +123,7 @@ clay_app(shapes_and_stone
     RES_FILES
         src/qmldir
         ${SNS_ASSETS}
+        ${SNS_SOUND}
 )
 
 # The downloads for a friend without Qt (.github/workflows/package.yml):
@@ -107,5 +150,8 @@ qt_add_shaders(shapes_and_stone "shapes_and_stone_shaders"
         src/shaders/body.frag
         src/shaders/floor.frag
         src/shaders/motes.frag
+        src/shaders/moths.frag
+        src/shaders/overhang.frag
+        src/shaders/prop.frag
         src/shaders/wall.frag
 )

@@ -1,0 +1,229 @@
+{
+  "version": 1,
+  "name": "village",
+  "variation": {
+    "seed": 31,
+    "pool": 3
+  },
+  "layers": [
+    {
+      "name": "breeze",
+      "role": "body",
+      "source": "noise",
+      "length": 10000,
+      "gain": -13,
+      "envelope": {
+        "attack": 1500,
+        "decay": 0,
+        "sustain": 1,
+        "release": 1500
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 380
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 0.35,
+        "depth": 0.3,
+        "shape": "smooth_random"
+      },
+      "vary": {
+        "lfo.rate": [
+          -0.08,
+          0.08
+        ]
+      },
+      "noise": {
+        "color": "pink"
+      }
+    },
+    {
+      "name": "grass",
+      "role": "tail",
+      "source": "noise",
+      "length": 10000,
+      "gain": -30,
+      "envelope": {
+        "attack": 1500,
+        "decay": 0,
+        "sustain": 1,
+        "release": 1500
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1800,
+        "resonance": 0.05
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 0.5,
+        "depth": 0.6,
+        "shape": "smooth_random"
+      },
+      "noise": {
+        "color": "pink"
+      }
+    },
+    {
+      "name": "cricket0",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4200,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 700,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket1",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4150,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 1500,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket2",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4230,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 2300,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket3",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4180,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 4100,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket4",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4210,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 4900,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket5",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4170,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 6400,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket6",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4240,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 7200,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    },
+    {
+      "name": "cricket7",
+      "role": "tail",
+      "source": "sine",
+      "freq": 4190,
+      "length": 380,
+      "gain": -31.5,
+      "offset": 8600,
+      "envelope": {
+        "attack": 20,
+        "decay": 0,
+        "sustain": 1,
+        "release": 60
+      },
+      "lfo": {
+        "target": "volume",
+        "rate": 32,
+        "depth": 1
+      }
+    }
+  ]
+}

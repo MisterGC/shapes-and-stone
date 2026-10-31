@@ -790,7 +790,7 @@ def main():
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
     ap.add_argument("--seed", type=int, default=2026,
-                    help="the game's seed; its first dungeon has the lineup the script needs"))
+                    help="the game's seed; its first dungeon has the lineup the script needs")
     ap.add_argument("--seconds", type=float, default=8.0, help="how long the knights fight")
     ap.add_argument("--lag", type=int, default=300,
                     help="ms the joiner may show an id, HP or AI state after the host")

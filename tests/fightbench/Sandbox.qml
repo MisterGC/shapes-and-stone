@@ -342,7 +342,7 @@ Item {
         // A guardian's shield turns swings: a charged heavy swing breaks
         // its guard
         if (answer === "heavy" && target.enemyType === "guardian" && target.aiState !== "stagger") {
-            // Held past the charge's hold, the knight let it go: press anew
+            // The charge was cancelled (a hit): press anew
             if (_held && !p.isCharging && p.chargeHeld > Balance.knight.chargeStart) letGo(p)
             if (!_held) _held = p.pressSwing()
             if (p.chargeFull && targetDist <= heavyReach(p)) {
