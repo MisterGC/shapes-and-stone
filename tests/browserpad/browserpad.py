@@ -82,6 +82,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # The runtime fetches every QML file of the game at once; the default
+    # backlog of 5 resets some of them, and the game does not load
+    request_queue_size = 128
+
+
 class Bench:
     def __init__(self, page, out):
         self.page = page
@@ -122,8 +128,13 @@ class Bench:
 
 def run(bench, timeout_s):
     page = bench.page
-    if not bench.wait_for("QML loaded successfully", 0, timeout_s * 1000):
-        print("[BrowserPad] FAIL the game did not load", flush=True)
+    end = time.time() + timeout_s
+    while time.time() < end and not any("QML loaded successfully" in line or "QML Error" in line
+                                        for line in bench.lines):
+        page.wait_for_timeout(100)
+    errors = [line for line in bench.lines if "QML Error" in line]
+    if errors or not any("QML loaded successfully" in line for line in bench.lines):
+        print("[BrowserPad] FAIL the game did not load" + (": " + errors[0] if errors else ""), flush=True)
         return 100
     page.wait_for_timeout(3000)
     bench.shot("title")
@@ -195,7 +206,7 @@ def main():
     if args.out:
         os.makedirs(args.out, exist_ok=True)
 
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Handler, directory=bundle))
+    server = Server(("127.0.0.1", 0), functools.partial(Handler, directory=bundle))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as pw:
