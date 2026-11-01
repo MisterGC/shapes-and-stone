@@ -21,26 +21,26 @@ QtObject {
     readonly property string storeKey: "controls"
 
     // The actions in the order the hints name them. name: what the hint
-    // says; hold: pressed and released, not only pressed; move: one of the
+    // says; title: what the Control Input page calls it; hold: pressed and released, not only pressed; move: one of the
     // four the keyboard walks with; pointer: aimed with the mouse pointer
     readonly property var actions: [
-        { id: "moveUp", name: "move", move: true },
-        { id: "moveLeft", name: "move", move: true },
-        { id: "moveDown", name: "move", move: true },
-        { id: "moveRight", name: "move", move: true },
-        { id: "aim", name: "aim", pointer: true },
-        { id: "strike", name: "strike, hold to charge, at a vein dig", hold: true },
-        { id: "shield", name: "shield", hold: true },
-        { id: "dash", name: "dash" },
-        { id: "whirlwind", name: "whirlwind" },
-        { id: "talk", name: "talk" },
-        { id: "potion", name: "potion" },
-        { id: "draught", name: "draught" },
-        { id: "lock", name: "lock on" },
-        { id: "knight", name: "knight" },
-        { id: "mute", name: "mute" },
-        { id: "effects", name: "effects" },
-        { id: "menu", name: "menu" }
+        { id: "moveUp", name: "move", title: "Move up", move: true },
+        { id: "moveLeft", name: "move", title: "Move left", move: true },
+        { id: "moveDown", name: "move", title: "Move down", move: true },
+        { id: "moveRight", name: "move", title: "Move right", move: true },
+        { id: "aim", name: "aim", title: "Aim", pointer: true },
+        { id: "strike", name: "strike, hold to charge, at a vein dig", title: "Strike", hold: true },
+        { id: "shield", name: "shield", title: "Shield", hold: true },
+        { id: "dash", name: "dash", title: "Dash" },
+        { id: "whirlwind", name: "whirlwind", title: "Whirlwind" },
+        { id: "talk", name: "talk", title: "Talk, open a door" },
+        { id: "potion", name: "potion", title: "Potion" },
+        { id: "draught", name: "draught", title: "Draught" },
+        { id: "lock", name: "lock on", title: "Lock on an enemy" },
+        { id: "knight", name: "knight", title: "Knight panel" },
+        { id: "mute", name: "mute", title: "Mute" },
+        { id: "effects", name: "effects", title: "Effects on and off" },
+        { id: "menu", name: "menu", title: "Menu" }
     ]
 
     // key: a Qt.Key, 0 for none; mouse: a Qt mouse button, 0 for none;
@@ -217,6 +217,22 @@ QtObject {
         const p = padName(pad(action === "move" ? "moveUp" : action), padLabel)
         return p !== "" ? p : keysName(action)
     }
+    // An action's own binding as the Control Input page shows it (issue
+    // #220), "" for none. On the mouse and keyboard its key and mouse
+    // button, "F / MMB", the aim "Mouse"; on the pad its input, a move as
+    // the left stick and the D-pad in its direction, "L stick / D-pad up"
+    function keysBindingName(action) {
+        const a = actions.find(x => x.id === action)
+        if (a && a.pointer) return "Mouse"
+        return [keyName(key(action)), mouseName(mouse(action))].filter(n => n !== "").join(" / ")
+    }
+    function padBindingName(action, padLabel) {
+        const input = pad(action)
+        const ways = { "axisY+": "up", "axisX-": "left", "axisY-": "down", "axisX+": "right" }
+        if (ways[input]) return "L stick / D-pad " + ways[input]
+        return padName(input, padLabel)
+    }
+
     // What action is bound to on the device in use: the pad's while one is
     // in use (onPad)
     function name(action, onPad, padLabel) {
