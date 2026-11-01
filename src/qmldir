@@ -44,6 +44,7 @@ MenuPad 1.0 MenuPad.qml
 KnightPanel 1.0 KnightPanel.qml
 KnightPad 1.0 KnightPad.qml
 ControlTable 1.0 ControlTable.qml
+PadNotice 1.0 PadNotice.qml
 SongMusic 1.0 SongMusic.qml
 AmbienceBed 1.0 AmbienceBed.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml
