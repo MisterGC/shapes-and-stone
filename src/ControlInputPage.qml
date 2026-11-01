@@ -191,8 +191,17 @@ Item {
 
     // The pad comes into use on the page: the pick goes to its column. On
     // the title that is the pad's first press - in the browser the one that
-    // lists it (issue #236)
-    onPadChanged: if (pad && capturing === "") pickColumn(1)
+    // lists it (issue #236). A pick on a Reset or Back, where a click left
+    // the resting mouse, goes up to the first action whose pad cell can be
+    // rebound, so the pad's next A picks a cell and resets nothing
+    onPadChanged: {
+        if (!pad || capturing !== "") return
+        pickColumn(1)
+        if (selectedIndex >= actions.length) {
+            const first = actions.findIndex((a, i) => !isFixed(i, 1))
+            pick(first >= 0 ? first : 0)
+        }
+    }
     // A press on a pad is making it the controller's source
     // (KnightPad.takingPad): that press only takes the pad. It does not
     // choose the cell or the Reset of the mouse and keyboard column picked

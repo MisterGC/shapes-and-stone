@@ -105,8 +105,9 @@ button in the *Mouse and keyboard* column, or the new pad button in the
 *Gamepad* column. A key or button another action has trades places with
 it: that action gets what this one had. Esc or the pad's B cancels. A
 pad's first press on the page - in the browser the one that lists it -
-only takes the pad and moves the pick to the *Gamepad* column; its next A
-picks the cell there.
+only takes the pad and moves the pick to the *Gamepad* column, off a
+*Reset* or *Back* to the first action it can rebind; its next A picks the
+cell there.
 *Reset to defaults* under a column puts that column's defaults back. The
 menu stays on Esc and Start, the aim on the mouse and the right stick, and
 the moves on the left stick, so nobody locks themselves out. A change is
