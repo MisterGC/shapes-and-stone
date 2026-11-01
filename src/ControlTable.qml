@@ -110,6 +110,95 @@ QtObject {
         save()
     }
 
+    // The Control Input page's two columns (issue #221): "keys", an
+    // action's key and mouse button as one binding, and "pad". A cell is
+    // what an action has in a column: { key, mouse } for "keys", the pad
+    // input for "pad"
+    function cell(action, column) {
+        return column === "pad" ? pad(action) : { key: key(action), mouse: mouse(action) }
+    }
+    // Whether action's binding in column stays as it is: the menu's, so
+    // nobody locks themselves out of the menu; the aim's, the mouse
+    // pointer and the right stick; and a move's on the pad, the left stick
+    function fixed(action, column) {
+        const a = actions.find(x => x.id === action)
+        if (!a || action === "menu" || a.pointer) return true
+        return column === "pad" && !!a.move
+    }
+    // Whether action can have value as its cell in column: a move only a
+    // key, nothing else a key and a mouse button at once
+    function _takes(action, column, value) {
+        if (fixed(action, column)) return false
+        if (column === "pad") return _valid(action, "pad", value)
+        if (!value || !_valid(action, "key", value.key) || !_valid(action, "mouse", value.mouse)) return false
+        const a = actions.find(x => x.id === action)
+        return a.move ? value.key !== 0 && value.mouse === 0 : true
+    }
+    // The action whose cell in column holds input, "" for none
+    function holder(column, input) {
+        if (column === "pad") return actionOfPad(input)
+        if (!input) return ""
+        return input.key ? actionOfKey(input.key) : actionOfMouse(input.mouse || 0)
+    }
+
+    // Rebinds action's cell in column to input - a key ({ key }), a mouse
+    // button ({ mouse }) or a pad input - as the Control Input page does
+    // with the next input pressed. The cell then holds that input alone;
+    // when another action holds it, the two actions trade their cells.
+    // Returns { taken, swapped }: swapped the other action's id or "";
+    // not taken when the cell is fixed, the input is not one it takes, or
+    // the other action cannot take the cell it would get (a move a mouse
+    // button or nothing, the menu anything). Kept at once
+    function rebind(action, column, input) {
+        let value = input
+        if (column !== "pad")
+            value = { key: input && input.key ? input.key : 0, mouse: input && input.mouse ? input.mouse : 0 }
+        const refused = { taken: false, swapped: "" }
+        if (!defaults[action] || (column !== "pad" && value.key === 0 && value.mouse === 0)
+                || (column === "pad" && value === "") || !_takes(action, column, value))
+            return refused
+        const other = holder(column, value)
+        if (other === action) return { taken: true, swapped: "" }
+        const mine = cell(action, column)
+        let next = JSON.parse(JSON.stringify(bindings))
+        if (other !== "") {
+            // The other action's whole cell, else the input alone where
+            // this one cannot take that (a move a key with a mouse button)
+            if (!_takes(other, column, mine)) return refused
+            const theirs = cell(other, column)
+            const take = _takes(action, column, theirs) ? theirs : value
+            _put(next, action, column, take)
+            _put(next, other, column, mine)
+        } else {
+            _put(next, action, column, value)
+        }
+        bindings = next
+        save()
+        return { taken: true, swapped: other }
+    }
+    function _put(table, action, column, value) {
+        if (column === "pad") {
+            table[action].pad = value
+        } else {
+            table[action].key = value.key
+            table[action].mouse = value.mouse
+        }
+    }
+    // The defaults of one column back, the other column kept, kept
+    function resetColumn(column) {
+        let next = JSON.parse(JSON.stringify(bindings))
+        for (const a in next) {
+            if (column === "pad") {
+                next[a].pad = defaults[a].pad
+            } else {
+                next[a].key = defaults[a].key
+                next[a].mouse = defaults[a].mouse
+            }
+        }
+        bindings = next
+        save()
+    }
+
     function _valid(action, which, value) {
         if (which === "key") return typeof value === "number" && value >= 0 && Math.floor(value) === value
         if (which === "mouse")
