@@ -1533,6 +1533,16 @@ ClayWorld2d {
     // A bench keeps its record apart from the player's with its own name
     property string recordStoreName: "ShapesAndStone"
     KeyValueStore { id: records; name: world.recordStoreName }
+    // Every control of the knight, kept with the record under "controls"
+    // (issue #218): the key handler, the MouseArea, the pad and the hints
+    // read it
+    ControlTable { id: controlTable; store: records }
+    readonly property alias controls: controlTable
+    // What action is bound to on the device in use, for a hint: "E", "LMB",
+    // or the pad's button while a pad is in use
+    function controlName(action) {
+        return controlTable.name(action, knightPad.inUse, b => knightPad.label(b))
+    }
     function _startRunRecord() {
         campFreed.startRun()
         runKills = 0
@@ -1623,6 +1633,7 @@ ClayWorld2d {
         _loadRecord()
         campFreed.load()
         _loadVolumes()
+        controlTable.load()
         _loadMaster()
         runStartRecord = ownRecord.depth
         console.log("[Game] Record so far:", recordLine === "" ? "none" : recordLine)
