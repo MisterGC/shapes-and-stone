@@ -9,7 +9,10 @@
 // Mouse are listed and in use. A virtual pad plugged in (where the build
 // reads pads) is listed by its name, a press on it marks it in use and the
 // hint names its buttons, a key marks the keyboard again, and unplugged it
-// is gone. Esc goes back to the title, on Control Input; a click on the
+// is gone. With Strike's mouse and keyboard cell picked the pad's A, taking
+// the pad again, moves the pick to Strike's gamepad cell and chooses
+// nothing (issue #236); Enter makes the mouse and keyboard cell wait and
+// the pad's A cancels it, the pick on the gamepad's column. Esc goes back to the title, on Control Input; a click on the
 // row opens the page and a click on Back closes it. In the game Esc opens
 // the pause menu, S three times and Enter open the page over it, the menu
 // hidden and the world still paused, M mutes, Esc goes back to the menu on
@@ -93,6 +96,8 @@ Window {
     }
     function page() { return shown("controlInputPage") }
     function menu() { return shown("pauseMenu") }
+    function prompt() { return find(page(), "controlPrompt").text }
+    function rowOf(action) { return game.controls.actions.findIndex(a => a.id === action) }
     // The device chips: [{ name, inUse }]
     function devices() {
         let list = []
@@ -194,6 +199,41 @@ Window {
             press(Qt.Key_W)
             check(devices()[0].inUse && !devices().find(x => x.name === "Bench Pad").inUse,
                   "a key marks the keyboard in use again (" + deviceNames() + ")")
+            // Strike's mouse and keyboard cell picked, then the pad's A
+            press(Qt.Key_A)
+            for (let n = 0; page().selectedIndex < rowOf("strike") && n < 20; n++) press(Qt.Key_S)
+            check(page().column === 0 && page().selectedIndex === rowOf("strike"),
+                  "A and S pick Strike's mouse and keyboard cell")
+            GamepadHub.setVirtualGamepadInput(padId, "south", 1)
+        }],
+        [() => padId < 0 || game.padInUse, () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 0)
+            check(page().column === 1 && page().selectedIndex === rowOf("strike") && page().capturing === ""
+                  && prompt() === "",
+                  "the pad's A, taking the pad, puts the pick on Strike's gamepad cell and chooses nothing (column "
+                  + page().column + ", waiting: '" + page().capturing + "', prompt: '" + prompt() + "')")
+        }],
+        [100, () => {
+            if (padId < 0) return
+            // Strike's mouse and keyboard cell waits, the pad's A cancels it
+            press(Qt.Key_A)
+            press(Qt.Key_Return)
+            check(page().capturing === "keys" && !game.padInUse, "Enter makes Strike's mouse and keyboard cell wait")
+        }],
+        [100, () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 1)
+        }],
+        [() => padId < 0 || game.padInUse, () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 0)
+            check(page().capturing === "" && page().column === 1 && prompt() === "Strike kept as it was",
+                  "the pad's A cancels it and puts the pick on the gamepad's column (column " + page().column
+                  + ", prompt: '" + prompt() + "')")
+        }],
+        [100, () => {
+            if (padId < 0) return
             GamepadHub.detachVirtualGamepad(padId)
             padId = -1
         }],
