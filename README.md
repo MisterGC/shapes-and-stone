@@ -69,6 +69,29 @@ Game* and tells the others the code shown, they type it and click *Join
 Game*. A native game that hosts with *Internet* takes browser players too;
 a LAN code does not work in the browser.
 
+**Controls:** the knight plays with the mouse and keyboard or with a
+gamepad, whichever was used last. By default:
+
+| Action | Mouse and keyboard | Gamepad |
+|--------|--------------------|---------|
+| Move | W, A, S, D | left stick or D-pad |
+| Aim | the mouse | right stick |
+| Strike (hold to charge, at a vein dig, at a pond cast) | left button | R1 |
+| Shield | right button | L1 |
+| Dash | Space | B |
+| Whirlwind | Q | R2 |
+| Talk, open a door | E | A |
+| Potion | 1 | X |
+| Draught | 2 | Y |
+| Lock on an enemy | F or middle button | L2 |
+| Knight panel | C | Select |
+| Mute | M | - |
+| Effects on and off | V | - |
+| Menu | Esc | Start |
+
+In a dialogue 1 to 5 buy what is offered; on a pad the stick picks a ware,
+the potion's button buys it and the dash's closes the dialogue.
+
 ---
 
 ## BUILD
@@ -95,7 +118,7 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
 not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
-`pause`, `fallen`, `focus`, `gamepad`, `downed`, `joinleave`, `gold`,
+`pause`, `fallen`, `focus`, `gamepad`, `controls`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
 `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
@@ -349,10 +372,27 @@ QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/l
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fightmusic/fightmusic.qml
 ```
 
-At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
-potion, 2 draught, M mute and Esc menu. F or the middle button locks on an
-enemy (see target lock).
+Every control comes from one table, `src/ControlTable.qml`: per action its
+key and mouse button, and its gamepad input. The game's key handler and
+mouse area, the pad (`src/KnightPad.qml`), the pad's Start in the menus,
+the swing's `InputAction` and every hint that names a control read it. The
+player's table is kept with the record as JSON under `controls`; with
+nothing kept, or for an action or field missing or not valid there, the
+defaults apply - the controls in the table under PLAY. The pad's sticks
+move and aim and are not rebound: they reach the game as the controller's
+axes only. The controls bench rebinds a key, the moves, the shield, a mouse
+button and two pad buttons and checks that the game follows each, that the
+hints name every action, that the table is kept and loaded by a new game,
+and that what is missing in it has its default; it exits with the number
+of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controls/controls.qml
+```
+
+At depth 0 a line at the bottom of the screen names the controls: every
+action of the table with its key or mouse button, or its pad button while a
+pad is in use, the moves as one ("WASD move").
 Esc opens a menu with Resume and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
@@ -368,7 +408,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
 
 A gamepad plays the knight too, through Clayground's `GameController` in its
 `full` layout (`src/KnightPad.qml`): the left stick or the D-pad moves, the
-right stick aims - at rest the knight faces the way it walks - R1 strikes
+right stick aims - at rest the knight faces the way it walks - and each
+button does what the control table binds it to, by default: R1 strikes
 (hold to charge, at a vein dig, at a pond cast), L1 shields, B dashes, A
 talks, X drinks a potion, Y a draught, R2 whirls, L2 locks on and Select
 opens the knight panel. In a dialogue A goes on, the stick picks a ware, X
