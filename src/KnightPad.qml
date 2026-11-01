@@ -114,8 +114,14 @@ Item {
     // triggerOn
     property var _down: ({})
 
+    // A button or trigger was pressed, as GameController.inputs names it:
+    // the Control Input page rebinds a pad cell to it (issue #221)
+    signal inputPressed(string name)
+
     // A button or trigger changed: on its press or release, the action it
-    // is bound to. Not for a change a key made (the keyboard's moves)
+    // is bound to. Not for a change a key made (the keyboard's moves). A
+    // press while the Control Input page waits for one (Game.rebinding) is
+    // the page's alone
     function _input(name) {
         let value = controller.inputValue(name)
         _moved(value)
@@ -123,6 +129,9 @@ Item {
         if (!!_down[name] === down) return
         _down[name] = down
         if (_inKey || !controls) return
+        const rebinding = !!game && !!game.rebinding
+        if (down && enabled) inputPressed(name)
+        if (down && rebinding) return
         let action = controls.actionOfPad(name)
         if (action !== "") _act(action, down)
     }
