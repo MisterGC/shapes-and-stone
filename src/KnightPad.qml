@@ -3,13 +3,14 @@ import QtQml
 import Clayground.GameController
 
 // The knight on a gamepad (issue #200): the game's controller in its full
-// layout - the left stick moves (Game.knightMoveX), the right stick aims, R1
-// strikes as the left mouse button does, L1 raises the shield, B dashes
-// (Game.qml) and the other buttons do what the keys do. The pad is in use
-// from its first input to the next key press, and its aim from its first
-// input to the next move of the mouse; the hints name its buttons
-// meanwhile. A physical pad is taken as the controller's source when one
-// of its buttons or sticks moves, the keyboard again when a key goes down.
+// layout - the left stick moves (Game.knightMoveX), the right stick aims and
+// each button or trigger does the action it is bound to in the game's
+// ControlTable (issue #218): R1 strikes as the left mouse button does, L1
+// raises the shield, B dashes and so on by default. The pad is in use from
+// its first input to the next key press, and its aim from its first input
+// to the next move of the mouse; the hints name its buttons meanwhile. A
+// physical pad is taken as the controller's source when one of its buttons
+// or sticks moves, the keyboard again when a key goes down.
 Item {
     id: knightPad
 
@@ -17,10 +18,16 @@ Item {
     property var game: null
     // The game's dialogue panel: A goes on, the stick picks a ware, X buys it
     property var dialogue: null
+    // The game's ControlTable: which action each pad input does, and the
+    // keys the keyboard walks with
+    property var controls: null
 
-    // The keyboard's part of the controller: WASD and Space for B
-    readonly property var keyboardKeys: ({ axisX: [Qt.Key_A, Qt.Key_D], axisY: [Qt.Key_S, Qt.Key_W],
-                                           buttonB: Qt.Key_Space })
+    // The keyboard's part of the controller: the four keys of the moves.
+    // Every other key is the game's key handler's
+    readonly property var keyboardKeys: controls
+        ? ({ axisX: [controls.key("moveLeft"), controls.key("moveRight")],
+             axisY: [controls.key("moveDown"), controls.key("moveUp")] })
+        : ({ axisX: [Qt.Key_A, Qt.Key_D], axisY: [Qt.Key_S, Qt.Key_W] })
 
     // A pad drives the knight: the hints name its buttons
     property bool inUse: false
@@ -32,14 +39,15 @@ Item {
     property real deadZone: 0.3
     property real triggerOn: 0.5
 
-    // What a button is printed with on the selected pad (a PlayStation pad's
-    // Cross), else its position's name in the full layout
+    // What a button or trigger is printed with on the selected pad (a
+    // PlayStation pad's Cross), else its position's name in the full
+    // layout: "A", "R1", "R2", "Select"
     function label(button) {
         const pad = controller ? controller.gamepad : null
         const at = { buttonA: "south", buttonB: "east", buttonX: "west", buttonY: "north" }
         if (pad && pad.labels && at[button] && pad.labels[at[button]])
             return pad.labels[at[button]]
-        return button.replace("button", "")
+        return button.replace(/^(button|trigger)/, "")
     }
 
     function keyboardUsed() {
@@ -96,18 +104,43 @@ Item {
     }
     function _free() { return _playing() && !game.talking }
 
-    // The press of R1 or L1 that began a strike or a raised shield, ended
-    // by its release wherever the game is by then
+    // The press that began a strike or a raised shield, ended by its
+    // release wherever the game is by then
     property bool _striking: false
     property bool _shielding: false
-    property bool _l2: false
-    property bool _r2: false
     property int _wareStep: 0
 
-    function _button(name, down) {
-        if (!enabled) return
-        if (name === "buttonR1") {
-            if (down && _playing() && !game.talking) {
+    // Each pad input as last seen pressed: a trigger is pressed past
+    // triggerOn
+    property var _down: ({})
+
+    // A button or trigger changed: on its press or release, the action it
+    // is bound to. Not for a change a key made (the keyboard's moves)
+    function _input(name) {
+        let value = controller.inputValue(name)
+        _moved(value)
+        let down = typeof value === "number" ? value > triggerOn : !!value
+        if (!!_down[name] === down) return
+        _down[name] = down
+        if (_inKey || !controls) return
+        let action = controls.actionOfPad(name)
+        if (action !== "") _act(action, down)
+    }
+
+    // A press that closed a menu, the title or the fallen screen (MenuPad's
+    // A, B or Start) is theirs: the game, playing again from that moment,
+    // does not act on it too
+    readonly property bool _overlay: !!game && (game.overlayUp || game.masterOpen)
+    property bool _overlayLeft: false
+    on_OverlayChanged: if (!_overlay) {
+        _overlayLeft = true
+        Qt.callLater(() => knightPad._overlayLeft = false)
+    }
+
+    function _act(action, down) {
+        if (!enabled || (down && _overlayLeft)) return
+        if (action === "strike") {
+            if (down && _free()) {
                 game.strikePress()
                 _striking = true
             } else if (!down && _striking) {
@@ -116,8 +149,8 @@ Item {
             }
             return
         }
-        if (name === "buttonL1") {
-            if (down && _playing() && !game.talking) {
+        if (action === "shield") {
+            if (down && _free()) {
                 game.player.raiseShield()
                 _shielding = true
             } else if (!down && _shielding) {
@@ -126,32 +159,31 @@ Item {
             }
             return
         }
-        if (!down || !_playing()) return
+        if (!down) return
+        // Mute and the effects anywhere; the menu is MenuPad's Start
+        if (action === "mute") { game.muted = !game.muted; return }
+        if (action === "effects") { game.fx = !game.fx; return }
+        if (!_playing()) return
         let panel = dialogue
-        if (name === "buttonA") {
+        if (action === "dash") {
+            // In a dialogue it closes it, as Esc does
+            if (!game.talking) game.player.dash()
+            else if (inUse) panel.close()
+        } else if (action === "talk") {
             if (game.talking) panel.advance()
             else game.interact()
-        } else if (name === "buttonX") {
+        } else if (action === "potion") {
+            // In a dialogue with wares it buys the one the stick picked
             if (game.talking && panel.wares.length > 0) game.buyWare(panel.wares[panel.selected])
             else if (!game.talking) game.drinkPotion()
-        } else if (name === "buttonY") {
+        } else if (action === "draught") {
             if (!game.talking) game.drinkDraught()
-        } else if (name === "buttonSelect") {
+        } else if (action === "whirlwind") {
+            if (!game.talking) game.player.unleash()
+        } else if (action === "lock") {
+            game.toggleLock()
+        } else if (action === "knight") {
             game.knightPanelOpen = !game.knightPanelOpen
-        }
-    }
-
-    // The triggers press past triggerOn: R2 whirls, L2 locks on
-    function _trigger(name, value) {
-        let down = value > triggerOn
-        if (name === "triggerR2") {
-            if (down === _r2) return
-            _r2 = down
-            if (down && enabled && _free()) game.player.unleash()
-        } else {
-            if (down === _l2) return
-            _l2 = down
-            if (down && enabled && _playing()) game.toggleLock()
         }
     }
 
@@ -176,21 +208,16 @@ Item {
         }
         function onAxisRightXChanged() { knightPad._moved(knightPad.controller.axisRightX); knightPad._aimLater() }
         function onAxisRightYChanged() { knightPad._moved(knightPad.controller.axisRightY); knightPad._aimLater() }
-        function onTriggerL2Changed() {
-            knightPad._moved(knightPad.controller.triggerL2)
-            knightPad._trigger("triggerL2", knightPad.controller.triggerL2)
-        }
-        function onTriggerR2Changed() {
-            knightPad._moved(knightPad.controller.triggerR2)
-            knightPad._trigger("triggerR2", knightPad.controller.triggerR2)
-        }
-        function onButtonAPressedChanged() { knightPad._pressed("buttonA") }
-        function onButtonBPressedChanged() { knightPad._moved(knightPad.controller.buttonBPressed) }
-        function onButtonXPressedChanged() { knightPad._pressed("buttonX") }
-        function onButtonYPressedChanged() { knightPad._pressed("buttonY") }
-        function onButtonL1PressedChanged() { knightPad._pressed("buttonL1") }
-        function onButtonR1PressedChanged() { knightPad._pressed("buttonR1") }
-        function onButtonSelectPressedChanged() { knightPad._pressed("buttonSelect") }
+        function onTriggerL2Changed() { knightPad._input("triggerL2") }
+        function onTriggerR2Changed() { knightPad._input("triggerR2") }
+        function onButtonAPressedChanged() { knightPad._input("buttonA") }
+        function onButtonBPressedChanged() { knightPad._input("buttonB") }
+        function onButtonXPressedChanged() { knightPad._input("buttonX") }
+        function onButtonYPressedChanged() { knightPad._input("buttonY") }
+        function onButtonL1PressedChanged() { knightPad._input("buttonL1") }
+        function onButtonR1PressedChanged() { knightPad._input("buttonR1") }
+        function onButtonStartPressedChanged() { knightPad._input("buttonStart") }
+        function onButtonSelectPressedChanged() { knightPad._input("buttonSelect") }
         // The selected pad was unplugged: the keyboard again
         function onGamepadSelectedChanged() {
             let c = knightPad.controller
@@ -202,12 +229,6 @@ Item {
             }
         }
     }
-    function _pressed(name) {
-        let down = controller.inputValue(name)
-        _moved(down)
-        _button(name, down)
-    }
-
     // A physical pad whose button or stick moves becomes the source
     Instantiator {
         model: GamepadHub.gamepads

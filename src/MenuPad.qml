@@ -3,8 +3,10 @@ import QtQuick
 // A gamepad in the menus (issue #201): the stick or the D-pad of the
 // game's controller moves the focus a row or a step, held it moves on
 // after a moment, A confirms, B goes back, X is the menu's own extra and
-// Start pauses. Only the press counts, so a button held into a menu does
-// nothing there; the game decides which menu each one reaches.
+// startInput, the menu's binding in the game's ControlTable (Start by
+// default, issue #218), pauses. Only the press counts, so a button held
+// into a menu does nothing there; the game decides which menu each one
+// reaches.
 Item {
     id: menuPad
 
@@ -14,6 +16,9 @@ Item {
     // Held, the direction moves again after delayMs and then every repeatMs
     property int delayMs: 400
     property int repeatMs: 150
+    // The pad input that pauses and resumes, as GameController.inputs names
+    // it; a trigger counts pressed past deadZone
+    property string startInput: "buttonStart"
 
     // dx, dy: -1, 0 or 1, up and right positive
     signal moved(int dx, int dy)
@@ -49,6 +54,11 @@ Item {
     on_DxChanged: _push()
     on_DyChanged: _push()
 
+    function _pressed(v) { return typeof v === "number" ? v > deadZone : !!v }
+    readonly property bool _start: !!controller && startInput !== ""
+                                   && _pressed(controller.inputValue(startInput))
+    on_StartChanged: if (_start) started()
+
     Timer {
         id: repeat
         onTriggered: {
@@ -63,6 +73,5 @@ Item {
         function onButtonAPressedChanged() { if (menuPad.controller.buttonAPressed) menuPad.confirmed() }
         function onButtonBPressedChanged() { if (menuPad.controller.buttonBPressed) menuPad.backed() }
         function onButtonXPressedChanged() { if (menuPad.controller.buttonXPressed) menuPad.extra() }
-        function onButtonStartPressedChanged() { if (menuPad.controller.buttonStartPressed) menuPad.started() }
     }
 }

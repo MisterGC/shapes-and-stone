@@ -1688,12 +1688,13 @@ ClayWorld2d {
         else openMaster({ index: 0, pos: dangerPosition, knights: knights, seed: masterSeed, go: go })
     }
 
-    // Mouse input: aiming + attack + shield (also handles WASM focus)
+    // Mouse input: aiming, and each button the action it is bound to in
+    // the control table (also handles WASM focus)
     MouseArea {
         id: mouseInput
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        acceptedButtons: Qt.LeftButton | controlTable.bindableMouseButtons
 
         // The mouse aims again as soon as it moves (knightPad)
         onPositionChanged: knightPad.mouseUsed()
@@ -1702,15 +1703,12 @@ ClayWorld2d {
             world.forceActiveFocus()
             knightPad.mouseUsed()
             if (!player) return
-            if (mouse.button === Qt.LeftButton) strikePress(mouse)
-            if (mouse.button === Qt.RightButton) player.raiseShield()
-            if (mouse.button === Qt.MiddleButton) toggleLock()
+            world._control(controlTable.actionOfMouse(mouse.button), true, mouse)
         }
 
         onReleased: (mouse) => {
             if (!player) return
-            if (mouse.button === Qt.LeftButton) strikeRelease(mouse)
-            if (mouse.button === Qt.RightButton) player.lowerShield()
+            world._control(controlTable.actionOfMouse(mouse.button), false, mouse)
         }
         onCanceled: if (player) {
             _picking = false
@@ -1806,66 +1804,95 @@ ClayWorld2d {
     property real playerScreenY: playerScreenPos.y
 
 
-    // Input handling
+    // Input handling: each key does the action it is bound to in the
+    // control table; the moves are the controller's (knightPad.keyboardKeys)
     Keys.onPressed: (event) => {
-        // Esc closes an open dialogue or the knight panel; only without
-        // either it opens the menu
-        if (event.key === Qt.Key_Escape) {
+        // 1 to 5 buy what the dialogue panel offers (the smith's gems and
+        // four upgrades), whatever they are bound to
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5
+                && dialoguePanel.visible && dialoguePanel.wares.length > 0) {
+            let i = event.key - Qt.Key_1
+            if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
+            event.accepted = true
+            return
+        }
+        event.accepted = _control(controlTable.actionOfKey(event.key), true, null, event.isAutoRepeat)
+    }
+    Keys.onReleased: (event) => {
+        if (event.isAutoRepeat) return
+        let action = controlTable.actionOfKey(event.key)
+        if (action === "strike" || action === "shield") event.accepted = _control(action, false, null)
+    }
+    // A key or mouse button bound to action went down (down) or up; mouse
+    // is the button's event, null for a key; repeat: the key's auto repeat.
+    // Returns whether the input was the game's. The pad's buttons are
+    // knightPad's
+    function _control(action, down, mouse, repeat) {
+        if (action === "" || action === "aim" || action.startsWith("move")) return false
+        // A mouse button is the MouseArea's, under which no menu is open; a
+        // key strikes or shields as the pad does, not in a dialogue
+        let free = !!mouse || (!overlayUp && !masterOpen && !talking)
+        if (action === "strike") {
+            if (down && !repeat && player && free) strikePress(mouse)
+            else if (!down && player) strikeRelease(mouse)
+            return true
+        }
+        if (action === "shield") {
+            if (down && !repeat && player && free) player.raiseShield()
+            else if (!down && player) player.lowerShield()
+            return true
+        }
+        if (!down) return false
+        // The menu's key closes an open dialogue or the knight panel; only
+        // without either it opens the menu
+        if (action === "menu") {
             if (talking) dialoguePanel.close()
             else if (knightPanelOpen) knightPanelOpen = false
             else if (screen === "game" && player && !fallen) openMenu()
-            event.accepted = true
-            return
+            return true
         }
-        if (event.key === Qt.Key_F && player && screen === "game") {
+        if (action === "lock") {
+            if (!player || screen !== "game") return false
             toggleLock()
-            event.accepted = true
-            return
+            return true
         }
-        if (event.key === Qt.Key_M) {
+        if (action === "mute") {
             muted = !muted
-            event.accepted = true
-            return
+            return true
         }
-        // Q: the whirlwind, with full momentum
-        if (event.key === Qt.Key_Q) {
-            if (!event.isAutoRepeat && screen === "game" && player && !fallen && !talking) player.unleash()
-            event.accepted = true
-            return
-        }
-        if (event.key === Qt.Key_C) {
-            if (screen === "game" && player && !fallen) knightPanelOpen = !knightPanelOpen
-            event.accepted = true
-            return
-        }
-        if (event.key === Qt.Key_V) {
+        if (action === "effects") {
             fx = !fx
-            event.accepted = true
-            return
+            return true
         }
-        // 1 to 5 buy what the dialogue panel offers (the smith's gems and
-        // four upgrades); without wares 1 drinks a potion and 2 a mana
-        // draught
-        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5) {
-            let i = event.key - Qt.Key_1
-            if (dialoguePanel.visible && dialoguePanel.wares.length > 0) {
-                if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
-                event.accepted = true
-            } else if (event.key === Qt.Key_1) {
-                drinkPotion()
-                event.accepted = true
-            } else if (event.key === Qt.Key_2) {
-                drinkDraught()
-                event.accepted = true
-            }
-            return
+        // The dash, as the pad's: not in a dialogue, nor under a menu, the
+        // title or the fallen screen, which let some keys through
+        if (action === "dash") {
+            if (!repeat && player && !overlayUp && !masterOpen && !talking) player.dash()
+            return true
         }
-        if (event.key === Qt.Key_E) {
+        // The whirlwind, with full momentum
+        if (action === "whirlwind") {
+            if (!repeat && screen === "game" && player && !fallen && !talking) player.unleash()
+            return true
+        }
+        if (action === "knight") {
+            if (screen === "game" && player && !fallen) knightPanelOpen = !knightPanelOpen
+            return true
+        }
+        if (action === "potion") {
+            drinkPotion()
+            return true
+        }
+        if (action === "draught") {
+            drinkDraught()
+            return true
+        }
+        if (action === "talk") {
             if (dialoguePanel.visible) dialoguePanel.advance()
             else interact()
-            event.accepted = true
-            return
+            return true
         }
+        return false
     }
     // E or a pad's A: a nearby NPC to talk to, else the cat, else a
     // traveller of the deep (issue #176), else a door; a vein is the left
@@ -1938,16 +1965,23 @@ ClayWorld2d {
                 console.log("[Game] Selecting touchscreen gamepad")
                 selectTouchscreenGamepad()
             } else {
-                console.log("[Game] Selecting keyboard (WASD + Space)")
+                console.log("[Game] Selecting keyboard (the moves of the control table)")
                 selectKeyboard(knightPad.keyboardKeys)
             }
         }
 
-        // B dashes; on a pad in a dialogue it closes it, as Esc does
+        // On touch B dashes; elsewhere the dash is the control table's
+        // (knightPad, the key handler)
         onButtonBPressedChanged: {
-            if (!buttonBPressed || !player || world.overlayUp) return
+            if (!world.touchControls || !buttonBPressed || !player || world.overlayUp) return
             if (!world.talking) player.dash()
-            else if (knightPad.inUse) dialoguePanel.close()
+        }
+    }
+    // The moves rebound: the keyboard walks with the new keys
+    Connections {
+        target: knightPad
+        function onKeyboardKeysChanged() {
+            if (gameCtrl.keyboardSelected) gameCtrl.selectKeyboard(knightPad.keyboardKeys)
         }
     }
 
@@ -1959,6 +1993,7 @@ ClayWorld2d {
         controller: gameCtrl
         game: world
         dialogue: dialoguePanel
+        controls: controlTable
         enabled: !world.touchControls
     }
     readonly property bool padInUse: knightPad.inUse
@@ -1984,6 +2019,7 @@ ClayWorld2d {
     }
     MenuPad {
         controller: gameCtrl
+        startInput: controlTable.pad("menu")
         onMoved: (dx, dy) => {
             let m = world._padMenu()
             if (m && m.padMove) m.padMove(dx, dy)
@@ -8435,6 +8471,7 @@ ClayWorld2d {
                 inSession: session.connected
                 pad: world.padInUse
                 padLabels: world.padLabels
+                muteKey: controlTable.key("mute")
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
                 onVolumeSet: (which, value) => world.setVolume(which, value)
@@ -8533,6 +8570,7 @@ ClayWorld2d {
             DungeonMasterPanel {
                 pad: world.padInUse
                 padLabels: world.padLabels
+                muteKey: controlTable.key("mute")
                 depth: world.masterAsk ? world.depthOf(world.masterAsk.index) : 0
                 rows: world.masterAsk ? world.masterRows() : []
                 preview: world.masterPreview
