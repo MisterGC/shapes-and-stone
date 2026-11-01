@@ -781,8 +781,10 @@ Item {
         remotePlayers = ({})
     }
 
-    // Multiplayer lobby
+    // Multiplayer lobby; lobby is it while it is up, for the gamepad
+    readonly property var lobby: lobbyLoader.item
     Loader {
+        id: lobbyLoader
         anchors.fill: parent
         active: session.showLobby
         sourceComponent: Component {

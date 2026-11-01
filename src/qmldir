@@ -40,7 +40,9 @@ DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml
 FallenScreen 1.0 FallenScreen.qml
 PauseMenu 1.0 PauseMenu.qml
+MenuPad 1.0 MenuPad.qml
 KnightPanel 1.0 KnightPanel.qml
+KnightPad 1.0 KnightPad.qml
 SongMusic 1.0 SongMusic.qml
 AmbienceBed 1.0 AmbienceBed.qml
 MultiplayerLobby 1.0 MultiplayerLobby.qml

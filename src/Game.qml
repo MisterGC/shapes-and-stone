@@ -1684,29 +1684,21 @@ ClayWorld2d {
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
+        // The mouse aims again as soon as it moves (knightPad)
+        onPositionChanged: knightPad.mouseUsed()
+
         onPressed: (mouse) => {
             world.forceActiveFocus()
+            knightPad.mouseUsed()
             if (!player) return
-            // The left button strikes with the pickaxe while it aims at a
-            // vein in reach (pressPick), else swings on release, or
-            // charges while held
-            if (mouse.button === Qt.LeftButton) {
-                // At a camp's pond the left button fishes (Fishing)
-                _fishingPress = fishing.press()
-                if (_fishingPress) return
-                _picking = pressPick()
-                if (!_picking) player.pressSwing(mouse)
-            }
+            if (mouse.button === Qt.LeftButton) strikePress(mouse)
             if (mouse.button === Qt.RightButton) player.raiseShield()
             if (mouse.button === Qt.MiddleButton) toggleLock()
         }
 
         onReleased: (mouse) => {
             if (!player) return
-            if (mouse.button === Qt.LeftButton && _fishingPress) {
-                fishing.release()
-                _fishingPress = false
-            } else if (mouse.button === Qt.LeftButton && !_picking) player.releaseSwing(mouse)
+            if (mouse.button === Qt.LeftButton) strikeRelease(mouse)
             if (mouse.button === Qt.RightButton) player.lowerShield()
         }
         onCanceled: if (player) {
@@ -1716,6 +1708,25 @@ ClayWorld2d {
             player.dropSwing()
             player.lowerShield()
         }
+    }
+
+    // The left button, or a pad's R1 (knightPad, no mouse event): it
+    // strikes with the pickaxe while it aims at a vein in reach
+    // (pressPick), else swings on release, or charges while held
+    function strikePress(mouse) {
+        if (!player) return
+        // At a camp's pond it fishes (Fishing)
+        _fishingPress = fishing.press()
+        if (_fishingPress) return
+        _picking = pressPick()
+        if (!_picking) player.pressSwing(mouse)
+    }
+    function strikeRelease(mouse) {
+        if (!player) return
+        if (_fishingPress) {
+            fishing.release()
+            _fishingPress = false
+        } else if (!_picking) player.releaseSwing(mouse)
     }
 
     // Target lock: F or the middle button locks the knight's facing on
@@ -1739,7 +1750,8 @@ ClayWorld2d {
     }
     function _pickLockTarget() {
         let px = player.xWu + player.widthWu / 2, py = player.yWu - player.heightWu / 2
-        let aim = Math.atan2(playerScreenY - mouseInput.mouseY, mouseInput.mouseX - playerScreenX)
+        let aim = knightPad.aiming ? knightPad.aimAngle * Math.PI / 180
+            : Math.atan2(playerScreenY - mouseInput.mouseY, mouseInput.mouseX - playerScreenX)
         let best = null, bestScore = Infinity
         for (let e of enemies) {
             if (!e || e.destroyed !== false) continue
@@ -1838,33 +1850,39 @@ ClayWorld2d {
             return
         }
         if (event.key === Qt.Key_E) {
-            if (dialoguePanel.visible) {
-                dialoguePanel.advance()
-            } else if (player) {
-                // Find nearby NPC to interact with, else a traveller of
-                // the deep (issue #176), else a door; a vein is the left
-                // button's (issue #169)
-                let items = world.room.children
-                let talked = false
-                for (let i = 0; i < items.length; i++) {
-                    let npc = items[i]
-                    if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
-                        npc.interact()
-                        talked = true
-                        break
-                    }
-                }
-                if (!talked && !fallen) talked = feedCat()
-                if (!talked && !fallen) talked = talkToDeepTraveller()
-                if (!talked && !fallen)
-                    useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
-                                        Balance.dungeon.doorReach))
-            }
+            if (dialoguePanel.visible) dialoguePanel.advance()
+            else interact()
             event.accepted = true
             return
         }
     }
-    Keys.forwardTo: gameCtrl
+    // E or a pad's A: a nearby NPC to talk to, else the cat, else a
+    // traveller of the deep (issue #176), else a door; a vein is the left
+    // button's (issue #169)
+    function interact() {
+        if (!player) return
+        let items = world.room.children
+        let talked = false
+        for (let i = 0; i < items.length; i++) {
+            let npc = items[i]
+            if ((npc.objectName === "npc" || npc.objectName === "traveller") && npc.nearbyPlayer) {
+                npc.interact()
+                talked = true
+                break
+            }
+        }
+        if (!talked && !fallen) talked = feedCat()
+        if (!talked && !fallen) talked = talkToDeepTraveller()
+        if (!talked && !fallen)
+            useDoor(nearestDoor(player.xWu + player.widthWu / 2, player.yWu - player.heightWu / 2,
+                                Balance.dungeon.doorReach))
+    }
+    // Under a menu, the title or the fallen screen no key reaches the
+    // controller: the pad there is the menus' (MenuPad), and Space or Shift
+    // let through by the title or the fallen screen must not press its B
+    // or A as well. knightPad first: a key press makes the keyboard the
+    // controller's source again before the controller reads it
+    Keys.forwardTo: overlayUp ? [] : [knightPad, gameCtrl]
     function openMenu() {
         // The menu takes the keys, and the keyboard gamepad lets go of what
         // is held when the focus moves (clayground#413); the shield and the
@@ -1881,20 +1899,26 @@ ClayWorld2d {
     // Where the keys or the touch pad steer the knight, -1..1 on each axis;
     // every level binds its knight to these. While a dialogue is open the
     // knight stands, so it cannot walk off and leave the panel up, and a
-    // key still held moves it again once the panel closes
+    // key still held moves it again once the panel closes. Under the menu
+    // the stick is the menu's, so the knight stands there too
     readonly property bool talking: dialoguePanel.visible
     // Locked on an enemy (toggleLock), the keys turn with it: W and S
     // walk towards it and away, A and D circle it
     readonly property real _lockRad: player && player.lockedOn ? player.facingAngle * Math.PI / 180 : 0
     readonly property bool _lockSteer: !!player && player.lockedOn
-    readonly property real knightMoveX: talking ? 0 : !_lockSteer ? gameCtrl.axisX
+    readonly property real knightMoveX: talking || menuOpen ? 0 : !_lockSteer ? gameCtrl.axisX
         : gameCtrl.axisY * Math.cos(_lockRad) + gameCtrl.axisX * Math.sin(_lockRad)
-    readonly property real knightMoveY: talking ? 0 : !_lockSteer ? -gameCtrl.axisY
+    readonly property real knightMoveY: talking || menuOpen ? 0 : !_lockSteer ? -gameCtrl.axisY
         : -gameCtrl.axisY * Math.sin(_lockRad) + gameCtrl.axisX * Math.cos(_lockRad)
+    // The one controller of the game: the keys, the touch pad or a
+    // gamepad. Full has Start, which pauses; on touch it stays nes, one
+    // stick and A/B on the screen
+    readonly property alias gameController: gameCtrl
     GameController {
         id: gameCtrl
         anchors.fill: parent
         showDebugOverlay: false
+        layout: world.touchControls ? "nes" : "full"
 
         Component.onCompleted: {
             console.log("[Game] GameController.onCompleted - os:", Qt.platform.os)
@@ -1903,16 +1927,78 @@ ClayWorld2d {
                 console.log("[Game] Selecting touchscreen gamepad")
                 selectTouchscreenGamepad()
             } else {
-                console.log("[Game] Selecting keyboard (WASD + Space/Shift)")
-                selectKeyboard(Qt.Key_W, Qt.Key_S, Qt.Key_A, Qt.Key_D,
-                               Qt.Key_Space, Qt.Key_Shift)
+                console.log("[Game] Selecting keyboard (WASD + Space)")
+                selectKeyboard(knightPad.keyboardKeys)
             }
         }
 
+        // B dashes; on a pad in a dialogue it closes it, as Esc does
         onButtonBPressedChanged: {
-            if (buttonBPressed && player && !world.talking) {
-                player.dash()
+            if (!buttonBPressed || !player || world.overlayUp) return
+            if (!world.talking) player.dash()
+            else if (knightPad.inUse) dialoguePanel.close()
+        }
+    }
+
+    // A gamepad plays the knight (issue #200); on touch the controller is
+    // the touch pad's alone
+    KnightPad {
+        id: knightPad
+        objectName: "knightPad"
+        controller: gameCtrl
+        game: world
+        dialogue: dialoguePanel
+        enabled: !world.touchControls
+    }
+    readonly property bool padInUse: knightPad.inUse
+    // The key or pad button that talks, for the prompts over NPCs and
+    // travellers and the dialogue panel's
+    readonly property string talkKey: padInUse ? knightPad.label("buttonA") : "E"
+    // The pad's face buttons as printed on it, for the hints of the HUD and
+    // the menus while a pad is in use (issue #202)
+    readonly property var padLabels: ({ A: knightPad.label("buttonA"), B: knightPad.label("buttonB"),
+                                        X: knightPad.label("buttonX"), Y: knightPad.label("buttonY") })
+
+    // A gamepad in the menus (issue #201): the stick or D-pad, A, B, X and
+    // Start reach the menu on top - the dungeon master's panel, the title,
+    // the lobby, the fallen screen or the pause menu - and in the game
+    // Start does what Esc does
+    function _padMenu() {
+        if (masterOpen) return masterLoader.item
+        if (screen === "title") return titleLoader.item
+        if (screen === "lobby") return session.lobby
+        if (screen === "game" && fallen) return fallenLoader.item
+        if (screen === "game" && menuOpen) return pauseLoader.item
+        return null
+    }
+    MenuPad {
+        controller: gameCtrl
+        onMoved: (dx, dy) => {
+            let m = world._padMenu()
+            if (m && m.padMove) m.padMove(dx, dy)
+        }
+        onConfirmed: {
+            let m = world._padMenu()
+            if (m && m.padConfirm) m.padConfirm()
+        }
+        onBacked: {
+            let m = world._padMenu()
+            if (m && m.padBack) m.padBack()
+        }
+        onExtra: {
+            let m = world._padMenu()
+            if (m && m.padExtra) m.padExtra()
+        }
+        onStarted: {
+            let m = world._padMenu()
+            if (m) {
+                // Start resumes from the pause menu, elsewhere it confirms
+                if (m === pauseLoader.item) m.padBack()
+                else if (m !== fallenLoader.item && m.padConfirm) m.padConfirm()
             }
+            else if (talking) dialoguePanel.close()
+            else if (knightPanelOpen) knightPanelOpen = false
+            else if (screen === "game" && player && !fallen) openMenu()
         }
     }
 
@@ -2106,7 +2192,7 @@ ClayWorld2d {
             anchors.centerIn: parent
             text: player ? Math.ceil(player.mana) + " / " + player.maxMana : ""
             color: "white"
-            font.pixelSize: 10
+            font.pixelSize: 12
             font.bold: true
         }
     }
@@ -2279,7 +2365,7 @@ ClayWorld2d {
         anchors.topMargin: 2
         z: 1000
         visible: player !== null && player.potions > 0
-        text: "Potions " + (player ? player.potions : 0) + "  [1]"
+        text: "Potions " + (player ? player.potions : 0) + "  [" + (padInUse ? padLabels.X : "1") + "]"
         color: "#66CC66"
         style: Text.Outline
         styleColor: "#000000"
@@ -2315,7 +2401,7 @@ ClayWorld2d {
         anchors.topMargin: player && player.potions > 0 ? 20 : 2
         z: 1000
         visible: player !== null && player.draughts > 0
-        text: "Draughts " + (player ? player.draughts : 0) + "  [2]"
+        text: "Draughts " + (player ? player.draughts : 0) + "  [" + (padInUse ? padLabels.Y : "2") + "]"
         color: "#B080E0"
         style: Text.Outline
         styleColor: "#000000"
@@ -2325,7 +2411,8 @@ ClayWorld2d {
     }
 
     // The controls, for a first-time player: shown at depth 0 on a keyboard
-    // and mouse, out of the way of the dialogue panel and the fallen screen
+    // and mouse, or a pad's while one is in use (knightPad), out of the way
+    // of the dialogue panel and the fallen screen
     readonly property bool touchControls: Qt.platform.os === "ios" || Qt.platform.os === "android"
     Text {
         id: controlsHint
@@ -2333,11 +2420,21 @@ ClayWorld2d {
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: 12
+        // A narrow window breaks it into lines rather than cut its ends off
+        width: Math.min(implicitWidth, parent.width - 24)
+        wrapMode: Text.WordWrap
+        horizontalAlignment: Text.AlignHCenter
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        text: "WASD move  •  LMB strike, hold to charge, at a vein dig  •  RMB shield  •  Space dash  •  "
-              + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
+        // A pad's button stays on the line of what it does, each item whole
+        text: knightPad.inUse
+              ? ["L stick move", "R stick aim", "R1 strike, hold to charge, at a vein dig", "L1 shield",
+                 knightPad.label("buttonB") + " dash", "R2 whirlwind", knightPad.label("buttonA") + " talk",
+                 knightPad.label("buttonX") + " potion", knightPad.label("buttonY") + " draught",
+                 "L2 lock on", "Select knight"].map(t => t.replace(/ /g, "\u00A0")).join("  •  ")
+              : "WASD move  •  LMB strike, hold to charge, at a vein dig  •  RMB shield  •  Space dash  •  "
+                + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -2346,7 +2443,7 @@ ClayWorld2d {
         font.letterSpacing: 1
     }
 
-    // Crosshair at mouse position
+    // Crosshair at mouse position; a pad aims with the knight's facing
     Item {
         id: crosshair
         x: mouseInput.mouseX - 6
@@ -2354,6 +2451,7 @@ ClayWorld2d {
         width: 12
         height: 12
         z: 1000
+        visible: !knightPad.aiming
 
         // Horizontal line
         Rectangle {
@@ -2463,6 +2561,7 @@ ClayWorld2d {
     // DEV menu (sandbox only)
     Column {
         id: devMenu
+        objectName: "devMenu"
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.margins: 10
@@ -3219,7 +3318,14 @@ ClayWorld2d {
     Component { id: goldDropComponent; GoldDrop {} }
 
     // Dialogue panel (bottom-center, hidden by default)
-    DialoguePanel { id: dialoguePanel; parent: world; gold: player ? player.gold : 0 }
+    DialoguePanel {
+        id: dialoguePanel
+        parent: world
+        gold: player ? player.gold : 0
+        pad: world.padInUse
+        talkKey: world.talkKey
+        buyKey: knightPad.label("buttonX")
+    }
 
     // The knight panel (C), on the left under the gold and the potions
     KnightPanel {
@@ -3468,6 +3574,8 @@ ClayWorld2d {
             // Mouse aiming: bind screen coords for facing calculation
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+            player.padAim = Qt.binding(() => knightPad.aiming)
+            player.padAimAngle = Qt.binding(() => knightPad.aimAngle)
             player.playerScreenX = Qt.binding(() => playerScreenX)
             player.playerScreenY = Qt.binding(() => playerScreenY)
             gameCamera.target = player
@@ -5895,6 +6003,8 @@ ClayWorld2d {
             player.moveY = Qt.binding(() => knightMoveY)
             player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
             player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+            player.padAim = Qt.binding(() => knightPad.aiming)
+            player.padAimAngle = Qt.binding(() => knightPad.aimAngle)
             player.playerScreenX = Qt.binding(() => playerScreenX)
             player.playerScreenY = Qt.binding(() => playerScreenY)
             gameCamera.target = player
@@ -6751,13 +6861,31 @@ ClayWorld2d {
     function _canDig(p) {
         return !p.isBlocking && !p.shieldWanted && !p.isAttacking && !p.isCharging && !p.isDashing
     }
-    // Where the mouse aims, in wu: the point under it in the world, or a
-    // bench's aimOverride ({x, y})
+    // Where the mouse aims, in wu: the point under it in the world, a
+    // pad's aim (padAimWu) or a bench's aimOverride ({x, y})
     property var aimOverride: null
     function aimWu() {
         if (aimOverride) return aimOverride
+        if (knightPad.aiming && player) return padAimWu()
         let p = mouseInput.mapToItem(world.room, mouseInput.mouseX, mouseInput.mouseY)
         return { x: p.x / world.pixelPerUnit, y: (world.room.height - p.y) / world.pixelPerUnit }
+    }
+    // A pad aims a direction, not a point: the first whole vein or pond
+    // water on the knight's facing within padAimReach wu, else the point
+    // that far out
+    readonly property real padAimReach: Balance.fishing.castMax
+    function padAimWu() {
+        let c = _knightCentre(), r = player.facingAngle * Math.PI / 180
+        let ponds = fishing.ponds()
+        for (let d = 0.25; d <= padAimReach; d += 0.25) {
+            let x = c.x + Math.cos(r) * d, y = c.y + Math.sin(r) * d
+            for (let v of veins)
+                if (!v.split && Math.abs(x - v.cxWu) <= v.sizeWu / 2 && Math.abs(y - v.cyWu) <= v.sizeWu / 2)
+                    return { x: v.cxWu, y: v.cyWu }
+            for (let p of ponds)
+                if (fishing.inside(p, x, y, 0.92)) return { x: x, y: y }
+        }
+        return { x: c.x + Math.cos(r) * padAimReach, y: c.y + Math.sin(r) * padAimReach }
     }
     // Whether the aim is on v's cell or within pad wu of it
     function _aimOn(v, pad) {
@@ -7384,7 +7512,7 @@ ClayWorld2d {
     // travellers' physics clock, seconds;
     // deepTravellerSounds the last veinSoundsKept of their sounds, "dig"
     // or "chord", muted too, deepTravellerSoundCount all of them
-    Component { id: deepTravellerComponent; DeepTraveller {} }
+    Component { id: deepTravellerComponent; DeepTraveller { talkKey: world.talkKey } }
     // The chord plays live from its recipe (sound/cues.json)
     SfxPlayer {
         id: travellerChord
@@ -8041,13 +8169,16 @@ ClayWorld2d {
         return { ox: ox, oy: oy, size: size }
     }
 
-    // The keys and the mouse steer the knight, and the camera follows it
+    // The keys and the mouse, or a pad, steer the knight, and the camera
+    // follows it
     function _bindKnight() {
         if (!player) return
         player.moveX = Qt.binding(() => knightMoveX)
         player.moveY = Qt.binding(() => knightMoveY)
         player.mouseScreenX = Qt.binding(() => mouseInput.mouseX)
         player.mouseScreenY = Qt.binding(() => mouseInput.mouseY)
+        player.padAim = Qt.binding(() => knightPad.aiming)
+        player.padAimAngle = Qt.binding(() => knightPad.aimAngle)
         player.playerScreenX = Qt.binding(() => playerScreenX)
         player.playerScreenY = Qt.binding(() => playerScreenY)
         gameCamera.target = player
@@ -8284,12 +8415,15 @@ ClayWorld2d {
 
     // Esc menu (over the dungeon, under the fallen screen)
     Loader {
+        id: pauseLoader
         anchors.fill: parent
         z: 4400
         active: menuOpen && screen === "game" && !fallen
         sourceComponent: Component {
             PauseMenu {
                 inSession: session.connected
+                pad: world.padInUse
+                padLabels: world.padLabels
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
                 onVolumeSet: (which, value) => world.setVolume(which, value)
@@ -8301,11 +8435,14 @@ ClayWorld2d {
 
     // Fallen screen (over the dungeon, under the title)
     Loader {
+        id: fallenLoader
         anchors.fill: parent
         z: 4500
         active: fallen && screen === "game"
         sourceComponent: Component {
             FallenScreen {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 depth: world.depth
                 kills: world.runKills
                 secrets: world.runSecrets
@@ -8327,11 +8464,14 @@ ClayWorld2d {
 
     // Title screen (covers everything when active)
     Loader {
+        id: titleLoader
         anchors.fill: parent
         z: 5000
         active: screen === "title"
         sourceComponent: Component {
             TitleScreen {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 muted: world.muted
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
@@ -8374,11 +8514,14 @@ ClayWorld2d {
 
     // The dungeon master's panel (over the lobby and the fallen screen)
     Loader {
+        id: masterLoader
         anchors.fill: parent
         z: 5600
         active: world.masterOpen
         sourceComponent: Component {
             DungeonMasterPanel {
+                pad: world.padInUse
+                padLabels: world.padLabels
                 depth: world.masterAsk ? world.depthOf(world.masterAsk.index) : 0
                 rows: world.masterAsk ? world.masterRows() : []
                 preview: world.masterPreview

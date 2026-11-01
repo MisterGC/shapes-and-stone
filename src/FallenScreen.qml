@@ -38,6 +38,12 @@ Item {
     property bool canGoAgain: true
     // The party has fallen and this joiner waits for the host to go again
     property bool waitsForHost: false
+    // A pad in use (Game.padInUse): the hint names its buttons, as printed
+    // on it (Game.padLabels)
+    property bool pad: false
+    property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
+    readonly property string _goKey: pad ? padLabels.A : "Enter"
+    readonly property string _backKey: pad ? padLabels.B : "Esc"
     // Another knight of the session still stands: this one is down, the
     // run goes on, and the dungeon stays in sight
     property bool partyFights: false
@@ -142,7 +148,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "This session"
                 color: "#888888"
-                font.pixelSize: 11
+                font.pixelSize: 12
                 font.letterSpacing: 1
             }
             Repeater {
@@ -164,12 +170,12 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             objectName: "fallenHint"
             text: fallenScreen.canGoAgain
-                  ? "Enter to go again • Esc to the title"
+                  ? fallenScreen._goKey + " to go again • " + fallenScreen._backKey + " to the title"
                   : fallenScreen.waitsForHost
-                    ? "Waiting for the host to go again • Esc to leave the session"
+                    ? "Waiting for the host to go again • " + fallenScreen._backKey + " to leave the session"
                     : fallenScreen.partyFights
-                      ? "Your party fights on • Esc to leave the session"
-                      : "Esc to leave the session"
+                      ? "Your party fights on • " + fallenScreen._backKey + " to leave the session"
+                      : fallenScreen._backKey + " to leave the session"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
@@ -180,6 +186,11 @@ Item {
     function clock(seconds) {
         return Math.floor(seconds / 60) + ":" + String(Math.floor(seconds % 60)).padStart(2, "0")
     }
+
+    // The gamepad (MenuPad): A goes again where Enter does, B leaves for
+    // the title as Esc does
+    function padConfirm() { if (canGoAgain) goAgain() }
+    function padBack() { backToTitle() }
 
     Keys.onPressed: (event) => {
         // Other keys go on to the game: M still mutes, and the fallen

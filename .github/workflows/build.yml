@@ -65,3 +65,9 @@ jobs:
     # -V prints its output on a pass too, so the log shows the game came up.
     - name: Headless start
       run: ctest --test-dir build -R '^testshapes_and_stone$' -V --timeout 120
+
+    # The benches that finish in about 30 s offscreen, one after the other:
+    # one red bench is a non-zero exit, which fails the job. The networked,
+    # windowed and slow ones run by hand (README, "Benches").
+    - name: Quick benches
+      run: python3 tests/run_quick.py --qml "$QT_ROOT_DIR/bin/qml"

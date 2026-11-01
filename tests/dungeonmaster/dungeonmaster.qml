@@ -230,11 +230,11 @@ Window {
             bench.shown = p
             check(p.rooms.length === asked.rooms, "the preview has the asked " + asked.rooms + " rooms ("
                   + p.rooms.length + ")")
-            let short = shortOf(perRoom(p.rooms, p.enemies, p.features),
+            let shortRooms = shortOf(perRoom(p.rooms, p.enemies, p.features),
                                 { enemies: asked.enemies, spikes: asked.spikes, slits: asked.slits,
                                   breakables: asked.breakables })
-            check(short.length === 0, "every room but the start room holds the asked counts in the preview"
-                  + (short.length ? " - short: " + short.join(", ") : ""))
+            check(shortRooms.length === 0, "every room but the start room holds the asked counts in the preview"
+                  + (shortRooms.length ? " - short: " + shortRooms.join(", ") : ""))
             check(p.depth === asked.depth && near(p.position, asked.position),
                   "the preview is at base depth " + p.depth + " and position " + p.position)
             press(Qt.Key_Return)
@@ -247,10 +247,10 @@ Window {
                                game.breakables.map(b => cellOf("urn", b.cell))
                                .concat(game.plates.map(o => cellOf("spike", o.cell)))
                                .concat(game.slits.map(o => cellOf("slit", o.cell))))
-            let short = shortOf(objs, { enemies: asked.enemies, spikes: asked.spikes, slits: asked.slits,
+            let shortRooms = shortOf(objs, { enemies: asked.enemies, spikes: asked.spikes, slits: asked.slits,
                                         breakables: asked.breakables })
-            check(short.length === 0, "the built dungeon's enemies, breakables, plates and slits: the asked counts per room"
-                  + (short.length ? " - short: " + short.join(", ") : ""))
+            check(shortRooms.length === 0, "the built dungeon's enemies, breakables, plates and slits: the asked counts per room"
+                  + (shortRooms.length ? " - short: " + shortRooms.join(", ") : ""))
             check(game.levelIndex === 0 && game.depth === 0 && game.dangerDepth === 1 && near(game.danger, 1.2),
                   "the run stays at depth 0, its danger counts from base depth 1: " + game.danger.toFixed(3))
             check(game.masterSeed === game.scenarioSeed && game.levelSeedNow() === p.seed,

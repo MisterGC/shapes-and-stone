@@ -106,7 +106,7 @@ Item {
                     text: parent.d
                     color: "#DDDDDD"
                     opacity: 0.6
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     font.bold: true
                 }
             }
@@ -165,7 +165,7 @@ Item {
         color: "#E8C35A"
         style: Text.Outline
         styleColor: "#000000"
-        font.pixelSize: gauge.camp ? 13 : 11
+        font.pixelSize: gauge.camp ? 13 : 12
         font.bold: true
     }
 }

@@ -926,8 +926,8 @@ Window {
             let record = (a) => actions.push(a)
             p.acted.connect(record)
             let shorts = 0
-            let short = () => shorts++
-            p.momentumShort.connect(short)
+            let onShort = () => shorts++
+            p.momentumShort.connect(onShort)
             let whirls0 = game.fightRecord.whirlwinds
 
             // Momentum: a swing into the air earns none, one that hits two
@@ -1080,7 +1080,7 @@ Window {
                   + " shows and the mana bar flashes (acted " + (actions.join(", ") || "nothing") + ")")
 
             p.acted.disconnect(record)
-            p.momentumShort.disconnect(short)
+            p.momentumShort.disconnect(onShort)
             for (let o of game.enemies) if (!o.destroyed) { o.halted = false; o.aiState = "patrol" }
             Clayground.physicsStep(Math.ceil(Balance.knight.whirlDuration / stepS) + 2)
             Clayground.paused = false

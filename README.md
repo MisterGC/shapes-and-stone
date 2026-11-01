@@ -34,6 +34,25 @@ Ubuntu, Debian: `libopengl0`). If it says it needs
 FUSE, install `libfuse2` (Ubuntu, Debian:
 `sudo apt install libfuse2`), or start it with `--appimage-extract-and-run`.
 
+**Steam Deck:** the Linux AppImage plays on the Deck in Game Mode, on its
+built-in controls. Set it up once in Desktop Mode (Steam button > *Power* >
+*Switch to Desktop*):
+
+1. Download `ShapesAndStone-linux-x86_64.AppImage`, right-click it in the
+   file manager, open *Properties > Permissions* and tick *Is executable*.
+2. Open Steam, choose *Games > Add a Non-Steam Game to My Library...*, click
+   *Browse...*, pick the AppImage (set the file type to *All Files* if it is
+   not listed) and click *Add Selected Programs*.
+3. Return to Game Mode with the *Return to Gaming Mode* icon on the desktop.
+
+The game is then in the library under *Non-Steam*. Steam hands the Deck's
+controls to it as a gamepad: the left stick moves, the right stick aims, R1
+strikes, L1 shields, B dashes and A talks - the controls hint at the bottom
+names them all - and the stick, A and B work every menu. If the knight does
+not answer the sticks, set the game's controller layout to Steam's
+*Gamepad* template (Steam button > *Controller settings*). The lobby's code
+is typed with the on-screen keyboard (Steam + X).
+
 **Playing together over LAN:** all players are on the same network. One
 player chooses *Multiplayer*, picks *LAN*, clicks *Host Game* and tells the
 others the LAN code shown. Each of them chooses *Multiplayer*, types the code
@@ -72,6 +91,47 @@ check every PR runs (`.github/workflows/build.yml`):
 ```
 ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 ```
+
+Every push and PR also runs the quick benches: each bench that finishes in
+about 30 s offscreen, one after the other. A bench that fails a check, does
+not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
+`pause`, `fallen`, `focus`, `gamepad`, `downed`, `joinleave`, `gold`,
+`dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
+`first` and `second`), `record`, `danger`, `spikes`, `deep`,
+`dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
+runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
+through `XMLHttpRequest`. To run them, or some of them, the same way:
+
+```
+python3 tests/run_quick.py [--qml <Qt>/bin/qml] [--held] [--only gold camp]
+```
+
+Eight are quick here but not in CI yet, run by hand (`--held` adds them, the
+list is `HELD`):
+
+- `balance`: on CI's runner the next level does not keep the knight's HP and
+  mana.
+- `settings`: CI's runner has no audio output device, and step 12 times out.
+- `cat`, `loops`, `partysize`, `camps`: 55.9, 72.1, 39.4 and 31.3 s on CI's
+  runner, over 30 s.
+- `impacts`, `enemies`: a host and a joiner in one process whose timing checks
+  pass on one CI run and fail on the next.
+
+The other benches run by hand, each with the command in its section below:
+
+- Offscreen, but over 30 s: `features`, `secrets`, `veins`, `holes`, `talks`,
+  `freed`, `travellers`, `campsolid`, `breakables`, `slits`, `doors` and
+  `cave`.
+- With a window and an out dir, for the screenshots: `knights`, `gauge`,
+  `looks`, `ring`, and the `-- <out dir>` runs of the offscreen ones.
+- Two processes over the network, or the dojo's synthetic pad, through the
+  live loader (`-DCLAYGROUND_WITH_TOOLS=ON`): `sameworld`, `revive`,
+  `goagain`, `recordparty`, `dangerparty`, `breakparty`, `spikeparty`,
+  `slitparty`, `doorparty`, `secretparty`, `veinparty`, `holeparty`,
+  `talkparty`, `masterparty`, `padknight`, `netbench` and the fight bench
+  (`run_fightbench.py`, `run_reload.py`); `--mode cloud` needs the internet.
+- `deck`, through `clayrender` in a graphics session.
 
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
@@ -120,7 +180,9 @@ host's id, and goes on every screen once the knight's screen has judged
 it. The enemy bench
 starts a host and a joiner in one process, joins them over LAN, puts a
 knight at each of two enemies, compares every enemy on both screens for
-five seconds (the joiner shows the parry ring of the host's enemies),
+five seconds, its position against the host's at the joiner's render
+delay, which may be at most 100 ms (the joiner shows the parry ring of
+the host's enemies),
 has one of the host's enemies wind up a crushing blow (the joiner shows
 its `"crush"` state white-hot with the doubled ring, and its lunge with no
 parry window) and the joiner's knight judge one on its held shield,
@@ -148,10 +210,13 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/wallpush/wallpush.qml
 
 The same-world bench checks the same over the network, as a real session
 has it: two processes of Clayground's live loader, a host and a joiner,
-connected over Local (LAN) or Cloud signaling and started on a fixed seed.
+connected over Local (LAN) or Cloud signaling and started on a fixed seed
+(2027), whose first dungeon needs at least one spitter and two grunts or
+guardians; a seed without them stops the bench with the lineup it needed
+and the one it has.
 The joiner's knight answers one of the host's enemies: it stands until the
 enemy walks into its reach and swings, parries it, blocks, blocks
-perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it and
+perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it as it closes in and
 kills it while the host's knight kills another. Each answer counts once,
 on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
@@ -301,6 +366,29 @@ the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
 ```
 
+A gamepad plays the knight too, through Clayground's `GameController` in its
+`full` layout (`src/KnightPad.qml`): the left stick or the D-pad moves, the
+right stick aims - at rest the knight faces the way it walks - R1 strikes
+(hold to charge, at a vein dig, at a pond cast), L1 shields, B dashes, A
+talks, X drinks a potion, Y a draught, R2 whirls, L2 locks on and Select
+opens the knight panel. In a dialogue A goes on, the stick picks a ware, X
+buys it and B closes it. A physical pad becomes the source when one of its
+buttons or sticks moves, the keyboard again when a key goes down; the
+controls hint, the talk prompts and the dialogue name the pad's buttons from
+its first input to the next key press - A, B, X and Y as printed on the pad,
+Cross on a PlayStation pad. Moving the mouse gives the aim back to the mouse. Buttons
+count by position, so the bottom face button is A whatever it is labelled.
+On iOS and Android the touch pad stays the controller. The pad knight bench
+plays the dojo's `dungeon` scenario in Clayground's live loader with the
+dojo's synthetic pad alone - the inspector's gamepad input, no key and no
+click - then hands it to the mouse and the keyboard, plugs in a virtual SDL
+pad to check the physical source, and buys a ware in the `village`; it
+prints a PASS or FAIL line per check and exits with the number of failures:
+
+```
+python3 tests/padknight/run_padknight.py
+```
+
 At 0 HP the knight falls: the enemies stop and a screen shows how deep the
 run got, counted in dungeons from depth 0, its kills, the secret rooms
 the party found and its time. Enter starts a new run from depth
@@ -323,6 +411,43 @@ of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/focus/focus.qml
+```
+
+Every menu works with a gamepad: the title, the lobby, the dungeon
+master's panel, the pause menu and the fallen screen. The stick or the
+D-pad moves the focus (held, it moves on after a moment), A confirms, B
+goes back - it resumes from the pause menu, leaves the lobby and the
+fallen screen, and on the dungeon master's panel gives the row back to the
+game - and X generates there. Start pauses and resumes, and confirms on
+the title and the panel. Under the menu the stick gives the knight no
+motion and B no dash. In the lobby the pad cannot type a code: Join Game
+takes the one typed or pasted. While a pad is in use the hints of the
+title, the pause menu, the fallen screen, the dungeon master's panel and
+the knight panel name its buttons instead of keys. Off touch the game's
+controller has the full layout, for Start; on touch it keeps one stick and
+A/B. The gamepad
+bench goes from the title through the dungeon master's panel into a game,
+pauses, resumes and returns to the title, through the lobby and the fallen
+screen, with Clayground's synthetic pad alone, and exits with the number
+of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gamepad/gamepad.qml
+```
+
+The Steam Deck's screen is 1280x800, and every text a player reads is at
+least 12 px, the size Valve recommends for it. The Deck bench renders the
+HUD and every menu at 1280x800 with Clayground's `clayrender` - the title,
+the lobby, the dungeon master's panel, the dungeon's HUD, the knight panel,
+the pause menu, the fallen screen and a seller's dialogue - once with the
+keyboard and once with a pad in use, and saves a PNG of each. On each it
+checks that no text on screen is smaller than 12 px, none is elided, none
+of the HUD's or a menu's reaches past the window's edge and, with the pad,
+that no text names a key. It renders through the GPU, so it needs a
+graphics session, and exits with the number of failed checks:
+
+```
+python3 tests/deck/run_deck.py --out <dir>
 ```
 
 In a session a knight at 0 HP is down, drawn slumped and dark on every
@@ -1804,7 +1929,7 @@ python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10
 `.github/workflows/pages.yml` does the same with the runtime of a Clayground
 release and, when the check passes, puts `build/web/` on GitHub Pages. It
 runs by hand (*Run workflow*, with the Clayground release to take the
-runtime from, `v2026.9` by default) and when a release of the game is
+runtime from, `v2026.11` by default) and when a release of the game is
 published, never on a push. Pages must be set to deploy from GitHub Actions
 (*Settings > Pages > Source*).
 
