@@ -191,10 +191,19 @@ Item {
     function padConfirm() { if (capturing === "" && !_settling) choose(selectedIndex) }
     function padBack() { if (capturing === "" && !_settling) close() }
 
+    // The console says what the page shows: the devices with the ones in
+    // use, and the prompt under the table. The browser build has nothing
+    // else to tell a bench (tests/browserpad) what the page did
+    function _logDevices() {
+        console.info("[ControlInputPage] devices:", devices.map(d => d.name + (d.inUse ? " (in use)" : "")).join(", "))
+    }
+    onDevicesChanged: _logDevices()
+
     // Deferred like the pause menu's: the menu under it may still hold the
     // focus in the same frame
     Component.onCompleted: {
         column = pad ? 1 : 0
+        _logDevices()
         Qt.callLater(forceActiveFocus)
     }
 
@@ -443,6 +452,7 @@ Item {
                   : page.note
             color: "#E0B060"
             font.pixelSize: 14
+            onTextChanged: if (text !== "") console.info("[ControlInputPage] prompt:", text)
         }
 
         Text {
