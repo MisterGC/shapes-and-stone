@@ -39,7 +39,7 @@ Item {
             if (pads[i].type === "unsupported")
                 return "This browser does not read gamepads - play with one in Chrome"
         if (backend === "browser" && pads.length === 0)
-            return "Gamepad? Press a button on your gamepad"
+            return "Press a button on your gamepad to use it"
         return ""
     }
 

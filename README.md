@@ -481,7 +481,7 @@ screen says so with the pad's name, on the title, in the lobby and in a
 game (`src/PadNotice.qml`); a pad that drove the knight and is unplugged
 adds that the keyboard and mouse play now. Pads already there when the
 game starts get their notice too. In the browser a pad is only listed after
-a press on it, so the title says "Press a button on your gamepad" until one
+a press on it, so the title says "Press a button on your gamepad to use it" until one
 is; a pad the browser lists but cannot read - Firefox, Clayground's
 `unsupported` pad type - gets a notice and a title line that say to use
 Chrome. The pad notice bench plugs in and unplugs virtual pads on

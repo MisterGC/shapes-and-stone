@@ -122,7 +122,7 @@ Window {
         }],
         [0, () => {
             let browser = notice.titleLineFor("browser", [])
-            check(browser === "Gamepad? Press a button on your gamepad",
+            check(browser === "Press a button on your gamepad to use it",
                   "the browser listing no pad: the title asks for a press (" + browser + ")")
             check(notice.titleLineFor("browser", [{type: "standard", name: "Pad"}]) === "",
                   "the browser listing a pad: the title says nothing")
