@@ -233,10 +233,12 @@ Window {
             press(Qt.Key_Return)
             check(page().capturing === "" && prompt().indexOf("menu stays on Esc and Start") !== -1,
                   "the menu's key cell stays fixed (" + prompt() + ")")
-            go(rowOf("menu"), 1)
+            check(go(rowOf("menu"), 1), "the menu's gamepad cell is picked (row " + page().selectedIndex
+                  + ", column " + page().column + ")")
             press(Qt.Key_Return)
             check(page().capturing === "" && game.controls.pad("menu") === "buttonStart",
-                  "and its pad cell too")
+                  "and its pad cell too (waiting: '" + page().capturing + "' " + page().captureAction
+                  + ", menu on " + game.controls.pad("menu") + ", " + prompt() + ")")
             // A move takes no mouse button
             go(rowOf("moveUp"), 0)
             press(Qt.Key_Return)
