@@ -118,7 +118,7 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
 not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
-`pause`, `fallen`, `focus`, `gamepad`, `controls`, `downed`, `joinleave`, `gold`,
+`pause`, `fallen`, `focus`, `gamepad`, `controls`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
 `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
@@ -474,6 +474,24 @@ of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gamepad/gamepad.qml
+```
+
+When a gamepad connects or is unplugged a short notice at the top of the
+screen says so with the pad's name, on the title, in the lobby and in a
+game (`src/PadNotice.qml`); a pad that drove the knight and is unplugged
+adds that the keyboard and mouse play now. Pads already there when the
+game starts get their notice too. In the browser a pad is only listed after
+a press on it, so the title says "Press a button on your gamepad" until one
+is; a pad the browser lists but cannot read - Firefox, Clayground's
+`unsupported` pad type - gets a notice and a title line that say to use
+Chrome. The pad notice bench plugs in and unplugs virtual pads on
+Clayground's `GamepadHub`, on the title and in a game, checks each notice,
+that the keyboard drives again after the driving pad left and that the
+notices go, checks the title's line for the browser and a native build,
+and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/padnotice/padnotice.qml
 ```
 
 The Steam Deck's screen is 1280x800, and every text a player reads is at
