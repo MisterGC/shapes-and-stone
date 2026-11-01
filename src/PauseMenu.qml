@@ -1,7 +1,7 @@
 import QtQuick
 
-// Opened with Esc during a run: Resume, the Music and Sound volumes, and
-// Title. Alone the game is paused under it; in a session the world goes
+// Opened with Esc during a run: Resume, the Music and Sound volumes, the
+// Control Input page (issue #220) and Title. Alone the game is paused under it; in a session the world goes
 // on, since a pause would stop every other player's enemies, and only this
 // knight stops taking input. W/S or the arrows pick, A/D or the arrows turn
 // a volume down or up a tenth, Enter or Space confirms, Esc resumes; a
@@ -14,6 +14,8 @@ Item {
 
     signal resume()
     signal toTitle()
+    // The Control Input page is to open over the menu
+    signal controlInput()
     // which: "music" or "sound", value 0..1
     signal volumeSet(string which, real value)
 
@@ -26,7 +28,7 @@ Item {
     // The key that mutes, in the game's control table (Game.controls)
     property int muteKey: Qt.Key_M
     property int selectedIndex: 0
-    readonly property var choices: ["Resume", "Music", "Sound", "Title"]
+    readonly property var choices: ["Resume", "Music", "Sound", "Control Input", "Title"]
     property real musicVolume: 1
     property real soundVolume: 1
 
@@ -36,7 +38,8 @@ Item {
 
     function choose(index) {
         if (index === 0) resume()
-        else if (index === 3) toTitle()
+        else if (index === 3) controlInput()
+        else if (index === 4) toTitle()
     }
     // The row's volume, or -1 for a row that has none
     function volumeOf(index) {
@@ -100,7 +103,7 @@ Item {
             model: pauseMenu.choices
             delegate: Rectangle {
                 id: btn
-                objectName: "pauseChoice" + modelData
+                objectName: "pauseChoice" + modelData.replace(" ", "")
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 220; height: 44; radius: 6
                 readonly property bool isCurrent: pauseMenu.selectedIndex === index

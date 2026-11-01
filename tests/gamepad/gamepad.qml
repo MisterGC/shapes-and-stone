@@ -183,8 +183,8 @@ Window {
         }]],
         start(),
         [[() => menu() !== null, () => {}]],
-        down(), down(), down(),
-        [[0, () => check(menu().selectedIndex === 3, "down three times picks Title")]],
+        down(), down(), down(), down(),
+        [[0, () => check(menu().selectedIndex === 4, "down four times picks Title")]],
         a(),
         [[() => solo.screen === "title" && titleAt(0), () => {
             check(solo.player === null && !solo.menuOpen, "A on Title clears the run and goes to the title")
