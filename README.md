@@ -92,6 +92,13 @@ gamepad, whichever was used last. By default:
 In a dialogue 1 to 5 buy what is offered; on a pad the stick picks a ware,
 the potion's button buys it and the dash's closes the dialogue.
 
+*Control Input*, in the menu under *Sound* and on the title, shows the
+keyboard, the mouse and each connected gamepad by name, the one in use
+marked, and every action with its key or mouse button and its gamepad
+button side by side. In the browser a gamepad is listed once one of its
+buttons was pressed on the page; Firefox lists it but reads none of its
+input yet.
+
 ---
 
 ## BUILD
@@ -118,7 +125,7 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
 not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
-`pause`, `fallen`, `focus`, `gamepad`, `controls`, `downed`, `joinleave`, `gold`,
+`pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
 `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
@@ -390,10 +397,27 @@ of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controls/controls.qml
 ```
 
+The Control Input page (`src/ControlInputPage.qml`) reads the same table:
+a row per action with its title, its key and mouse button and its pad
+input, and above them the devices - Keyboard, Mouse and each pad of
+`GameController.gamepads` by name - with the ones in use marked. It opens
+from the pause menu and the title and goes back to the one it came from.
+The gamepad bench walks it with the pad; the control input bench opens and
+closes it from both by keyboard and mouse, checks every row against the
+table, plugs in a virtual pad (where the build reads pads), finds it listed
+and marked in use after a press and gone once unplugged, and with an out
+dir after `--` saves the page over the title and over the pause menu at
+1280x800:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controlinput/controlinput.qml [-- <out dir>]
+```
+
 At depth 0 a line at the bottom of the screen names the controls: every
 action of the table with its key or mouse button, or its pad button while a
 pad is in use, the moves as one ("WASD move").
-Esc opens a menu with Resume and Title. Alone it pauses the game: the
+Esc opens a menu with Resume, the Music and Sound volumes, Control Input
+and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
 would stop every player's enemies: the menu says the party fights on and
