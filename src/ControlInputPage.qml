@@ -352,6 +352,7 @@ Item {
                                 hoverEnabled: true
                                 cursorShape: cell.col >= 0 && !cell.fixed ? Qt.PointingHandCursor : Qt.ArrowCursor
                                 onEntered: {
+                                    if (page.capturing !== "") return
                                     if (page.selectedIndex !== row.rowIndex) page.pick(row.rowIndex)
                                     if (cell.col >= 0 && page.column !== cell.col) page.pickColumn(cell.col)
                                 }
@@ -458,13 +459,14 @@ Item {
         }
     }
 
-    // While a cell waits, a mouse button pressed anywhere is its input
+    // While a cell waits, a mouse button pressed anywhere is its input.
+    // It takes no hover: the cell under a resting mouse stays hovered, and
+    // is not entered again, picking itself, once the wait ends
     MouseArea {
         objectName: "controlCapture"
         anchors.fill: parent
         enabled: page.capturing !== ""
         acceptedButtons: Qt.AllButtons
-        hoverEnabled: true
         onPressed: (mouse) => {
             page.forceActiveFocus()
             if (!page._armed) return
