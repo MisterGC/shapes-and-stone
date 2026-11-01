@@ -99,6 +99,16 @@ button side by side. In the browser a gamepad is listed once one of its
 buttons was pressed on the page; Firefox lists it but reads none of its
 input yet.
 
+To rebind a control, pick its cell - W/S and A/D, the stick, or the mouse -
+and choose it with Enter, A or a click; then press the new key or mouse
+button in the *Mouse and keyboard* column, or the new pad button in the
+*Gamepad* column. A key or button another action has trades places with
+it: that action gets what this one had. Esc or the pad's B cancels.
+*Reset to defaults* under a column puts that column's defaults back. The
+menu stays on Esc and Start, the aim on the mouse and the right stick, and
+the moves on the left stick, so nobody locks themselves out. A change is
+kept at once and survives a restart and, in the browser, a reload.
+
 ---
 
 ## BUILD
@@ -125,7 +135,7 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
 not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
-`pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `downed`, `joinleave`, `gold`,
+`pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
 `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
@@ -412,6 +422,28 @@ dir after `--` saves the page over the title and over the pause menu at
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controlinput/controlinput.qml [-- <out dir>]
 ```
+
+On the page a chosen cell waits for the next input and rebinds to it
+(`ControlTable.rebind`): the cell then holds that input alone, and when
+another action holds it the two actions trade their cells. The rebind bench
+rebinds the dash to K by keyboard, the strike to the right button by a
+click - the shield had it and moves to the left button - and the potion to
+the pad's Y, the draught's, and checks that the game follows each: K
+dashes and Space no longer does, the right button swings, the left one
+shields, Y drinks a potion. It checks that the button that chose a cell is
+not taken, that Esc and the pad's B cancel, that the menu stays fixed and
+a move takes no mouse button, and that each column's Reset puts its own
+defaults back; every change is kept at once. With an out dir after `--` it
+saves the page while a cell waits:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/rebind/rebind.qml [-- <out dir>]
+```
+
+In the browser Clayground.Storage writes what is kept to IndexedDB in the
+background, and a page reloaded during that write would lose the change;
+the bundle's page asks before leaving while a write is under way
+(`window.clayStorage.busy`, `packaging/web-bundle.py`).
 
 At depth 0 a line at the bottom of the screen names the controls: every
 action of the table with its key or mouse button, or its pad button while a
