@@ -134,11 +134,12 @@ Window {
         [() => solo.player && solo.enemies.length > 0, () => {
             standUp(solo)
             let hint = shown(solo, "controlsHint")
-            let text = hint ? hint.text : ""
+            // Each item is kept whole on its line with no-break spaces
+            let text = hint ? hint.text.replace(/\u00A0/g, " ") : ""
             check(hint !== null && solo.depth === 0, "at depth 0 the controls hint is shown")
             for (let k of ["LMB", "hold to charge", "RMB", "Space dash", "E talk", "M mute", "Esc"])
                 check(text.indexOf(k) >= 0, "the hint names " + k + " (" + text + ")")
-            // Space dashes (KeyboardGamepad sets buttonB from the A key), Shift does nothing
+            // Space dashes (the control table's dash), Shift does nothing
             check(text.indexOf("Shift") < 0, "the hint does not name Shift (" + text + ")")
             check(menu(solo) === null && !solo.menuOpen, "no menu before Esc")
             hold(solo, Qt.Key_D)

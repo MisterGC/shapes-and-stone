@@ -1999,7 +1999,7 @@ ClayWorld2d {
     readonly property bool padInUse: knightPad.inUse
     // The key or pad button that talks, for the prompts over NPCs and
     // travellers and the dialogue panel's
-    readonly property string talkKey: padInUse ? knightPad.label("buttonA") : "E"
+    readonly property string talkKey: controlName("talk")
     // The pad's face buttons as printed on it, for the hints of the HUD and
     // the menus while a pad is in use (issue #202)
     readonly property var padLabels: ({ A: knightPad.label("buttonA"), B: knightPad.label("buttonB"),
@@ -2412,7 +2412,7 @@ ClayWorld2d {
         anchors.topMargin: 2
         z: 1000
         visible: player !== null && player.potions > 0
-        text: "Potions " + (player ? player.potions : 0) + "  [" + (padInUse ? padLabels.X : "1") + "]"
+        text: "Potions " + (player ? player.potions : 0) + "  [" + controlName("potion") + "]"
         color: "#66CC66"
         style: Text.Outline
         styleColor: "#000000"
@@ -2448,7 +2448,7 @@ ClayWorld2d {
         anchors.topMargin: player && player.potions > 0 ? 20 : 2
         z: 1000
         visible: player !== null && player.draughts > 0
-        text: "Draughts " + (player ? player.draughts : 0) + "  [" + (padInUse ? padLabels.Y : "2") + "]"
+        text: "Draughts " + (player ? player.draughts : 0) + "  [" + controlName("draught") + "]"
         color: "#B080E0"
         style: Text.Outline
         styleColor: "#000000"
@@ -2474,14 +2474,9 @@ ClayWorld2d {
         z: 1000
         visible: player !== null && depth === 0 && !touchControls && !fallen && !menuOpen
                  && !dialoguePanel.visible
-        // A pad's button stays on the line of what it does, each item whole
-        text: knightPad.inUse
-              ? ["L stick move", "R stick aim", "R1 strike, hold to charge, at a vein dig", "L1 shield",
-                 knightPad.label("buttonB") + " dash", "R2 whirlwind", knightPad.label("buttonA") + " talk",
-                 knightPad.label("buttonX") + " potion", knightPad.label("buttonY") + " draught",
-                 "L2 lock on", "Select knight"].map(t => t.replace(/ /g, "\u00A0")).join("  •  ")
-              : "WASD move  •  LMB strike, hold to charge, at a vein dig  •  RMB shield  •  Space dash  •  "
-                + "Q whirlwind  •  E talk  •  1 potion  •  2 draught  •  C knight  •  M mute  •  Esc menu"
+        // Every action from the control table, a pad's buttons while one is
+        // in use; each item stays whole on its line
+        text: controlTable.hint(knightPad.inUse, b => knightPad.label(b))
         color: "#BBBBBB"
         opacity: 0.85
         style: Text.Outline
@@ -3371,7 +3366,7 @@ ClayWorld2d {
         gold: player ? player.gold : 0
         pad: world.padInUse
         talkKey: world.talkKey
-        buyKey: knightPad.label("buttonX")
+        buyKey: controlTable.padOrKeysName("potion", b => knightPad.label(b))
     }
 
     // The knight panel (C), on the left under the gold and the potions
@@ -4852,7 +4847,7 @@ ClayWorld2d {
     // session the host does: a node's E asks it, and it publishes the
     // doors not closed in the level (session property "doors") for every
     // screen, a node that joins later too
-    Component { id: doorComponent; Door {} }
+    Component { id: doorComponent; Door { talkKey: world.talkKey } }
     property var doors: []
     // Host, and alone: the doors not closed in this level, "gx,gy" to
     // "open" or "bashed"
