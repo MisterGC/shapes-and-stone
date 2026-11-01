@@ -56,7 +56,7 @@ endforeach()
 
 clay_app(shapes_and_stone
 
-    VERSION 0.3.0
+    VERSION 0.4.0
 
     LINK_LIBS
         Qt::Core
