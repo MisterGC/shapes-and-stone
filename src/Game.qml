@@ -2287,7 +2287,8 @@ ClayWorld2d {
         }
         Text {
             visible: momentumHud.full
-            text: "Q"
+            // The whirlwind's key or pad button, from the control table
+            text: world.controlName("whirlwind")
             color: Balance.momentum.color
             style: Text.Outline
             styleColor: "#000000"
