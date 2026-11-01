@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "menu_change",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "tick", "role": "body", "source": "triangle", "freq": 880, "length": 110, "gain": -6.5, "envelope": {"attack": 1, "decay": 100, "sustain": 0, "release": 0}},
+    {"name": "click", "role": "transient", "source": "noise", "length": 6, "gain": -20.5, "envelope": {"attack": 0.5, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 2500, "resonance": 0.2}},
+    {"name": "octave", "role": "tail", "source": "sine", "freq": 1760, "length": 60, "gain": -22.5, "envelope": {"attack": 1, "decay": 55, "sustain": 0, "release": 0}}
+  ]
+}

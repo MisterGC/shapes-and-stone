@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "deep_rumble",
+  "variation": { "seed": 158, "pool": 4 },
+  "layers": [
+    { "name": "rumble", "role": "body", "source": "noise", "length": 1080, "gain": 9.1,
+      "envelope": { "attack": 180, "decay": 850, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 150, "resonance": 0.2 },
+      "vary": { "filter.cutoff": [-20, 20] } },
+    { "name": "rumble_deep", "role": "body", "source": "noise", "length": 1080, "gain": 9.1,
+      "envelope": { "attack": 180, "decay": 850, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 115, "resonance": 0.2 },
+      "vary": { "filter.cutoff": [-20, 20] } },
+    { "name": "knock1", "role": "transient", "source": "noise", "offset": 60, "length": 40,
+      "gain": 5.1, "envelope": { "attack": 0.5, "decay": 30, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 380 }, "vary": { "offset": [0, 30] } },
+    { "name": "knock2", "role": "transient", "source": "noise", "offset": 210, "length": 40,
+      "gain": 5.1, "envelope": { "attack": 0.5, "decay": 30, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 380 }, "vary": { "offset": [0, 30] } },
+    { "name": "knock3", "role": "transient", "source": "noise", "offset": 380, "length": 40,
+      "gain": 5.1, "envelope": { "attack": 0.5, "decay": 30, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 380 }, "vary": { "offset": [0, 30] } }
+  ]
+}

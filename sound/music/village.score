@@ -1,0 +1,43 @@
+# village: the camp by night between two dungeons, a warm and quiet loop
+# under the fire's crackle. One segment, F major, 92 bpm, 16 bars: a
+# flute tune over a plucked harp in quarters, a round bass and soft
+# brushes on the off-beats; the last bar sits on C to lead back to F.
+tempo 92
+meter 4
+
+instrument flute = warm:flute
+instrument harp  = warm:harp
+instrument bass  = warm:bass
+instrument brush = warm:brush
+
+track tune  flute vel=0.85
+track harp  harp  vel=0.58
+track bass  bass  vel=0.55
+track brush brush vel=0.35 transpose=0
+
+let arp[F]  = F3 A3 C4 A3
+let arp[Bb] = Bb3 D4 F4 D4
+let arp[C]  = C3 G3 E4 G3
+let arp[Dm] = D3 A3 F4 A3
+let arp[Gm] = G3 Bb3 D4 Bb3
+let arp[Am] = A3 C4 E4 C4
+let root[F]  = F2:2! C2:2
+let root[Bb] = Bb1:2! F2:2
+let root[C]  = C2:2! G1:2
+let root[Dm] = D2:2! A1:2
+let root[Gm] = G1:2! D2:2
+let root[Am] = A1:2! E2:2
+let chords = F F Bb C F Dm Gm C F F Bb C Am Dm Gm C
+let off = r:.5 C4:.5~ r:.5 C4:.5~ r:.5 C4:.5~ r:.5 C4:.5~
+
+pattern Village
+  tune: A4:1.5 G4:.5 F4 C5 | A4:3 r | Bb4:1.5 A4:.5 G4 F4 | G4:3 r |
+        A4 C5 F5:1.5 E5:.5 | D5:2 A4:2 | Bb4:1.5 A4:.5 G4 D4 | E4:2 G4:2 |
+        F4:1.5 A4:.5 C5:2 | F5:3 r | D5:1.5 C5:.5 Bb4 D5 | C5:3 r |
+        C5 A4 E4 A4 | F4:1.5 A4:.5 D5:2 | Bb4:1.5 A4:.5 G4:2 | E4:2 G4 C5
+  harp: $arp[$chords]
+  bass: $root[$chords]
+  brush: $off*16
+
+segment night: Village
+start night

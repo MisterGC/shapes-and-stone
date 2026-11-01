@@ -1,0 +1,102 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.02,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -21.532309,
+    "lufs_block_s": 0.02,
+    "true_peak_dbtp": -9.067557,
+    "peak_dbfs": -9.073084,
+    "rms_dbfs": -20.680931,
+    "crest_factor_db": 11.607846
+  },
+  "envelope": {
+    "silence_start_s": 2.3e-05,
+    "silence_end_s": 0.011565,
+    "attack_s": 0.0,
+    "peak_at_s": 0.004989,
+    "peak_db": -21.431577,
+    "fall_20db_at_s": 0.012472,
+    "fall_60db_at_s": 0.014966
+  },
+  "spectrum": {
+    "centroid_hz": 3107.03334,
+    "rolloff_hz": 3736.010742,
+    "flatness": 0.050778,
+    "band_shares": {
+      "20_60": 5e-06,
+      "60_250": 5.7e-05,
+      "250_500": 0.000306,
+      "500_2k": 0.054668,
+      "2k_5k": 0.883233,
+      "5k_10k": 0.047355,
+      "10k_20k": 0.014375
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.01161,
+        null
+      ],
+      [
+        0.02322,
+        null
+      ],
+      [
+        0.03483,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 2.334671,
+    "roughness_asper": 0.0,
+    "roughness_max_asper": 0.0
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": -9.5e-05,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "harsh_2_5k"
+  ],
+  "file": "fish_click.wav",
+  "pictures": {
+    "spectrogram": "fish_click.spec.png",
+    "waveform": "fish_click.wave.png"
+  }
+}

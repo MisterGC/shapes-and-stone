@@ -1,5 +1,6 @@
 #version 440
-// Procedural floor: flagstones (dungeon) or trodden earth (village), computed
+// Procedural floor: flagstones (dungeon), trodden earth (village) or basalt
+// (the ember camp), computed
 // in world units so the pattern stays fixed to the ground while the camera
 // moves. No texture is sampled - every tile, seam and pebble is arithmetic.
 
@@ -13,10 +14,11 @@ layout(std140, binding = 0) uniform buf {
     float pixelsPerWu; // chunky pixel grid: detail snaps to 1/pixelsPerWu
     float stoneWu;     // flagstone size (a wide stone is twice as long)
     float seamPx;      // gap between stones, in chunky pixels (may be < 1)
-    float style;       // 0 = flagstones, 1 = earth
+    float style;       // 0 = flagstones, 1 = earth, 2 = basalt
     float seed;
     float crackShare;  // share of the flagstones cracked across
     float moss;        // share of the flagstone floor moss grows over
+    float grass;       // share of the earth grass grows over (0.45 the old village)
     vec4 baseColor;
     vec4 seamColor;
 } ubuf;
@@ -109,9 +111,13 @@ vec3 earth(vec2 p) {
     // Trodden ground: two scales of soft patches, sparse pebbles and tufts.
     float n = noise(p * 0.35) * 0.6 + noise(p * 1.3) * 0.4;
     vec3 col = ubuf.baseColor.rgb * (0.82 + 0.3 * n);
-    // Tufts of grass take over where the ground is least trodden.
-    float grass = smoothstep(0.62, 0.7, noise(p * 0.22 + 9.0));
-    col = mix(col, vec3(0.15, 0.22, 0.17), grass * 0.45);
+    // Tufts of grass take over where the ground is least trodden; the
+    // more grass, the more of the ground they take
+    if (ubuf.grass > 0.0) {
+        float t = 0.62 + (0.45 - ubuf.grass) * 0.5;
+        float grass = smoothstep(t, t + 0.08, noise(p * 0.22 + 9.0));
+        col = mix(col, vec3(0.15, 0.22, 0.17), grass * 0.45);
+    }
 
     vec2 cell = floor(p * 2.0);
     float h = hash(cell);
@@ -126,10 +132,32 @@ vec3 earth(vec2 p) {
     return col;
 }
 
+vec3 basalt(vec2 p) {
+    // Cooled lava: irregular plates of dark rock (the nearest of jittered
+    // points), dark seams between them, some of them still warm
+    vec2 cell = floor(p / 0.5);
+    float f1 = 9.0, f2 = 9.0;
+    vec2 near = cell;
+    for (int j = -1; j <= 1; j++)
+        for (int i = -1; i <= 1; i++) {
+            vec2 c = cell + vec2(float(i), float(j));
+            vec2 at = (c + 0.15 + 0.7 * vec2(hash(c + 1.3), hash(c + 2.9))) * 0.5;
+            float d = length(p - at);
+            if (d < f1) { f2 = f1; f1 = d; near = c; }
+            else if (d < f2) f2 = d;
+        }
+    float h = hash(near);
+    vec3 col = ubuf.baseColor.rgb * (0.82 + 0.3 * h) * (0.9 + 0.2 * noise(p * 0.25));
+    if (f2 - f1 < 1.5 / ubuf.pixelsPerWu)
+        return h > 0.965 ? vec3(0.42, 0.11, 0.04) : ubuf.seamColor.rgb * 0.8;
+    if (hash(floor(p * ubuf.pixelsPerWu)) > 0.985) col *= 1.25;
+    return col;
+}
+
 void main() {
     // World position, y up like the world; snapped to the chunky pixel grid.
     vec2 rawP = vec2(qt_TexCoord0.x, 1.0 - qt_TexCoord0.y) * ubuf.sizeWu;
     vec2 p = (floor(rawP * ubuf.pixelsPerWu) + 0.5) / ubuf.pixelsPerWu;
-    vec3 col = ubuf.style < 0.5 ? flagstones(p, rawP) : earth(p);
+    vec3 col = ubuf.style < 0.5 ? flagstones(p, rawP) : ubuf.style < 1.5 ? earth(p) : basalt(p);
     fragColor = vec4(col, 1.0) * ubuf.qt_Opacity;
 }

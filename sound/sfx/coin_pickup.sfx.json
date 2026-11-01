@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "name": "coin_pickup",
+  "variation": {
+    "seed": 1,
+    "pool": 4
+  },
+  "layers": [
+    {
+      "name": "first",
+      "role": "transient",
+      "source": "sine",
+      "freq": 1560,
+      "length": 70,
+      "gain": -6,
+      "envelope": {
+        "attack": 0.3,
+        "decay": 70,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "fm": {
+        "ratio": 1.41,
+        "index": 1.6,
+        "decay": 40,
+        "sustain": 0,
+        "decayCurve": 1
+      },
+      "vary": {
+        "detune": [
+          -2,
+          2
+        ]
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 2500
+      }
+    },
+    {
+      "name": "coins",
+      "role": "body",
+      "source": "sine",
+      "freq": 1850,
+      "offset": 18,
+      "length": 45,
+      "gain": -10,
+      "envelope": {
+        "attack": 0.3,
+        "decay": 45,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "fm": {
+        "ratio": 1.53,
+        "index": 1.4,
+        "decay": 30,
+        "sustain": 0,
+        "decayCurve": 1
+      },
+      "burst": {
+        "count": 6,
+        "duration": 170,
+        "density": 0.45,
+        "jitter": {
+          "time": 0.7,
+          "gain": 5,
+          "freq": 5,
+          "length": 15
+        }
+      },
+      "filter": {
+        "type": "lowpass",
+        "cutoff": 2500
+      }
+    },
+    {
+      "name": "bag",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "offset": 6,
+      "length": 80,
+      "gain": -2,
+      "envelope": {
+        "attack": 2,
+        "decay": 78,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 380,
+        "resonance": 0.05
+      }
+    },
+    {
+      "name": "settle",
+      "role": "tail",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "offset": 60,
+      "length": 3,
+      "gain": -20,
+      "envelope": {
+        "attack": 0,
+        "decay": 3,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1900,
+        "resonance": 0.2
+      },
+      "burst": {
+        "count": 5,
+        "duration": 180,
+        "density": 0.3,
+        "jitter": {
+          "time": 0.8,
+          "gain": 4,
+          "cutoff": 0.4
+        }
+      }
+    }
+  ]
+}

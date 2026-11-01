@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "name": "shield_empty",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "thunk", "role": "body", "source": "sine", "freq": 220, "length": 60, "gain": -3.9, "envelope": {"attack": 1, "decay": 55, "sustain": 0, "release": 0}, "pitch": {"start": 3, "end": -4, "time": 50}},
+    {"name": "knock", "role": "transient", "source": "noise", "length": 25, "gain": -11.9, "envelope": {"attack": 0.5, "decay": 20, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 700}}
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "name": "deep_chink",
+  "variation": { "seed": 155, "pool": 6 },
+  "layers": [
+    { "name": "thud", "role": "body", "source": "noise", "length": 70, "gain": 10.7,
+      "envelope": { "attack": 0.5, "decay": 55, "sustain": 0, "release": 0 },
+      "filter": { "type": "bandpass", "cutoff": 170, "resonance": 0 },
+      "vary": { "filter.cutoff": [-20, 20] } },
+    { "name": "iron1", "role": "transient", "source": "sine", "freq": 1250, "length": 150,
+      "gain": -13.9, "envelope": { "attack": 0, "decay": 125, "sustain": 0, "release": 0 },
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "iron2", "role": "transient", "source": "sine", "freq": 3012.5, "length": 90,
+      "gain": -18.3, "envelope": { "attack": 0, "decay": 75, "sustain": 0, "release": 0 },
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "iron3", "role": "transient", "source": "sine", "freq": 4912.5, "length": 54,
+      "gain": -21.8, "envelope": { "attack": 0, "decay": 45, "sustain": 0, "release": 0 },
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "grit", "role": "transient", "source": "noise", "offset": 2, "length": 30,
+      "gain": -13.9, "envelope": { "attack": 0, "decay": 30, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 1800 } }
+  ]
+}

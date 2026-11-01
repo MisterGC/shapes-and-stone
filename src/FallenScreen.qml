@@ -2,7 +2,8 @@ import QtQuick
 
 // Shown when the knight falls: how deep the run got, its kills, the
 // secret rooms found and its time,
-// the record of the deepest descent, this session's runs with the depth
+// the record of the deepest descent, who was freed tonight and the
+// specials with the camps, this session's runs with the depth
 // and time of each, newest first, Enter to go again, Esc back to the
 // title. In a session whose other knights still fight it says the knight
 // is down, keeps the dungeon in sight and offers only Esc, which leaves;
@@ -26,6 +27,10 @@ Item {
     property string recordLine: ""
     // This run went deeper than the record
     property bool newRecord: false
+    // Who was freed tonight and the specials with the camps (CampFreed);
+    // "" for none (issue #159)
+    property string freedLine: ""
+    property string joinedLine: ""
     // The session's runs, newest first: {depth, seconds}
     property var runs: []
     // Enter starts the next run: alone, or the host once the party has
@@ -33,6 +38,12 @@ Item {
     property bool canGoAgain: true
     // The party has fallen and this joiner waits for the host to go again
     property bool waitsForHost: false
+    // A pad in use (Game.padInUse): the hint names its buttons, as printed
+    // on it (Game.padLabels)
+    property bool pad: false
+    property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
+    readonly property string _goKey: pad ? padLabels.A : "Enter"
+    readonly property string _backKey: pad ? padLabels.B : "Esc"
     // Another knight of the session still stands: this one is down, the
     // run goes on, and the dungeon stays in sight
     property bool partyFights: false
@@ -109,6 +120,24 @@ Item {
             font.bold: fallenScreen.newRecord
         }
 
+        Text {
+            objectName: "fallenFreed"
+            visible: fallenScreen.freedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: fallenScreen.freedLine
+            color: "#A8D4FF"
+            font.pixelSize: 13
+        }
+
+        Text {
+            objectName: "fallenJoined"
+            visible: fallenScreen.joinedLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: fallenScreen.joinedLine
+            color: "#E8C35A"
+            font.pixelSize: 13
+        }
+
         // Tonight's runs, newest first, numbered from the first
         Column {
             objectName: "fallenRuns"
@@ -119,7 +148,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "This session"
                 color: "#888888"
-                font.pixelSize: 11
+                font.pixelSize: 12
                 font.letterSpacing: 1
             }
             Repeater {
@@ -141,12 +170,12 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             objectName: "fallenHint"
             text: fallenScreen.canGoAgain
-                  ? "Enter to go again • Esc to the title"
+                  ? fallenScreen._goKey + " to go again • " + fallenScreen._backKey + " to the title"
                   : fallenScreen.waitsForHost
-                    ? "Waiting for the host to go again • Esc to leave the session"
+                    ? "Waiting for the host to go again • " + fallenScreen._backKey + " to leave the session"
                     : fallenScreen.partyFights
-                      ? "Your party fights on • Esc to leave the session"
-                      : "Esc to leave the session"
+                      ? "Your party fights on • " + fallenScreen._backKey + " to leave the session"
+                      : fallenScreen._backKey + " to leave the session"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
@@ -157,6 +186,11 @@ Item {
     function clock(seconds) {
         return Math.floor(seconds / 60) + ":" + String(Math.floor(seconds % 60)).padStart(2, "0")
     }
+
+    // The gamepad (MenuPad): A goes again where Enter does, B leaves for
+    // the title as Esc does
+    function padConfirm() { if (canGoAgain) goAgain() }
+    function padBack() { backToTitle() }
 
     Keys.onPressed: (event) => {
         // Other keys go on to the game: M still mutes, and the fallen

@@ -1,0 +1,162 @@
+{
+  "line": "blacksmith_greeting",
+  "text": "Ah, another one from the depths. Your blade's seen some work.",
+  "audio": "npc_greetings/blacksmith_greeting.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-191/sound/voice/npc_greetings/blacksmith_greeting.wav",
+    "duration": 5.4
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.03,
+      "value": "X"
+    },
+    {
+      "start": 0.03,
+      "end": 0.53,
+      "value": "C"
+    },
+    {
+      "start": 0.53,
+      "end": 0.67,
+      "value": "B"
+    },
+    {
+      "start": 0.67,
+      "end": 1.17,
+      "value": "X"
+    },
+    {
+      "start": 1.17,
+      "end": 1.42,
+      "value": "C"
+    },
+    {
+      "start": 1.42,
+      "end": 1.49,
+      "value": "B"
+    },
+    {
+      "start": 1.49,
+      "end": 1.63,
+      "value": "E"
+    },
+    {
+      "start": 1.63,
+      "end": 1.7,
+      "value": "F"
+    },
+    {
+      "start": 1.7,
+      "end": 1.84,
+      "value": "C"
+    },
+    {
+      "start": 1.84,
+      "end": 1.91,
+      "value": "G"
+    },
+    {
+      "start": 1.91,
+      "end": 1.98,
+      "value": "B"
+    },
+    {
+      "start": 1.98,
+      "end": 2.06,
+      "value": "A"
+    },
+    {
+      "start": 2.06,
+      "end": 2.15,
+      "value": "B"
+    },
+    {
+      "start": 2.15,
+      "end": 2.29,
+      "value": "C"
+    },
+    {
+      "start": 2.29,
+      "end": 2.4,
+      "value": "A"
+    },
+    {
+      "start": 2.4,
+      "end": 2.64,
+      "value": "B"
+    },
+    {
+      "start": 2.64,
+      "end": 3.13,
+      "value": "C"
+    },
+    {
+      "start": 3.13,
+      "end": 3.27,
+      "value": "F"
+    },
+    {
+      "start": 3.27,
+      "end": 3.35,
+      "value": "A"
+    },
+    {
+      "start": 3.35,
+      "end": 3.54,
+      "value": "H"
+    },
+    {
+      "start": 3.54,
+      "end": 3.61,
+      "value": "C"
+    },
+    {
+      "start": 3.61,
+      "end": 3.68,
+      "value": "B"
+    },
+    {
+      "start": 3.68,
+      "end": 3.75,
+      "value": "C"
+    },
+    {
+      "start": 3.75,
+      "end": 4.31,
+      "value": "B"
+    },
+    {
+      "start": 4.31,
+      "end": 4.42,
+      "value": "A"
+    },
+    {
+      "start": 4.42,
+      "end": 4.48,
+      "value": "F"
+    },
+    {
+      "start": 4.48,
+      "end": 4.61,
+      "value": "E"
+    },
+    {
+      "start": 4.61,
+      "end": 4.82,
+      "value": "C"
+    },
+    {
+      "start": 4.82,
+      "end": 5.4,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}

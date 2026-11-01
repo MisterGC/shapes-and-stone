@@ -257,11 +257,12 @@ Item {
     // The knight standing as far from enemy id as the enemy sees, up to
     // d Wu and no nearer than near Wu (2 without), facing it; with open,
     // only on a spot whose cell and the eight around it are floor. False
-    // where it sees no spot
+    // where it sees no spot. Never farther than half a Wu inside the
+    // enemy's sight range: beyond it the enemy does not notice the knight
     function standOff(id, d, near, open) {
         let e = _byId()[id], p = game.player
         if (!e || !p) return false
-        for (let r = d; r >= (near || 2); r -= 0.5) {
+        for (let r = Math.min(d, Balance.enemy.sightRange - 0.5); r >= (near || 2); r -= 0.5) {
             for (let k = 0; k < 8; k++) {
                 let a = k * Math.PI / 4
                 let x = e.xWu + Math.cos(a) * r, y = e.yWu + Math.sin(a) * r
@@ -292,7 +293,7 @@ Item {
     // mode "swing": one swing once the enemy is in reach; "parry": swings
     // only into its parry window, from the window's late-th frame on this
     // screen, until one parry; "push": raises the shield
-    // and dashes into it once it is in reach; "block": holds the shield up
+    // and dashes into it as it closes in, a dash away; "block": holds the shield up
     // toward it; "perfect": keeps the shield down until its parry window's
     // late-th frame on this screen and raises it then, just before the
     // lunge lands, and holds it; "dodge": dashes at it from its parry window's late-th
@@ -356,8 +357,11 @@ Item {
             log.lastSwing = what
             log.swings = (log.swings || 0) + 1
             p.attack()
-        } else if (guardMode === "push" && p.dashCooldown <= 0 && inRange && d <= 1.6
-                   && e.aiState !== "lunge" && e.aiState !== "telegraph") {
+        } else if (guardMode === "push" && p.dashCooldown <= 0 && d >= 2 && d <= 2.6
+                   && (e.aiState === "chase" || e.aiState === "circle")) {
+            // It closes in: a dash meets it within the dash's 2.2 Wu. Within
+            // lungeRange (2 Wu) it winds up, and its lunge lands on the
+            // knight's centre, where a push has no direction
             log.push = what
             log.reach = reach()
             log.dash = []

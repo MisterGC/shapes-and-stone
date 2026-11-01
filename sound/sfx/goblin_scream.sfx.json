@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "goblin_scream",
+  "variation": {"seed": 11, "pool": 3},
+  "layers": [
+    {"name": "scream", "role": "body", "source": "sawtooth", "freq": 580, "length": 440, "gain": 0.4, "envelope": {"attack": 8, "decay": 420, "sustain": 0, "release": 0}, "pitch": {"start": 3, "end": -5, "time": 440}, "lfo": {"target": "pitch", "rate": 17, "depth": 0.6}, "filter": {"type": "bandpass", "cutoff": 1100, "resonance": 0.45}, "vary": {"detune": [-0.5, 0.5]}},
+    {"name": "throat", "role": "body", "source": "sawtooth", "freq": 290, "length": 440, "gain": -7.6, "envelope": {"attack": 8, "decay": 420, "sustain": 0, "release": 0}, "pitch": {"start": 3, "end": -5, "time": 440}, "filter": {"type": "lowpass", "cutoff": 900}},
+    {"name": "rasp", "role": "tail", "source": "noise", "length": 420, "gain": -15.6, "envelope": {"attack": 8, "decay": 400, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 2400, "resonance": 0.2}}
+  ]
+}

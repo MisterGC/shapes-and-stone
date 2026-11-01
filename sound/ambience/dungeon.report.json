@@ -1,0 +1,331 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 10.0,
+  "time_span_s": 16.0,
+  "loop": true,
+  "loudness": {
+    "lufs_integrated": -34.719208,
+    "lufs_block_s": 0.4,
+    "true_peak_dbtp": -14.007971,
+    "peak_dbfs": -14.01539,
+    "rms_dbfs": -33.635428,
+    "crest_factor_db": 19.620038
+  },
+  "envelope": {
+    "silence_start_s": 0.046735,
+    "silence_end_s": 0.034649,
+    "attack_s": 0.856213,
+    "peak_at_s": 3.107937,
+    "peak_db": -20.685867,
+    "fall_20db_at_s": 9.575737,
+    "fall_60db_at_s": 9.994785
+  },
+  "spectrum": {
+    "centroid_hz": 443.347058,
+    "rolloff_hz": 1356.591797,
+    "flatness": 0.003118,
+    "band_shares": {
+      "20_60": 0.173951,
+      "60_250": 0.477201,
+      "250_500": 0.124523,
+      "500_2k": 0.215016,
+      "2k_5k": 0.007875,
+      "5k_10k": 0.001144,
+      "10k_20k": 0.00029
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.030162,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.16254,
+        null
+      ],
+      [
+        0.325079,
+        null
+      ],
+      [
+        0.487619,
+        null
+      ],
+      [
+        0.650159,
+        null
+      ],
+      [
+        0.812698,
+        null
+      ],
+      [
+        0.975238,
+        null
+      ],
+      [
+        1.137778,
+        null
+      ],
+      [
+        1.300317,
+        null
+      ],
+      [
+        1.462857,
+        null
+      ],
+      [
+        1.625397,
+        null
+      ],
+      [
+        1.787937,
+        null
+      ],
+      [
+        1.950476,
+        null
+      ],
+      [
+        2.113016,
+        null
+      ],
+      [
+        2.275556,
+        null
+      ],
+      [
+        2.438095,
+        null
+      ],
+      [
+        2.600635,
+        null
+      ],
+      [
+        2.763175,
+        null
+      ],
+      [
+        2.925714,
+        null
+      ],
+      [
+        3.088254,
+        1269.920842
+      ],
+      [
+        3.250794,
+        null
+      ],
+      [
+        3.413333,
+        null
+      ],
+      [
+        3.575873,
+        null
+      ],
+      [
+        3.738413,
+        null
+      ],
+      [
+        3.900952,
+        null
+      ],
+      [
+        4.063492,
+        null
+      ],
+      [
+        4.226032,
+        null
+      ],
+      [
+        4.388571,
+        null
+      ],
+      [
+        4.551111,
+        null
+      ],
+      [
+        4.713651,
+        null
+      ],
+      [
+        4.87619,
+        null
+      ],
+      [
+        5.03873,
+        null
+      ],
+      [
+        5.20127,
+        null
+      ],
+      [
+        5.36381,
+        null
+      ],
+      [
+        5.526349,
+        null
+      ],
+      [
+        5.688889,
+        null
+      ],
+      [
+        5.851429,
+        null
+      ],
+      [
+        6.013968,
+        null
+      ],
+      [
+        6.176508,
+        null
+      ],
+      [
+        6.339048,
+        null
+      ],
+      [
+        6.501587,
+        null
+      ],
+      [
+        6.664127,
+        null
+      ],
+      [
+        6.826667,
+        null
+      ],
+      [
+        6.989206,
+        null
+      ],
+      [
+        7.151746,
+        null
+      ],
+      [
+        7.314286,
+        null
+      ],
+      [
+        7.476825,
+        null
+      ],
+      [
+        7.639365,
+        null
+      ],
+      [
+        7.801905,
+        null
+      ],
+      [
+        7.964444,
+        null
+      ],
+      [
+        8.126984,
+        null
+      ],
+      [
+        8.289524,
+        null
+      ],
+      [
+        8.452063,
+        null
+      ],
+      [
+        8.614603,
+        null
+      ],
+      [
+        8.777143,
+        null
+      ],
+      [
+        8.939683,
+        null
+      ],
+      [
+        9.102222,
+        null
+      ],
+      [
+        9.264762,
+        null
+      ],
+      [
+        9.427302,
+        null
+      ],
+      [
+        9.589841,
+        null
+      ],
+      [
+        9.752381,
+        null
+      ],
+      [
+        9.914921,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.169907,
+    "roughness_asper": 0.023693,
+    "roughness_max_asper": 0.366911
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.000234,
+    "loop_seam_jump": 1e-06,
+    "loop_seam_jump_ratio": 0.000104
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "too_quiet_vs_target",
+    "late_start"
+  ],
+  "file": "dungeon.wav",
+  "pictures": {
+    "spectrogram": "dungeon.spec.png",
+    "waveform": "dungeon.wave.png"
+  }
+}

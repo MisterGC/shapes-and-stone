@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "heartbeat",
+  "variation": { "seed": 191, "pool": 1 },
+  "layers": [
+    { "name": "lub", "role": "body", "source": "sine", "freq": 58, "offset": 0, "length": 160,
+      "gain": -2, "envelope": { "attack": 6, "decay": 125, "sustain": 0, "release": 0 },
+      "pitch": { "start": 8.14, "end": 0, "time": 45 } },
+    { "name": "lub_knock", "role": "transient", "source": "noise", "offset": 0, "length": 30,
+      "gain": -6.5, "envelope": { "attack": 0, "decay": 25, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 180 } },
+    { "name": "dub", "role": "body", "source": "sine", "freq": 72, "offset": 170, "length": 160,
+      "gain": -6.4, "envelope": { "attack": 6, "decay": 125, "sustain": 0, "release": 0 },
+      "pitch": { "start": 8.14, "end": 0, "time": 45 } },
+    { "name": "dub_knock", "role": "transient", "source": "noise", "offset": 170, "length": 30,
+      "gain": -11, "envelope": { "attack": 0, "decay": 25, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 180 } }
+  ]
+}

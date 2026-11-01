@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "name": "deep_crumble",
+  "variation": { "seed": 1, "pool": 6 },
+  "layers": [
+    {
+      "name": "grit",
+      "role": "body",
+      "source": "noise",
+      "gain": 11,
+      "length": 4.16874,
+      "envelope": { "decay": 4.16874, "sustain": 0 },
+      "filter": { "type": "bandpass", "cutoff": 648.42, "resonance": 0.3 },
+      "burst": { "count": 21.5, "duration": 331.61, "density": 0.3, "jitter": { "time": 1, "gain": 2, "cutoff": 0.5, "length": 1 } }
+    },
+    {
+      "name": "trickle",
+      "role": "tail",
+      "source": "noise",
+      "gain": -2,
+      "offset": 191.314,
+      "length": 3.47395,
+      "envelope": { "decay": 3.47395, "sustain": 0 },
+      "filter": { "type": "bandpass", "cutoff": 648.42, "resonance": 0.3 },
+      "burst": { "count": 10, "duration": 357.119, "density": 0.5, "jitter": { "time": 1, "gain": 4, "cutoff": 0.5, "length": 1 } }
+    },
+    {
+      "name": "rumble",
+      "role": "body",
+      "source": "noise",
+      "gain": 0,
+      "length": 1100,
+      "envelope": { "attack": 20, "decay": 1050, "sustain": 0, "decayCurve": 1 },
+      "filter": { "type": "bandpass", "cutoff": 95, "resonance": 0.45 },
+      "noise": { "color": "brown" },
+      "drive": 9
+    }
+  ]
+}

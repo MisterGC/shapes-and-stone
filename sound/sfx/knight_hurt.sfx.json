@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "knight_hurt",
+  "variation": {"seed": 5, "pool": 3},
+  "layers": [
+    {"name": "thud", "role": "body", "source": "sine", "freq": 92, "length": 270, "gain": -3.2, "envelope": {"attack": 2, "decay": 260, "sustain": 0, "release": 0}, "pitch": {"start": 7, "end": 0, "time": 50}, "vary": {"detune": [-1, 1]}},
+    {"name": "body", "role": "body", "source": "noise", "length": 120, "gain": -9.2, "envelope": {"attack": 1, "decay": 100, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 260}},
+    {"name": "breath", "role": "tail", "source": "sawtooth", "freq": 115, "length": 160, "gain": -15.2, "offset": 20, "envelope": {"attack": 15, "decay": 140, "sustain": 0, "release": 0}, "pitch": {"start": 2, "end": -3, "time": 160}, "filter": {"type": "bandpass", "cutoff": 520, "resonance": 0.3}, "vary": {"detune": [-1, 1]}}
+  ]
+}

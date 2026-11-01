@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "name": "fish_plop",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "drop", "role": "body", "source": "sine", "freq": 420, "length": 120, "gain": -4.7, "offset": 0, "envelope": {"attack": 2, "decay": 75, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 13.65, "time": 120}},
+    {"name": "water", "role": "tail", "source": "noise", "length": 200, "gain": -13.3, "envelope": {"attack": 2, "decay": 125, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 900, "resonance": 0.13}}
+  ]
+}

@@ -6,6 +6,39 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-01
+
+The knight and every menu play with a gamepad, a Steam Deck's built-in controls too; the deep has veins to dig, spawn holes that answer greed and petrified travellers to free; the camp is a cave with a pond to fish; fights become duels; and every sound comes from the sound factory. Built on Clayground v2026.11.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser. A gamepad works in Chrome; Firefox lists it but it drives nothing yet.
+
+### Added
+
+- **Gamepad:** the knight plays with a gamepad, through Clayground's `GameController` in its `full` layout: the left stick moves, the right stick aims, R1 strikes and charges, L1 shields, B dashes, A talks, X and Y drink a potion and a draught, R2 whirls, L2 locks on and Select opens the knight panel; in a dialogue the stick picks a ware and X buys it. A pad takes over when it is used and the keyboard when a key goes down, the mouse takes the aim back when it moves, and while a pad is in use the controls hint, the talk prompts and the dialogue name its buttons. The pad bench plays it with the dojo's synthetic pad alone. (#200)
+- **Menus with a gamepad:** the stick or the D-pad picks on the title, the pause menu, the fallen screen, the dungeon master panel and the lobby (held, it repeats), A confirms, B goes back and X generates on the panel; Start pauses and resumes. The pad cannot type a code, so Join takes the one typed or pasted. Under a menu the stick moves no knight and B makes no dash. (#201)
+- **Steam Deck:** the README says how to add the Linux AppImage to Steam as a non-Steam game and play it in Game Mode on the Deck's built-in controls. While a pad is in use the hints of the title, the pause menu, the fallen screen, the dungeon master's panel and the knight panel, and the HUD's potions, name its buttons instead of keys. The Deck bench renders the HUD and every menu at 1280x800, with the keyboard and with a pad, and checks the size and fit of every text on screen. (#202)
+- **The dungeon's music follows the fight:** the more enemies near the knight are after it, up to three, the more the dungeon's song plays - a pulse of kick and snare with the first, a horn's counter-line and brushes with the second and third - and it settles slowly once they give up or fall (`Balance.music`). (#191)
+- **The villagers speak and their mouths move:** the innkeeper's, the blacksmith's and the witch's greetings are voiced lines from the sound factory, and while one plays the speaker shows a mouth that follows the line's lip-sync cues, resting once the line is over. (#191)
+- **Veins and gems:** veins glint in the dungeon's walls, each in a stretch of rough rock face. Aimed at a vein in reach, the left button folds the sword into a pickaxe and strikes on a closing ring: a strike on the beat is clean, any other chips. The last strike splits the stone and the cut gem - amber tetrahedron near the top, up to an icosahedron deep down - rises over the knight under CLEAN CUT or CHIPPED and drops into a pouch; the smith buys the pouch, and a fallen knight drops it. In a session the host splits a vein on every screen and gives its gem to the first knight that split it (`Balance.deep`). (#155, #156, #169)
+- **Spawn holes:** a room with a vein has a hole low in its north wall. Each gem cut there may wake it, the likelier the more the gem is worth and the more knights there are; woken, it puffs dust, opens its eyes, sends waves of the depth's creatures and crumbles shut for good (`Balance.deep.hole`). (#157, #175)
+- **Petrified travellers:** a miner caught mid-swing or a lost traveller stands grey in a vein's rock face, and the same pickaxe frees them on a slower ring. A freed miner works beside the vein until the hole sends creatures; a lost one thanks the knight and walks off. Striking a traveller never wakes the hole. (#158)
+- **Travellers by the camp's fire:** travellers freed in a run sit round the fire of every later camp of that run, and the rare specials - a healer, a cook, a lamplighter - join the camps for good, each with a comfort at the fire and none with fight power. The title and the fall screen say who was freed tonight and who is with the camps. (#159)
+- **Fishing:** a camp's pond can be fished: cast with the left button, click on the bite, hold to reel and let go while the fish thrashes. Five kinds of fish from cave minnow to the rare glimmerfin, five bites a camp; the innkeeper buys the creel and the cave cat takes a fish and purrs. (#188)
+
+### Changed
+
+- **Duel fights:** a full charge is kept until release and spins all round, the knight moves slower while charging; F or the middle button locks on an enemy, so W/S close and open the distance and A/D circle it; a grunt circles before it strikes; below 35% health a blood-red edge beats with the heart, and a potion fills the bar over a second. (#186)
+- **The camp is a cave:** a seeded cave about 1.5x the old box, with outcrops and bays, an overhanging lip with stalactites, and a tavern and a smithy whose walls cast the campfire's shadows. (#145)
+- **Text size:** every text a player reads is at least 12 px, the size Valve recommends for the Steam Deck's 1280x800 - the mana, the depth gauge, the dialogue's and the menus' hints, the lobby's notes, the talk prompts and the speech bubbles were 9 to 11 px. (#202)
+- **Fourteen sounds revised and approved:** the village's night ambience, the creature's burst, the camp's anvil, crackle, creak and hiss, the coin, the deep's crumble, freed chord and tink, the sword's hit, the shield's clang, the sword's swing and the knight's footstep, now a dry heel tap, revised in the sound factory's studio and delivered with their renders. Five of them use a layer's drive or an LFO's shape, new in Clayground v2026.11. (#199)
+- **The sword's swing, the shield's clang and the deep's crumble come from design files:** each is the sound factory's stock template - `swing`, `metal-hit`, `crumble` - with its macro knobs set and a few values overridden, compiled to the recipe the game plays and tuned with `sp tweak`. The crumble loses its harsh edge (the report's `harsh_2_5k` flag); the swing sits a little lower and darker. Clayground v2026.11 has the curves, FM, bursts and coloured noise the templates use. (#195)
+- **All of the game's sound comes from the sound factory** (#191): the title's, the camp's and the dungeon's music are songs in the factory's note notation that Clayground's `SongPlayer` plays live; the dungeon's and the camp's ambience, the fight's, the menus', the coin's and the fishing sounds and the cat's purr are recipes in `sound/`; the greetings and the knight's whirlwind shout are spoken by vocli and lip-synced. Every one is a cue in `sound/cues.json` with its sound report, waiting for a person's verdict. The hand-made wav and mp3 files and `tools/fishing_sounds.py` are gone.
+- **The deep's, the camp's and the knight's sounds** come from the sound factory: the chink, the tink, the crumble, the rumble, the groan, the freed chord, the camp's crackle, anvil, drip, creak and hiss, the potion and the heartbeat are recipes in `sound/`, listed with their sound reports in the cue sheet `sound/cues.json`. Ten play live through Clayground's `SfxPlayer`, a little different each time, the chink, the tink, the anvil and the drip transposed per play; the crackle, the creak and the hiss play their renders, pitched per play as before, since their pitch is in noise and filters a recipe's detune does not move. The Python scripts that synthesised them are gone. (#190)
+
+### Fixed
+
+- **Enemies stuck in a wall:** an enemy flush under a wall never saw the knight and could patrol into the wall for good, since its sight and its path were measured from its top-left corner. It now sees and walks from its middle, and patrols between cells it can reach in a straight line. (#184)
+
 ## [0.3.0] - 2026-10-12
 
 Dungeons fight back and hide things: spike plates and arrow slits you learn to read, doors you shut and enemies bash, loops and secret rooms to find, urns, barrels, crates and crystals to break for gold, and a Dungeon Master panel to tune the next dungeon before you enter it. Built on Clayground v2026.9.
@@ -165,7 +198,8 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.0
 [0.3.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.3.0
 [0.2.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.2
 [0.2.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.1

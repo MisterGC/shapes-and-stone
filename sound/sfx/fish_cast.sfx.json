@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "name": "fish_cast",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "swish", "role": "body", "source": "noise", "length": 320, "gain": -1.1, "envelope": {"attack": 160, "decay": 160, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 1500, "resonance": 0.2}},
+    {"name": "tick0", "role": "transient", "source": "noise", "length": 8, "gain": -11.6, "offset": 50, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick1", "role": "transient", "source": "noise", "length": 8, "gain": -12.5, "offset": 82, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick2", "role": "transient", "source": "noise", "length": 8, "gain": -13.5, "offset": 114, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick3", "role": "transient", "source": "noise", "length": 8, "gain": -14.7, "offset": 146, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick4", "role": "transient", "source": "noise", "length": 8, "gain": -16.0, "offset": 178, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick5", "role": "transient", "source": "noise", "length": 8, "gain": -17.6, "offset": 210, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick6", "role": "transient", "source": "noise", "length": 8, "gain": -19.6, "offset": 242, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick7", "role": "transient", "source": "noise", "length": 8, "gain": -22.1, "offset": 274, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}},
+    {"name": "tick8", "role": "transient", "source": "noise", "length": 8, "gain": -25.6, "offset": 306, "envelope": {"attack": 1, "decay": 5, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 3000}}
+  ]
+}

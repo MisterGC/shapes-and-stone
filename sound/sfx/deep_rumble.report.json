@@ -1,0 +1,268 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 1.08,
+  "time_span_s": 2.0,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -19.716933,
+    "lufs_block_s": 0.4,
+    "true_peak_dbtp": -1.970213,
+    "peak_dbfs": -1.97574,
+    "rms_dbfs": -17.428782,
+    "crest_factor_db": 15.453042
+  },
+  "envelope": {
+    "silence_start_s": 0.001179,
+    "silence_end_s": 0.059025,
+    "attack_s": 0.225805,
+    "peak_at_s": 0.326757,
+    "peak_db": -7.767057,
+    "fall_20db_at_s": 0.892971,
+    "fall_60db_at_s": 1.027664
+  },
+  "spectrum": {
+    "centroid_hz": 126.273606,
+    "rolloff_hz": 183.032227,
+    "flatness": 7e-06,
+    "band_shares": {
+      "20_60": 0.184239,
+      "60_250": 0.748829,
+      "250_500": 0.05776,
+      "500_2k": 0.00902,
+      "2k_5k": 0.000144,
+      "5k_10k": 7e-06,
+      "10k_20k": 0.0
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.02322,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ],
+      [
+        0.06966,
+        null
+      ],
+      [
+        0.09288,
+        null
+      ],
+      [
+        0.1161,
+        null
+      ],
+      [
+        0.13932,
+        null
+      ],
+      [
+        0.16254,
+        null
+      ],
+      [
+        0.18576,
+        null
+      ],
+      [
+        0.20898,
+        null
+      ],
+      [
+        0.2322,
+        null
+      ],
+      [
+        0.25542,
+        null
+      ],
+      [
+        0.278639,
+        null
+      ],
+      [
+        0.301859,
+        null
+      ],
+      [
+        0.325079,
+        null
+      ],
+      [
+        0.348299,
+        null
+      ],
+      [
+        0.371519,
+        null
+      ],
+      [
+        0.394739,
+        null
+      ],
+      [
+        0.417959,
+        null
+      ],
+      [
+        0.441179,
+        null
+      ],
+      [
+        0.464399,
+        null
+      ],
+      [
+        0.487619,
+        null
+      ],
+      [
+        0.510839,
+        null
+      ],
+      [
+        0.534059,
+        null
+      ],
+      [
+        0.557279,
+        null
+      ],
+      [
+        0.580499,
+        null
+      ],
+      [
+        0.603719,
+        null
+      ],
+      [
+        0.626939,
+        null
+      ],
+      [
+        0.650159,
+        null
+      ],
+      [
+        0.673379,
+        null
+      ],
+      [
+        0.696599,
+        null
+      ],
+      [
+        0.719819,
+        null
+      ],
+      [
+        0.743039,
+        null
+      ],
+      [
+        0.766259,
+        null
+      ],
+      [
+        0.789478,
+        null
+      ],
+      [
+        0.812698,
+        null
+      ],
+      [
+        0.835918,
+        null
+      ],
+      [
+        0.859138,
+        null
+      ],
+      [
+        0.882358,
+        null
+      ],
+      [
+        0.905578,
+        null
+      ],
+      [
+        0.928798,
+        null
+      ],
+      [
+        0.952018,
+        null
+      ],
+      [
+        0.975238,
+        null
+      ],
+      [
+        0.998458,
+        null
+      ],
+      [
+        1.021678,
+        null
+      ],
+      [
+        1.044898,
+        null
+      ],
+      [
+        1.068118,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 0.668777,
+    "roughness_asper": 0.049518,
+    "roughness_max_asper": 0.445649
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.002987,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "deep_rumble.wav",
+  "pictures": {
+    "spectrogram": "deep_rumble.spec.png",
+    "waveform": "deep_rumble.wave.png"
+  }
+}

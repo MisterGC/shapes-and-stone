@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "name": "camp_creak",
+  "variation": {
+    "seed": 150,
+    "pool": 1
+  },
+  "layers": [
+    {
+      "name": "slip",
+      "role": "body",
+      "source": "noise",
+      "length": 3,
+      "gain": 10,
+      "envelope": {
+        "attack": 0,
+        "decay": 3,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 680,
+        "resonance": 0.7
+      },
+      "burst": {
+        "count": 70,
+        "duration": 850,
+        "density": 2.2,
+        "jitter": {
+          "time": 0.35,
+          "gain": 3,
+          "cutoff": 0.15
+        }
+      },
+      "drive": 10
+    },
+    {
+      "name": "grain",
+      "role": "tail",
+      "source": "noise",
+      "length": 2,
+      "gain": 7,
+      "envelope": {
+        "attack": 0,
+        "decay": 2,
+        "sustain": 0,
+        "release": 0,
+        "decayCurve": 1
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 1550,
+        "resonance": 0.6
+      },
+      "burst": {
+        "count": 70,
+        "duration": 850,
+        "density": 2.2,
+        "jitter": {
+          "time": 0.35,
+          "gain": 4,
+          "cutoff": 0.2
+        }
+      },
+      "drive": 5
+    },
+    {
+      "name": "load",
+      "role": "body",
+      "source": "noise",
+      "noise": {
+        "color": "pink"
+      },
+      "length": 850,
+      "gain": -6,
+      "envelope": {
+        "attack": 200,
+        "decay": 650,
+        "sustain": 0,
+        "release": 0
+      },
+      "filter": {
+        "type": "bandpass",
+        "cutoff": 300,
+        "resonance": 0.05
+      }
+    }
+  ],
+  "maxVoices": 8
+}

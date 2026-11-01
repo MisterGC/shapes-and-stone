@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "menu_confirm",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "first", "role": "body", "source": "triangle", "freq": 659.25, "length": 320, "gain": -6.6, "envelope": {"attack": 2, "decay": 310, "sustain": 0, "release": 0}},
+    {"name": "second", "role": "body", "source": "triangle", "freq": 987.77, "length": 600, "gain": -5.6, "offset": 90, "envelope": {"attack": 2, "decay": 590, "sustain": 0, "release": 0}},
+    {"name": "glow", "role": "tail", "source": "sine", "freq": 1975.5, "length": 600, "gain": -19.6, "offset": 90, "envelope": {"attack": 2, "decay": 590, "sustain": 0, "release": 0}},
+    {"name": "root", "role": "body", "source": "sine", "freq": 329.63, "length": 500, "gain": -15.6, "envelope": {"attack": 4, "decay": 490, "sustain": 0, "release": 0}}
+  ]
+}

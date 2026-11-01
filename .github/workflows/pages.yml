@@ -17,7 +17,7 @@ on:
     inputs:
       runtime:
         description: 'Clayground release whose clayground-starter.zip is the runtime'
-        default: 'v2026.9'
+        default: 'v2026.11'
   release:
     types: [ published ]
 
@@ -27,7 +27,7 @@ concurrency:
 
 env:
   # A push or a published release has no input: the runtime is this one.
-  RUNTIME: ${{ inputs.runtime || 'v2026.9' }}
+  RUNTIME: ${{ inputs.runtime || 'v2026.11' }}
   # The Qt the runtime is built with; only its qsb is used here.
   QT_VERSION: '6.10.1'
   AQT_VERSION: '>=3.2.0'

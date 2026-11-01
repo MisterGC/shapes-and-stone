@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "fish_land",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "splash", "role": "body", "source": "noise", "length": 450, "gain": -3.9, "envelope": {"attack": 5, "decay": 250, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 1000, "resonance": 0.05}},
+    {"name": "drop0", "role": "tail", "source": "sine", "freq": 1123.3, "length": 50, "gain": -11.3, "offset": 116, "envelope": {"attack": 2, "decay": 35, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 8.14, "time": 50}},
+    {"name": "drop1", "role": "tail", "source": "sine", "freq": 747.7, "length": 50, "gain": -11.3, "offset": 73, "envelope": {"attack": 2, "decay": 35, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 8.14, "time": 50}},
+    {"name": "drop2", "role": "tail", "source": "sine", "freq": 937.5, "length": 50, "gain": -11.3, "offset": 123, "envelope": {"attack": 2, "decay": 35, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 8.14, "time": 50}},
+    {"name": "drop3", "role": "tail", "source": "sine", "freq": 1284.5, "length": 50, "gain": -11.3, "offset": 241, "envelope": {"attack": 2, "decay": 35, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 8.14, "time": 50}},
+    {"name": "drop4", "role": "tail", "source": "sine", "freq": 1118.8, "length": 50, "gain": -11.3, "offset": 103, "envelope": {"attack": 2, "decay": 35, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 8.14, "time": 50}},
+    {"name": "flop", "role": "body", "source": "noise", "length": 120, "gain": -0.8, "offset": 420, "envelope": {"attack": 2, "decay": 62, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 500}},
+    {"name": "thud", "role": "body", "source": "sine", "freq": 140, "length": 100, "gain": -5.2, "offset": 420, "envelope": {"attack": 2, "decay": 75, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": -6.17, "time": 100}}
+  ]
+}

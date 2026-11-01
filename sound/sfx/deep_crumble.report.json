@@ -1,0 +1,274 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 1.1,
+  "time_span_s": 2.0,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -21.457539,
+    "lufs_block_s": 0.4,
+    "true_peak_dbtp": -2.194873,
+    "peak_dbfs": -2.482432,
+    "rms_dbfs": -20.512183,
+    "crest_factor_db": 18.029751
+  },
+  "envelope": {
+    "silence_start_s": 0.00034,
+    "silence_end_s": 0.103243,
+    "attack_s": 0.012132,
+    "peak_at_s": 0.067347,
+    "peak_db": -9.275767,
+    "fall_20db_at_s": 0.31678,
+    "fall_60db_at_s": 1.070068
+  },
+  "spectrum": {
+    "centroid_hz": 528.800293,
+    "rolloff_hz": 968.994141,
+    "flatness": 0.021581,
+    "band_shares": {
+      "20_60": 0.038612,
+      "60_250": 0.656227,
+      "250_500": 0.033932,
+      "500_2k": 0.215606,
+      "2k_5k": 0.04185,
+      "5k_10k": 0.011172,
+      "10k_20k": 0.002602
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.0,
+    "median_hz": null,
+    "start_hz": null,
+    "end_hz": null,
+    "sweep_semitones": null,
+    "track": [
+      [
+        0.0,
+        null
+      ],
+      [
+        0.02322,
+        null
+      ],
+      [
+        0.04644,
+        null
+      ],
+      [
+        0.06966,
+        null
+      ],
+      [
+        0.09288,
+        null
+      ],
+      [
+        0.1161,
+        null
+      ],
+      [
+        0.13932,
+        null
+      ],
+      [
+        0.16254,
+        null
+      ],
+      [
+        0.18576,
+        null
+      ],
+      [
+        0.20898,
+        null
+      ],
+      [
+        0.2322,
+        null
+      ],
+      [
+        0.25542,
+        null
+      ],
+      [
+        0.278639,
+        null
+      ],
+      [
+        0.301859,
+        null
+      ],
+      [
+        0.325079,
+        null
+      ],
+      [
+        0.348299,
+        null
+      ],
+      [
+        0.371519,
+        null
+      ],
+      [
+        0.394739,
+        null
+      ],
+      [
+        0.417959,
+        null
+      ],
+      [
+        0.441179,
+        null
+      ],
+      [
+        0.464399,
+        null
+      ],
+      [
+        0.487619,
+        null
+      ],
+      [
+        0.510839,
+        null
+      ],
+      [
+        0.534059,
+        null
+      ],
+      [
+        0.557279,
+        null
+      ],
+      [
+        0.580499,
+        null
+      ],
+      [
+        0.603719,
+        null
+      ],
+      [
+        0.626939,
+        null
+      ],
+      [
+        0.650159,
+        null
+      ],
+      [
+        0.673379,
+        null
+      ],
+      [
+        0.696599,
+        null
+      ],
+      [
+        0.719819,
+        null
+      ],
+      [
+        0.743039,
+        null
+      ],
+      [
+        0.766259,
+        null
+      ],
+      [
+        0.789478,
+        null
+      ],
+      [
+        0.812698,
+        null
+      ],
+      [
+        0.835918,
+        null
+      ],
+      [
+        0.859138,
+        null
+      ],
+      [
+        0.882358,
+        null
+      ],
+      [
+        0.905578,
+        null
+      ],
+      [
+        0.928798,
+        null
+      ],
+      [
+        0.952018,
+        null
+      ],
+      [
+        0.975238,
+        null
+      ],
+      [
+        0.998458,
+        null
+      ],
+      [
+        1.021678,
+        null
+      ],
+      [
+        1.044898,
+        null
+      ],
+      [
+        1.068118,
+        null
+      ],
+      [
+        1.091338,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.563645,
+    "roughness_asper": 3.95135,
+    "roughness_max_asper": 4.617102
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.000463,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [
+    "rough"
+  ],
+  "file": "deep_crumble.wav",
+  "pictures": {
+    "spectrogram": "deep_crumble.spec.png",
+    "waveform": "deep_crumble.wave.png"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "name": "dungeon",
+  "variation": {"seed": 21, "pool": 3},
+  "layers": [
+    {"name": "draught", "role": "body", "source": "noise", "length": 10000, "gain": -7.0, "envelope": {"attack": 1500, "decay": 0, "sustain": 1, "release": 1500}, "filter": {"type": "lowpass", "cutoff": 180}, "lfo": {"target": "volume", "rate": 0.13, "depth": 0.4}, "vary": {"lfo.rate": [-0.03, 0.03]}},
+    {"name": "wind", "role": "body", "source": "noise", "length": 10000, "gain": -16.0, "envelope": {"attack": 1500, "decay": 0, "sustain": 1, "release": 1500}, "filter": {"type": "bandpass", "cutoff": 420, "resonance": 0.4}, "lfo": {"target": "volume", "rate": 0.21, "depth": 0.7}, "vary": {"filter.cutoff": [-60, 60]}},
+    {"name": "drip0", "role": "tail", "source": "sine", "freq": 1480, "length": 60, "gain": -17.0, "offset": 900, "envelope": {"attack": 2, "decay": 50, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 60}},
+    {"name": "drip1", "role": "tail", "source": "sine", "freq": 1210, "length": 60, "gain": -17.0, "offset": 3100, "envelope": {"attack": 2, "decay": 50, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 60}},
+    {"name": "drip2", "role": "tail", "source": "sine", "freq": 1630, "length": 60, "gain": -17.0, "offset": 5600, "envelope": {"attack": 2, "decay": 50, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 60}},
+    {"name": "drip3", "role": "tail", "source": "sine", "freq": 1340, "length": 60, "gain": -17.0, "offset": 7900, "envelope": {"attack": 2, "decay": 50, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": 7.02, "time": 60}}
+  ]
+}

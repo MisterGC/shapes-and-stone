@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "name": "sword_swing",
+  "variation": { "seed": 1, "pool": 1 },
+  "layers": [
+    {
+      "name": "whoosh",
+      "role": "body",
+      "source": "noise",
+      "gain": 6,
+      "length": 312,
+      "envelope": { "attack": 66.8572, "decay": 245.143, "sustain": 0, "decayCurve": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 542.236, "resonance": 0.35, "attack": 89.1429, "decay": 193.143, "sustain": 0, "amount": 2.04, "decayCurve": 0.5 },
+      "noise": { "color": "pink" }
+    },
+    {
+      "name": "air",
+      "role": "body",
+      "source": "sine",
+      "freq": 197.741,
+      "gain": -13.5,
+      "offset": 29.7143,
+      "length": 222.858,
+      "envelope": { "attack": 44.5714, "decay": 178.286, "sustain": 0, "decayCurve": 0.5 },
+      "pitch": { "start": 3.5, "end": -7, "time": 222.858, "curve": 0.3 }
+    },
+    {
+      "name": "edge",
+      "role": "tail",
+      "source": "noise",
+      "gain": -9,
+      "offset": 59.4286,
+      "length": 148.571,
+      "envelope": { "attack": 29.7143, "decay": 118.857, "sustain": 0, "decayCurve": 0.5 },
+      "filter": { "type": "bandpass", "cutoff": 2091.28, "resonance": 0.26 }
+    }
+  ]
+}

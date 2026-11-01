@@ -1,0 +1,65 @@
+# dungeon: the dungeon's music, one segment that loops while the knight is
+# below. The fight's intensity (how many enemies are after the knight,
+# Balance.music) brings in a pulse - kick and snare - from 0.15 to 0.5,
+# and from 0.5 to 1 a battle layer: a horn's counter-line under the tune
+# and brushes on the eighths. A minor, 96 bpm, 16 bars; the last bar sits
+# on E so the loop leads back into A minor.
+tempo 96
+meter 4
+
+instrument reed  = warm:reed
+instrument pad   = warm:strings
+instrument harp  = warm:harp
+instrument bass  = warm:bass
+instrument kick  = warm:kick
+instrument snare = warm:snare
+instrument brush = warm:brush
+instrument brass = warm:brass
+
+track tune  reed  vel=0.85
+track pad   pad   vel=0.45
+track harp  harp  vel=0.5
+track bass  bass  vel=0.55
+track kick  kick  vel=0.6 transpose=0
+track snare snare vel=0.45 transpose=0
+track horn  brass vel=0.6
+track brush brush vel=0.4 transpose=0
+
+let pad[Am] = A3+E4:4
+let pad[F]  = F3+C4:4
+let pad[G]  = G3+D4:4
+let pad[Dm] = D3+A3:4
+let pad[E]  = E3+B3:4
+let ost[Am] = A3:.5 C4:.5 E4:.5 C4:.5 A3:.5 C4:.5 E4:.5 C4:.5
+let ost[F]  = F3:.5 A3:.5 C4:.5 A3:.5 F3:.5 A3:.5 C4:.5 A3:.5
+let ost[G]  = G3:.5 B3:.5 D4:.5 B3:.5 G3:.5 B3:.5 D4:.5 B3:.5
+let ost[Dm] = D3:.5 F3:.5 A3:.5 F3:.5 D3:.5 F3:.5 A3:.5 F3:.5
+let ost[E]  = E3:.5 G#3:.5 B3:.5 G#3:.5 E3:.5 G#3:.5 B3:.5 G#3:.5
+let root[Am] = A1:2! E2:2
+let root[F]  = F1:2! C2:2
+let root[G]  = G1:2! D2:2
+let root[Dm] = D2:2! A1:2
+let root[E]  = E1:2! B1:2
+let chords = Am Am F F G G Am Am Dm Dm Am Am F G E E
+let beat = C2! r C2 r
+let back = r C4 r C4!
+let eighths = r:.5 C4:.5~ r:.5 C4:.5 r:.5 C4:.5~ r:.5 C4:.5
+
+pattern Dungeon
+  tune: E4:2 A4:1.5 B4:.5 | C5:3 B4 | A4:2 F4:2 | C5:4 |
+        B4:1.5 A4:.5 G4:2 | D5:3 r | C5:1.5 B4:.5 A4 E4 | A4:4 |
+        F4:1.5 A4:.5 D5:2 | C5 A4 F4:2 | E4:1.5 A4:.5 C5:2 | B4:2 A4:2 |
+        A4 C5 F5:2 | D5:2 B4:2 | G#4:2 B4:2 | E5:3 r
+  pad: $pad[$chords]
+  harp: $ost[$chords]
+  bass: $root[$chords]
+  kick: $beat*16
+  snare: $back*16
+  horn: A3:2 C4:2 | E4:4 | C4:2 A3:2 | F3:2 A3:2 | D4:2 B3:2 | G3:4 | E4:2 C4:2 | E4:2 A3:2 |
+        D4:2 F4:2 | A3:4 | C4:2 E4:2 | E4:2 C4:2 | C4:2 A3:2 | B3:2 G3:2 | B3:2 D4:2 | G#3:4
+  brush: $eighths*16
+
+segment explore: Dungeon
+start explore
+layer pulse: kick snare intensity=0.15..0.5 fade=4
+layer battle: horn brush intensity=0.5..1 fade=4

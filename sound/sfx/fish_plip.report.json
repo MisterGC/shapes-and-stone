@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.06,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -17.465931,
+    "lufs_block_s": 0.06,
+    "true_peak_dbtp": -7.906243,
+    "peak_dbfs": -7.91177,
+    "rms_dbfs": -15.549684,
+    "crest_factor_db": 7.637914
+  },
+  "envelope": {
+    "silence_start_s": 4.5e-05,
+    "silence_end_s": 0.021224,
+    "attack_s": 0.002449,
+    "peak_at_s": 0.007483,
+    "peak_db": -12.159987,
+    "fall_20db_at_s": 0.037415,
+    "fall_60db_at_s": 0.044898
+  },
+  "spectrum": {
+    "centroid_hz": 1005.281052,
+    "rolloff_hz": 1087.426758,
+    "flatness": 1e-06,
+    "band_shares": {
+      "20_60": 3e-06,
+      "60_250": 2.4e-05,
+      "250_500": 2.8e-05,
+      "500_2k": 0.999938,
+      "2k_5k": 7e-06,
+      "5k_10k": 0.0,
+      "10k_20k": 0.0
+    }
+  },
+  "pitch": {
+    "voiced_share": 1.0,
+    "median_hz": 1047.237397,
+    "start_hz": 1007.93684,
+    "end_hz": 1178.053646,
+    "sweep_semitones": 2.7,
+    "track": [
+      [
+        0.0,
+        996.359698
+      ],
+      [
+        0.01161,
+        1007.93684
+      ],
+      [
+        0.02322,
+        1007.93684
+      ],
+      [
+        0.03483,
+        1086.537955
+      ],
+      [
+        0.04644,
+        1178.053646
+      ],
+      [
+        0.05805,
+        1292.118667
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.003426,
+    "roughness_asper": 0.122533,
+    "roughness_max_asper": 0.122533
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": -9.5e-05,
+    "loop_seam_jump": 0.0,
+    "loop_seam_jump_ratio": 0.0
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "fish_plip.wav",
+  "pictures": {
+    "spectrogram": "fish_plip.spec.png",
+    "waveform": "fish_plip.wave.png"
+  }
+}

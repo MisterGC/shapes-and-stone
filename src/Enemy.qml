@@ -54,6 +54,71 @@ PhysicsItem {
 
     widthWu: 0.8
     heightWu: 0.8
+    // A knight's target lock is on it: four arcs round it, each with an arrowhead pointing in, closing
+    // in and out slowly
+    readonly property bool lockedOn: !!gameWorld && !!gameWorld.player
+                                     && gameWorld.player.lockTarget === enemy && !destroyed
+    // The one a lock would pick now: the arcs faint, thin and still
+    readonly property bool lockPreview: !lockedOn && !!gameWorld
+                                        && gameWorld.lockCandidate === enemy && !destroyed
+    Canvas {
+        id: lockMark
+        z: -1
+        opacity: enemy.lockedOn ? 1 : enemy.lockPreview ? 0.35 : 0
+        onOpacityChanged: requestPaint()
+        Behavior on opacity { NumberAnimation { duration: 250 } }
+        visible: opacity > 0.01
+        width: enemy.width * 3.2; height: enemy.height * 3.2
+        anchors.centerIn: parent
+        property real pulse: 0
+        NumberAnimation on pulse { running: enemy.lockedOn; loops: Animation.Infinite; from: 0; to: 1; duration: 1400 }
+        onPulseChanged: requestPaint()
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var r = width / 2
+            var live = enemy.lockedOn
+            var breath = live ? Math.sin(pulse * Math.PI * 2) : 0
+            var ring = r * (0.66 - 0.05 * breath)
+            var span = 50 * Math.PI / 180
+            var head = r * 0.13
+            ctx.strokeStyle = "rgba(255, 210, 140, 0.95)"
+            ctx.fillStyle = "rgba(255, 210, 140, 0.95)"
+            ctx.lineWidth = live ? 2.5 : 1.5
+            ctx.lineCap = "round"
+            for (var k = 0; k < 4; k++) {
+                var mid = Math.PI / 4 + k * Math.PI / 2
+                ctx.beginPath()
+                ctx.arc(r, r, ring, mid - span / 2, mid + span / 2)
+                ctx.stroke()
+                if (!live) continue
+                // Arrowhead at the arc's middle, pointing at the enemy
+                var c = Math.cos(mid), sn = Math.sin(mid)
+                var bx = r + c * ring, by = r + sn * ring
+                var tx = r + c * (ring - head), ty = r + sn * (ring - head)
+                ctx.beginPath()
+                ctx.moveTo(tx, ty)
+                ctx.lineTo(bx - sn * head * 0.6, by + c * head * 0.6)
+                ctx.lineTo(bx + sn * head * 0.6, by - c * head * 0.6)
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
+    }
+    // Where it stands: the centre of its box. Its top-left corner reaches
+    // into a wall it is pushed against, its centre does not (issue #184)
+    readonly property real centreXWu: xWu + widthWu / 2
+    readonly property real centreYWu: yWu - heightWu / 2
+    // The centre of a knight's box
+    function _centreOf(knight) {
+        return Qt.point(knight.xWu + knight.widthWu / 2, knight.yWu - knight.heightWu / 2)
+    }
+    // Whether it sees the knight, from where it stands to where the
+    // knight stands
+    function _sees(knight) {
+        let c = _centreOf(knight)
+        return gameWorld.hasLineOfSight(centreXWu, centreYWu, c.x, c.y)
+    }
 
     bodyType: remote ? Body.Kinematic : Body.Dynamic
     fixedRotation: true
@@ -75,6 +140,9 @@ PhysicsItem {
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
+    // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
+    // was built with (issue #157)
+    property string fromHole: ""
     property real facingAngle: 0          // Guardian tracks player direction
     readonly property real shieldArc: Balance.enemy.shieldArc
     readonly property real shieldRotSpeed: Balance.enemy.shieldTurnSpeed
@@ -103,6 +171,11 @@ PhysicsItem {
     // Combat state
     property real attackCooldown: 0
     property real _attackTimer: 0
+    // Circling the knight (Balance.enemy.circle...): the time left, the way
+    // round (1 or -1), and whether it has made up its mind to go in
+    property real _circleT: 0
+    property int _circleDir: 1
+    property bool _committed: false
     property real _dirToTargetX: 0
     property real _dirToTargetY: 0
     property bool parryWindow: false
@@ -228,6 +301,7 @@ PhysicsItem {
             switch (enemy.aiState) {
             case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
             case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
+            case "circle": base = "#B84040"; break
             case "kite": base = "#8EBB5A"; break
             // A spitter winding up its shot turns warm yellow: an attack
             // coming, like the melee telegraph, and far from its kiting green
@@ -596,7 +670,7 @@ PhysicsItem {
         repeat: enemy.aiState === "patrol"
         onArrived: {
             if (enemy.aiState === "chase") {
-                if (target && gameWorld && gameWorld.hasLineOfSight(xWu, yWu, target.xWu, target.yWu)) {
+                if (target && gameWorld && _sees(target)) {
                     _recalcChasePath()
                     followPath.running = true
                 } else {
@@ -823,10 +897,10 @@ PhysicsItem {
         let dx = target.xWu - xWu
         let dy = target.yWu - yWu
         let dist = Math.sqrt(dx * dx + dy * dy)
-        let canSee = gameWorld.hasLineOfSight(xWu, yWu, target.xWu, target.yWu)
+        let canSee = _sees(target)
         if (canSee) {
             _unseenT = 0
-            _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
+            _lastKnownTargetPos = _centreOf(target)
         } else {
             _unseenT += dt
         }
@@ -866,7 +940,15 @@ PhysicsItem {
                 }
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
+                if (enemyType === "grunt" && !_committed && canSee && dist < Balance.enemy.circleRange) {
+                    let ct = Balance.enemy.circleTime
+                    _circleT = ct[0] + Math.random() * (ct[1] - ct[0])
+                    _circleDir = Math.random() < 0.5 ? 1 : -1
+                    aiState = "circle"
+                    break
+                }
                 if (dist < lungeRange && canSee) {
+                    _committed = false
                     // Capture direction to target for wind-up/lunge
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
@@ -876,6 +958,40 @@ PhysicsItem {
                     _recalcChasePath()
                     _pathRecalcTimer = Balance.enemy.repathInterval
                 }
+            }
+            break
+
+        case "circle":
+            // Grunt: round the knight at circleDist, sizing it up
+            if (!canSee) {
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            _circleT -= dt
+            if (dist < lungeRange * Balance.enemy.circleStrikeIn && attackCooldown <= 0) {
+                let len = Math.max(0.01, dist)
+                _dirToTargetX = dx / len
+                _dirToTargetY = dy / len
+                _committed = false
+                windUp(windUpDuration)
+                break
+            }
+            if (_circleT <= 0) {
+                // Its mind made up: in it goes
+                _committed = true
+                aiState = "chase"
+                _recalcChasePath()
+                break
+            }
+            {
+                let len = Math.max(0.01, dist)
+                let ndx = dx / len, ndy = dy / len
+                let s = Balance.enemy.circleSpeed
+                let radial = Math.max(-1, Math.min(1, (dist - Balance.enemy.circleDist) * 1.5))
+                let vx = -ndy * _circleDir * s + ndx * radial * s
+                let vy = ndx * _circleDir * s + ndy * radial * s
+                body.linearVelocity = Qt.point(vx, -vy)
             }
             break
 
@@ -981,8 +1097,8 @@ PhysicsItem {
     function _recalcChasePath() {
         if (!target || !gameWorld) return
         let goal = _unseenT > 0 && _lastKnownTargetPos ? _lastKnownTargetPos
-                                                       : Qt.point(target.xWu, target.yWu)
-        let path = gameWorld.findPath(xWu, yWu, goal.x, goal.y)
+                                                       : _centreOf(target)
+        let path = gameWorld.findPath(centreXWu, centreYWu, goal.x, goal.y)
         if (path.length > 1) {
             // Skip first waypoint (our current cell)
             followPath.wpsWu = path.slice(1)
@@ -992,31 +1108,41 @@ PhysicsItem {
         // If no path found, keep current path (or stop)
     }
 
+    // Patrol near its spawn: from the cell there to up to two cells beside
+    // it and back, each a straight walk between cell centres, which its
+    // centre can reach. A cell beside is one it walks to straight: no
+    // wall, no breakable, no shut door between. Pushed away from its spawn
+    // behind a wall, it patrols round the cell it stands in (issue #184)
     function _setupPatrol() {
-        // Patrol near spawn point: 2-3 waypoints in a small area
+        if (!gameWorld) return
+        let cs = gameWorld.cellSize
+        let cellCentre = (x, y) => Qt.point(Math.floor(x / cs) * cs + cs / 2,
+                                            Math.floor(y / cs) * cs + cs / 2)
+        let open = (from, to) => {
+            let gx = Math.floor(to.x / cs), gy = Math.floor(to.y / cs)
+            return gx >= 0 && gx < gameWorld.gridWidth && gy >= 0 && gy < gameWorld.gridHeight
+                && gameWorld.grid[gy][gx] !== gameWorld.cellWall
+                && !(gameWorld.breakableAt && gameWorld.breakableAt(gx + "," + gy))
+                && gameWorld.hasLineOfSight(from.x, from.y, to.x, to.y)
+        }
+        let here = Qt.point(centreXWu, centreYWu)
+        let home = cellCentre(_spawnXWu + widthWu / 2, _spawnYWu - heightWu / 2)
+        if (!open(here, home)) home = cellCentre(here.x, here.y)
         let r = Balance.enemy.patrolRadius
         let offsets = [
-            Qt.point(_spawnXWu - r, _spawnYWu),
-            Qt.point(_spawnXWu + r, _spawnYWu),
-            Qt.point(_spawnXWu, _spawnYWu + r),
-            Qt.point(_spawnXWu, _spawnYWu - r)
+            Qt.point(home.x - r, home.y),
+            Qt.point(home.x + r, home.y),
+            Qt.point(home.x, home.y + r),
+            Qt.point(home.x, home.y - r)
         ]
-        // Pick 2 random reachable offsets
-        let wps = []
+        // Home first, the walk there straight from where it stands
+        let wps = [home]
         for (let p of offsets) {
-            if (gameWorld) {
-                let gx = Math.floor(p.x / gameWorld.cellSize)
-                let gy = Math.floor(p.y / gameWorld.cellSize)
-                if (gx >= 0 && gx < gameWorld.gridWidth &&
-                    gy >= 0 && gy < gameWorld.gridHeight &&
-                    gameWorld.grid[gy][gx] !== gameWorld.cellWall) {
-                    wps.push(p)
-                }
-            }
-            if (wps.length >= 2) break
+            let c = cellCentre(p.x, p.y)
+            if (open(home, c)) wps.push(c, home)
+            if (wps.length >= 5) break
         }
-        if (wps.length >= 2)
-            followPath.wpsWu = wps
+        followPath.wpsWu = wps
     }
 
     function performAttack() {
@@ -1183,7 +1309,7 @@ PhysicsItem {
         if (aiState === "patrol" && target) {
             console.log("[Enemy] Hit while patrolling — chasing attacker!")
             _unseenT = 0
-            _lastKnownTargetPos = Qt.point(target.xWu, target.yWu)
+            _lastKnownTargetPos = _centreOf(target)
             aiState = "chase"
             _recalcChasePath()
         }

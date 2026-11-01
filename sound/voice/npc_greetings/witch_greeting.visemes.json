@@ -1,0 +1,127 @@
+{
+  "line": "witch_greeting",
+  "text": "The stones whisper of what lies below...",
+  "audio": "npc_greetings/witch_greeting.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-191/sound/voice/npc_greetings/witch_greeting.wav",
+    "duration": 3.52
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.12,
+      "value": "X"
+    },
+    {
+      "start": 0.12,
+      "end": 0.36,
+      "value": "B"
+    },
+    {
+      "start": 0.36,
+      "end": 0.43,
+      "value": "E"
+    },
+    {
+      "start": 0.43,
+      "end": 0.71,
+      "value": "F"
+    },
+    {
+      "start": 0.71,
+      "end": 0.78,
+      "value": "B"
+    },
+    {
+      "start": 0.78,
+      "end": 0.85,
+      "value": "F"
+    },
+    {
+      "start": 0.85,
+      "end": 0.99,
+      "value": "B"
+    },
+    {
+      "start": 0.99,
+      "end": 1.07,
+      "value": "A"
+    },
+    {
+      "start": 1.07,
+      "end": 1.54,
+      "value": "E"
+    },
+    {
+      "start": 1.54,
+      "end": 1.65,
+      "value": "C"
+    },
+    {
+      "start": 1.65,
+      "end": 1.76,
+      "value": "G"
+    },
+    {
+      "start": 1.76,
+      "end": 1.85,
+      "value": "F"
+    },
+    {
+      "start": 1.85,
+      "end": 1.92,
+      "value": "C"
+    },
+    {
+      "start": 1.92,
+      "end": 1.99,
+      "value": "B"
+    },
+    {
+      "start": 1.99,
+      "end": 2.13,
+      "value": "H"
+    },
+    {
+      "start": 2.13,
+      "end": 2.2,
+      "value": "D"
+    },
+    {
+      "start": 2.2,
+      "end": 2.34,
+      "value": "B"
+    },
+    {
+      "start": 2.34,
+      "end": 2.42,
+      "value": "A"
+    },
+    {
+      "start": 2.42,
+      "end": 2.53,
+      "value": "B"
+    },
+    {
+      "start": 2.53,
+      "end": 2.81,
+      "value": "E"
+    },
+    {
+      "start": 2.81,
+      "end": 2.95,
+      "value": "F"
+    },
+    {
+      "start": 2.95,
+      "end": 3.52,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}

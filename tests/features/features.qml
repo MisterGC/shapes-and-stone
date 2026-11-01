@@ -6,14 +6,14 @@
 // showing every kind and hiding a secret room (issue #128); builds
 // the same seed at the same danger twice and checks the same features on
 // the same cells, and the scenario seed's against the fingerprint
-// recorded below, so they are the same on every
-// run; builds the dungeon played at low, middle and high danger and
+// recorded below, so they are the same on every run, the kinds but the
+// veins as before there were any (issue #156); builds the dungeon played at low, middle and high danger and
 // checks it holds as many of each kind as the table asks there; then
 // builds the features scenario on 50 seeds and walks
 // each grid itself: every feature on a room's cell, not in the start
 // room, not beside a corridor, the table's distance clear of the entrance
-// and the exit, one to a cell, and each room holding its showcase count
-// or every cell it has free. The next level is built without the
+// and the exit, one to a cell, a vein's with a wall north of it, and each
+// room holding its showcase count or every cell it has free. The next level is built without the
 // showcase. With an out dir and a window it saves features.png. Prints
 // one PASS or FAIL line per check and exits with the number of failures.
 //
@@ -57,8 +57,11 @@ Window {
     }
 
     // The features scenario on the scenario seed at danger 0: the
-    // fingerprint of its features, recorded from this build
-    readonly property string recorded: "104b4168"
+    // fingerprint of its features, recorded from this build, and of those
+    // but the veins, recorded before there were any (issue #156): the
+    // veins, laid out last, move no other kind
+    readonly property string recorded: "50c00f22"
+    readonly property string recordedNoVeins: "104b4168"
     readonly property int seeds: 50
 
     function kinds() { return Object.keys(Balance.dungeon.kinds) }
@@ -117,25 +120,32 @@ Window {
             })
         })
     }
+    // Whether the cell "gx,gy" has a wall north of it, a vein's face
+    function wallNorth(c) {
+        let p = c.split(",").map(Number), row = game.grid[p[1] + 1]
+        return row !== undefined && row[p[0]] === game.cellWall
+    }
     function roomOf(gx, gy) {
         return game.rooms.findIndex(r => gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h)
     }
 
-    // One seed's dungeon against the rules: [broken, short, features]
+    // One seed's dungeon against the rules: [broken, shortRooms, features]
     function walk(seed) {
-        let broken = [], short = [], cells = {}
+        let broken = [], shortRooms = [], cells = {}
         for (let f of game.features) {
             let why = ruleBroken(f.gx, f.gy)
             if (cells[f.gx + "," + f.gy]) why = "on a cell taken"
             cells[f.gx + "," + f.gy] = true
             if (f.xWu !== (f.gx + 0.5) * game.cellSize || f.yWu !== (f.gy + 0.5) * game.cellSize)
                 why = "off its cell's centre"
+            if (f.kind === "vein" && !wallNorth(f.gx + "," + f.gy)) why = "a vein without a wall north of it"
             if (why !== "") broken.push("seed " + seed + " " + f.kind + " at " + f.gx + "," + f.gy + " " + why)
         }
         // Each room asks showcase of each kind (whole numbers), or every
         // cell it has free if fewer; a slit only where a free cell on the
         // room's edge is left that fires across it, off the room's other
-        // slits' lines (slitCells)
+        // slits' lines (slitCells); a vein only where a free cell with a
+        // wall north of it is left
         let asked = 0
         for (let k of kinds()) asked += Balance.dungeon.kinds[k].showcase
         for (let r = 1; r < game.rooms.length; r++) {
@@ -144,10 +154,14 @@ Window {
             let got = here.length
             let slitsShort = Balance.dungeon.kinds.slit.showcase - here.filter(f => f.kind === "slit").length
             let edgeLeft = slitCells(r, here.filter(f => f.kind === "slit")).filter(c => !here.some(f => f.gx + "," + f.gy === c)).length
-            if (got !== want && !(slitsShort > 0 && got + slitsShort === want && edgeLeft < slitsShort))
-                short.push("seed " + seed + " room " + r + " holds " + got + ", asked " + want)
+            let veinsShort = Balance.dungeon.kinds.vein.showcase - here.filter(f => f.kind === "vein").length
+            let northLeft = freeCells(r).filter(c => wallNorth(c) && !here.some(f => f.gx + "," + f.gy === c)).length
+            let excused = (slitsShort > 0 && edgeLeft < slitsShort ? slitsShort : 0)
+                + (veinsShort > 0 && northLeft === 0 ? veinsShort : 0)
+            if (got !== want && !(excused > 0 && got + excused === want))
+                shortRooms.push("seed " + seed + " room " + r + " holds " + got + ", asked " + want)
         }
-        return [broken, short, game.features.length]
+        return [broken, shortRooms, game.features.length]
     }
 
     property var steps: [
@@ -178,6 +192,9 @@ Window {
             console.log("[Features] scenario fingerprint:", h, game.features.length, "features")
             check(h === recorded, "seed " + game.scenarioSeed + " places the features recorded ("
                   + h + ", recorded " + recorded + ")")
+            let hv = hash(lines().filter(l => l.indexOf("vein:") !== 0))
+            check(hv === recordedNoVeins, "the features but the veins are those recorded before the veins ("
+                  + hv + ", recorded " + recordedNoVeins + ")")
             let secret = game.secretRooms[0]
             check(game.secretRooms.length === Balance.dungeon.secretShowcase && secret && secret.clue && secret.clue.visible
                   && game.grid[secret.gy][secret.gx] === game.cellWall,
@@ -256,9 +273,9 @@ Window {
                   + "doorway, corridor, entrance and exit distance, one a cell)"
                   + (walked.broken.length ? ": " + walked.broken.length + ", e.g. "
                      + walked.broken.slice(0, 3).join("; ") : ""))
-            check(walked.short.length === 0, "every room on " + seeds + " seeds holds its showcase count or "
-                  + "all it has free" + (walked.short.length ? ": " + walked.short.length + " do not, e.g. "
-                                         + walked.short.slice(0, 3).join("; ") : ""))
+            check(walked.shortRooms.length === 0, "every room on " + seeds + " seeds holds its showcase count or "
+                  + "all it has free" + (walked.shortRooms.length ? ": " + walked.shortRooms.length + " do not, e.g. "
+                                         + walked.shortRooms.slice(0, 3).join("; ") : ""))
             // The next level is built without the showcase
             game.applyScenario("features")
             game.resetDungeon()
@@ -279,7 +296,7 @@ Window {
 
     // The rules on 50 seeds, at dangers across the bands: one dungeon a
     // step, so the last one's objects are gone before the next is built
-    property var walked: ({ broken: [], short: [], total: 0, least: 1e9 })
+    property var walked: ({ broken: [], shortRooms: [], total: 0, least: 1e9 })
     function seedSteps() {
         let out = []
         for (let i = 0; i < seeds; i++) {
@@ -288,7 +305,7 @@ Window {
                 game.applyScenario("features", (i % 10) * 0.55, seed)
                 let w = walk(seed)
                 walked.broken = walked.broken.concat(w[0])
-                walked.short = walked.short.concat(w[1])
+                walked.shortRooms = walked.shortRooms.concat(w[1])
                 walked.total += w[2]
                 walked.least = Math.min(walked.least, w[2])
             }])

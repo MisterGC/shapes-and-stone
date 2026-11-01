@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "fish_snap",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "crack", "role": "transient", "source": "noise", "length": 20, "gain": -6.5, "envelope": {"attack": 0.5, "decay": 10, "sustain": 0, "release": 0}, "filter": {"type": "highpass", "cutoff": 2000}},
+    {"name": "twang", "role": "body", "source": "sine", "freq": 520, "length": 400, "gain": -10.6, "offset": 5, "envelope": {"attack": 1, "decay": 225, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": -4.54, "time": 400}},
+    {"name": "twang2", "role": "tail", "source": "sine", "freq": 1045, "length": 400, "gain": -21.1, "offset": 5, "envelope": {"attack": 1, "decay": 225, "sustain": 0, "release": 0}, "pitch": {"start": 0, "end": -4.54, "time": 400}}
+  ]
+}

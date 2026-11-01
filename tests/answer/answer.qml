@@ -32,8 +32,8 @@
 // knight.chargeStart; held, it charges at knight.chargeSpeed and is full on
 // the step knight.chargeTime reaches; a full charge let go of at a guardian
 // facing the knight deals knight.heavySwing times atk through its shield
-// and staggers it; a hit while charging cancels it; held knight.chargeHold
-// past full it goes at normal strength. A tough guardian's crushing blow
+// and staggers it; a hit while charging cancels it; held long past full it
+// stays full and its release is a heavy blow. A tough guardian's crushing blow
 // winds up for at least enemy.crushWindUp as aiState "crush", white-hot
 // with a doubled ring, and its lunge opens no parry window; on a held
 // shield it takes enemy.crushMana mana and enemy.crushShare of the damage
@@ -769,7 +769,7 @@ Window {
             }
             let startSteps = Math.round(k.chargeStart / stepS)
             let fullSteps = Math.round(k.chargeTime / stepS)
-            let letGoSteps = Math.round((k.chargeTime + k.chargeHold) / stepS)
+            let keptSteps = Math.round((k.chargeTime + 3) / stepS)
             let actions = []
             let record = (a) => actions.push(a)
             p.acted.connect(record)
@@ -853,8 +853,8 @@ Window {
                   + p.isCharging + ", release swings " + p.isAttacking + ")")
             Clayground.physicsStep(Math.ceil(k.hurtGrace / stepS) + 1)
 
-            // Held chargeHold past full, the knight lets it go at normal
-            // strength, and the release swings nothing more
+            // Held long past full, the charge is kept, and its release is
+            // one heavy blow
             ready()
             let gr = game.enemies.find(x => x.enemyType === "grunt" && !x.destroyed)
             gr.halt()
@@ -862,22 +862,18 @@ Window {
             gr.xWu = p.xWu + 1.5
             gr.yWu = p.yWu
             mouse.mousePress(game, cx, cy, Qt.LeftButton)
-            Clayground.physicsStep(letGoSteps - 1)
-            let held = p.chargeFull && !p.isAttacking
-            let ghp = gr.hp
-            Clayground.physicsStep(1)
-            let letGo = p.isAttacking && !p.isHeavy && !p.isCharging
-            Clayground.physicsStep(1)
-            let normalLost = ghp - gr.hp
+            Clayground.physicsStep(keptSteps)
+            let kept = p.chargeFull && !p.isAttacking
             actions = []
             mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(1)
             let afterRelease = actions.slice()
-            check(held && letGo && normalLost === p.atk - gr.def,
-                  "held " + letGoSteps + " steps (" + (k.chargeTime + k.chargeHold).toFixed(1)
-                  + " s), the charge goes at normal strength: " + normalLost + " HP, atk "
-                  + p.atk + " less def " + gr.def + " (full until then " + held + ")")
-            check(afterRelease.length === 0,
-                  "its release later swings no second time (acted "
+            check(kept && p.isAttacking && p.isHeavy,
+                  "held " + keptSteps + " steps (" + (k.chargeTime + 3).toFixed(1)
+                  + " s), the charge stays full (" + kept + ") and its release is a heavy blow ("
+                  + p.isHeavy + ")")
+            check(afterRelease.length === 1 && afterRelease[0] === "heavy",
+                  "its release swings once, heavy (acted "
                   + (afterRelease.join(", ") || "nothing") + ")")
             gr.halted = false
             gr.aiState = "patrol"
@@ -930,8 +926,8 @@ Window {
             let record = (a) => actions.push(a)
             p.acted.connect(record)
             let shorts = 0
-            let short = () => shorts++
-            p.momentumShort.connect(short)
+            let onShort = () => shorts++
+            p.momentumShort.connect(onShort)
             let whirls0 = game.fightRecord.whirlwinds
 
             // Momentum: a swing into the air earns none, one that hits two
@@ -1084,7 +1080,7 @@ Window {
                   + " shows and the mana bar flashes (acted " + (actions.join(", ") || "nothing") + ")")
 
             p.acted.disconnect(record)
-            p.momentumShort.disconnect(short)
+            p.momentumShort.disconnect(onShort)
             for (let o of game.enemies) if (!o.destroyed) { o.halted = false; o.aiState = "patrol" }
             Clayground.physicsStep(Math.ceil(Balance.knight.whirlDuration / stepS) + 2)
             Clayground.paused = false

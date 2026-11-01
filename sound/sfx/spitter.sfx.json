@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "spitter",
+  "variation": {"seed": 1, "pool": 1},
+  "layers": [
+    {"name": "gurgle", "role": "body", "source": "sawtooth", "freq": 92, "length": 900, "gain": 0.8, "envelope": {"attack": 380, "decay": 500, "sustain": 0, "release": 0}, "lfo": {"target": "pitch", "rate": 11, "depth": 1.2}, "filter": {"type": "bandpass", "cutoff": 650, "resonance": 0.35}},
+    {"name": "throat", "role": "body", "source": "noise", "length": 950, "gain": -3.2, "envelope": {"attack": 450, "decay": 480, "sustain": 0, "release": 0}, "filter": {"type": "lowpass", "cutoff": 420}, "lfo": {"target": "volume", "rate": 9, "depth": 0.5}},
+    {"name": "spit", "role": "transient", "source": "noise", "length": 160, "gain": -0.2, "offset": 520, "envelope": {"attack": 4, "decay": 150, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 1800, "resonance": 0.25}},
+    {"name": "wet", "role": "tail", "source": "noise", "length": 500, "gain": -11.2, "offset": 560, "envelope": {"attack": 10, "decay": 480, "sustain": 0, "release": 0}, "filter": {"type": "bandpass", "cutoff": 3500, "resonance": 0.1}}
+  ]
+}
