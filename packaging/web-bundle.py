@@ -11,6 +11,13 @@ shaders baked to .qsb by Qt's qsb, for the same targets as the native build
 a shader from its in-memory file system, but fetches images and sounds by
 their URL, so preloading assets/ would download them twice.
 
+The sound is the cue sheet's, as in the native build: sound/cues.json names
+each cue's recipe, song or render (and a voiced line's viseme cues), and those
+files go to sound/ beside the QML. The QML asks for "../sound/...", which in
+the bundle would leave the game's folder, so the bundle's copy asks for
+"sound/..." instead; a sound file the QML names that the cue sheet does not
+ship stops the bundle (#216).
+
 --check runs Clayground's run_in_browser.py on the written files in headless
 Chromium and exits with its code: 0 = the game loaded to the title without a
 QML, shader or WebGL error. It needs Playwright with Chromium.
@@ -28,6 +35,7 @@ import zipfile
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 SRC = os.path.join(ROOT, "src")
+SOUND = os.path.join(ROOT, "sound")
 WEBDOJO = os.path.join(ROOT, "clayground", "tools", "webdojo")
 # The starter's own sample game and its notes for a new game are not ours.
 STARTER_SKIP = {"Main.qml", "README.md", "make-assets-manifest.py"}
@@ -103,6 +111,59 @@ def copy_game(out):
             shutil.copy2(src, os.path.join(out, name))
 
 
+def cue_files():
+    # As CMakeLists.txt: a live cue ships its recipe or song, a rendered one
+    # its render and, for a voiced line, the viseme cues beside it.
+    with open(os.path.join(SOUND, "cues.json"), encoding="utf-8") as f:
+        cues = json.load(f)["cues"]
+    files = set()
+    for cue in cues.values():
+        if cue["mode"] == "live":
+            files.add(cue["source"])
+            continue
+        files.add(cue["render"])
+        visemes = re.sub(r"\.wav$", ".visemes.json", cue["render"])
+        if visemes != cue["render"] and os.path.isfile(os.path.join(SOUND, visemes)):
+            files.add(visemes)
+    return sorted(files)
+
+
+def copy_sound(out):
+    files = cue_files()
+    for rel in files:
+        src = os.path.join(SOUND, rel)
+        if not os.path.isfile(src):
+            raise SystemExit(f"sound/cues.json names sound/{rel}, which does not exist")
+        dst = os.path.join(out, "sound", rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+    return files
+
+
+def point_at_sound(out):
+    # The game's "../sound/..." is sound/ beside the QML in the bundle. A
+    # whole path the QML names must be one the cue sheet shipped.
+    missing = set()
+    for dirpath, _, names in os.walk(out):
+        for name in names:
+            if not name.endswith((".qml", ".js")):
+                continue
+            path = os.path.join(dirpath, name)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            if '"../sound/' not in text:
+                continue
+            text = text.replace('"../sound/', '"sound/')
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            for rel in re.findall(r'"sound/([^"]+\.[a-z0-9]+)"', text):
+                if not os.path.isfile(os.path.join(out, "sound", rel)):
+                    missing.add(rel)
+    if missing:
+        raise SystemExit("the QML names sound files the cue sheet does not ship: "
+                         + ", ".join(f"sound/{m}" for m in sorted(missing)))
+
+
 def bake_shaders(qsb, out):
     baked = []
     shaders = os.path.join(out, "shaders")
@@ -164,6 +225,8 @@ def main():
     copy_runtime(os.path.abspath(args.runtime), out)
     name_page(out)
     copy_game(out)
+    sounds = copy_sound(out)
+    point_at_sound(out)
     baked = bake_shaders(qsb, out)
     files = load_manifest_module().collect(out, [])
     with open(os.path.join(out, "assets-manifest.json"), "w", encoding="utf-8") as f:
@@ -172,7 +235,7 @@ def main():
     with open(os.path.join(out, "RUNTIME-MANIFEST.json")) as f:
         runtime = json.load(f)
     print(f"{out}: runtime {runtime.get('version', '?')}, {len(baked)} shader(s) baked, "
-          f"assets-manifest.json lists {len(files)} file(s)")
+          f"{len(sounds)} sound file(s), assets-manifest.json lists {len(files)} file(s)")
     if args.check:
         return check(out, args.do or ["wait:6000", "shot:title"])
     return 0

@@ -6,6 +6,16 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-01
+
+The browser version has its sound again.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser.
+
+### Fixed
+
+- **No sound in the browser:** since the sound moved to the sound factory's `sound/` folder, the browser version left it out, so 0.4.0 played no music, ambience, effect or voice there. The web bundle now carries the cue sheet's sound files, and a sound file the game names that the bundle does not carry stops the build. (#216)
+
 ## [0.4.0] - 2026-11-01
 
 The knight and every menu play with a gamepad, a Steam Deck's built-in controls too; the deep has veins to dig, spawn holes that answer greed and petrified travellers to free; the camp is a cave with a pond to fish; fights become duels; and every sound comes from the sound factory. Built on Clayground v2026.11.
@@ -198,7 +208,8 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.1
 [0.4.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.0
 [0.3.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.3.0
 [0.2.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.2.2
