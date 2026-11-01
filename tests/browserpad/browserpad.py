@@ -16,10 +16,10 @@ browser show it. The pad is a Pro Controller in the standard mapping.
 On the title a click opens Control Input, the mouse left resting where it
 clicked, over the mouse and keyboard column's Reset. The pad's A, its
 first press, lists it by name and marks it in use, and chooses nothing on
-the page: not that Reset, nor a cell of that column. The D-pad goes up to
-the first row and down to Strike, A makes its
-gamepad cell wait, Y rebinds it (the draught had Y, so the two trade) - and
-no game has started. It reads the page from the console lines it prints
+the page: not that Reset, nor a cell of that column. The pick goes up to
+Strike's gamepad cell, the first one the pad can rebind; the pad's next A
+makes it wait and resets nothing, and Y rebinds it (the draught had Y, so
+the two trade) - and no game has started. It reads the page from the console lines it prints
 ("[ControlInputPage] devices: ...", "[ControlInputPage] prompt: ..."),
 prints one PASS or FAIL line per check and exits with the number of
 failures; 100 when the game did not load. With --out it writes the
@@ -39,9 +39,7 @@ import time
 PAD_NAME = "Pro Controller"
 PAD_ID = PAD_NAME + " (STANDARD GAMEPAD Vendor: 057e Product: 2009)"
 # The standard gamepad's buttons (https://w3c.github.io/gamepad/#remapping)
-A, B, X, Y, DPAD_UP, DPAD_DOWN = 0, 1, 2, 3, 12, 13
-# The page's rows: 17 actions, the Resets and Back
-ROWS = 19
+A, Y = 0, 3
 
 # Chrome's navigator.getGamepads(), driven by window.__padStep(step). A
 # step presses or lets go of a button; the first press plugs the pad in.
@@ -163,16 +161,14 @@ def run(bench, timeout_s):
                 " of the mouse and keyboard column under the resting mouse (" + (" / ".join(prompts) or "no prompt") + ")")
     bench.shot("first-press")
 
-    # The D-pad up to the first row, down to Strike, A, then Y
+    # The pad's next A: Strike's gamepad cell waits, no Reset; then Y
     mark = len(bench.lines)
-    for _ in range(ROWS):
-        bench.press(DPAD_UP)
-    for _ in range(5):
-        bench.press(DPAD_DOWN)
     bench.press(A)
     prompts = bench.page_lines("prompt", mark)
-    bench.check(bool(prompts) and prompts[-1] == "Press a gamepad button for Strike",
-                "the D-pad up to the top, down to Strike, and A make its gamepad cell wait (" + (" / ".join(prompts) or "no prompt") + ")")
+    bench.check(bool(prompts) and prompts[-1] == "Press a gamepad button for Strike"
+                and not any("defaults are back" in p for p in prompts),
+                "its next A makes Strike's gamepad cell wait and resets no column ("
+                + (" / ".join(prompts) or "no prompt") + ")")
     bench.shot("waiting")
     mark = len(bench.lines)
     bench.press(Y)

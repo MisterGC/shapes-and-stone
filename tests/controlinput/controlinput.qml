@@ -12,7 +12,9 @@
 // is gone. With Strike's mouse and keyboard cell picked the pad's A, taking
 // the pad again, moves the pick to Strike's gamepad cell and chooses
 // nothing (issue #236); Enter makes the mouse and keyboard cell wait and
-// the pad's A cancels it, the pick on the gamepad's column. Esc goes back to the title, on Control Input; a click on the
+// the pad's A cancels it, the pick on the gamepad's column. With the mouse
+// and keyboard's Reset picked, the pad's A taking the pad moves the pick
+// up to Strike's gamepad cell and resets nothing. Esc goes back to the title, on Control Input; a click on the
 // row opens the page and a click on Back closes it. In the game Esc opens
 // the pause menu, S three times and Enter open the page over it, the menu
 // hidden and the world still paused, M mutes, Esc goes back to the menu on
@@ -234,6 +236,20 @@ Window {
         }],
         [100, () => {
             if (padId < 0) return
+            // The mouse and keyboard's Reset picked, then the pad's A
+            press(Qt.Key_W)
+            for (let n = 0; page().selectedIndex < page().resetIndex && n < 30; n++) press(Qt.Key_S)
+            press(Qt.Key_A)
+            check(page().selectedIndex === page().resetIndex && page().column === 0 && !game.padInUse,
+                  "S and A pick the mouse and keyboard's Reset")
+            GamepadHub.setVirtualGamepadInput(padId, "south", 1)
+        }],
+        [() => padId < 0 || game.padInUse, () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 0)
+            check(page().column === 1 && page().selectedIndex === rowOf("strike") && prompt() === "",
+                  "the pad's A, taking the pad on that Reset, moves the pick up to Strike's gamepad cell and resets nothing (row "
+                  + page().selectedIndex + ", column " + page().column + ", prompt: '" + prompt() + "')")
             GamepadHub.detachVirtualGamepad(padId)
             padId = -1
         }],

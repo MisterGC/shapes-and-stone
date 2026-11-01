@@ -436,8 +436,8 @@ The browser pad bench runs the browser game (`build/web`, from
 pressed on it, then the pad in its slot with that press down, and a fresh
 snapshot on every call. On the title a click opens Control Input, the mouse
 left over the mouse and keyboard column's Reset; the pad's first A lists it
-by name and in use and chooses nothing, the D-pad goes to Strike, A makes
-its gamepad cell wait and Y rebinds it, and no game starts. It reads the
+by name and in use and chooses nothing, its next A makes Strike's gamepad
+cell wait, resetting nothing, and Y rebinds it, and no game starts. It reads the
 page from the lines it prints to the console (`[ControlInputPage]
 devices: ...`, `prompt: ...`), exits with the number of failed checks and
 needs Playwright with Chromium; `--out` keeps the console and a screenshot
