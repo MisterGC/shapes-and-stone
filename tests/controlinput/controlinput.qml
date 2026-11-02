@@ -1,7 +1,9 @@
 // Control Input bench - the Control Input page (issue #220) opens and
 // closes from the title and the pause menu by keyboard and mouse, and
 // lists every action with both its bindings and the devices with the one
-// in use marked. The gamepad bench walks it with the pad.
+// in use marked. The gamepad bench walks it with the pad. A Nintendo pad
+// without labels, as the browser lists one, has its face buttons named B,
+// A, Y, X from the bottom one round (issue #237).
 //
 // On the title S three times and Enter open the page over it, with the
 // focus; every action of the control table has its row with its key or
@@ -140,6 +142,26 @@ Window {
         check(off.length === 0, "the defaults read side by side, e.g. Strike | LMB | R1, Mute | M | - (" + off.join("; ") + ")")
     }
 
+    // A Nintendo pad without labels, as the browser lists it, has its face
+    // buttons named the Nintendo way (issue #237): Chrome's id "Pro
+    // Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)" reaches the
+    // game as "Pro Controller"
+    function checkNintendoLetters() {
+        const kp = find(game, "knightPad")
+        const faces = ["buttonA", "buttonB", "buttonX", "buttonY"]
+        const letters = pad => faces.map(b => kp.faceLabel(pad, b)).join("")
+        const pro = { name: "Pro Controller", labels: {} }
+        check(letters(pro) === "BAYX" && letters({ name: "Joy-Con L+R", labels: {} }) === "BAYX"
+              && letters({ name: "Nintendo Switch Pro Controller", labels: {} }) === "BAYX",
+              "a Nintendo pad without labels names its bottom, right, left and top buttons B, A, Y, X ("
+              + letters(pro) + ")")
+        check(letters({ name: "Xbox Wireless Controller", labels: {} }) === "ABXY" && letters(null) === "ABXY",
+              "any other pad without labels, or none, names them A, B, X, Y")
+        check(kp.faceLabel({ name: "Pro Controller", labels: { south: "Cross" } }, "buttonA") === "Cross"
+              && kp.faceLabel(pro, "buttonR1") === "R1" && kp.faceLabel(pro, "triggerL2") === "L2",
+              "a pad's own labels win, and the shoulders and triggers keep their names")
+    }
+
     function capture(name, then) {
         if (outDir === "") { then(); return }
         bench.contentItem.grabToImage(r => {
@@ -163,6 +185,7 @@ Window {
                   "Enter opens the Control Input page over the title, with the focus")
             check(title().covered && !find(title(), "titleChoice0").parent.visible, "the title's menu is hidden under the page")
             checkRows()
+            checkNintendoLetters()
             let d = devices()
             check(d.length >= 2 && d[0].name === "Keyboard" && d[1].name === "Mouse" && d[0].inUse && d[1].inUse,
                   "Keyboard and Mouse are listed, in use (" + deviceNames() + ")")
