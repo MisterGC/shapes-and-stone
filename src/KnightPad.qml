@@ -39,15 +39,33 @@ Item {
     property real deadZone: 0.3
     property real triggerOn: 0.5
 
-    // What a button or trigger is printed with on the selected pad (a
-    // PlayStation pad's Cross), else its position's name in the full
-    // layout: "A", "R1", "R2", "Select"
+    // What a button or trigger is printed with on the selected pad - while
+    // no pad is in use on the first one connected, for the Control Input
+    // page's gamepad column - (a PlayStation pad's Cross, a Nintendo pad's
+    // B for buttonA), else its position's name in the full layout: "A",
+    // "R1", "R2", "Select"
     function label(button) {
-        const pad = controller ? controller.gamepad : null
+        let pad = controller ? controller.gamepad : null
+        if (!pad && !inUse && controller && controller.gamepads && controller.gamepads.length > 0)
+            pad = controller.gamepads[0]
+        return faceLabel(pad, button)
+    }
+    function faceLabel(pad, button) {
         const at = { buttonA: "south", buttonB: "east", buttonX: "west", buttonY: "north" }
         if (pad && pad.labels && at[button] && pad.labels[at[button]])
             return pad.labels[at[button]]
+        if (at[button] && isNintendo(pad)) return nintendoLetters[at[button]]
         return button.replace(/^(button|trigger)/, "")
+    }
+
+    // Workaround until clayground#501: in the browser a pad has no labels
+    // and its name has lost the vendor of its id (057e for Nintendo), so a
+    // Switch pad, read by position like any other, would be named the Xbox
+    // way - its B as A. Without labels a pad is taken for a Nintendo one
+    // by the names Nintendo's pads report, and named the Nintendo way
+    readonly property var nintendoLetters: ({ south: "B", east: "A", west: "Y", north: "X" })
+    function isNintendo(pad) {
+        return !!pad && /nintendo|pro controller|joy-con|snes controller|n64 controller/i.test(pad.name || "")
     }
 
     function keyboardUsed() {

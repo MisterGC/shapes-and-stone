@@ -128,7 +128,7 @@ Window {
               + wrong.join("; ") + ")")
         let rows = { moveUp: ["Move up", "W", "L stick / D-pad up"], aim: ["Aim", "Mouse", "R stick"],
                      strike: ["Strike", "LMB", "R1"], shield: ["Shield", "RMB", "L1"],
-                     dash: ["Dash", "Space", "B"], whirlwind: ["Whirlwind", "Q", "R2"],
+                     dash: ["Dash", "Space", game.padLabels.B], whirlwind: ["Whirlwind", "Q", "R2"],
                      lock: ["Lock on an enemy", "F / MMB", "L2"], knight: ["Knight panel", "C", "Select"],
                      mute: ["Mute", "M", "-"], menu: ["Menu", "Esc", "Start"] }
         let off = []
