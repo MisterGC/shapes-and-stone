@@ -423,8 +423,9 @@ table, plugs in a virtual pad (where the build reads pads), finds it listed
 and marked in use after a press and gone once unplugged, and with an out
 dir after `--` saves the page over the title and over the pause menu at
 1280x800. It also checks that the pad's A, taking the pad, moves the pick to
-the gamepad's column and chooses nothing, and that a pad press cancelling a
-key wait moves it there too:
+the gamepad's column and chooses nothing, that a pad press cancelling a
+key wait moves it there too, and that a Nintendo pad without labels has its
+face buttons named B, A, Y and X from the bottom one round:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controlinput/controlinput.qml [-- <out dir>]
@@ -437,7 +438,9 @@ pressed on it, then the pad in its slot with that press down, and a fresh
 snapshot on every call. On the title a click opens Control Input, the mouse
 left over the mouse and keyboard column's Reset; the pad's first A lists it
 by name and in use and chooses nothing, its next A makes Strike's gamepad
-cell wait, resetting nothing, and Y rebinds it, and no game starts. It reads the
+cell wait, resetting nothing, and Y rebinds it, and no game starts. The pad
+is a Pro Controller: the hint names its bottom button B and its right one
+A, and the right one cancels a waiting cell. It reads the
 page from the lines it prints to the console (`[ControlInputPage]
 devices: ...`, `prompt: ...`), exits with the number of failed checks and
 needs Playwright with Chromium; `--out` keeps the console and a screenshot
@@ -499,6 +502,11 @@ controls hint, the talk prompts and the dialogue name the pad's buttons from
 its first input to the next key press - A, B, X and Y as printed on the pad,
 Cross on a PlayStation pad. Moving the mouse gives the aim back to the mouse. Buttons
 count by position, so the bottom face button is A whatever it is labelled.
+The browser gives no labels, so there a Nintendo pad - one that calls
+itself a Pro Controller, a Joy-Con or Nintendo's - has its bottom, right,
+left and top buttons named B, A, Y and X, as printed on it: B rebinds and A
+cancels on the Control Input page. That is a workaround until Clayground
+gives the browser's pads their labels (clayground#501).
 On iOS and Android the touch pad stays the controller. The pad knight bench
 plays the dojo's `dungeon` scenario in Clayground's live loader with the
 dojo's synthetic pad alone - the inspector's gamepad input, no key and no
