@@ -104,11 +104,17 @@ Item {
     function isFixed(index, col) {
         return index < actions.length && !!controls && controls.fixed(actions[index].id, columns[col])
     }
-    function _fixedNote(action) {
-        if (action === "menu")
+    // Whether action is one of the moves, which take a key alone
+    function isMove(action) { return !!controls && controls.isMove(action) }
+    // What the page says of a cell that stays as it is
+    // (ControlTable.fixedReason)
+    function _fixedNote(action, col) {
+        const why = controls.fixedReason(action, columns[col])
+        if (why === "menu")
             return "The menu stays on " + keysText("menu") + " and " + padText("menu") + ", so it always opens"
-        if (action === "aim") return "The aim stays on the mouse and the right stick"
-        return "The moves stay on the left stick and the D-pad"
+        if (why === "pointer") return "The aim stays on the mouse and the right stick"
+        if (why === "stick") return "The moves stay on the left stick and the D-pad"
+        return titleOf(action) + " stays as it is"
     }
     // What an input is called: a key, a mouse button, a pad input
     function inputName(input) {
@@ -131,7 +137,7 @@ Item {
             controls.resetColumn(columns[column])
             note = column === 1 ? "The gamepad's defaults are back" : "The mouse and keyboard's defaults are back"
         } else if (isFixed(index, column)) {
-            note = _fixedNote(actions[index].id)
+            note = _fixedNote(actions[index].id, column)
         } else {
             _capture(actions[index].id, columns[column])
         }
@@ -164,12 +170,14 @@ Item {
             _endCapture(r.swapped !== "" ? titleOf(action) + " swapped with " + titleOf(r.swapped) : "")
             return
         }
-        const other = controls.holder(capturing, input)
+        // Why not, as ControlTable.rebind says it
         const name = inputName(input)
-        if (typeof input !== "string" && input.mouse && action.startsWith("move"))
+        if (r.reason === "keyOnly")
             _endCapture(titleOf(action) + " takes a key, not a mouse button")
-        else if (other !== "" && other !== action)
-            _endCapture(name + " stays with " + titleOf(other))
+        else if (r.reason === "held")
+            _endCapture(name + " stays with " + titleOf(r.holder))
+        else if (r.reason === "fixed")
+            _endCapture(_fixedNote(action, columns.indexOf(capturing)))
         else
             _endCapture(titleOf(action) + " cannot take " + (name !== "" ? name : "that"))
     }
@@ -475,7 +483,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             height: 18
             text: page.capturing === "keys"
-                  ? (page.captureAction.startsWith("move") ? "Press a key for " : "Press a key or mouse button for ")
+                  ? (page.isMove(page.captureAction) ? "Press a key for " : "Press a key or mouse button for ")
                     + page.titleOf(page.captureAction)
                   : page.capturing === "pad" ? "Press a gamepad button for " + page.titleOf(page.captureAction)
                   : page.note
