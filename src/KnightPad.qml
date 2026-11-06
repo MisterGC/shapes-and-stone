@@ -39,15 +39,33 @@ Item {
     property real deadZone: 0.3
     property real triggerOn: 0.5
 
-    // What a button or trigger is printed with on the selected pad (a
-    // PlayStation pad's Cross), else its position's name in the full
-    // layout: "A", "R1", "R2", "Select"
+    // What a button or trigger is printed with on the selected pad - while
+    // no pad is in use on the first one connected, for the Control Input
+    // page's gamepad column - (a PlayStation pad's Cross, a Nintendo pad's
+    // B for buttonA), else its position's name in the full layout: "A",
+    // "R1", "R2", "Select"
     function label(button) {
-        const pad = controller ? controller.gamepad : null
+        let pad = controller ? controller.gamepad : null
+        if (!pad && !inUse && controller && controller.gamepads && controller.gamepads.length > 0)
+            pad = controller.gamepads[0]
+        return faceLabel(pad, button)
+    }
+    function faceLabel(pad, button) {
         const at = { buttonA: "south", buttonB: "east", buttonX: "west", buttonY: "north" }
         if (pad && pad.labels && at[button] && pad.labels[at[button]])
             return pad.labels[at[button]]
+        if (at[button] && isNintendo(pad)) return nintendoLetters[at[button]]
         return button.replace(/^(button|trigger)/, "")
+    }
+
+    // Workaround until clayground#501: in the browser a pad has no labels
+    // and its name has lost the vendor of its id (057e for Nintendo), so a
+    // Switch pad, read by position like any other, would be named the Xbox
+    // way - its B as A. Without labels a pad is taken for a Nintendo one
+    // by the names Nintendo's pads report, and named the Nintendo way
+    readonly property var nintendoLetters: ({ south: "B", east: "A", west: "Y", north: "X" })
+    function isNintendo(pad) {
+        return !!pad && /nintendo|pro controller|joy-con|snes controller|n64 controller/i.test(pad.name || "")
     }
 
     function keyboardUsed() {
@@ -67,12 +85,21 @@ Item {
         _aimLater()
     }
 
+    // A physical pad is being made the controller's source by a press on
+    // it (_touched). That press reaches the controller, and so MenuPad, in
+    // the same turn, before this pad's own handlers see it: the Control
+    // Input page lets it only take the pad (issue #236)
+    readonly property bool takingPad: _takingPad
+    property bool _takingPad: false
+
     // The pad at index of the hub, or the keyboard for -1
     property bool _selecting: false
     function _select(index) {
         _selecting = true
+        _takingPad = index >= 0
         if (index >= 0) controller.selectGamepad(index)
         else controller.selectKeyboard(keyboardKeys)
+        _takingPad = false
         _selecting = false
     }
 
@@ -114,8 +141,14 @@ Item {
     // triggerOn
     property var _down: ({})
 
+    // A button or trigger was pressed, as GameController.inputs names it:
+    // the Control Input page rebinds a pad cell to it (issue #221)
+    signal inputPressed(string name)
+
     // A button or trigger changed: on its press or release, the action it
-    // is bound to. Not for a change a key made (the keyboard's moves)
+    // is bound to. Not for a change a key made (the keyboard's moves). A
+    // press while the Control Input page waits for one (Game.rebinding) is
+    // the page's alone
     function _input(name) {
         let value = controller.inputValue(name)
         _moved(value)
@@ -123,6 +156,9 @@ Item {
         if (!!_down[name] === down) return
         _down[name] = down
         if (_inKey || !controls) return
+        const rebinding = !!game && !!game.rebinding
+        if (down && enabled) inputPressed(name)
+        if (down && rebinding) return
         let action = controls.actionOfPad(name)
         if (action !== "") _act(action, down)
     }

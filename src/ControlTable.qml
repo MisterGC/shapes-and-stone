@@ -21,26 +21,26 @@ QtObject {
     readonly property string storeKey: "controls"
 
     // The actions in the order the hints name them. name: what the hint
-    // says; hold: pressed and released, not only pressed; move: one of the
+    // says; title: what the Control Input page calls it; hold: pressed and released, not only pressed; move: one of the
     // four the keyboard walks with; pointer: aimed with the mouse pointer
     readonly property var actions: [
-        { id: "moveUp", name: "move", move: true },
-        { id: "moveLeft", name: "move", move: true },
-        { id: "moveDown", name: "move", move: true },
-        { id: "moveRight", name: "move", move: true },
-        { id: "aim", name: "aim", pointer: true },
-        { id: "strike", name: "strike, hold to charge, at a vein dig", hold: true },
-        { id: "shield", name: "shield", hold: true },
-        { id: "dash", name: "dash" },
-        { id: "whirlwind", name: "whirlwind" },
-        { id: "talk", name: "talk" },
-        { id: "potion", name: "potion" },
-        { id: "draught", name: "draught" },
-        { id: "lock", name: "lock on" },
-        { id: "knight", name: "knight" },
-        { id: "mute", name: "mute" },
-        { id: "effects", name: "effects" },
-        { id: "menu", name: "menu" }
+        { id: "moveUp", name: "move", title: "Move up", move: true },
+        { id: "moveLeft", name: "move", title: "Move left", move: true },
+        { id: "moveDown", name: "move", title: "Move down", move: true },
+        { id: "moveRight", name: "move", title: "Move right", move: true },
+        { id: "aim", name: "aim", title: "Aim", pointer: true },
+        { id: "strike", name: "strike, hold to charge, at a vein dig", title: "Strike", hold: true },
+        { id: "shield", name: "shield", title: "Shield", hold: true },
+        { id: "dash", name: "dash", title: "Dash" },
+        { id: "whirlwind", name: "whirlwind", title: "Whirlwind" },
+        { id: "talk", name: "talk", title: "Talk, open a door" },
+        { id: "potion", name: "potion", title: "Potion" },
+        { id: "draught", name: "draught", title: "Draught" },
+        { id: "lock", name: "lock on", title: "Lock on an enemy" },
+        { id: "knight", name: "knight", title: "Knight panel" },
+        { id: "mute", name: "mute", title: "Mute" },
+        { id: "effects", name: "effects", title: "Effects on and off" },
+        { id: "menu", name: "menu", title: "Menu" }
     ]
 
     // key: a Qt.Key, 0 for none; mouse: a Qt mouse button, 0 for none;
@@ -107,6 +107,117 @@ QtObject {
     // Every action back to its default, kept
     function reset() {
         bindings = defaults
+        save()
+    }
+
+    // The Control Input page's two columns (issue #221): "keys", an
+    // action's key and mouse button as one binding, and "pad". A cell is
+    // what an action has in a column: { key, mouse } for "keys", the pad
+    // input for "pad"
+    function cell(action, column) {
+        return column === "pad" ? pad(action) : { key: key(action), mouse: mouse(action) }
+    }
+    // Why action's binding in column stays as it is, "" when it can be
+    // rebound: "menu", the menu's, so nobody locks themselves out of the
+    // menu; "pointer", the aim's, the mouse pointer and the right stick;
+    // "stick", a move's on the pad, the left stick; "unknown", no such
+    // action
+    function fixedReason(action, column) {
+        const a = actions.find(x => x.id === action)
+        if (!a) return "unknown"
+        if (action === "menu") return "menu"
+        if (a.pointer) return "pointer"
+        return column === "pad" && !!a.move ? "stick" : ""
+    }
+    function fixed(action, column) { return fixedReason(action, column) !== "" }
+    // Whether action is one of the four moves
+    function isMove(action) {
+        const a = actions.find(x => x.id === action)
+        return !!a && !!a.move
+    }
+    // Whether action can have value as its cell in column: a move only a
+    // key, nothing else a key and a mouse button at once
+    function _takes(action, column, value) {
+        if (fixed(action, column)) return false
+        if (column === "pad") return _valid(action, "pad", value)
+        if (!value || !_valid(action, "key", value.key) || !_valid(action, "mouse", value.mouse)) return false
+        const a = actions.find(x => x.id === action)
+        return a.move ? value.key !== 0 && value.mouse === 0 : true
+    }
+    // The action whose cell in column holds input, "" for none
+    function holder(column, input) {
+        if (column === "pad") return actionOfPad(input)
+        if (!input) return ""
+        return input.key ? actionOfKey(input.key) : actionOfMouse(input.mouse || 0)
+    }
+
+    // Rebinds action's cell in column to input - a key ({ key }), a mouse
+    // button ({ mouse }) or a pad input - as the Control Input page does
+    // with the next input pressed. The cell then holds that input alone;
+    // an input the cell has already keeps the cell as it is. When another
+    // action holds the input the two trade: their whole cells, or, where a
+    // move takes a key from an action with a mouse button too, the keys
+    // alone, the other action keeping its mouse button. Kept at once.
+    //
+    // Returns { taken, swapped, reason, holder }: swapped the id of the
+    // action traded with, else ""; when not taken, reason says why -
+    // "fixed", the cell stays as it is (fixedReason); "keyOnly", a move
+    // takes a key, not a mouse button; "input", the input is not one the
+    // cell takes; "held", holder has the input and cannot take what it
+    // would get (a move a mouse button)
+    function rebind(action, column, input) {
+        let value = input
+        if (column !== "pad")
+            value = { key: input && input.key ? input.key : 0, mouse: input && input.mouse ? input.mouse : 0 }
+        const refused = (reason, holder) => ({ taken: false, swapped: "", reason: reason, holder: holder || "" })
+        if (!defaults[action]) return refused("input")
+        if (fixed(action, column)) return refused("fixed")
+        if ((column !== "pad" && value.key === 0 && value.mouse === 0) || (column === "pad" && value === ""))
+            return refused("input")
+        if (column !== "pad" && isMove(action) && value.mouse !== 0) return refused("keyOnly")
+        if (!_takes(action, column, value)) return refused("input")
+        const other = holder(column, value)
+        if (other === action) return { taken: true, swapped: "", reason: "", holder: "" }
+        const mine = cell(action, column)
+        let next = JSON.parse(JSON.stringify(bindings))
+        if (other !== "") {
+            // The other action's whole cell, else the key alone where this
+            // one cannot take the whole (a move a key with a mouse button):
+            // the other then keeps its mouse button
+            const theirs = cell(other, column)
+            const whole = _takes(action, column, theirs)
+            const take = whole ? theirs : value
+            const give = whole || column === "pad" ? mine : { key: mine.key, mouse: theirs.mouse }
+            if (!_takes(other, column, give)) return refused("held", other)
+            _put(next, action, column, take)
+            _put(next, other, column, give)
+        } else {
+            _put(next, action, column, value)
+        }
+        bindings = next
+        save()
+        return { taken: true, swapped: other, reason: "", holder: "" }
+    }
+    function _put(table, action, column, value) {
+        if (column === "pad") {
+            table[action].pad = value
+        } else {
+            table[action].key = value.key
+            table[action].mouse = value.mouse
+        }
+    }
+    // The defaults of one column back, the other column kept, kept
+    function resetColumn(column) {
+        let next = JSON.parse(JSON.stringify(bindings))
+        for (const a in next) {
+            if (column === "pad") {
+                next[a].pad = defaults[a].pad
+            } else {
+                next[a].key = defaults[a].key
+                next[a].mouse = defaults[a].mouse
+            }
+        }
+        bindings = next
         save()
     }
 
@@ -217,6 +328,22 @@ QtObject {
         const p = padName(pad(action === "move" ? "moveUp" : action), padLabel)
         return p !== "" ? p : keysName(action)
     }
+    // An action's own binding as the Control Input page shows it (issue
+    // #220), "" for none. On the mouse and keyboard its key and mouse
+    // button, "F / MMB", the aim "Mouse"; on the pad its input, a move as
+    // the left stick and the D-pad in its direction, "L stick / D-pad up"
+    function keysBindingName(action) {
+        const a = actions.find(x => x.id === action)
+        if (a && a.pointer) return "Mouse"
+        return [keyName(key(action)), mouseName(mouse(action))].filter(n => n !== "").join(" / ")
+    }
+    function padBindingName(action, padLabel) {
+        const input = pad(action)
+        const ways = { "axisY+": "up", "axisX-": "left", "axisY-": "down", "axisX+": "right" }
+        if (ways[input]) return "L stick / D-pad " + ways[input]
+        return padName(input, padLabel)
+    }
+
     // What action is bound to on the device in use: the pad's while one is
     // in use (onPad)
     function name(action, onPad, padLabel) {

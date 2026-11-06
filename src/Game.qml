@@ -1934,6 +1934,25 @@ ClayWorld2d {
     function closeMenu() {
         menuOpen = false
     }
+    // The Control Input page (issue #220), over the pause menu or the title;
+    // closed, the menu under it has the focus again. It goes when that menu
+    // goes: the run resumed, left or ended
+    property bool controlInputOpen: false
+    readonly property bool _controlInputCan: screen === "title" || (screen === "game" && menuOpen && !fallen)
+    on_ControlInputCanChanged: if (!_controlInputCan) controlInputOpen = false
+    function openControlInput() {
+        if (_controlInputCan) controlInputOpen = true
+    }
+    // The page waits for the input that rebinds a cell (issue #221): no
+    // pad press does its action meanwhile
+    readonly property bool rebinding: controlInputOpen && !!controlInputLoader.item
+                                      && controlInputLoader.item.capturing !== ""
+    function closeControlInput() {
+        if (!controlInputOpen) return
+        controlInputOpen = false
+        let under = screen === "title" ? titleLoader.item : pauseLoader.item
+        if (under) under.forceActiveFocus()
+    }
     // Where the keys or the touch pad steer the knight, -1..1 on each axis;
     // every level binds its knight to these. While a dialogue is open the
     // knight stands, so it cannot walk off and leave the panel up, and a
@@ -1995,6 +2014,7 @@ ClayWorld2d {
         dialogue: dialoguePanel
         controls: controlTable
         enabled: !world.touchControls
+        onInputPressed: (name) => { if (controlInputLoader.item) controlInputLoader.item.padInput(name) }
     }
     readonly property bool padInUse: knightPad.inUse
     // The key or pad button that talks, for the prompts over NPCs and
@@ -2011,6 +2031,7 @@ ClayWorld2d {
     // Start does what Esc does
     function _padMenu() {
         if (masterOpen) return masterLoader.item
+        if (controlInputOpen && controlInputLoader.item) return controlInputLoader.item
         if (screen === "title") return titleLoader.item
         if (screen === "lobby") return session.lobby
         if (screen === "game" && fallen) return fallenLoader.item
@@ -2039,8 +2060,9 @@ ClayWorld2d {
         onStarted: {
             let m = world._padMenu()
             if (m) {
-                // Start resumes from the pause menu, elsewhere it confirms
-                if (m === pauseLoader.item) m.padBack()
+                // Start resumes from the pause menu and leaves the Control
+                // Input page, elsewhere it confirms
+                if (m === pauseLoader.item || m === controlInputLoader.item) m.padBack()
                 else if (m !== fallenLoader.item && m.padConfirm) m.padConfirm()
             }
             else if (talking) dialoguePanel.close()
@@ -8464,6 +8486,7 @@ ClayWorld2d {
         active: menuOpen && screen === "game" && !fallen
         sourceComponent: Component {
             PauseMenu {
+                visible: !world.controlInputOpen
                 inSession: session.connected
                 pad: world.padInUse
                 padLabels: world.padLabels
@@ -8473,6 +8496,7 @@ ClayWorld2d {
                 onVolumeSet: (which, value) => world.setVolume(which, value)
                 onResume: world.closeMenu()
                 onToTitle: world.backToTitle()
+                onControlInput: world.openControlInput()
             }
         }
     }
@@ -8526,8 +8550,34 @@ ClayWorld2d {
                 joinedLine: campFreed.joinedLine
                 dungeonMaster: world.dungeonMaster
                 onDungeonMasterToggled: world.setDungeonMaster(!world.dungeonMaster)
+                covered: world.controlInputOpen
                 onSinglePlayerSelected: screen = "game"
                 onMultiplayerSelected: screen = "lobby"
+                onControlInputSelected: world.openControlInput()
+            }
+        }
+    }
+
+    // The Control Input page (over the pause menu and the title, under the
+    // dungeon master's panel)
+    Loader {
+        id: controlInputLoader
+        anchors.fill: parent
+        z: 5100
+        active: world.controlInputOpen
+        sourceComponent: Component {
+            ControlInputPage {
+                controls: controlTable
+                inSession: session.connected
+                pad: world.padInUse
+                padLabels: world.padLabels
+                padLabel: b => knightPad.label(b)
+                padTaking: knightPad.takingPad
+                gamepads: gameCtrl.gamepads
+                gamepad: gameCtrl.gamepad
+                muteKey: controlTable.key("mute")
+                onKeyUsed: knightPad.keyboardUsed()
+                onClosed: world.closeControlInput()
             }
         }
     }

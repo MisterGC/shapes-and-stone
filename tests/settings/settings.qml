@@ -119,7 +119,8 @@ Window {
         }],
         [() => shown("pauseMenu") !== null && shown("pauseMenu").activeFocus, () => {
             let m = shown("pauseMenu")
-            check(m.choices.join(",") === "Resume,Music,Sound,Title", "the menu has Resume, Music, Sound, Title")
+            check(m.choices.join(",") === "Resume,Music,Sound,Control Input,Title",
+                  "the menu has Resume, Music, Sound, Control Input, Title")
             check(find(m, "pauseVolumeMusic").text === "100%", "Music shows 100%")
             press(Qt.Key_S)
             press(Qt.Key_A)
