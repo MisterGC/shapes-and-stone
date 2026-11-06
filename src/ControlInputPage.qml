@@ -15,9 +15,10 @@ import QtQuick
 // input - in the mouse and keyboard column a key or a mouse button, in the
 // gamepad column a pad button - and is rebound to it (ControlTable.rebind):
 // one another action has trades cells with it. Esc or the pad's B cancels,
-// and so does an input of the other column's device. The pad coming into
-// use - its first press on the page - and a pad press that cancels put the
-// pick on the gamepad's column; that first press chooses nothing. The
+// and so does an input of the other column's device. A pad press that
+// takes the pad from the mouse and keyboard - its first on the page, and
+// each after a key - only takes it and puts the pick on the gamepad's
+// column; it chooses nothing. A pad press that cancels puts it there too. The
 // menu, the aim and the pad's moves stay fixed, so nobody locks themselves
 // out of the menu. A Reset puts its column's defaults back. Every change
 // is kept at once.
@@ -46,6 +47,11 @@ Item {
     property var padLabels: ({ A: "A", B: "B", X: "X", Y: "Y" })
     // What a pad input is printed with on the selected pad (KnightPad.label)
     property var padLabel: null
+    // A press on a pad is making it the controller's source
+    // (KnightPad.takingPad): that press only takes the pad. It does not
+    // choose the cell or the Reset of the mouse and keyboard column picked
+    // before, by the keys or by the resting mouse
+    property bool padTaking: false
     // The connected pads (GameController.gamepads) and the selected one
     // (GameController.gamepad), null for none
     property var gamepads: []
@@ -197,11 +203,12 @@ Item {
         }
     }
 
-    // The pad comes into use on the page: the pick goes to its column. On
-    // the title that is the pad's first press - in the browser the one that
-    // lists it (issue #236). A pick on a Reset or Back, where a click left
-    // the resting mouse, goes up to the first action whose pad cell can be
-    // rebound, so the pad's next A picks a cell and resets nothing
+    // The pad comes into use on the page: the pick goes to its column. That
+    // is a pad press after a key, or the pad's first press - in the browser
+    // the one that lists it (issue #236). A pick on a Reset or Back, where a
+    // click left the resting mouse, goes up to the first action whose pad
+    // cell can be rebound, so the pad's next A picks a cell and resets
+    // nothing
     onPadChanged: {
         if (!pad || capturing !== "") return
         pickColumn(1)
@@ -210,12 +217,6 @@ Item {
             pick(first >= 0 ? first : 0)
         }
     }
-    // A press on a pad is making it the controller's source
-    // (KnightPad.takingPad): that press only takes the pad. It does not
-    // choose the cell or the Reset of the mouse and keyboard column picked
-    // before, by the keys or by the resting mouse
-    property bool padTaking: false
-
     // The gamepad (MenuPad): the stick picks a row and a column, A
     // chooses, B and Start go back. While a cell waits its presses are
     // padInput's
