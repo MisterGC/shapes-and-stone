@@ -5,7 +5,8 @@ import Clayground.GameController
 // the pad's name at the top of the screen, on the title, in the lobby and
 // in a game, in the pause menu's look. A pad that was driving the knight
 // and is unplugged says the keyboard and mouse play again. A pad the
-// browser lists but cannot read (Firefox, clayground's "unsupported" type)
+// browser lists but cannot read (clayground's "unsupported" type: a Switch
+// pad in Firefox on macOS or Windows)
 // says to use Chrome. titleLine is the title's standing line about pads:
 // in the browser, where a pad is only listed after a press on it, "press a
 // button on your gamepad" until one is.

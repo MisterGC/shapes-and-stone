@@ -594,9 +594,9 @@ game (`src/PadNotice.qml`); a pad that drove the knight and is unplugged
 adds that the keyboard and mouse play now. Pads already there when the
 game starts get their notice too. In the browser a pad is only listed after
 a press on it, so the title says "Press a button on your gamepad to use it" until one
-is; a pad the browser lists but cannot read - Firefox, Clayground's
-`unsupported` pad type - gets a notice and a title line that say to use
-Chrome. The pad notice bench plugs in and unplugs virtual pads on
+is; a pad the browser lists but cannot read - a Switch pad in Firefox on
+macOS or Windows, Clayground's `unsupported` pad type - gets a notice and a
+title line that say to use Chrome. The pad notice bench plugs in and unplugs virtual pads on
 Clayground's `GamepadHub`, on the title and in a game, checks each notice,
 that the keyboard drives again after the driving pad left and that the
 notices go, checks the title's line for the browser and a native build,
