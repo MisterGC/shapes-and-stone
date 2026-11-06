@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **A gamepad plays in Firefox:** the browser version runs on Clayground v2026.11.1, which reads a pad in Firefox wherever Firefox reads it cleanly - every pad on Linux, every pad but Nintendo's Switch pads on macOS and Windows. Such a Switch pad is listed on the Control Input page with "no input in this browser" and plays in Chrome. (#240)
+
 ## [0.4.1] - 2026-11-01
 
 The browser version has its sound again.

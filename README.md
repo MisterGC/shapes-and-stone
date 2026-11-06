@@ -96,8 +96,9 @@ the potion's button buys it and the dash's closes the dialogue.
 keyboard, the mouse and each connected gamepad by name, the one in use
 marked, and every action with its key or mouse button and its gamepad
 button side by side. In the browser a gamepad is listed once one of its
-buttons was pressed on the page; Firefox lists it but reads none of its
-input yet.
+buttons was pressed on the page. Firefox reads a pad as Chrome does, except
+Nintendo's Switch pads on macOS and Windows, which it misreads: such a pad
+is listed with "no input in this browser" and plays in Chrome.
 
 To rebind a control, pick its cell - W/S and A/D, the stick, or the mouse -
 and choose it with Enter, A or a click; then press the new key or mouse
@@ -2058,7 +2059,7 @@ python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10
 `.github/workflows/pages.yml` does the same with the runtime of a Clayground
 release and, when the check passes, puts `build/web/` on GitHub Pages. It
 runs by hand (*Run workflow*, with the Clayground release to take the
-runtime from, `v2026.11` by default) and when a release of the game is
+runtime from, `v2026.11.1` by default) and when a release of the game is
 published, never on a push. Pages must be set to deploy from GitHub Actions
 (*Settings > Pages > Source*).
 
