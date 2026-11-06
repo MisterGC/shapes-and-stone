@@ -426,9 +426,14 @@ Window {
         id: script
         property int i: 0
         property real waitedMs: 0
+        // A step is running: a key click spins the event loop, and on Linux
+        // offscreen it spins long enough for this timer to come due inside
+        // it. The next step must not run then, before this one is through
+        property bool inStep: false
         interval: 20
         repeat: true
         onTriggered: {
+            if (inStep) return
             let step = bench.steps[i]
             waitedMs += interval
             let ready = typeof step[0] === "number" ? waitedMs >= step[0] : step[0]()
@@ -442,11 +447,14 @@ Window {
                 return
             }
             waitedMs = 0
-            // Advance first: a key click spins the event loop, and this
-            // timer must not run the same step again inside it
             i++
             if (i >= bench.steps.length) stop()
-            step[1]()
+            inStep = true
+            try {
+                step[1]()
+            } finally {
+                inStep = false
+            }
         }
     }
 }
