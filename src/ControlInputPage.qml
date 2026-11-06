@@ -477,11 +477,16 @@ Item {
             }
         }
 
-        // While a cell waits what it takes, else what the last choice did
+        // While a cell waits what it takes, else what the last choice did.
+        // Its line stays when it is empty - a Column leaves out an item of
+        // no width - so the table does not move under a resting mouse when
+        // a note appears or clears
         Text {
             objectName: "controlPrompt"
             anchors.horizontalCenter: parent.horizontalCenter
+            width: rows.width
             height: 18
+            horizontalAlignment: Text.AlignHCenter
             text: page.capturing === "keys"
                   ? (page.isMove(page.captureAction) ? "Press a key for " : "Press a key or mouse button for ")
                     + page.titleOf(page.captureAction)
