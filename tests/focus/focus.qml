@@ -141,7 +141,8 @@ Window {
     ]).concat(holdD("the fallen screen goes again")).concat([
         [0, () => press(Qt.Key_Escape)],
         [() => shown("pauseMenu") !== null && shown("pauseMenu").activeFocus, () => {
-            // Down past Music and Sound to Title
+            // Down past Music, Sound and Control Input to Title
+            press(Qt.Key_S)
             press(Qt.Key_S)
             press(Qt.Key_S)
             press(Qt.Key_S)
