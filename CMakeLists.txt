@@ -56,7 +56,7 @@ endforeach()
 
 clay_app(shapes_and_stone
 
-    VERSION 0.4.1
+    VERSION 0.4.2
 
     LINK_LIBS
         Qt::Core
@@ -111,9 +111,12 @@ clay_app(shapes_and_stone
         src/TitleScreen.qml
         src/FallenScreen.qml
         src/PauseMenu.qml
+        src/ControlInputPage.qml
         src/MenuPad.qml
         src/KnightPanel.qml
         src/KnightPad.qml
+        src/ControlTable.qml
+        src/PadNotice.qml
         src/SongMusic.qml
         src/AmbienceBed.qml
         src/MultiplayerLobby.qml

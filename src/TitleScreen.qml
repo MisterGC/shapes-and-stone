@@ -9,6 +9,9 @@ Item {
     // The third row: the dungeon master's panel before each dungeon, on
     // or off (Game.dungeonMaster); Enter or a click turns it over
     signal dungeonMasterToggled()
+    // The fourth row: the Control Input page (issue #220) is to open over
+    // the title
+    signal controlInputSelected()
     property bool dungeonMaster: false
     // A pad in use (Game.padInUse): the hint names its buttons, as printed
     // on it (Game.padLabels)
@@ -20,8 +23,12 @@ Item {
     property real musicVolume: 1
     property real soundVolume: 1
     property int _selectedIndex: 0
+    readonly property var choices: ["Single Player", "Multiplayer", "Dungeon Master", "Control Input"]
     // Why the game came back here, e.g. the host was lost; "" for none
     property string message: ""
+    // What the title says about gamepads (PadNotice.titleLine): in the
+    // browser, to press a button on one; "" for nothing
+    property string padLine: ""
     // The deepest descent kept on this machine (Game.recordLine); "" for none
     property string recordLine: ""
     // Who was freed tonight and the specials with the camps (CampFreed);
@@ -93,8 +100,10 @@ Item {
         }
     }
 
-    // Menu buttons
+    // Menu buttons, hidden under the Control Input page
+    property bool covered: false
     Column {
+        visible: !titleScreen.covered
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: parent.height * 0.08
@@ -146,7 +155,7 @@ Item {
         }
 
         Repeater {
-            model: ["Single Player", "Multiplayer", "Dungeon Master"]
+            model: titleScreen.choices
             delegate: Rectangle {
                 id: btn
                 objectName: "titleChoice" + index
@@ -188,6 +197,15 @@ Item {
         }
 
         Text {
+            objectName: "titlePadLine"
+            visible: titleScreen.padLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.padLine
+            color: "#AAAAAA"
+            font.pixelSize: 13
+        }
+
+        Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: titleScreen.pad
                   ? "Up/down to navigate \u2022 " + titleScreen.padLabels.A + " to select"
@@ -205,7 +223,7 @@ Item {
             if (_selectedIndex > 0) { _selectedIndex--; menuHoverSound.play() }
             event.accepted = true
         } else if (event.key === Qt.Key_S || event.key === Qt.Key_Down) {
-            if (_selectedIndex < 2) { _selectedIndex++; menuHoverSound.play() }
+            if (_selectedIndex < choices.length - 1) { _selectedIndex++; menuHoverSound.play() }
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
                    || event.key === Qt.Key_Space) {
@@ -217,7 +235,7 @@ Item {
     // The gamepad (MenuPad): up and down pick, A or Start selects
     function padMove(dx, dy) {
         _startMusic()
-        let next = Math.max(0, Math.min(2, _selectedIndex - dy))
+        let next = Math.max(0, Math.min(choices.length - 1, _selectedIndex - dy))
         if (next !== _selectedIndex) { _selectedIndex = next; menuHoverSound.play() }
     }
     function padConfirm() {
@@ -247,6 +265,11 @@ Item {
         if (_selectedIndex === 2) {
             menuHoverSound.play()
             dungeonMasterToggled()
+            return
+        }
+        if (_selectedIndex === 3) {
+            menuConfirmSound.play()
+            controlInputSelected()
             return
         }
         _pendingSelection = _selectedIndex

@@ -27,6 +27,8 @@ RectBoxBody {
     // "closed", "open" or "bashed"
     property string doorState: "closed"
     property bool prompt: false
+    // The key or pad button that opens it (Game.talkKey)
+    property string talkKey: "E"
 
     readonly property bool shut: doorState === "closed"
     readonly property var _wood: ["#6E4A28", "#5A4A3A", "#45291A"][band]
@@ -111,13 +113,13 @@ RectBoxBody {
         color: Qt.darker(door._wood, 1.3)
     }
 
-    // E for this node's knight in reach
+    // The talk key for this node's knight in reach
     Text {
         visible: door.prompt
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.top
         anchors.bottomMargin: 4
-        text: "E"
+        text: door.talkKey
         color: "#F0E6C8"
         font.pixelSize: 14
         font.bold: true

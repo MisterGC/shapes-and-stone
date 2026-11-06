@@ -1,5 +1,5 @@
 // Pause bench - a first-time player sees the controls at depth 0, and Esc
-// opens a menu with Resume, Music, Sound and Title (issue #39).
+// opens a menu with Resume, Music, Sound, Control Input and Title (issue #39).
 //
 // Alone: at depth 0 the controls hint names LMB and its hold to charge,
 // RMB, Space for the dash (not Shift), E, M and Esc, and deeper it is gone. With D held, Esc opens
@@ -134,11 +134,12 @@ Window {
         [() => solo.player && solo.enemies.length > 0, () => {
             standUp(solo)
             let hint = shown(solo, "controlsHint")
-            let text = hint ? hint.text : ""
+            // Each item is kept whole on its line with no-break spaces
+            let text = hint ? hint.text.replace(/\u00A0/g, " ") : ""
             check(hint !== null && solo.depth === 0, "at depth 0 the controls hint is shown")
             for (let k of ["LMB", "hold to charge", "RMB", "Space dash", "E talk", "M mute", "Esc"])
                 check(text.indexOf(k) >= 0, "the hint names " + k + " (" + text + ")")
-            // Space dashes (KeyboardGamepad sets buttonB from the A key), Shift does nothing
+            // Space dashes (the control table's dash), Shift does nothing
             check(text.indexOf("Shift") < 0, "the hint does not name Shift (" + text + ")")
             check(menu(solo) === null && !solo.menuOpen, "no menu before Esc")
             hold(solo, Qt.Key_D)
@@ -204,7 +205,8 @@ Window {
             press(menu(solo), Qt.Key_S)
             press(menu(solo), Qt.Key_S)
             press(menu(solo), Qt.Key_S)
-            check(menu(solo).selectedIndex === 3, "S three times picks Title, past Music and Sound")
+            press(menu(solo), Qt.Key_S)
+            check(menu(solo).selectedIndex === 4, "S four times picks Title, past Music, Sound and Control Input")
             press(menu(solo), Qt.Key_Return)
         }],
         [() => solo.screen === "title", () => {
@@ -331,6 +333,7 @@ Window {
             press(host, Qt.Key_Escape)
         }],
         [() => menu(host) !== null && menu(host).activeFocus, () => {
+            press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)

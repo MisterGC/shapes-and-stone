@@ -69,6 +69,52 @@ Game* and tells the others the code shown, they type it and click *Join
 Game*. A native game that hosts with *Internet* takes browser players too;
 a LAN code does not work in the browser.
 
+**Controls:** the knight plays with the mouse and keyboard or with a
+gamepad, whichever was used last. By default:
+
+| Action | Mouse and keyboard | Gamepad |
+|--------|--------------------|---------|
+| Move | W, A, S, D | left stick or D-pad |
+| Aim | the mouse | right stick |
+| Strike (hold to charge, at a vein dig, at a pond cast) | left button | R1 |
+| Shield | right button | L1 |
+| Dash | Space | B |
+| Whirlwind | Q | R2 |
+| Talk, open a door | E | A |
+| Potion | 1 | X |
+| Draught | 2 | Y |
+| Lock on an enemy | F or middle button | L2 |
+| Knight panel | C | Select |
+| Mute | M | - |
+| Effects on and off | V | - |
+| Menu | Esc | Start |
+
+In a dialogue 1 to 5 buy what is offered; on a pad the stick picks a ware,
+the potion's button buys it and the dash's closes the dialogue.
+
+*Control Input*, in the menu under *Sound* and on the title, shows the
+keyboard, the mouse and each connected gamepad by name, the one in use
+marked, and every action with its key or mouse button and its gamepad
+button side by side. In the browser a gamepad is listed once one of its
+buttons was pressed on the page. Firefox reads a pad as Chrome does, except
+Nintendo's Switch pads on macOS and Windows, which it misreads: such a pad
+is listed with "no input in this browser" and plays in Chrome.
+
+To rebind a control, pick its cell - W/S and A/D, the stick, or the mouse -
+and choose it with Enter, A or a click; then press the new key or mouse
+button in the *Mouse and keyboard* column, or the new pad button in the
+*Gamepad* column. A key or button another action has trades places with
+it: that action gets what this one had. Esc or the pad's B cancels. A
+pad press that takes the pad from the mouse and keyboard - its first on
+the page, in the browser the one that lists it, and each one after a key -
+only takes the pad and moves the pick to the *Gamepad* column, off a
+*Reset* or *Back* to the first action it can rebind; its next A picks the
+cell there.
+*Reset to defaults* under a column puts that column's defaults back. The
+menu stays on Esc and Start, the aim on the mouse and the right stick, and
+the moves on the left stick, so nobody locks themselves out. A change is
+kept at once and survives a restart and, in the browser, a reload.
+
 ---
 
 ## BUILD
@@ -95,7 +141,7 @@ ctest --test-dir build -R '^testshapes_and_stone$' --output-on-failure
 Every push and PR also runs the quick benches: each bench that finishes in
 about 30 s offscreen, one after the other. A bench that fails a check, does
 not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
-`pause`, `fallen`, `focus`, `gamepad`, `downed`, `joinleave`, `gold`,
+`pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
 `dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
@@ -132,6 +178,8 @@ The other benches run by hand, each with the command in its section below:
   `talkparty`, `masterparty`, `padknight`, `netbench` and the fight bench
   (`run_fightbench.py`, `run_reload.py`); `--mode cloud` needs the internet.
 - `deck`, through `clayrender` in a graphics session.
+- `browserpad`, the browser game in Chromium through Playwright, and
+  `firefoxpad`, the same in Firefox.
 
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
@@ -349,11 +397,110 @@ QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/l
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/fightmusic/fightmusic.qml
 ```
 
-At depth 0 a line at the bottom of the screen names the controls: WASD,
-LMB strike (hold to charge, at a vein dig), RMB shield, Space dash, E talk, 1
-potion, 2 draught, M mute and Esc menu. F or the middle button locks on an
-enemy (see target lock).
-Esc opens a menu with Resume and Title. Alone it pauses the game: the
+Every control comes from one table, `src/ControlTable.qml`: per action its
+key and mouse button, and its gamepad input. The game's key handler and
+mouse area, the pad (`src/KnightPad.qml`), the pad's Start in the menus,
+the swing's `InputAction` and every hint that names a control read it. The
+player's table is kept with the record as JSON under `controls`; with
+nothing kept, or for an action or field missing or not valid there, the
+defaults apply - the controls in the table under PLAY. The pad's sticks
+move and aim and are not rebound: they reach the game as the controller's
+axes only. The controls bench rebinds a key, the moves, the shield, a mouse
+button and two pad buttons and checks that the game follows each, that the
+hints name every action, that the table is kept and loaded by a new game,
+and that what is missing in it has its default; it exits with the number
+of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controls/controls.qml
+```
+
+The Control Input page (`src/ControlInputPage.qml`) reads the same table:
+a row per action with its title, its key and mouse button and its pad
+input, and above them the devices - Keyboard, Mouse and each pad of
+`GameController.gamepads` by name - with the ones in use marked. It opens
+from the pause menu and the title and goes back to the one it came from.
+The gamepad bench walks it with the pad; the control input bench opens and
+closes it from both by keyboard and mouse, checks every row against the
+table, plugs in a virtual pad (where the build reads pads), finds it listed
+and marked in use after a press and gone once unplugged, and with an out
+dir after `--` saves the page over the title and over the pause menu at
+1280x800. It also checks that the pad's A, taking the pad, moves the pick to
+the gamepad's column and chooses nothing, that a pad press cancelling a
+key wait moves it there too, that with the mouse resting on the mouse and
+keyboard column's Reset the pad rebinds Strike twice, the table in its
+place and the pick in the gamepad's column, and that a Nintendo pad without
+labels has its face buttons named B, A, Y and X from the bottom one round:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controlinput/controlinput.qml [-- <out dir>]
+```
+
+The browser pad bench runs the browser game (`build/web`, from
+`packaging/web-bundle.py`) in headless Chromium with a stand-in for
+`navigator.getGamepads()` shaped like Chrome's: no pad until a button is
+pressed on it, then the pad in its slot with that press down, and a fresh
+snapshot on every call. On the title a click opens Control Input, the mouse
+left over the mouse and keyboard column's Reset; the pad's first A lists it
+by name and in use and chooses nothing, its next A makes Strike's gamepad
+cell wait, resetting nothing, and Y rebinds it, and no game starts. The pad
+is a Pro Controller: the hint names its bottom button B and its right one
+A, and the right one cancels a waiting cell. It reads the
+page from the lines it prints to the console (`[ControlInputPage]
+devices: ...`, `prompt: ...`), exits with the number of failed checks and
+needs Playwright with Chromium; `--out` keeps the console and a screenshot
+per step:
+
+```
+python3 tests/browserpad/browserpad.py build/web [--out <dir>] [--headed] [--chromium <executable>]
+```
+
+The Firefox pad bench does the same in Playwright's Firefox, with the pads
+named as Firefox names them (`045e-02ea-Xbox Wireless Controller`). An Xbox
+pad's first press lists it by name and in use, without "no input in this
+browser", its next A makes Strike's gamepad cell wait and its B cancels
+that. A Pro Controller pressed beside it is listed with no input on macOS
+and Windows, where Firefox misreads the Switch pads, and clean on Linux.
+It needs a runtime from Clayground v2026.11.1 on, the first that reads a
+pad in Firefox (clayground#474), and Playwright with Firefox
+(`python -m playwright install firefox`):
+
+```
+python3 tests/firefoxpad/firefoxpad.py build/web [--out <dir>] [--headed] [--firefox <executable>]
+```
+
+On the page a chosen cell waits for the next input and rebinds to it
+(`ControlTable.rebind`): the cell then holds that input alone, an input it
+has already keeps it as it is, and when another action holds it the two
+actions trade their cells - where a move takes a key from an action with a
+mouse button too, the keys alone, the other keeping its mouse button. The
+rebind bench rebinds the dash to K by keyboard, the strike to the right button by a
+click - the shield had it and moves to the left button - and the potion to
+the pad's Y, the draught's, and checks that the game follows each: K
+dashes and Space no longer does, the right button swings, the left one
+shields, Y drinks a potion. It checks that the button that chose a cell is
+not taken, that Esc and the pad's B cancel, that a pad press cancels a key
+cell's wait and a mouse press a pad cell's, that the menu stays fixed and
+a move takes no mouse button, that the move up takes F from the lock,
+which keeps its middle button, that the strike's cell does not take F
+then, as the move would get the right button, and that each column's
+Reset puts its own defaults back; every change is kept at once. With an
+out dir after `--` it saves the page while a cell waits:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/rebind/rebind.qml [-- <out dir>]
+```
+
+In the browser Clayground.Storage writes what is kept to IndexedDB in the
+background, and a page reloaded during that write would lose the change;
+the bundle's page asks before leaving while a write is under way
+(`window.clayStorage.busy`, `packaging/web-bundle.py`).
+
+At depth 0 a line at the bottom of the screen names the controls: every
+action of the table with its key or mouse button, or its pad button while a
+pad is in use, the moves as one ("WASD move").
+Esc opens a menu with Resume, the Music and Sound volumes, Control Input
+and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
 would stop every player's enemies: the menu says the party fights on and
@@ -368,7 +515,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pause/pause.qml
 
 A gamepad plays the knight too, through Clayground's `GameController` in its
 `full` layout (`src/KnightPad.qml`): the left stick or the D-pad moves, the
-right stick aims - at rest the knight faces the way it walks - R1 strikes
+right stick aims - at rest the knight faces the way it walks - and each
+button does what the control table binds it to, by default: R1 strikes
 (hold to charge, at a vein dig, at a pond cast), L1 shields, B dashes, A
 talks, X drinks a potion, Y a draught, R2 whirls, L2 locks on and Select
 opens the knight panel. In a dialogue A goes on, the stick picks a ware, X
@@ -378,6 +526,11 @@ controls hint, the talk prompts and the dialogue name the pad's buttons from
 its first input to the next key press - A, B, X and Y as printed on the pad,
 Cross on a PlayStation pad. Moving the mouse gives the aim back to the mouse. Buttons
 count by position, so the bottom face button is A whatever it is labelled.
+The browser gives no labels, so there a Nintendo pad - one that calls
+itself a Pro Controller, a Joy-Con or Nintendo's - has its bottom, right,
+left and top buttons named B, A, Y and X, as printed on it: B rebinds and A
+cancels on the Control Input page. That is a workaround until Clayground
+gives the browser's pads their labels (clayground#501).
 On iOS and Android the touch pad stays the controller. The pad knight bench
 plays the dojo's `dungeon` scenario in Clayground's live loader with the
 dojo's synthetic pad alone - the inspector's gamepad input, no key and no
@@ -433,6 +586,24 @@ of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gamepad/gamepad.qml
+```
+
+When a gamepad connects or is unplugged a short notice at the top of the
+screen says so with the pad's name, on the title, in the lobby and in a
+game (`src/PadNotice.qml`); a pad that drove the knight and is unplugged
+adds that the keyboard and mouse play now. Pads already there when the
+game starts get their notice too. In the browser a pad is only listed after
+a press on it, so the title says "Press a button on your gamepad to use it" until one
+is; a pad the browser lists but cannot read - a Switch pad in Firefox on
+macOS or Windows, Clayground's `unsupported` pad type - gets a notice and a
+title line that say to use Chrome. The pad notice bench plugs in and unplugs virtual pads on
+Clayground's `GamepadHub`, on the title and in a game, checks each notice,
+that the keyboard drives again after the driving pad left and that the
+notices go, checks the title's line for the browser and a native build,
+and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/padnotice/padnotice.qml
 ```
 
 The Steam Deck's screen is 1280x800, and every text a player reads is at
@@ -1929,7 +2100,7 @@ python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10
 `.github/workflows/pages.yml` does the same with the runtime of a Clayground
 release and, when the check passes, puts `build/web/` on GitHub Pages. It
 runs by hand (*Run workflow*, with the Clayground release to take the
-runtime from, `v2026.11` by default) and when a release of the game is
+runtime from, `v2026.11.1` by default) and when a release of the game is
 published, never on a push. Pages must be set to deploy from GitHub Actions
 (*Settings > Pages > Source*).
 

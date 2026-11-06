@@ -1,6 +1,12 @@
 // Gamepad bench - every menu works with a gamepad (issue #201), driven by
 // the synthetic pad alone: no key is pressed and nothing is clicked.
 //
+// On the title the stick goes down to Control Input and A opens the page
+// (issue #220): the stick picks its rows, B goes back to the title, and
+// opened again Start does. In the pause menu A on Control Input opens the
+// page over it, the game still paused; B goes back to the menu and, opened
+// again, Start does without resuming.
+//
 // The pad is clayground's SyntheticGamepad on the game's controller, fed
 // the way the dojo inspector's gamepad input feeds it. On the title the
 // stick moves the focus and A turns the dungeon master on, then A goes to
@@ -98,6 +104,7 @@ Window {
         return c !== null && c.isCurrent
     }
     function menu() { return shown("pauseMenu") }
+    function controlPage() { return shown("controlInputPage") }
     function panel() { return shown("dungeonMasterPanel") }
     function lobby() { return solo.screen === "lobby" ? solo.data.find(d => d.lobby !== undefined).lobby : null }
     function net() { return lobby() ? lobby().network : null }
@@ -115,6 +122,33 @@ Window {
             check(solo.gameController.layout === "full", "off touch the controller has the full layout ("
                   + solo.gameController.layout + ")")
         }]],
+        // The Control Input page (issue #220): A on the title's row opens
+        // it, the stick picks a row, B and Start each go back to the title
+        down(), down(), down(),
+        [[0, () => check(titleAt(3), "down three times on the title moves to Control Input")]],
+        a(),
+        [[() => controlPage() !== null, () => {
+            check(solo.screen === "title" && solo.controlInputOpen, "A on Control Input opens the page over the title")
+            check(find(controlPage(), "controlHint").text.indexOf("or Start to go back") !== -1,
+                  "its hint names the pad's buttons")
+        }]],
+        down(), down(),
+        [[0, () => check(controlPage().selectedIndex === 2, "down twice picks the third row ("
+                         + controlPage().selectedIndex + ")")]],
+        up(),
+        [[0, () => check(controlPage().selectedIndex === 1, "up picks the second row")]],
+        b(),
+        [[() => controlPage() === null, () => {
+            check(solo.screen === "title" && titleAt(3), "B goes back to the title, on Control Input")
+        }]],
+        a(),
+        [[() => controlPage() !== null, () => {}]],
+        start(),
+        [[() => controlPage() === null, () => {
+            check(solo.screen === "title" && titleAt(3), "Start on the page goes back to the title too")
+        }]],
+        up(), up(), up(),
+        [[0, () => check(titleAt(0), "up three times goes back to Single Player")]],
         down(),
         [[0, () => check(titleAt(1), "down on the title moves to Multiplayer")]],
         down(),
@@ -184,7 +218,26 @@ Window {
         start(),
         [[() => menu() !== null, () => {}]],
         down(), down(), down(),
-        [[0, () => check(menu().selectedIndex === 3, "down three times picks Title")]],
+        [[0, () => check(menu().selectedIndex === 3, "down three times in the menu picks Control Input")]],
+        a(),
+        [[() => controlPage() !== null, () => {
+            check(menu() === null && solo.menuOpen && solo.gamePaused,
+                  "A on Control Input opens the page over the pause menu, the game still paused")
+        }]],
+        down(),
+        [[0, () => check(controlPage().selectedIndex === 1, "down picks the page's second row")]],
+        b(),
+        [[() => controlPage() === null && menu() !== null, () => {
+            check(solo.menuOpen && menu().selectedIndex === 3, "B goes back to the pause menu, on Control Input")
+        }]],
+        a(),
+        [[() => controlPage() !== null, () => {}]],
+        start(),
+        [[() => controlPage() === null && menu() !== null, () => {
+            check(solo.menuOpen && solo.gamePaused, "Start on the page goes back to the pause menu, it does not resume")
+        }]],
+        down(),
+        [[0, () => check(menu().selectedIndex === 4, "down once more picks Title")]],
         a(),
         [[() => solo.screen === "title" && titleAt(0), () => {
             check(solo.player === null && !solo.menuOpen, "A on Title clears the run and goes to the title")

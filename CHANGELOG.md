@@ -6,6 +6,29 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-06
+
+Every control can be rebound, for mouse and keyboard and for a gamepad, on a new Control Input page; the game says when a gamepad connects or leaves; and in the browser a gamepad plays in Firefox too. Built on Clayground v2026.11.1.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser.
+
+### Added
+
+- **Control Input page:** under Sound in the pause menu and on the title, a page lists the devices there are - keyboard, mouse and each gamepad by name, the one in use marked - and every control side by side, for mouse and keyboard and for a gamepad. ([#220](https://github.com/MisterGC/shapes-and-stone/issues/220))
+- **Rebind any control:** pick a control in either column and press the new key, mouse button or pad button. A binding another control already has swaps with it, Esc or B cancels, and *Reset* under each column brings its defaults back; opening the menu stays fixed so nobody locks themselves out. Every change is saved at once, so it survives a restart and a browser reload. ([#221](https://github.com/MisterGC/shapes-and-stone/issues/221), [#242](https://github.com/MisterGC/shapes-and-stone/issues/242))
+- **Gamepad notices:** a short notice names a gamepad when it connects or leaves, on the title, in the lobby and in a game; when the pad that played leaves, it says the keyboard and mouse play now. In the browser the title asks you to press a button on your pad until the browser lists it. ([#219](https://github.com/MisterGC/shapes-and-stone/issues/219))
+
+### Changed
+
+- **One table for every control:** the keys, the mouse, the gamepad, the swing and every controls hint read the same table, so the hints now also name F, V and the middle mouse button. ([#218](https://github.com/MisterGC/shapes-and-stone/issues/218))
+- **A gamepad plays in Firefox:** the browser version runs on Clayground v2026.11.1, which reads a pad in Firefox wherever Firefox reads it cleanly - every pad on Linux, SteamOS included, and every pad but Nintendo's Switch pads on macOS and Windows. Such a Switch pad is listed on the Control Input page with "no input in this browser" and plays in Chrome. ([#240](https://github.com/MisterGC/shapes-and-stone/issues/240))
+- **A Nintendo pad shows its own letters in the browser:** the browser does not say what is printed on a pad's buttons, so a Switch pad read as an Xbox pad - its B showed A, and its A cancelled. Now the Control Input page, the menus and the hints name a Nintendo pad's buttons as printed. ([#237](https://github.com/MisterGC/shapes-and-stone/issues/237))
+
+### Fixed
+
+- **Control Input on the title takes a gamepad on its first press**, without a game started first; that press only takes the pad and chooses nothing. ([#236](https://github.com/MisterGC/shapes-and-stone/issues/236))
+- **A resting mouse no longer takes the pick back from the gamepad** on the Control Input page when a note appears or clears. ([#243](https://github.com/MisterGC/shapes-and-stone/issues/243))
+
 ## [0.4.1] - 2026-11-01
 
 The browser version has its sound again.
@@ -208,7 +231,8 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.2
 [0.4.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.1
 [0.4.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.0
 [0.3.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.3.0
