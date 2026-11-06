@@ -8,7 +8,11 @@
 // shield is on the left button. The potion's pad cell takes Y, the
 // draught's, which gets X; A, which chose the talk's pad cell, is not taken
 // itself, and B cancels it, the page still open. Esc cancels the talk's key
-// cell; the menu's cells stay fixed; a move takes no mouse button. In the
+// cell; the menu's cells stay fixed; a move takes no mouse button. The
+// move up takes F from the lock, which gets W and keeps its middle button;
+// the strike's cell does not take F then, as the move would get the right
+// button. The pad's X cancels the talk's key cell and the left button the
+// potion's pad cell, each binding kept. In the
 // village K dashes and Space no longer does, the right button swings, the
 // left one raises the shield and the pad's Y drinks a potion. In the pause
 // menu's page a click on the mouse and keyboard's Reset puts that column's
@@ -251,6 +255,61 @@ Window {
             check(page().capturing === "" && game.controls.key("moveUp") === Qt.Key_W
                   && game.controls.mouse("lock") === Qt.MiddleButton && prompt() === "Move up takes a key, not a mouse button",
                   "the middle button is not taken by the move and stays with the lock (" + prompt() + ")")
+            // A move takes a key: the lock's F, the lock keeping its middle
+            // button
+            press(Qt.Key_Return)
+        }],
+        [60, () => {
+            check(page().capturing === "keys" && page().captureAction === "moveUp", "the move's key cell waits")
+            press(Qt.Key_F)
+            let c = game.controls
+            check(c.key("moveUp") === Qt.Key_F && c.mouse("moveUp") === 0, "F pressed, the move is on F")
+            check(c.key("lock") === Qt.Key_W && c.mouse("lock") === Qt.MiddleButton
+                  && find(game, "controlRowlock").keysText === "W / MMB",
+                  "the lock had it: it gets W and keeps the middle button ("
+                  + find(game, "controlRowlock").keysText + ")")
+            check(prompt() === "Move up swapped with Lock on an enemy", "the page says they swapped (" + prompt() + ")")
+            // A swap the other action refuses: the strike's right button
+            // is no move's
+            check(go(rowOf("strike"), 0), "the strike's mouse and keyboard cell is picked")
+            press(Qt.Key_Return)
+        }],
+        [60, () => {
+            check(page().capturing === "keys" && page().captureAction === "strike", "the strike's key cell waits")
+            press(Qt.Key_F)
+            let c = game.controls
+            check(page().capturing === "" && c.key("strike") === 0 && c.mouse("strike") === Qt.RightButton
+                  && c.key("moveUp") === Qt.Key_F && c.mouse("moveUp") === 0,
+                  "F, the move's, is not taken: the move would get the right button")
+            check(prompt() === "F stays with Move up", "the page says why (" + prompt() + ")")
+            // A pad press cancels a key cell's wait
+            go(rowOf("talk"), 0)
+            press(Qt.Key_Return)
+        }],
+        [60, () => {
+            check(page().capturing === "keys" && page().captureAction === "talk", "the talk's key cell waits")
+            pad({buttonX: true})
+        }],
+        [60, () => {
+            pad({})
+            let c = game.controls
+            check(page().capturing === "" && c.key("talk") === Qt.Key_E && c.pad("talk") === "buttonA"
+                  && c.pad("draught") === "buttonX" && prompt() === "Talk, open a door kept as it was",
+                  "the pad's X cancels it: the talk keeps E and A, the draught X (" + prompt() + ")")
+            check(page().column === 1, "and the pick goes to the gamepad's column")
+            // A mouse press cancels a pad cell's wait
+            check(go(rowOf("potion"), 1), "the potion's gamepad cell is picked")
+            press(Qt.Key_Return)
+        }],
+        [60, () => {
+            check(page().capturing === "pad" && page().captureAction === "potion", "the potion's pad cell waits")
+            mouseOnPage(Qt.LeftButton)
+        }],
+        [60, () => {
+            let c = game.controls
+            check(page().capturing === "" && c.pad("potion") === "buttonY" && c.mouse("shield") === Qt.LeftButton
+                  && c.mouse("potion") === 0 && prompt() === "Potion kept as it was",
+                  "the left button cancels it: the potion keeps Y, the shield the left button (" + prompt() + ")")
             press(Qt.Key_Escape)
         }],
         // The game follows each
