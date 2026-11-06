@@ -105,7 +105,8 @@ and choose it with Enter, A or a click; then press the new key or mouse
 button in the *Mouse and keyboard* column, or the new pad button in the
 *Gamepad* column. A key or button another action has trades places with
 it: that action gets what this one had. Esc or the pad's B cancels. A
-pad's first press on the page - in the browser the one that lists it -
+pad press that takes the pad from the mouse and keyboard - its first on
+the page, in the browser the one that lists it, and each one after a key -
 only takes the pad and moves the pick to the *Gamepad* column, off a
 *Reset* or *Back* to the first action it can rebind; its next A picks the
 cell there.
@@ -426,8 +427,10 @@ and marked in use after a press and gone once unplugged, and with an out
 dir after `--` saves the page over the title and over the pause menu at
 1280x800. It also checks that the pad's A, taking the pad, moves the pick to
 the gamepad's column and chooses nothing, that a pad press cancelling a
-key wait moves it there too, and that a Nintendo pad without labels has its
-face buttons named B, A, Y and X from the bottom one round:
+key wait moves it there too, that with the mouse resting on the mouse and
+keyboard column's Reset the pad rebinds Strike twice, the table in its
+place and the pick in the gamepad's column, and that a Nintendo pad without
+labels has its face buttons named B, A, Y and X from the bottom one round:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controlinput/controlinput.qml [-- <out dir>]

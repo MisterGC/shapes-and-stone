@@ -78,9 +78,10 @@ def run(bench, timeout_s):
     agent = page.evaluate("navigator.userAgent")
     print("[FirefoxPad] user agent:", agent, flush=True)
 
-    # The title's Control Input row, at 1280x800
+    # The title's Control Input row, at 1280x800, where the page's mouse and
+    # keyboard Reset will be under the resting mouse
     mark = len(bench.lines)
-    page.mouse.click(640, 687)
+    page.mouse.click(640, 675)
     bench.check(bench.wait_for("[ControlInputPage] devices:", mark, 5000),
                 "a click on Control Input opens the page over the title")
     page.wait_for_timeout(500)

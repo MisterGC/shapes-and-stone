@@ -16,8 +16,12 @@
 // nothing (issue #236); Enter makes the mouse and keyboard cell wait and
 // the pad's A cancels it, the pick on the gamepad's column. With the mouse
 // and keyboard's Reset picked, the pad's A taking the pad moves the pick
-// up to Strike's gamepad cell and resets nothing. Esc goes back to the title, on Control Input; a click on the
-// row opens the page and a click on Back closes it. In the game Esc opens
+// up to Strike's gamepad cell and resets nothing. With the mouse resting
+// near the bottom of that Reset the pad takes the pick, rebinds Strike to Y,
+// the D-pad clears the note and the pad rebinds Strike to X: the table stays
+// in its place and the pick in the gamepad's column (issue #243). Esc goes
+// back to the title, on Control Input; a click on the row opens the page and
+// a click on Back closes it. In the game Esc opens
 // the pause menu, S three times and Enter open the page over it, the menu
 // hidden and the world still paused, M mutes, Esc goes back to the menu on
 // Control Input and the menu's click and Back's click do the same.
@@ -101,6 +105,9 @@ Window {
     function page() { return shown("controlInputPage") }
     function menu() { return shown("pauseMenu") }
     function prompt() { return find(page(), "controlPrompt").text }
+    // Where the table is in the window
+    function rowsY() { return find(page(), "controlRows").mapToItem(null, 0, 0).y }
+    property real restY: 0
     function rowOf(action) { return game.controls.actions.findIndex(a => a.id === action) }
     // The device chips: [{ name, inUse }]
     function devices() {
@@ -273,6 +280,76 @@ Window {
             check(page().column === 1 && page().selectedIndex === rowOf("strike") && prompt() === "",
                   "the pad's A, taking the pad on that Reset, moves the pick up to Strike's gamepad cell and resets nothing (row "
                   + page().selectedIndex + ", column " + page().column + ", prompt: '" + prompt() + "')")
+        }],
+        [100, () => {
+            if (padId < 0) return
+            // The mouse resting on the mouse and keyboard's Reset, near its
+            // bottom edge, then the pad takes the pick and rebinds twice
+            press(Qt.Key_W)
+            let r = find(game, "controlResetKeys")
+            input.mouseMove(r, r.width / 2, r.height - 6, -1, Qt.NoButton, Qt.NoModifier)
+            bench.restY = rowsY()
+            check(page().selectedIndex === page().resetIndex && page().column === 0 && !game.padInUse,
+                  "the mouse resting on the mouse and keyboard's Reset picks it")
+            GamepadHub.setVirtualGamepadInput(padId, "south", 1)
+        }],
+        [() => padId < 0 || game.padInUse, () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 0)
+            check(page().column === 1 && page().selectedIndex === rowOf("strike"),
+                  "the pad's A, taking the pad, moves the pick off the resting mouse's Reset to Strike's gamepad cell")
+        }],
+        [100, () => { if (padId >= 0) GamepadHub.setVirtualGamepadInput(padId, "south", 1) }],
+        [() => padId < 0 || page().capturing === "pad", () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 0)
+            check(rowsY() === restY, "the table keeps its place when the prompt appears (y " + restY + " -> " + rowsY() + ")")
+        }],
+        [100, () => { if (padId >= 0) GamepadHub.setVirtualGamepadInput(padId, "north", 1) }],
+        [() => padId < 0 || page().capturing === "", () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "north", 0)
+        }],
+        [100, () => {
+            if (padId < 0) return
+            check(game.controls.pad("strike") === "buttonY" && page().column === 1
+                  && page().selectedIndex === rowOf("strike") && prompt() === "Strike swapped with Draught",
+                  "the pad rebinds Strike to Y, the pick stays on Strike's gamepad cell (row "
+                  + page().selectedIndex + ", column " + page().column + ", prompt: '" + prompt() + "')")
+            // The D-pad down clears the note. Pressed and let go at once:
+            // held past MenuPad.delayMs it would move on
+            GamepadHub.setVirtualGamepadInput(padId, "dpadDown", 1)
+            GamepadHub.setVirtualGamepadInput(padId, "dpadDown", 0)
+        }],
+        [100, () => {
+            if (padId < 0) return
+            check(prompt() === "" && rowsY() === restY && page().column === 1
+                  && page().selectedIndex === rowOf("strike") + 1,
+                  "the D-pad clears the note, the table keeps its place and the pick goes down to Shield's gamepad cell, not to the resting mouse's Reset (row "
+                  + page().selectedIndex + ", column " + page().column + ", y " + rowsY() + ")")
+            GamepadHub.setVirtualGamepadInput(padId, "dpadUp", 1)
+            GamepadHub.setVirtualGamepadInput(padId, "dpadUp", 0)
+        }],
+        [100, () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 1)
+        }],
+        [() => padId < 0 || page().capturing === "pad", () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "south", 0)
+        }],
+        [100, () => { if (padId >= 0) GamepadHub.setVirtualGamepadInput(padId, "west", 1) }],
+        [() => padId < 0 || page().capturing === "", () => {
+            if (padId < 0) return
+            GamepadHub.setVirtualGamepadInput(padId, "west", 0)
+        }],
+        [100, () => {
+            if (padId < 0) return
+            check(game.controls.pad("strike") === "buttonX" && page().column === 1
+                  && page().selectedIndex === rowOf("strike") && rowsY() === restY,
+                  "a second rebind, to X, also leaves the pick on Strike's gamepad cell and the table in its place (row "
+                  + page().selectedIndex + ", column " + page().column + ", y " + rowsY() + ")")
+            game.controls.reset()
             GamepadHub.detachVirtualGamepad(padId)
             padId = -1
         }],
@@ -349,9 +426,14 @@ Window {
         id: script
         property int i: 0
         property real waitedMs: 0
+        // A step is running: a key click spins the event loop, and on Linux
+        // offscreen it spins long enough for this timer to come due inside
+        // it. The next step must not run then, before this one is through
+        property bool inStep: false
         interval: 20
         repeat: true
         onTriggered: {
+            if (inStep) return
             let step = bench.steps[i]
             waitedMs += interval
             let ready = typeof step[0] === "number" ? waitedMs >= step[0] : step[0]()
@@ -365,11 +447,14 @@ Window {
                 return
             }
             waitedMs = 0
-            // Advance first: a key click spins the event loop, and this
-            // timer must not run the same step again inside it
             i++
             if (i >= bench.steps.length) stop()
-            step[1]()
+            inStep = true
+            try {
+                step[1]()
+            } finally {
+                inStep = false
+            }
         }
     }
 }
