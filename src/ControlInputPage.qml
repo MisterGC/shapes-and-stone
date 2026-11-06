@@ -23,8 +23,8 @@ import QtQuick
 // is kept at once.
 //
 // A browser lists a gamepad only once one of its buttons was pressed on
-// the page, and Firefox lists a pad with no input at all (clayground#474):
-// the device row says so.
+// the page, and Firefox lists a Switch pad it misreads, on macOS and
+// Windows, with no input at all (clayground#474): the device row says so.
 Item {
     id: page
     objectName: "controlInputPage"
