@@ -114,6 +114,7 @@ clay_app(shapes_and_stone
         src/MenuPad.qml
         src/KnightPanel.qml
         src/KnightPad.qml
+        src/ControlTable.qml
         src/SongMusic.qml
         src/AmbienceBed.qml
         src/MultiplayerLobby.qml

@@ -37,6 +37,7 @@ QUICK = [
     ("fallen", "fallen/fallen.qml", []),
     ("focus", "focus/focus.qml", []),
     ("gamepad", "gamepad/gamepad.qml", []),
+    ("controls", "controls/controls.qml", []),
     ("downed", "downed/downed.qml", []),
     ("joinleave", "joinleave/joinleave.qml", []),
     ("gold", "gold/gold.qml", []),

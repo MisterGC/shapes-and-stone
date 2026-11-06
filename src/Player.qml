@@ -1207,7 +1207,11 @@ PhysicsItem {
     InputAction {
         id: swingInput
         world: player.world
-        mouseButton: Qt.LeftButton
+        // The strike's mouse button in the game's control table (issue
+        // #218); a key or pad button bound to it presses without a mouse
+        // event (Game.strikePress)
+        mouseButton: player.gameWorld && player.gameWorld.controls
+                     ? player.gameWorld.controls.mouse("strike") : Qt.LeftButton
         holdThresholdMs: Balance.knight.chargeStart * 1000
         onPressedChanged: if (pressed) player._onSwingPressed()
         onHeldMsChanged: if (pressed) player._onSwingHeld(heldMs)
