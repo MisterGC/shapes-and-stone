@@ -482,6 +482,7 @@ Item {
         // no width - so the table does not move under a resting mouse when
         // a note appears or clears
         Text {
+            id: promptText
             objectName: "controlPrompt"
             anchors.horizontalCenter: parent.horizontalCenter
             width: rows.width
@@ -494,10 +495,11 @@ Item {
                   : page.note
             color: "#E0B060"
             font.pixelSize: 14
-            onTextChanged: if (text !== "") console.info("[ControlInputPage] prompt:", text)
+            onTextChanged: if (promptText.text !== "") console.info("[ControlInputPage] prompt:", promptText.text)
         }
 
         Text {
+            id: hintText
             objectName: "controlHint"
             anchors.horizontalCenter: parent.horizontalCenter
             text: page.capturing !== ""
@@ -508,7 +510,7 @@ Item {
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
-            onTextChanged: console.info("[ControlInputPage] hint:", text)
+            onTextChanged: console.info("[ControlInputPage] hint:", hintText.text)
         }
     }
 
