@@ -221,7 +221,7 @@ Item {
     function padBack() { if (capturing === "" && !_settling && !padTaking) close() }
 
     // The console says what the page shows: the devices with the ones in
-    // use, and the prompt under the table. The browser build has nothing
+    // use, and the prompt and the hint under the table. The browser build has nothing
     // else to tell a bench (tests/browserpad) what the page did
     function _logDevices() {
         console.info("[ControlInputPage] devices:", devices.map(d => d.name + (d.inUse ? " (in use)" : "")).join(", "))
@@ -488,13 +488,14 @@ Item {
             objectName: "controlHint"
             anchors.horizontalCenter: parent.horizontalCenter
             text: page.capturing !== ""
-                  ? (page.pad ? page.padLabels.B + " or Esc to cancel" : "Esc or the gamepad's B to cancel")
+                  ? (page.pad ? page.padLabels.B + " or Esc to cancel" : "Esc or the gamepad's " + page.padLabels.B + " to cancel")
                   : page.pad
                   ? "Stick to pick • " + page.padLabels.A + " to rebind • " + page.padLabels.B + " or Start to go back"
                   : "W/S and A/D to pick • Enter or a click to rebind • Esc to go back"
             color: "#888888"
             font.pixelSize: 12
             font.italic: true
+            onTextChanged: console.info("[ControlInputPage] hint:", text)
         }
     }
 

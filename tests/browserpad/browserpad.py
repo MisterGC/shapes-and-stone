@@ -19,7 +19,10 @@ first press, lists it by name and marks it in use, and chooses nothing on
 the page: not that Reset, nor a cell of that column. The pick goes up to
 Strike's gamepad cell, the first one the pad can rebind; the pad's next A
 makes it wait and resets nothing, and Y rebinds it (the draught had Y, so
-the two trade) - and no game has started. It reads the page from the console lines it prints
+the two trade) - and no game has started. The hint names the face buttons
+as the Pro Controller has them printed, the bottom one B and the right one
+A, and while the cell waits says A cancels; the right button does (issue
+#237). It reads the page from the console lines it prints
 ("[ControlInputPage] devices: ...", "[ControlInputPage] prompt: ..."),
 prints one PASS or FAIL line per check and exits with the number of
 failures; 100 when the game did not load. With --out it writes the
@@ -38,8 +41,10 @@ import time
 
 PAD_NAME = "Pro Controller"
 PAD_ID = PAD_NAME + " (STANDARD GAMEPAD Vendor: 057e Product: 2009)"
-# The standard gamepad's buttons (https://w3c.github.io/gamepad/#remapping)
-A, Y = 0, 3
+# The standard gamepad's buttons (https://w3c.github.io/gamepad/#remapping),
+# by position as an Xbox pad names them. The Pro Controller has B, A and X
+# printed there, and the game names them so (issue #237)
+A, B, Y = 0, 1, 3
 
 # Chrome's navigator.getGamepads(), driven by window.__padStep(step). A
 # step presses or lets go of a button; the first press plugs the pad in.
@@ -159,6 +164,10 @@ def run(bench, timeout_s):
     bench.check(not prompts,
                 "that press only takes the pad: it chooses nothing on the page, not the cell or Reset"
                 " of the mouse and keyboard column under the resting mouse (" + (" / ".join(prompts) or "no prompt") + ")")
+    hints = bench.page_lines("hint", mark)
+    bench.check(bool(hints) and hints[-1] == "Stick to pick \u2022 B to rebind \u2022 A or Start to go back",
+                "the hint names the Pro Controller's buttons as printed: B, the bottom one, rebinds and A goes back ("
+                + (hints[-1] if hints else "no hint") + ")")
     bench.shot("first-press")
 
     # The pad's next A: Strike's gamepad cell waits, no Reset; then Y
@@ -169,6 +178,9 @@ def run(bench, timeout_s):
                 and not any("defaults are back" in p for p in prompts),
                 "its next A makes Strike's gamepad cell wait and resets no column ("
                 + (" / ".join(prompts) or "no prompt") + ")")
+    hints = bench.page_lines("hint", mark)
+    bench.check(bool(hints) and hints[-1] == "A or Esc to cancel",
+                "while it waits the hint says A cancels (" + (hints[-1] if hints else "no hint") + ")")
     bench.shot("waiting")
     mark = len(bench.lines)
     bench.press(Y)
@@ -176,6 +188,16 @@ def run(bench, timeout_s):
     bench.check(bool(prompts) and prompts[-1] == "Strike swapped with Draught",
                 "Y rebinds it; the draught had Y and gets R1 (" + (" / ".join(prompts) or "no prompt") + ")")
     bench.shot("rebound")
+
+    # The bottom button again makes Strike's cell wait; the right one, the
+    # Pro Controller's A, cancels it
+    bench.press(A)
+    mark = len(bench.lines)
+    bench.press(B)
+    prompts = bench.page_lines("prompt", mark)
+    bench.check(bool(prompts) and prompts[-1] == "Strike kept as it was",
+                "the right button, printed A, cancels the waiting cell (" + (" / ".join(prompts) or "no prompt") + ")")
+    bench.shot("cancelled")
 
     started = [line for line in bench.lines if "[Game] New run" in line or "Spawning player" in line]
     bench.check(not started, "no game was started" + (" (" + started[0] + ")" if started else ""))
