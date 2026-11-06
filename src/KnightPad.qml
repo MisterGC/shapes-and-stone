@@ -67,12 +67,21 @@ Item {
         _aimLater()
     }
 
+    // A physical pad is being made the controller's source by a press on
+    // it (_touched). That press reaches the controller, and so MenuPad, in
+    // the same turn, before this pad's own handlers see it: the Control
+    // Input page lets it only take the pad (issue #236)
+    readonly property bool takingPad: _takingPad
+    property bool _takingPad: false
+
     // The pad at index of the hub, or the keyboard for -1
     property bool _selecting: false
     function _select(index) {
         _selecting = true
+        _takingPad = index >= 0
         if (index >= 0) controller.selectGamepad(index)
         else controller.selectKeyboard(keyboardKeys)
+        _takingPad = false
         _selecting = false
     }
 

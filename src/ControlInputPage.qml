@@ -15,9 +15,12 @@ import QtQuick
 // input - in the mouse and keyboard column a key or a mouse button, in the
 // gamepad column a pad button - and is rebound to it (ControlTable.rebind):
 // one another action has trades cells with it. Esc or the pad's B cancels,
-// and so does an input of the other column's device. The menu, the aim and
-// the pad's moves stay fixed, so nobody locks themselves out of the menu.
-// A Reset puts its column's defaults back. Every change is kept at once.
+// and so does an input of the other column's device. The pad coming into
+// use - its first press on the page - and a pad press that cancels put the
+// pick on the gamepad's column; that first press chooses nothing. The
+// menu, the aim and the pad's moves stay fixed, so nobody locks themselves
+// out of the menu. A Reset puts its column's defaults back. Every change
+// is kept at once.
 //
 // A browser lists a gamepad only once one of its buttons was pressed on
 // the page, and Firefox lists a pad with no input at all (clayground#474):
@@ -173,28 +176,63 @@ Item {
     // A pad input pressed (KnightPad.inputPressed): while a cell waits, the
     // gamepad's binding; B, the menu's input or any while the mouse and
     // keyboard's cell waits cancel
+    // A pad press that cancels the mouse and keyboard's cell puts the pick
+    // on the gamepad's column, so its next A waits on a pad cell
     function padInput(name) {
         if (capturing === "" || !_armed) return
-        if (name === "buttonB" || name === controls.pad("menu") || capturing === "keys") cancelCapture()
-        else _take(name)
+        const keysCell = capturing === "keys"
+        if (name === "buttonB" || name === controls.pad("menu") || keysCell) {
+            cancelCapture()
+            if (keysCell) pickColumn(1)
+        } else {
+            _take(name)
+        }
     }
+
+    // The pad comes into use on the page: the pick goes to its column. On
+    // the title that is the pad's first press - in the browser the one that
+    // lists it (issue #236). A pick on a Reset or Back, where a click left
+    // the resting mouse, goes up to the first action whose pad cell can be
+    // rebound, so the pad's next A picks a cell and resets nothing
+    onPadChanged: {
+        if (!pad || capturing !== "") return
+        pickColumn(1)
+        if (selectedIndex >= actions.length) {
+            const first = actions.findIndex((a, i) => !isFixed(i, 1))
+            pick(first >= 0 ? first : 0)
+        }
+    }
+    // A press on a pad is making it the controller's source
+    // (KnightPad.takingPad): that press only takes the pad. It does not
+    // choose the cell or the Reset of the mouse and keyboard column picked
+    // before, by the keys or by the resting mouse
+    property bool padTaking: false
 
     // The gamepad (MenuPad): the stick picks a row and a column, A
     // chooses, B and Start go back. While a cell waits its presses are
     // padInput's
     function padMove(dx, dy) {
-        if (capturing !== "" || _settling) return
+        if (capturing !== "" || _settling || padTaking) return
         note = ""
         if (dy !== 0) pick(selectedIndex - dy)
         else if (dx !== 0) pickColumn(column + dx)
     }
-    function padConfirm() { if (capturing === "" && !_settling) choose(selectedIndex) }
-    function padBack() { if (capturing === "" && !_settling) close() }
+    function padConfirm() { if (capturing === "" && !_settling && !padTaking) choose(selectedIndex) }
+    function padBack() { if (capturing === "" && !_settling && !padTaking) close() }
+
+    // The console says what the page shows: the devices with the ones in
+    // use, and the prompt under the table. The browser build has nothing
+    // else to tell a bench (tests/browserpad) what the page did
+    function _logDevices() {
+        console.info("[ControlInputPage] devices:", devices.map(d => d.name + (d.inUse ? " (in use)" : "")).join(", "))
+    }
+    onDevicesChanged: _logDevices()
 
     // Deferred like the pause menu's: the menu under it may still hold the
     // focus in the same frame
     Component.onCompleted: {
         column = pad ? 1 : 0
+        _logDevices()
         Qt.callLater(forceActiveFocus)
     }
 
@@ -443,6 +481,7 @@ Item {
                   : page.note
             color: "#E0B060"
             font.pixelSize: 14
+            onTextChanged: if (text !== "") console.info("[ControlInputPage] prompt:", text)
         }
 
         Text {

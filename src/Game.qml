@@ -8571,6 +8571,7 @@ ClayWorld2d {
                 pad: world.padInUse
                 padLabels: world.padLabels
                 padLabel: b => knightPad.label(b)
+                padTaking: knightPad.takingPad
                 gamepads: gameCtrl.gamepads
                 gamepad: gameCtrl.gamepad
                 muteKey: controlTable.key("mute")

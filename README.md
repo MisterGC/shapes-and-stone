@@ -103,7 +103,11 @@ To rebind a control, pick its cell - W/S and A/D, the stick, or the mouse -
 and choose it with Enter, A or a click; then press the new key or mouse
 button in the *Mouse and keyboard* column, or the new pad button in the
 *Gamepad* column. A key or button another action has trades places with
-it: that action gets what this one had. Esc or the pad's B cancels.
+it: that action gets what this one had. Esc or the pad's B cancels. A
+pad's first press on the page - in the browser the one that lists it -
+only takes the pad and moves the pick to the *Gamepad* column, off a
+*Reset* or *Back* to the first action it can rebind; its next A picks the
+cell there.
 *Reset to defaults* under a column puts that column's defaults back. The
 menu stays on Esc and Start, the aim on the mouse and the right stick, and
 the moves on the left stick, so nobody locks themselves out. A change is
@@ -172,6 +176,7 @@ The other benches run by hand, each with the command in its section below:
   `talkparty`, `masterparty`, `padknight`, `netbench` and the fight bench
   (`run_fightbench.py`, `run_reload.py`); `--mode cloud` needs the internet.
 - `deck`, through `clayrender` in a graphics session.
+- `browserpad`, the browser game in Chromium through Playwright.
 
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
@@ -417,10 +422,29 @@ closes it from both by keyboard and mouse, checks every row against the
 table, plugs in a virtual pad (where the build reads pads), finds it listed
 and marked in use after a press and gone once unplugged, and with an out
 dir after `--` saves the page over the title and over the pause menu at
-1280x800:
+1280x800. It also checks that the pad's A, taking the pad, moves the pick to
+the gamepad's column and chooses nothing, and that a pad press cancelling a
+key wait moves it there too:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/controlinput/controlinput.qml [-- <out dir>]
+```
+
+The browser pad bench runs the browser game (`build/web`, from
+`packaging/web-bundle.py`) in headless Chromium with a stand-in for
+`navigator.getGamepads()` shaped like Chrome's: no pad until a button is
+pressed on it, then the pad in its slot with that press down, and a fresh
+snapshot on every call. On the title a click opens Control Input, the mouse
+left over the mouse and keyboard column's Reset; the pad's first A lists it
+by name and in use and chooses nothing, its next A makes Strike's gamepad
+cell wait, resetting nothing, and Y rebinds it, and no game starts. It reads the
+page from the lines it prints to the console (`[ControlInputPage]
+devices: ...`, `prompt: ...`), exits with the number of failed checks and
+needs Playwright with Chromium; `--out` keeps the console and a screenshot
+per step:
+
+```
+python3 tests/browserpad/browserpad.py build/web [--out <dir>] [--headed] [--chromium <executable>]
 ```
 
 On the page a chosen cell waits for the next input and rebinds to it
