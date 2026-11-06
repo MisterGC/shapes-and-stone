@@ -316,11 +316,9 @@ Window {
                   && page().selectedIndex === rowOf("strike") && prompt() === "Strike swapped with Draught",
                   "the pad rebinds Strike to Y, the pick stays on Strike's gamepad cell (row "
                   + page().selectedIndex + ", column " + page().column + ", prompt: '" + prompt() + "')")
-            // The D-pad down clears the note
+            // The D-pad down clears the note. Pressed and let go at once:
+            // held past MenuPad.delayMs it would move on
             GamepadHub.setVirtualGamepadInput(padId, "dpadDown", 1)
-        }],
-        [100, () => {
-            if (padId < 0) return
             GamepadHub.setVirtualGamepadInput(padId, "dpadDown", 0)
         }],
         [100, () => {
@@ -330,9 +328,6 @@ Window {
                   "the D-pad clears the note, the table keeps its place and the pick goes down to Shield's gamepad cell, not to the resting mouse's Reset (row "
                   + page().selectedIndex + ", column " + page().column + ", y " + rowsY() + ")")
             GamepadHub.setVirtualGamepadInput(padId, "dpadUp", 1)
-        }],
-        [100, () => {
-            if (padId < 0) return
             GamepadHub.setVirtualGamepadInput(padId, "dpadUp", 0)
         }],
         [100, () => {
