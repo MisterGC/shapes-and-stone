@@ -8544,6 +8544,7 @@ ClayWorld2d {
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
                 message: world.titleMessage
+                padLine: padNotice.titleLine
                 recordLine: world.recordLine
                 freedLine: campFreed.tonightLine
                 joinedLine: campFreed.joinedLine
@@ -8604,6 +8605,15 @@ ClayWorld2d {
             font.pixelSize: 16
             font.italic: true
         }
+    }
+
+    // A gamepad connects or leaves: a notice with its name over every
+    // screen (issue #219)
+    PadNotice {
+        id: padNotice
+        anchors.fill: parent
+        z: 5700
+        controller: gameCtrl
     }
 
     // The dungeon master's panel (over the lobby and the fallen screen)

@@ -26,6 +26,9 @@ Item {
     readonly property var choices: ["Single Player", "Multiplayer", "Dungeon Master", "Control Input"]
     // Why the game came back here, e.g. the host was lost; "" for none
     property string message: ""
+    // What the title says about gamepads (PadNotice.titleLine): in the
+    // browser, to press a button on one; "" for nothing
+    property string padLine: ""
     // The deepest descent kept on this machine (Game.recordLine); "" for none
     property string recordLine: ""
     // Who was freed tonight and the specials with the camps (CampFreed);
@@ -191,6 +194,15 @@ Item {
                     onClicked: { titleScreen._startMusic(); titleScreen._confirm() }
                 }
             }
+        }
+
+        Text {
+            objectName: "titlePadLine"
+            visible: titleScreen.padLine !== ""
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: titleScreen.padLine
+            color: "#AAAAAA"
+            font.pixelSize: 13
         }
 
         Text {
