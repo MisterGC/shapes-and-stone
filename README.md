@@ -177,7 +177,8 @@ The other benches run by hand, each with the command in its section below:
   `talkparty`, `masterparty`, `padknight`, `netbench` and the fight bench
   (`run_fightbench.py`, `run_reload.py`); `--mode cloud` needs the internet.
 - `deck`, through `clayrender` in a graphics session.
-- `browserpad`, the browser game in Chromium through Playwright.
+- `browserpad`, the browser game in Chromium through Playwright, and
+  `firefoxpad`, the same in Firefox.
 
 Both knights, yours and the other player's, are drawn by `src/KnightView.qml`.
 The knight bench puts the two side by side in the dungeon, makes them swing,
@@ -449,6 +450,20 @@ per step:
 
 ```
 python3 tests/browserpad/browserpad.py build/web [--out <dir>] [--headed] [--chromium <executable>]
+```
+
+The Firefox pad bench does the same in Playwright's Firefox, with the pads
+named as Firefox names them (`045e-02ea-Xbox Wireless Controller`). An Xbox
+pad's first press lists it by name and in use, without "no input in this
+browser", its next A makes Strike's gamepad cell wait and its B cancels
+that. A Pro Controller pressed beside it is listed with no input on macOS
+and Windows, where Firefox misreads the Switch pads, and clean on Linux.
+It needs a runtime from Clayground v2026.11.1 on, the first that reads a
+pad in Firefox (clayground#474), and Playwright with Firefox
+(`python -m playwright install firefox`):
+
+```
+python3 tests/firefoxpad/firefoxpad.py build/web [--out <dir>] [--headed] [--firefox <executable>]
 ```
 
 On the page a chosen cell waits for the next input and rebinds to it
