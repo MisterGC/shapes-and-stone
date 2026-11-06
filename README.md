@@ -467,17 +467,22 @@ python3 tests/firefoxpad/firefoxpad.py build/web [--out <dir>] [--headed] [--fir
 ```
 
 On the page a chosen cell waits for the next input and rebinds to it
-(`ControlTable.rebind`): the cell then holds that input alone, and when
-another action holds it the two actions trade their cells. The rebind bench
-rebinds the dash to K by keyboard, the strike to the right button by a
+(`ControlTable.rebind`): the cell then holds that input alone, an input it
+has already keeps it as it is, and when another action holds it the two
+actions trade their cells - where a move takes a key from an action with a
+mouse button too, the keys alone, the other keeping its mouse button. The
+rebind bench rebinds the dash to K by keyboard, the strike to the right button by a
 click - the shield had it and moves to the left button - and the potion to
 the pad's Y, the draught's, and checks that the game follows each: K
 dashes and Space no longer does, the right button swings, the left one
 shields, Y drinks a potion. It checks that the button that chose a cell is
-not taken, that Esc and the pad's B cancel, that the menu stays fixed and
-a move takes no mouse button, and that each column's Reset puts its own
-defaults back; every change is kept at once. With an out dir after `--` it
-saves the page while a cell waits:
+not taken, that Esc and the pad's B cancel, that a pad press cancels a key
+cell's wait and a mouse press a pad cell's, that the menu stays fixed and
+a move takes no mouse button, that the move up takes F from the lock,
+which keeps its middle button, that the strike's cell does not take F
+then, as the move would get the right button, and that each column's
+Reset puts its own defaults back; every change is kept at once. With an
+out dir after `--` it saves the page while a cell waits:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/rebind/rebind.qml [-- <out dir>]

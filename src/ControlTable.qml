@@ -117,13 +117,23 @@ QtObject {
     function cell(action, column) {
         return column === "pad" ? pad(action) : { key: key(action), mouse: mouse(action) }
     }
-    // Whether action's binding in column stays as it is: the menu's, so
-    // nobody locks themselves out of the menu; the aim's, the mouse
-    // pointer and the right stick; and a move's on the pad, the left stick
-    function fixed(action, column) {
+    // Why action's binding in column stays as it is, "" when it can be
+    // rebound: "menu", the menu's, so nobody locks themselves out of the
+    // menu; "pointer", the aim's, the mouse pointer and the right stick;
+    // "stick", a move's on the pad, the left stick; "unknown", no such
+    // action
+    function fixedReason(action, column) {
         const a = actions.find(x => x.id === action)
-        if (!a || action === "menu" || a.pointer) return true
-        return column === "pad" && !!a.move
+        if (!a) return "unknown"
+        if (action === "menu") return "menu"
+        if (a.pointer) return "pointer"
+        return column === "pad" && !!a.move ? "stick" : ""
+    }
+    function fixed(action, column) { return fixedReason(action, column) !== "" }
+    // Whether action is one of the four moves
+    function isMove(action) {
+        const a = actions.find(x => x.id === action)
+        return !!a && !!a.move
     }
     // Whether action can have value as its cell in column: a move only a
     // key, nothing else a key and a mouse button at once
@@ -144,37 +154,49 @@ QtObject {
     // Rebinds action's cell in column to input - a key ({ key }), a mouse
     // button ({ mouse }) or a pad input - as the Control Input page does
     // with the next input pressed. The cell then holds that input alone;
-    // when another action holds it, the two actions trade their cells.
-    // Returns { taken, swapped }: swapped the other action's id or "";
-    // not taken when the cell is fixed, the input is not one it takes, or
-    // the other action cannot take the cell it would get (a move a mouse
-    // button or nothing, the menu anything). Kept at once
+    // an input the cell has already keeps the cell as it is. When another
+    // action holds the input the two trade: their whole cells, or, where a
+    // move takes a key from an action with a mouse button too, the keys
+    // alone, the other action keeping its mouse button. Kept at once.
+    //
+    // Returns { taken, swapped, reason, holder }: swapped the id of the
+    // action traded with, else ""; when not taken, reason says why -
+    // "fixed", the cell stays as it is (fixedReason); "keyOnly", a move
+    // takes a key, not a mouse button; "input", the input is not one the
+    // cell takes; "held", holder has the input and cannot take what it
+    // would get (a move a mouse button)
     function rebind(action, column, input) {
         let value = input
         if (column !== "pad")
             value = { key: input && input.key ? input.key : 0, mouse: input && input.mouse ? input.mouse : 0 }
-        const refused = { taken: false, swapped: "" }
-        if (!defaults[action] || (column !== "pad" && value.key === 0 && value.mouse === 0)
-                || (column === "pad" && value === "") || !_takes(action, column, value))
-            return refused
+        const refused = (reason, holder) => ({ taken: false, swapped: "", reason: reason, holder: holder || "" })
+        if (!defaults[action]) return refused("input")
+        if (fixed(action, column)) return refused("fixed")
+        if ((column !== "pad" && value.key === 0 && value.mouse === 0) || (column === "pad" && value === ""))
+            return refused("input")
+        if (column !== "pad" && isMove(action) && value.mouse !== 0) return refused("keyOnly")
+        if (!_takes(action, column, value)) return refused("input")
         const other = holder(column, value)
-        if (other === action) return { taken: true, swapped: "" }
+        if (other === action) return { taken: true, swapped: "", reason: "", holder: "" }
         const mine = cell(action, column)
         let next = JSON.parse(JSON.stringify(bindings))
         if (other !== "") {
-            // The other action's whole cell, else the input alone where
-            // this one cannot take that (a move a key with a mouse button)
-            if (!_takes(other, column, mine)) return refused
+            // The other action's whole cell, else the key alone where this
+            // one cannot take the whole (a move a key with a mouse button):
+            // the other then keeps its mouse button
             const theirs = cell(other, column)
-            const take = _takes(action, column, theirs) ? theirs : value
+            const whole = _takes(action, column, theirs)
+            const take = whole ? theirs : value
+            const give = whole || column === "pad" ? mine : { key: mine.key, mouse: theirs.mouse }
+            if (!_takes(other, column, give)) return refused("held", other)
             _put(next, action, column, take)
-            _put(next, other, column, mine)
+            _put(next, other, column, give)
         } else {
             _put(next, action, column, value)
         }
         bindings = next
         save()
-        return { taken: true, swapped: other }
+        return { taken: true, swapped: other, reason: "", holder: "" }
     }
     function _put(table, action, column, value) {
         if (column === "pad") {
