@@ -39,6 +39,7 @@ QUICK = [
     ("gamepad", "gamepad/gamepad.qml", []),
     ("controls", "controls/controls.qml", []),
     ("controlinput", "controlinput/controlinput.qml", []),
+    ("rebind", "rebind/rebind.qml", []),
     ("downed", "downed/downed.qml", []),
     ("joinleave", "joinleave/joinleave.qml", []),
     ("gold", "gold/gold.qml", []),

@@ -80,8 +80,20 @@ def copy_runtime(runtime, out):
 # button is down never reaches Qt: a knight held a direction its player had
 # let go of. Cancelling the press's default keeps the focus on Qt's input;
 # Qt reads the pointer events, which this leaves alone.
-KEEP_FOCUS = """<script>
+#
+# Clayground.Storage writes what the game keeps (the record, the volumes,
+# the controls rebound on the Control Input page, #221) to IndexedDB in the
+# background, and a page reloaded during that write loses it. While
+# window.clayStorage.busy says a write is under way the browser asks before
+# it leaves the page.
+PAGE_SCRIPT = """<script>
 document.getElementById('screen').addEventListener('mousedown', e => e.preventDefault(), true);
+window.addEventListener('beforeunload', e => {
+    if (window.clayStorage && window.clayStorage.busy) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
 </script>
 </body>"""
 
@@ -93,8 +105,8 @@ def name_page(out):
         html = f.read()
     html = re.sub(r"<title>.*?</title>", "<title>Shapes &amp; Stone</title>", html, count=1)
     if "</body>" not in html:
-        raise SystemExit(f"no </body> in {path} - cannot keep the focus on the game")
-    html = html.replace("</body>", KEEP_FOCUS, 1)
+        raise SystemExit(f"no </body> in {path} - cannot add the game's page script")
+    html = html.replace("</body>", PAGE_SCRIPT, 1)
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
 

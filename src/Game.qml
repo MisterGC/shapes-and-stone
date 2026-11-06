@@ -1943,6 +1943,10 @@ ClayWorld2d {
     function openControlInput() {
         if (_controlInputCan) controlInputOpen = true
     }
+    // The page waits for the input that rebinds a cell (issue #221): no
+    // pad press does its action meanwhile
+    readonly property bool rebinding: controlInputOpen && !!controlInputLoader.item
+                                      && controlInputLoader.item.capturing !== ""
     function closeControlInput() {
         if (!controlInputOpen) return
         controlInputOpen = false
@@ -2010,6 +2014,7 @@ ClayWorld2d {
         dialogue: dialoguePanel
         controls: controlTable
         enabled: !world.touchControls
+        onInputPressed: (name) => { if (controlInputLoader.item) controlInputLoader.item.padInput(name) }
     }
     readonly property bool padInUse: knightPad.inUse
     // The key or pad button that talks, for the prompts over NPCs and
