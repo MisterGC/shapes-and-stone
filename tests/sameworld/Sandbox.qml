@@ -168,7 +168,17 @@ Item {
                       : null
             bench.shotEnds.push([Date.now(), shotId, result, local, k])
         }
+        function onShotSentBack(shotId, local) {
+            let s = game._shotById[shotId]
+            bench.shotsBack.push([Date.now(), shotId, local,
+                                  s ? [bench.r3(s.dirX), bench.r3(s.dirY)] : null,
+                                  s ? [bench.r3(s.xWu), bench.r3(s.yWu)] : null])
+        }
     }
+    // Every shot a perfect block sent back on this screen, as [wall clock,
+    // shot id, local, its way [dx, dy] and its place [x, y] then]
+    // (Game.shotSentBack, issue #283)
+    property var shotsBack: []
     // The shots flying on this screen, as {id: [x, y]}
     function shots() {
         let out = {}
@@ -347,7 +357,9 @@ Item {
     // late-th frame on this screen and raises it then, just before the
     // lunge lands, and holds it; "dodge": dashes at it from its parry window's late-th
     // frame on this screen, once; "dodgeShot": dashes into shot shotToDodge
-    // once it comes within 1.2 Wu, once; "stand": faces it and stands, the
+    // once it comes within 1.2 Wu, once; "perfectShot": keeps the shield
+    // down until shot shotToDodge comes within 0.9 Wu and raises it then,
+    // a perfect block that sends it back (issue #283), and holds it; "stand": faces it and stands, the
     // shield down. The knight never walks. The log says what it did: when
     // (wall clock), how it stood and what it saw.
     // The enemy answered winds up no crushing blow (issue #80): the answers
@@ -446,6 +458,15 @@ Item {
                 log.dodge = Object.assign({shot: shotToDodge}, what)
                 p.dash()
                 guardMode = ""
+            }
+        } else if (guardMode === "perfectShot") {
+            let s = game._shotById[shotToDodge]
+            if (s && !s.destroyed && _distTo(p, s) <= 0.9) {
+                _face(p, s)
+                log.raise = Object.assign({shot: shotToDodge}, what)
+                p.mana = p.maxMana
+                p.isBlocking = true
+                guardMode = "raised"
             }
         } else if (guardMode === "pushing") {
             // What the knight does while the dash lasts
