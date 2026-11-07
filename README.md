@@ -265,7 +265,8 @@ and the one it has.
 The joiner's knight answers one of the host's enemies: it stands until the
 enemy walks into its reach and swings, parries it, blocks, blocks
 perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it as it closes in and
-kills it while the host's knight kills another. Each answer counts once,
+kills it while the host's knight kills another; the host gives that enemy
+200 HP first, so it stands until the kill. Each answer counts once,
 on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by

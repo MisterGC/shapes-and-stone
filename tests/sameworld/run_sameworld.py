@@ -940,7 +940,9 @@ def run(args, loader, tmp, procs, result, check):
         # The answers are timed on b's parry window, which a crushing blow
         # does not open: b winds up none
         check(H.eval1(f"noCrush('{b}')") is True, f"the host's {b} winds up no crushing blow")
-        H.eval([f"placeBeside('{a}')"])
+        H.eval([f"placeBeside('{a}')", f"sturdy('{b}', 200)"])
+        check(wait_for(lambda: J.eval1(f"hpOf('{b}')") == H.eval1(f"hpOf('{b}')") >= 200, 5, 0.05),
+              f"the host gives {b} 200 HP for the checks on it, and the joiner shows them")
         H.eval(["record(true)"])
         J.eval(["record(true)"])
         host_rec, join_rec = [], []
