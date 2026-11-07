@@ -2035,7 +2035,54 @@ danger, a depth plus a position in its range (`2.5`), and `--depth d` at
 the bottom of depth d's: the lineup stays the table's, the enemies hit as
 hard as there, and the same seed and danger give the same numbers. It
 exits 0 once the room is cleared or the knight has fallen. A fight takes
-about a minute of wall clock.
+about ten seconds of wall clock.
+
+The fight bench also measures a fight's pace (issue #267): whether a room
+flows - weak and normal enemies falling to a stroke or two, kill after
+kill - or is a duel that a button-masher loses and a reader of its rhythm
+wins. `--room flow` fills the fight room with fodder only, `--room duel`
+with a room's lead alone, a tough enemy (`Balance.pacing`), and in both the
+knight has the sword level it usually has at that depth (`--sword` sets
+another). Three more answers are the pacing pilots: `charge` holds a full
+charge and lets go at the nearest enemy, `masher` clicks, `skilled`
+parries, perfect-blocks and strikes in openings. `--pacing` plays both
+rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all three
+pilots, four loaders at a time, in about 15 s:
+
+```
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
+```
+
+It prints each fight: per enemy its hits to kill and its time to kill,
+from the first blow that landed and from the moment it engaged; the gaps
+between kills, the time engaged, the damage taken, the openings (an enemy
+staggered by a parry, a perfect block or a broken guard) and the charges a
+hit cancelled; and what a player would have heard. `--check` adds one PASS
+or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
+in the flow room each enemy dies to as many hits as `flowHits` gives the
+pilot and no two kills lie more than `flowGap` seconds apart; in the duel
+`masher` and `charge` take at least `duelSlow` seconds or fall, and
+`skilled` kills the lead within `duelSkilled` and takes less damage than
+both. Until the fights have their two rhythms (#266) the duel bands fail,
+and the CI job `slow-benches` runs `--check` without failing the build;
+the change that makes them pass makes it fail on red. Its report is kept
+as the run's `pacing` artifact.
+
+Nothing is heard in a bench: the game is muted and the loader starts with
+`CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
+like CI's runner. What would have been heard is the game's sound log: with
+`logSounds` on (the bench sets it, the dojo can with `eval logSounds =
+true`), every sound the game plays in the world goes into `soundLog` as
+`{t, cue, what, pitch, dist, gain}` - the seconds on the physics clock, the
+cue of `sound/cues.json`, the moment that sounds (`hit`, `heavySwing`,
+`scream`), the semitones off the cue's own, the distance from the knight
+and the gain - and `musicTrace` follows the song: its `state`, `segment`,
+`intensity` and whether it plays, a row whenever one changes. The bench
+steps the music's intensity on the physics clock (`followFightOnSteps`), so
+the same seed gives the same log and trace too. `--json` writes both in
+full. The two rooms are the dojo's scenarios `flow` and `duel` too: a
+reload lands in them, and an edit of `Balance.pacing` changes who stands
+there.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
