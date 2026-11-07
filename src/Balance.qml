@@ -530,6 +530,20 @@ QtObject {
         word: "OPEN"
     })
 
+    // A duel sounds and looks like one (issue #273). While a room's lead
+    // within music.reach of the knight is after it - not patrolling, not
+    // halted - the dungeon song plays its duel part, and its flow part
+    // again once the lead has fallen, given up or is out of reach; the
+    // song moves on the next bar. The lead growls as it spots the knight,
+    // at growlVolume, fading with the distance as the scream does. The
+    // song's sting plays on its next beat for every parry and perfect block
+    // of the knight in a duel and every opening of a lead within reach,
+    // one in stingGap seconds of the physics clock
+    readonly property var duel: ({
+        growlVolume: 0.8,
+        stingGap: 0.25
+    })
+
     // A dungeon's danger is its depth plus a position in [0, 1) in that
     // depth's range. Leaving a dungeon moves the position pull of the way
     // toward what it earned: 1 less the share of max HP the knights lost

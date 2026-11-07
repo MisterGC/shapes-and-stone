@@ -89,6 +89,9 @@ Window {
         [() => game.player && song() && song().playing && alive().length >= 3, () => {
             game.player.hp = 100000
             Clayground.paused = true
+            // The plain fight: no room's lead among them, whose duel moves
+            // the song to its duel part
+            for (let e of alive()) e.lead = false
             set(0, 0)
         }],
         [800, () => {

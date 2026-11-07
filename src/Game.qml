@@ -135,12 +135,15 @@ ClayWorld2d {
         level: muted ? 0 : 0.4 * musicVolume
     }
 
-    // The dungeon's song follows the fight: its intensity is fightIntensity
+    // The dungeon's song follows the fight: its intensity is fightIntensity,
+    // and while a room's lead is engaged it plays its duel part
+    // (Balance.duel)
     SongMusic {
         id: dungeonMusic
         source: "../sound/music/dungeon.song.json"
         level: muted ? 0 : 0.3 * musicVolume
         intensity: world.fightIntensity
+        state: world.duelEngaged ? "duel" : "flow"
     }
 
     AmbienceBed {
@@ -165,6 +168,12 @@ ClayWorld2d {
     // steps the world sets, so the same steps give the same music
     property int fightersNear: 0
     property real fightIntensity: 0
+    // The room's lead in this knight's duel (Balance.duel): within reach
+    // and after a knight - not patrolling, not halted - from its
+    // replicated lead and aiState, so a joined knight hears its own duel;
+    // null when there is none
+    property var duelLead: null
+    readonly property bool duelEngaged: duelLead !== null
     property bool followFightOnSteps: false
     readonly property bool _followingFight: levelType === "dungeon" && player !== null
     Timer {
@@ -178,16 +187,20 @@ ClayWorld2d {
     function _stopFollowingFight() {
         fightersNear = 0
         fightIntensity = 0
+        duelLead = null
     }
     function _followFight(dt) {
-        let cfg = Balance.music, near = 0
+        let cfg = Balance.music, near = 0, lead = null
         if (player) {
             for (let e of enemies) {
-                if (!e || e.destroyed || cfg.engaged.indexOf(e.aiState) < 0) continue
-                if (Math.hypot(e.xWu - player.xWu, e.yWu - player.yWu) <= cfg.reach) near++
+                if (!e || e.destroyed) continue
+                if (Math.hypot(e.xWu - player.xWu, e.yWu - player.yWu) > cfg.reach) continue
+                if (cfg.engaged.indexOf(e.aiState) >= 0) near++
+                if (e.lead && !lead && e.aiState !== "patrol" && e.aiState !== "idle") lead = e
             }
         }
         fightersNear = near
+        if (duelLead !== lead) duelLead = lead
         let goal = Math.min(1, near / cfg.fullAt)
         let step = (goal > fightIntensity ? cfg.rise : cfg.fall) * dt
         fightIntensity = goal > fightIntensity ? Math.min(goal, fightIntensity + step)
@@ -541,10 +554,11 @@ ClayWorld2d {
     }
 
     // A room's lead spots the knight: its growl, fading as the scream does
+    // (Balance.duel)
     SfxPlayer {
         id: leadGrowlSound
         source: "../sound/sfx/lead_growl.sfx.json"
-        volume: muted ? 0 : 0.8 * soundVolume
+        volume: muted ? 0 : Balance.duel.growlVolume * soundVolume
     }
     function playLeadGrowl(xWu, yWu) {
         let gain = 1
@@ -556,6 +570,27 @@ ClayWorld2d {
             leadGrowlSound.play(gain)
             logSound("sfx/lead_growl", "growl", 0, _distTo(xWu, yWu), gain)
         }
+    }
+
+    // The dungeon song's sting (Balance.duel): for a parry or a perfect
+    // block of this knight in a duel, and an opening of a lead within its
+    // reach; on the song's next beat, one in stingGap seconds of the
+    // physics clock, so a parry that opens the lead stings once
+    property real _stungAt: -1
+    function playSting() {
+        if (!dungeonMusic.playing) return
+        if (_stungAt >= 0 && physicsSeconds - _stungAt < Balance.duel.stingGap
+                && physicsSeconds >= _stungAt) return
+        _stungAt = physicsSeconds
+        dungeonMusic.playStinger("sting")
+        logSound("music/dungeon", "sting", 0, 0, 1)
+    }
+    // A lead opened, on this screen (Enemy.opening): within this knight's
+    // reach the sting
+    function leadOpened(enemy) {
+        if (!player || !enemy) return
+        if (Math.hypot(enemy.xWu - player.xWu, enemy.yWu - player.yWu) > Balance.music.reach) return
+        playSting()
     }
 
     // The NPCs' greetings are voiced lines of the sound factory
@@ -3056,9 +3091,15 @@ ClayWorld2d {
         switch (what) {
         case "dealt": r.damageDealt += amount; break
         case "taken": r.damageTaken += amount; break
-        case "parry": r.parries++; break
+        case "parry":
+            r.parries++
+            if (duelEngaged) playSting()
+            break
         case "block": r.blocks++; break
-        case "perfectBlock": r.perfectBlocks++; break
+        case "perfectBlock":
+            r.perfectBlocks++
+            if (duelEngaged) playSting()
+            break
         case "crushed": r.crushed++; break
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
