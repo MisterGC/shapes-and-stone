@@ -13,6 +13,14 @@
 // physicsSeconds it played at; with followFightOnSteps on the intensity
 // stands while no physics step runs and moves with the steps, and
 // musicTrace gets a row once it has moved musicTraceStep.
+// A duel (issue #273, Balance.duel): a room's lead patrolling near the
+// knight is none; as it spots the knight it growls and the song's state is
+// its duel part, which the song moves to on the next bar where an audio
+// output runs it (with none its playhead stands, clayground#507, and the
+// segment is skipped); a parry in the duel and the lead's opening each
+// sting once, the opening plays the slow motion - the physics at
+// slowScale for slowTime of the physics clock, the same steps every run -
+// and the lead's fall brings the flow part back.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -78,6 +86,9 @@ Window {
         return Math.sqrt(sum / Math.max(1, to - from))
     }
     property real lastIntensity: 0
+    property var duelLead: null
+    property real segmentWait: 0
+    property real positionBefore: 0
     function r3(v) { return Math.round(v * 1000) / 1000 }
     function lastSound() { return game.soundLog[game.soundLog.length - 1] }
 
@@ -89,8 +100,7 @@ Window {
         [() => game.player && song() && song().playing && alive().length >= 3, () => {
             game.player.hp = 100000
             Clayground.paused = true
-            // The plain fight: no room's lead among them, whose duel moves
-            // the song to its duel part
+            // The plain fight first: no room's lead among them
             for (let e of alive()) e.lead = false
             set(0, 0)
         }],
@@ -98,7 +108,7 @@ Window {
             let s = song()
             check(game.fightersNear === 0 && game.fightIntensity === 0 && s.intensity === 0,
                   "no enemy after the knight: the dungeon song plays at intensity 0 (" + s.intensity + ")")
-            check(s.loaded && s.version === 2 && s.segment === "flow",
+            check(s.loaded && s.version === 2 && s.segment === "flow" && s.state === "flow",
                   "it is the dungeon song, in its " + s.segment + " part")
             set(3, 2)
         }],
@@ -184,6 +194,76 @@ Window {
                   && moved.playing === true && moved.t > 0 && moved.t <= r3(game.physicsSeconds),
                   "the music trace gets a row once the intensity has moved musicTraceStep: "
                   + JSON.stringify(moved) + ", " + rows.length + " rows")
+            // A room's lead, patrolling 3 wu off the knight, the others away
+            set(0, 0)
+            duelLead = alive()[0]
+            duelLead.lead = true
+            duelLead.xWu = game.player.xWu + 3
+            duelLead.yWu = game.player.yWu
+            duelLead.aiState = "patrol"
+            game.clearSoundLog()
+            game.physicsSeconds = 0
+            // Followed without a step, on which its AI would spot the knight
+            game._followFight(0)
+            check(!game.duelEngaged && song().state === "flow",
+                  "a room's lead patrolling near the knight is no duel: the song's state is " + song().state)
+            duelLead.aiState = "chase"
+            let growl = game.soundLog.find(r => r.what === "growl")
+            check(growl !== undefined && growl.cue === "sfx/lead_growl" && Math.abs(growl.dist - 3) < 0.01
+                  && game.soundLog.filter(r => r.cue === "sfx/lead_growl").length === 1,
+                  "as it spots the knight the lead growls once, 3 wu off: " + JSON.stringify(growl))
+            Clayground.physicsStep(1)
+            let trace = game.musicTrace.find(m => m.state === "duel")
+            check(game.duelEngaged && game.duelLead === duelLead && song().state === "duel" && trace !== undefined
+                  && trace.t === r3(game.physicsSeconds),
+                  "on the next physics step the song's state is its duel part, in the music trace at "
+                  + (trace ? trace.t : "-") + " s: " + JSON.stringify(trace))
+            segmentWait = Date.now()
+            positionBefore = song().position
+        }],
+        // The song moves on its next bar, on the audio output's clock
+        [() => song().segment === "duel" || Date.now() - segmentWait > 4000, () => {
+            let s = song()
+            if (s.segment === "duel")
+                check(true, "the song moves to its duel part on the next bar (" + (Date.now() - segmentWait)
+                      + " ms)")
+            else if (s.position === positionBefore)
+                console.log("[FightMusic] SKIP no audio output runs the song (its playhead stands at "
+                            + s.position + "), so its segment stays " + s.segment + " (clayground#507)")
+            else
+                check(false, "the song moves to its duel part on the next bar: still " + s.segment
+                      + " after 4 s, its playhead moving")
+            // A parry in the duel stings, and one more at once does not
+            let from = game.soundLog.length
+            game.countFight("parry")
+            game.countFight("parry")
+            let stings = game.soundLog.slice(from).filter(r => r.what === "sting")
+            check(stings.length === 1 && stings[0].cue === "music/dungeon",
+                  "a parry in the duel plays the song's sting, two in a moment one: " + JSON.stringify(stings))
+            Clayground.physicsStep(30)
+            from = game.soundLog.length
+            duelLead.open("parry")
+            stings = game.soundLog.slice(from).filter(r => r.what === "sting")
+            check(duelLead.opening && stings.length === 1, "the lead's opening stings: " + JSON.stringify(stings))
+            let d = Balance.duel
+            check(game.slowing && Math.abs(game.slowLeft - d.slowTime) < 1e-9
+                  && Math.abs(game.physics.timeScale - Clayground.timeScale * d.slowScale) < 1e-6,
+                  "the opening plays the slow motion: the physics at " + game.physics.timeScale.toFixed(2)
+                  + " for " + game.slowLeft.toFixed(3) + " s of the physics clock")
+            let steps = Math.round(d.slowTime * 60)
+            Clayground.physicsStep(steps - 1)
+            let still = game.slowing
+            Clayground.physicsStep(1)
+            check(still && !game.slowing && game.physics.timeScale === Clayground.timeScale,
+                  "it ends on the " + steps + "th physics step (slowTime " + d.slowTime + " s), the time scale "
+                  + game.physics.timeScale + " again")
+            // The lead falls: the flow part again
+            duelLead.die()
+            Clayground.physicsStep(1)
+            check(!game.duelEngaged && song().state === "flow"
+                  && game.musicTrace[game.musicTrace.length - 1].state === "flow",
+                  "the lead falls: the song's state is its flow part again, in the trace at "
+                  + game.musicTrace[game.musicTrace.length - 1].t + " s")
             game.followFightOnSteps = false
             game.logSounds = false
             set(0, 0)
