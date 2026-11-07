@@ -127,13 +127,16 @@ Item {
     // id, kind, what it was on this screen when it arrived]
     // (Session.enemyBlowReceived); a push's carries its direction (dx, dy),
     // the enemy's position and the sender's knight's as this screen shows
-    // them, a stagger's its length in seconds
+    // them, a stagger's its length in seconds, a damage's and an open's the
+    // cause it opens a lead with (issue #271)
     property var received: []
     Connections {
         target: bench.session
         function onEnemyBlowReceived(fromId, blow) {
             let e = bench._byId()[blow.id], k = bench.session.remotePlayers[fromId]
             let at = blow.kind === "stagger" ? {seconds: blow.seconds === undefined ? null : blow.seconds}
+                   : blow.kind === "damage" ? {opens: blow.opens || ""}
+                   : blow.kind === "open" ? {opens: blow.cause || ""}
                    : blow.kind !== "push" ? null
                    : {dx: bench.r3(blow.dx), dy: bench.r3(blow.dy),
                       enemy: e ? [bench.r3(e.xWu), bench.r3(e.yWu)] : null,
@@ -212,6 +215,21 @@ Item {
     }
     // How often each enemy entered "stagger" since record(true)
     property var staggers: ({})
+    // How often each lead opened since record(true) (Enemy.opening)
+    property var openings: ({})
+    // Host: enemy id is a room's lead (on) or none, on every screen: the
+    // lead is replicated. A lead it makes winds up no crushing blow, so the
+    // parry the bench tries finds a window
+    function makeLead(id, on) {
+        let e = _byId()[id]
+        if (!e) return false
+        e.lead = on
+        if (on) e.crushChance = 0
+        return true
+    }
+    // Whether enemy id is a room's lead on this screen, and open now
+    function leadOf(id) { let e = _byId()[id]; return e ? e.lead : null }
+    function openingOf(id) { let e = _byId()[id]; return e ? e.opening : null }
 
     // The knight a step beside enemy id, facing it; the knights cannot fall
     function placeBeside(id) {
@@ -470,7 +488,12 @@ Item {
     // ---- the record: every enemy on this screen, every frame ----
     property bool recording: false
     property var _samples: []
-    function record(on) { recording = on; _samples = []; _passed = {}; if (on) staggers = {} }
+    function record(on) {
+        recording = on
+        _samples = []
+        _passed = {}
+        if (on) { staggers = {}; openings = {} }
+    }
     // The AI states and HPs each enemy took since the last frame: one can
     // last less than a frame (a lunge lands and a blow staggers it at once)
     // and still be sent, and so be shown by the other screen
@@ -490,6 +513,9 @@ Item {
                 if (en.aiState === "stagger") bench.staggers[id] = (bench.staggers[id] || 0) + 1
             })
             en.hpChanged.connect(() => bench._note(id, "h", en.hp))
+            en.openingChanged.connect(() => {
+                if (en.opening) bench.openings[id] = (bench.openings[id] || 0) + 1
+            })
         }
     }
     // One record: enemies() plus, per enemy, the states and HPs it took
