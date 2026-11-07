@@ -76,10 +76,8 @@ jobs:
   # own beside the quick ones. The fight bench's pacing run (issue #267)
   # plays the flow and the duel room at the depths of Balance.pacing with
   # its three pilots, offscreen and muted on a runner with no audio output
-  # device, and checks the bands. Its bands fail on purpose until the fights
-  # have their two rhythms (#266): till then a red check is reported here
-  # and does not fail the job (continue-on-error), and the change whose
-  # bands pass takes continue-on-error out.
+  # device, and checks the bands. Since a room's lead has its stance (#271)
+  # every band passes, and a red one fails the job.
   slow-benches:
     runs-on: ubuntu-latest
 
@@ -121,7 +119,6 @@ jobs:
       run: cmake --build build --target shapes_and_stone clayliveloader
 
     - name: Fight bench, pacing
-      continue-on-error: true
       run: python3 tests/fightbench/run_fightbench.py --pacing --check --json pacing.json
 
     - name: Keep the pacing report
