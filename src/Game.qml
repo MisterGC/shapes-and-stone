@@ -8307,9 +8307,12 @@ ClayWorld2d {
     }
 
     // --- Fight Room ---
-    function enterFightRoom() {
+    // lineup is who stands in it, as Balance.spawn.fightRoom; its roster
+    // (fightRoomRoster) when left out
+    function enterFightRoom(lineup) {
         console.log("[Game] Entering fight room")
         clearDungeon()
+        _fightLineup = lineup || null
         fightRoomActive = true
         let a = _buildArena(15)
 
@@ -8398,8 +8401,9 @@ ClayWorld2d {
     // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo
     // eval can set it to try a fight against one enemy
     property var fightRoomRoster: Balance.spawn.fightRoom
+    property var _fightLineup: null
     function _spawnFightRoomEnemies() {
-        for (let e of fightRoomRoster)
+        for (let e of (_fightLineup || fightRoomRoster))
             spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 
@@ -8419,7 +8423,9 @@ ClayWorld2d {
     // "deep" is a walled room with a vein in its north wall and the knight
     // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
     // hole, a miner and a lost traveller before its rock face and a special
-    function scenarios() { return ["dungeon", "village", "fight", "features", "deep"] }
+    // "flow" and "duel" are the fight room with the pacing bench's rooms
+    // (Balance.pacing): fodder only, and a room's lead alone
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8451,6 +8457,8 @@ ClayWorld2d {
         _startRunRecord()
         if (name === "fight")
             enterFightRoom()
+        else if (name === "flow" || name === "duel")
+            enterFightRoom(Balance.pacing[name])
         else if (name === "deep")
             enterDeepRoom()
         else if (name === "village")

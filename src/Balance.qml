@@ -447,6 +447,45 @@ QtObject {
         atk: 0.5
     })
 
+    // A fight's pace (issue #267): the fight bench's pacing run
+    // (tests/fightbench/run_fightbench.py --pacing) plays the flow room and
+    // the duel room in the dojo's fight room at each of depths, the knight
+    // with the sword level it usually has there - the highest the smith
+    // has sold by then (shop.levelDepth): 0 at depth 0, I at 2, II at 4 -
+    // and each played by three pilots: "charge" holds a full charge and
+    // lets go at the nearest enemy, "masher" clicks, "skilled" parries,
+    // perfect-blocks and strikes in openings. --check fails a fight outside
+    // these bands
+    readonly property var pacing: ({
+        depths: [0, 2, 4],
+        // Who stands where, offset in wu from the room's centre, as
+        // spawn.fightRoom. Flow: fodder only, weak and normal enemies
+        flow: [
+            { dx: 4, dy: 2, tier: 0, type: "grunt" },
+            { dx: -4, dy: 2, tier: 0, type: "grunt" },
+            { dx: 3, dy: -3, tier: 1, type: "grunt" },
+            { dx: -3, dy: -3, tier: 1, type: "spitter" },
+            { dx: 0, dy: 4, tier: 1, type: "guardian" }
+        ],
+        // Duel: a room's lead alone, a tough enemy
+        duel: [
+            { dx: 0, dy: 4, tier: 2, type: "grunt" }
+        ],
+        // Flow, every pilot: each enemy dies to as many blows that land as
+        // flowHits gives that pilot, from the first number to the second -
+        // one charged swing, two or three swings, parries among them for
+        // "skilled" -, no two kills lie more than flowGap seconds apart, and
+        // the knight does not fall
+        flowHits: { charge: [1, 1], masher: [2, 3], skilled: [1, 3] },
+        flowGap: 2.5,
+        // Duel: "masher" and "charge" take at least duelSlow seconds to
+        // kill the lead, from the moment it engages, or fall; "skilled"
+        // kills it within duelSkilled seconds and does not fall, and takes
+        // less damage than either of the others
+        duelSlow: 20,
+        duelSkilled: [6, 15]
+    })
+
     // A dungeon's danger is its depth plus a position in [0, 1) in that
     // depth's range. Leaving a dungeon moves the position pull of the way
     // toward what it earned: 1 less the share of max HP the knights lost
