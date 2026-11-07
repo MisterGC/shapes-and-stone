@@ -144,7 +144,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -174,7 +174,7 @@ The other benches run by hand, each with the command in its section below:
 - Two processes over the network, or the dojo's synthetic pad, through the
   live loader (`-DCLAYGROUND_WITH_TOOLS=ON`): `sameworld`, `revive`,
   `goagain`, `recordparty`, `dangerparty`, `breakparty`, `spikeparty`,
-  `slitparty`, `doorparty`, `secretparty`, `veinparty`, `holeparty`,
+  `slitparty`, `doorparty`, `bossparty`, `secretparty`, `veinparty`, `holeparty`,
   `talkparty`, `masterparty`, `padknight`, `netbench` and the fight bench
   (`run_fightbench.py`, `run_reload.py`); `--mode cloud` needs the internet.
 - `deck`, through `clayrender` in a graphics session.
@@ -317,10 +317,10 @@ it, where it came from, and a person's verdict once it has been heard.
 - **Ambience** beds are recipes too, `sound/ambience/<name>.sfx.json`, of
   10 s each that fade in and out; `AmbienceBed.qml` plays the next take
   8.5 s after the last, so they cross.
-- **Music** is three songs, `sound/music/<name>.score` in the factory's note
+- **Music** is four songs, `sound/music/<name>.score` in the factory's note
   notation, compiled by `sp compose` to `<name>.song.json`, which
-  `SongPlayer` plays live (`SongMusic.qml`): the title's, the camp's and the
-  dungeon's. The dungeon's song follows the fight: its intensity is how many
+  `SongPlayer` plays live (`SongMusic.qml`): the title's, the camp's, the
+  dungeon's and the Hollow Warden's. The dungeon's song follows the fight: its intensity is how many
   enemies within reach are after the knight, out of three
   (`Balance.music`), eased up fast and down slowly. A pulse of kick and
   snare comes in from 0.15 to 0.5, a horn's counter-line and brushes from
@@ -329,7 +329,11 @@ it, where it came from, and a person's verdict once it has been heard.
   the kick, a drone on A and E, the bass on the root and a harp's E ticking
   late in each bar. Its `sting`, a brass stab of A3, E4 and A4 with the
   harp's E5 up to A5, plays on the next beat for every parry and every
-  opening in a duel.
+  opening in a duel. The Warden's song (issue #274) plays in its place
+  from the moment the boss room shuts until the Warden falls, in A minor
+  too: its part `one`, a low choir, the bass tolling the root and a brass
+  call, and from the Warden's phase 2 on its part `two`, the bass running
+  in eighths under kick, snare and hat, moving on the next bar.
 - **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
   the knight's whirlwind shout are lines of the voice scripts
   `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
@@ -2089,6 +2093,77 @@ window on every beat:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/strings/strings.qml
 ```
 
+Every third dungeon ends in a boss room (issue #274, the table's `boss`
+group): at depth 2, 5, 8 and so on the dungeon's last room, the one the
+exit stairs' shaft leaves from, holds the Hollow Warden alone - no other
+enemy, feature, trap, wooden door or secret room in it. An iron gate
+(`BossGate.qml`) stands in every way into the room and one in the shaft.
+The ways in stand open until every knight still standing is in the room;
+then they shut, the Warden wakes, its name shows as a banner and its HP
+as a bar under the screen. The shaft's gate opens only when it falls, the
+ways in with it; a fall in the room ends the run as anywhere else. The
+Warden is a large hollow stone hexagon, `boss.size` wu a side, and a
+room's lead (`Enemy` type `warden`), counted among the rooms with a lead
+(`spawn.leadShare`), and in the dungeon's plan the witch reads: its
+stance, its openings and three
+strings of its own (`lead.strings.warden`) on a beat of `boss.beat`
+seconds. Each appearance is stronger: `boss.hp` times `1 + n *
+boss.hpGrow` HP for its n-th, with `depth.hp` and `party.hpPerKnight` on
+that as any enemy, and a tempo of `1 + n * boss.tempoGrow` that its beats
+are divided by. At `boss.phaseAt` of its HP its phase 2 begins: its core
+glows, `boss.adds` weak grunts come out of the floor round it and as many
+more at `boss.waveAt`, it plays `boss.phase2Tempo` times faster - beats,
+feint holds and count-ins -, the room's light turns to `boss.light` and its
+song to part two, and every `zone.every` seconds a floor zone
+(`BossZone.qml`) opens under each knight in the room: a ring of the slits'
+colour closes on it over `zone.warn` seconds, then the floor hurts a knight
+still standing on it, shield or not. Beaten, it drops `boss.gold` gold in
+`boss.drops` piles, a victory banner shows and every knight is healed to
+full HP and mana, a fallen one rises. `BossFight.qml` runs the fight: alone
+the game owns it, in a session the host - it wakes the Warden, calls the
+adds and opens the zones and the gates - and keeps it as the session
+property `boss`, so every screen shuts and opens its gates, shows the
+banners and draws the zones; each screen judges the zones under its own
+knight and heals its own knight. The Warden's `phase` and `dormant` are
+replicated with the rest of an enemy. The boss bench builds the dungeons of
+depths 0 to 8 and checks the boss rooms at exactly 2, 5 and 8, each the
+room of the exit's shaft, and the Warden's HP and tempo per appearance;
+then in the one at depth 2 it steps the knight into the room and checks
+the gates, the wake, the banner, the bar, the song's parts, phase 2 with
+its adds, tempo, light and core, a zone that hurts through a shield and one
+stepped out of, the second wave, and the fall with its gold, its open
+gates, its victory banner and the heal:
+
+```
+QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/boss/boss.qml
+```
+
+The dojo's `boss` scenario is the fight room with the Warden alone, its
+adds and zones in its phase 2, and `bossroom` the dungeon at the first boss
+depth at or past the danger given, the knight in the corridor at the
+Warden's door; an edit of the table's `boss` group changes the next fight
+after a reload. The boss capture renders one frame of the fight with
+Clayground's `clayrender` - `shot` `"banner"`, `"phase1"`, `"phase2"` or
+`"victory"` - with the copied shaders:
+
+```
+clayrender tests/boss/Capture.qml --out boss.png --size 1100x700 --set 'shot="phase2"' --wait-for 'ready' --settle
+```
+
+The boss party bench checks it over the network: a host and a joiner go
+down to depth 2; both build the boss room with the same gates and show the
+same Warden asleep, its HP the table's for two knights; with one knight in
+the room it stays open on both screens, with both in it shuts on both and
+the Warden wakes; struck to its phase 2 it shows on both with the same
+adds by id, the light turned and the host's zones; when it falls every
+gate opens on both, both show the victory banner and each heals its
+knight. It needs the live loader and exits with the number of failed
+checks:
+
+```
+python3 tests/bossparty/run_bossparty.py --mode local
+```
+
 The ring bench steps a grunt's wind-up in the paused fight room and saves
 it as `ring-0.png`, `ring-50.png` and `ring-100.png` (the parry window
 opening), then the tough guardian's crushing wind-up half way as
@@ -2149,7 +2224,7 @@ rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all three
 pilots, four loaders at a time, in about 15 s:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel boss] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,
@@ -2193,9 +2268,16 @@ and the gain - and `musicTrace` follows the song: its `state`, `segment`,
 `intensity` and whether it plays, a row whenever one changes. The bench
 steps the music's intensity on the physics clock (`followFightOnSteps`), so
 the same seed gives the same log and trace too. `--json` writes both in
-full. The two rooms are the dojo's scenarios `flow` and `duel` too: a
-reload lands in them, and an edit of `Balance.pacing` changes who stands
-there.
+full. The third room, `boss` (issue #274), is the Hollow Warden alone, its
+adds coming in its phase 2, at the boss depths' first appearance for depth
+0 and 2 and the next one's for 4; its report adds when the Warden's phase 2
+began, the adds it called, the zones it opened and those that hurt the
+knight. The skilled pilot steps out of a zone while it warns. At
+`bossDepth` `--check` adds its bands: `skilled` kills the Warden within
+`bossSkilled` seconds of its engagement and does not fall, `masher` falls
+or takes at least `bossSlow` times as long. The three rooms are the dojo's
+scenarios `flow`, `duel` and `boss` too: a reload lands in them, and an
+edit of `Balance.pacing` changes who stands there.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
@@ -2698,27 +2780,28 @@ Three enemy types — enough for variety, simple enough for solo dev.
 
 ### Boss: The Hollow Warden
 
-First boss. Guardian of the first descent. Tests mastery of blocking and timing.
+The boss of every third dungeon (issue #274, built in place of the first
+playable's boss): guardian of the descent, a duel that tests reading a
+rhythm. Its numbers are the table's `boss` group.
 
 | Attribute | Value |
 |-----------|-------|
-| **Shape** | Large Square (64x64) with rotating inner square |
-| **Color** | Dark Iron (#2F3640) with pulsing red core |
-| **Health** | 200 |
+| **Shape** | Large hollow stone hexagon, a frame turning in its hollow |
+| **Color** | Stone grey (#4A4E57), its core glowing orange-red (#FF5A2A) in phase 2 |
+| **Health** | 2500 at its first appearance, 35 % more each time after, with depth and party |
 | **Phases** | 2 |
 
-**Phase 1 (100%-50% HP):**
+**Phase 1 (100%-50% HP):** three strings of strikes, rests and a feint on
+a slow beat, each appearance a little faster. Parries, perfect blocks and
+a charged swing into its recovery open it.
 
-- **Slow Slam:** Telegraphs for 1 second (raises up), slams down dealing 30 damage in area. Blockable.
-- **Summon:** Every 20 seconds, spawns 2 Grunts.
+**Phase 2 (below 50% HP):** three weak grunts come out of the floor, three
+more at 25 %; it plays its strings 25 % faster; every few seconds a zone
+opens under each knight, warns with the slits' closing ring, then hurts;
+the room's light turns red and its song moves to its second part.
 
-**Phase 2 (Below 50% HP):**
-
-- Core turns bright red, movement speed increases by 30%
-- **Charge:** Telegraphs for 0.5 seconds, charges across room. 25 damage. Must dodge, not block.
-- **Slam** remains but faster telegraph (0.7 seconds)
-
-**Victory:** Boss dissolves into particles. Exit opens. Gold shower. Triumphant music sting.
+**Victory:** its gates open, the exit's too. A large pile of gold, a
+victory banner, and every knight healed to full HP and mana.
 
 ---
 
