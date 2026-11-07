@@ -1074,12 +1074,12 @@ ClayWorld2d {
         onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
         onShotReceived: (shot) => {
-            if (screen !== "game") return
+            if (screen !== "game" || _shotsBack[shot.id]) return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
             playSpitShot(shot.x, shot.y)
         }
         onStruckReported: (fromId, report) => {
-            if (report.source === "shot") _endShot(report.id, report.result)
+            if (report.source === "shot") _shotReported(report)
             else if (report.source === "arrow") _arrowReported(report)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
@@ -3191,6 +3191,10 @@ ClayWorld2d {
         // Whirlwinds that hit an enemy, and the enemies they hit
         property int whirlwinds: 0
         property int whirlHits: 0
+        // Shots this knight's perfect block sent back, and the ones of them
+        // that hit an enemy (Balance.projectile)
+        property int shotsBack: 0
+        property int shotBackHits: 0
         property int kills: 0
         // Kill chains of two links or more (Balance.chain), and the
         // longest one's links
@@ -3208,6 +3212,7 @@ ClayWorld2d {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
+        r.shotsBack = 0; r.shotBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
         r.seconds = 0; r.clearSeconds = -1
@@ -3216,7 +3221,8 @@ ClayWorld2d {
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
-    // enemy it hit), kill, chain (a kill made a chain amount links long),
+    // enemy it hit), shotBack (a perfect block sent a shot back),
+    // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
     // --- The kill chain (Balance.chain, issue #270) ---
@@ -3264,6 +3270,8 @@ ClayWorld2d {
         case "crushed": r.crushed++; break
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
+        case "shotBack": r.shotsBack++; break
+        case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break
         case "lift": r.lifts++; break
         case "lifted": r.lifted++; break
@@ -6065,7 +6073,8 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catEnemy,
-            collidesWith: catWall | catPlayer | catProp
+            // A shot's sensor: a shot sent back hits it
+            collidesWith: catWall | catPlayer | catProp | catProjectile
         }))
         if (enemy) {
             console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp,
@@ -6101,28 +6110,73 @@ ClayWorld2d {
     // knight. That node judges it by its knight's own state - hit, blocked,
     // dodged - and reports it, and the shot goes on every screen
     // (issue #18). One that meets no knight bursts on each screen alone.
+    // A perfect block sends it back (issue #283): the knight's node sends
+    // it back from where its shield met it, and every other node sends its
+    // shot of that id back from there too when the report comes. The node
+    // that sent it back judges the enemy it hits and reports that it went.
     property int _shotCount: 0
     property var _shotById: ({})
+    // The shots sent back on this screen, by id: one arriving after its
+    // report flies no more on its way to the knight
+    property var _shotsBack: ({})
     // A shot met a knight: this node's (local) or another's, which reported
-    // it; result as Player.takeDamage's, "blocked" for a deflected one
+    // it; result as Player.takeDamage's, "blocked" for a deflected one,
+    // "perfect" for one a perfect block sent back, which flies on, and
+    // "enemy" for one sent back that hit an enemy
     signal shotEnded(string shotId, string result, bool local)
+    // A perfect block sent shot id back: this node's knight's (local) or
+    // another's, which reported it
+    signal shotSentBack(string shotId, bool local)
     function spawnProjectile(px, py, dirX, dirY, damage) {
         let id = "shot" + (++_shotCount)
         if (session.connected && session.isHost)
             session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage})
         _flyShot(id, px, py, dirX, dirY, damage)
     }
-    // This node's knight met shot id
-    function shotLanded(id, result) {
+    // This node's knight met shot id; sent back ("perfect") from (x, y)
+    function shotLanded(id, result, x, y) {
         shotEnded(id, result, true)
-        if (session.connected) session.reportStruck({source: "shot", id: id, result: result})
+        let report = {source: "shot", id: id, result: result}
+        if (result === "perfect") {
+            let proj = _shotById[id]
+            _shotsBack[id] = true
+            countFight("shotBack")
+            shotSentBack(id, true)
+            report.x = x
+            report.y = y
+            if (proj) { report.dx = proj.dirX; report.dy = proj.dirY }
+        }
+        if (session.connected) session.reportStruck(report)
     }
     // Another node's knight met shot id: it goes here too, its impact is
-    // the other node's
+    // the other node's; sent back, it flies back here too
     function _endShot(id, result) {
         let proj = _shotById[id]
         if (proj && !proj.destroyed) proj.vanish()
         shotEnded(id, result, false)
+    }
+    function _shotReported(r) {
+        if (r.result !== "perfect") {
+            _endShot(r.id, r.result)
+            return
+        }
+        // From where that node's shield met it, the way it flies back. A
+        // shot already gone here flies again from there
+        let proj = _shotById[r.id]
+        if (!proj || proj.destroyed) {
+            _flyShot(r.id, r.x, r.y, -r.dx, -r.dy, 0)
+            proj = _shotById[r.id]
+        }
+        _shotsBack[r.id] = true
+        if (proj) {
+            proj.xWu = r.x
+            proj.yWu = r.y
+            proj.dirX = -r.dx
+            proj.dirY = -r.dy
+            proj.sendBack(false, 0)
+        }
+        shotEnded(r.id, r.result, false)
+        shotSentBack(r.id, false)
     }
     function _flyShot(id, px, py, dirX, dirY, damage) {
         let proj = projectileComponent.createObject(world.room, {
@@ -6137,9 +6191,10 @@ ClayWorld2d {
             // Solid fixture: collides with walls
             categories: catProjectile,
             collidesWith: catWall,
-            // Sensor fixture: detects player
+            // Sensor fixture: detects the knight, and the enemy a shot
+            // sent back hits
             sensorCategories: catProjectile,
-            sensorCollidesWith: catPlayer
+            sensorCollidesWith: catPlayer | catEnemy
         })
         if (proj) {
             _shotById[id] = proj
@@ -6386,6 +6441,7 @@ ClayWorld2d {
             try { if (_shotById[id] && !_shotById[id].destroyed) _shotById[id].vanish() } catch(err) {}
         }
         _shotById = {}
+        _shotsBack = {}
 
         grid = []
         rooms = []

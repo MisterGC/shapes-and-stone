@@ -421,11 +421,18 @@ QtObject {
     })
 
     // A spitter's shot: size wu a side, flying from the spitter's centre
-    // at the knight's
+    // at the knight's.
+    // A perfect block sends it back (issue #283): from the shield back
+    // along its line at backSpeed, for lifetime seconds from there. It
+    // hurts no knight then, and the first enemy it meets takes backDamage
+    // times the swing (atk) of the knight that sent it back. A lead it
+    // hits is opened, the blow landing whole (Balance.lead)
     readonly property var projectile: ({
         speed: 5.0,
         lifetime: 3.0,
-        size: 0.3
+        size: 0.3,
+        backSpeed: 10.0,
+        backDamage: 1.0
     })
 
     readonly property var spawn: ({

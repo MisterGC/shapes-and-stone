@@ -15,6 +15,13 @@ PhysicsItem {
     property real speed: Balance.projectile.speed
     property int damage: Balance.enemy.spitter.atk
     property bool destroyed: false
+    // A perfect block sent it back (Balance.projectile, issue #283): it
+    // flies back along its line, hurts no knight and bursts on the first
+    // enemy it meets. Only the screen whose knight sent it back (own)
+    // deals that enemy backDamage; on the others it bursts there alone
+    property bool back: false
+    property bool ownBack: false
+    property int backDamage: 0
     // It went, on this screen
     signal gone()
 
@@ -37,7 +44,7 @@ PhysicsItem {
         offsetXWu: projectile.widthWu / 2
         offsetYWu: -projectile.heightWu / 2
         radius: 2.5
-        color: "#9ADD55"
+        color: projectile.back ? "#E8FFD0" : "#9ADD55"
         intensity: 0.9
         castsShadows: false
     }
@@ -58,7 +65,7 @@ PhysicsItem {
         width: parent.width
         height: parent.height
         radius: width * 0.5
-        color: "#8EBB5A"
+        color: projectile.back ? "#E8FFD0" : "#8EBB5A"
     }
 
     fixtures: [
@@ -94,6 +101,7 @@ PhysicsItem {
 
     // Burst when its lifetime of simulated time is over
     PhysicsTimer {
+        id: life
         world: projectile.world
         running: true
         interval: Balance.projectile.lifetime * 1000
@@ -107,21 +115,27 @@ PhysicsItem {
             die()
     }
 
+    // The sensor met a knight or an enemy: a shot on its way judges this
+    // screen's knight, one sent back the first enemy
     function onHitPlayer(other) {
         if (destroyed) return
         let entity = other.getBody().target
-        if (!entity || !entity.takeDamage || entity.objectName === "enemy") return
+        if (!entity) return
+        if (back) {
+            if (entity.objectName === "enemy") hitEnemy(entity)
+            return
+        }
+        if (!entity.takeDamage || entity.objectName === "enemy") return
 
-        // Shield blocks projectile completely
-        if (entity.isBlocking && entity.isShieldFacing(xWu, yWu, widthWu)) {
-            let sp = entity.getShieldWorldPos()
-            if (gameWorld) {
-                gameWorld.playBlock()
-                gameWorld.impact("projectileDeflected", sp.x, sp.y, dirX, dirY)
-                gameWorld.countFight("block")
-                if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, "blocked")
-            }
-            if (entity.payBlock) entity.payBlock()
+        // The shield stops it whole; raised just before, it sends it back
+        let shield = entity.shieldShot ? entity.shieldShot(xWu, yWu, widthWu, dirX, dirY) : ""
+        if (shield === "perfect") {
+            sendBack(true, Math.round(entity.atk * Balance.projectile.backDamage))
+            if (gameWorld && gameWorld.shotLanded) gameWorld.shotLanded(shotId, "perfect", xWu, yWu)
+            return
+        }
+        if (shield === "blocked") {
+            if (gameWorld && gameWorld.shotLanded) gameWorld.shotLanded(shotId, "blocked")
             vanish()
             return
         }
@@ -133,6 +147,38 @@ PhysicsItem {
                 gameWorld.spawnHurtNumber(entity.xWu, entity.yWu, damage, "#6B8E4A")
             }
             if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, result)
+        }
+        die()
+    }
+
+    // A perfect block sends it back along its line (Balance.projectile):
+    // own when this screen's knight did, dealing damage to the enemy it
+    // meets. Its lifetime starts again
+    function sendBack(own, damage) {
+        if (destroyed || back) return
+        back = true
+        ownBack = own
+        backDamage = damage
+        dirX = -dirX
+        dirY = -dirY
+        speed = Balance.projectile.backSpeed
+        life.restart()
+    }
+
+    // Sent back, it met enemy: it bursts there, and the screen whose
+    // knight sent it back deals the blow - a lead's stance breaks under
+    // it (Enemy.takeShot) - and tells the others it is gone
+    function hitEnemy(enemy) {
+        if (destroyed || !enemy || enemy.destroyed) return
+        if (ownBack && enemy.takeShot) {
+            let dealt = enemy.takeShot(backDamage, xWu - dirX, yWu - dirY)
+            if (gameWorld) {
+                // The knight's own hit sound: its blow came back
+                if (gameWorld.playImpact) gameWorld.playImpact()
+                gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dealt, "#E8FFD0")
+                if (gameWorld.countFight) gameWorld.countFight("shotBackHit")
+                if (gameWorld.shotLanded) gameWorld.shotLanded(shotId, "enemy")
+            }
         }
         die()
     }
