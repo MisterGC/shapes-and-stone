@@ -33,7 +33,10 @@
 // the step knight.chargeTime reaches; a full charge let go of at a guardian
 // facing the knight deals knight.heavySwing times atk through its shield
 // and staggers it; a hit while charging cancels it; held long past full it
-// stays full and its release is a heavy blow. A tough guardian's crushing blow
+// stays full and its release is a heavy blow, followed by
+// knight.heavyRecovery before the next swing once its arc has faded; one
+// that hit no enemy leaves the knight open that long, no shield and no
+// dash, and a held right button raises the shield after. A tough guardian's crushing blow
 // winds up for at least enemy.crushWindUp as aiState "crush", white-hot
 // with a doubled ring, and its lunge opens no parry window; on a held
 // shield it takes enemy.crushMana mana and enemy.crushShare of the damage
@@ -875,6 +878,67 @@ Window {
             check(afterRelease.length === 1 && afterRelease[0] === "heavy",
                   "its release swings once, heavy (acted "
                   + (afterRelease.join(", ") || "nothing") + ")")
+
+            // Once its arc has faded the heavy swing is followed by
+            // heavyRecovery before the next swing; one that hit is not open
+            let swingSteps = Math.ceil((k.swingDuration + k.swingFade) / stepS)
+            let recoverySteps = Math.round(k.heavyRecovery / stepS)
+            Clayground.physicsStep(swingSteps)
+            let faded = !p.isAttacking
+            let hitOpen = p.openLeft
+            p.attack()
+            let early = p.isAttacking
+            Clayground.physicsStep(recoverySteps - 2)
+            p.attack()
+            let stillEarly = p.isAttacking
+            Clayground.physicsStep(2)
+            p.attack()
+            let after = p.isAttacking
+            check(faded && !early && !stillEarly && after && hitOpen === 0,
+                  "a heavy swing that hit is followed by " + k.heavyRecovery + " s (" + recoverySteps
+                  + " steps) before the next swing (at its fade " + early + ", a step short "
+                  + stillEarly + ", then " + after + ") and leaves the knight not open (" + hitOpen + ")")
+            Clayground.physicsStep(swingSteps + Math.ceil(k.attackCooldown / stepS))
+
+            // One that hit no enemy leaves the knight open for that time:
+            // no shield and no dash, and a held right button raises the
+            // shield once it is over
+            let px = p.xWu, py = p.yWu
+            gr.xWu = p.xWu - 6
+            gr.yWu = p.yWu + 6
+            ready()
+            p.dashCooldown = 0
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(fullSteps + 1)
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(1)
+            let missSwung = p.isHeavy
+            for (let n = 0; p.isAttacking && n < swingSteps; n++) Clayground.physicsStep(1)
+            let open = p.openLeft
+            p.raiseShield()
+            let shieldUp = p.isBlocking
+            p.moveX = 1
+            p.dash()
+            let dashed = p.isDashing
+            Clayground.physicsStep(recoverySteps - 2)
+            let stillOpen = p.openLeft > 0 && !p.isBlocking
+            Clayground.physicsStep(2)
+            let rose = p.isBlocking
+            p.lowerShield()
+            p.dash()
+            let dashedAfter = p.isDashing
+            p.moveX = 0
+            check(missSwung && Math.abs(open - k.heavyRecovery) < 1e-6 && !shieldUp && !dashed && stillOpen,
+                  "a heavy swing that hit nothing leaves the knight open " + open.toFixed(3)
+                  + " s: no shield (" + shieldUp + "), no dash (" + dashed + "), still open a step short ("
+                  + stillOpen + ")")
+            check(rose && dashedAfter,
+                  "once the knight is no longer open the held shield rises (" + rose
+                  + ") and a dash starts (" + dashedAfter + ")")
+            Clayground.physicsStep(Math.ceil((k.dashDuration + k.dashCooldown) / stepS) + 1)
+            p.xWu = px
+            p.yWu = py
+            Clayground.physicsStep(1)
             gr.halted = false
             gr.aiState = "patrol"
             p.acted.disconnect(record)
