@@ -12,7 +12,9 @@
 // Then a knight within lead.reach holding a full charge is struck first:
 // the grunt winds up at once, for enemy.minTelegraph, and its blow
 // cancels the charge; a knight with no charge gets the string's count-in,
-// enemy.windUp. Prints one PASS or FAIL line per check and exits with the
+// enemy.windUp. So for another node's knight, known to the host only by
+// its replicated action (Session: 4 a charge filling, 5 a full one): a
+// stand-in with actionState and no isCharging. Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/strings/strings.qml
@@ -248,6 +250,41 @@ Window {
         return out
     }
 
+    // Another node's knight as the host knows it: where it stands and its
+    // replicated action, no isCharging
+    QtObject {
+        id: remoteKnight
+        property real xWu: 0
+        property real yWu: 0
+        property real widthWu: 0.8
+        property real heightWu: 0.8
+        property int actionState: 0
+    }
+    // The grunt goes for that knight, (reach + lungeRange) / 2 wu off, its
+    // action code: what it winds up first
+    function tryRemotePunish(code) {
+        let p = game.player
+        let l = Balance.lead
+        let g = leadOf("grunt", (l.reach + Balance.enemy.lungeRange) / 2)
+        g._committed = true
+        remoteKnight.xWu = p.xWu
+        remoteKnight.yWu = p.yWu
+        remoteKnight.actionState = code
+        // This node's knight out of the way, the stand-in where it stood
+        p.xWu -= 20
+        g.target = remoteKnight
+        g.aiState = "chase"
+        let n = 0
+        while (g.stringName === "" && n < 120) { Clayground.physicsStep(1); n++ }
+        let out = {name: g.stringName, wound: g.windUpLength, steps: n}
+        g.halt()
+        g.lead = false
+        p.xWu = remoteKnight.xWu
+        p.yWu = remoteKnight.yWu
+        Clayground.physicsStep(2)
+        return out
+    }
+
     // The grunt strikes its first string at the standing knight; in its
     // first rest the knight presses for a charge. How many steps the rest
     // lasted, and the wind-up that came then
@@ -390,6 +427,20 @@ Window {
         check(calm.name !== "" && near(calm.wound, Balance.enemy.windUp, 1e-6),
               "a knight with no charge gets the string's count-in: " + calm.wound
               + " s (enemy.windUp " + Balance.enemy.windUp + ")")
+        for (let code of [4, 5]) {
+            let r = tryRemotePunish(code)
+            check(r.name !== "" && near(r.wound, Balance.enemy.minTelegraph, 1e-6),
+                  "another node's knight with action " + code + " (" + (code === 4 ? "filling" : "full")
+                  + " charge) is struck first: wound up " + r.wound + " s after " + r.steps
+                  + " steps (enemy.minTelegraph " + Balance.enemy.minTelegraph + ")")
+        }
+        let idle = tryRemotePunish(0)
+        // The count-in, a feint's hold on it when the string rolled opens
+        // with a feint
+        check(idle.name !== "" && (near(idle.wound, Balance.enemy.windUp, 1e-6)
+                                   || near(idle.wound, Balance.enemy.windUp + Balance.lead.feintHold, 1e-6)),
+              "another node's knight with action 0 gets the count-in: " + idle.wound + " s (enemy.windUp "
+              + Balance.enemy.windUp + ", with a feint " + (Balance.enemy.windUp + Balance.lead.feintHold) + ")")
         let cut = tryRestCut()
         check(cut.inRest && cut.cutAfter < steps(l.beat) && near(cut.wound, Balance.enemy.minTelegraph, 1e-6),
               "a knight that starts a charge in reach during a rest of \"" + cut.name
