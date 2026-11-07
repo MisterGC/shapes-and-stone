@@ -60,7 +60,6 @@ import argparse
 import concurrent.futures
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -144,9 +143,9 @@ class FightError(Exception):
         self.logs = logs
 
 
-def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
-    """Plays one fight in a loader of its own; returns its report, or raises
-    FightError with the directory the logs are kept in"""
+def start_loader(loader):
+    """The sandbox in a loader of its own: (its temp dir, its inspector, the
+    loader's process, its log)"""
     # The sandbox imports ../../src: copy both, keeping their places. The
     # game's sounds and music are ../sound of src, read only: a link
     tmp = tempfile.mkdtemp(prefix="sas_fightbench_")
@@ -166,8 +165,42 @@ def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
     proc = subprocess.Popen(
         [loader, "--sbx", os.path.join(sandbox_dir, "Sandbox.qml"), "--instance", "fight"],
         cwd=os.path.dirname(loader), env=env, stdout=log, stderr=subprocess.STDOUT)
+    return tmp, Inspect(sandbox_dir, "fight"), proc, log
+
+
+def stop_loader(proc, log):
+    proc.terminate()
     try:
-        bench = Inspect(sandbox_dir, "fight")
+        proc.wait(5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+    log.close()
+
+
+def read_pacing(loader):
+    """Balance.pacing as the game has it, read from a loaded sandbox, or
+    raises FightError"""
+    tmp, bench, proc, log = start_loader(loader)
+    try:
+        if not bench.wait_phase("ready"):
+            raise FightError("the sandbox did not load", tmp)
+        pacing = json.loads(bench.eval1("JSON.stringify(Balance.pacing)") or "null")
+    except (TimeoutError, json.JSONDecodeError, TypeError) as e:
+        raise FightError(f"Balance.pacing could not be read: {e}", tmp)
+    finally:
+        stop_loader(proc, log)
+    if not isinstance(pacing, dict) or not isinstance(pacing.get("depths"), list) or not pacing["depths"]:
+        raise FightError(f"Balance.pacing has no depths: {pacing!r}", tmp)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return pacing
+
+
+def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
+    """Plays one fight in a loader of its own; returns its report, or raises
+    FightError with the directory the logs are kept in"""
+    tmp, bench, proc, log = start_loader(loader)
+    try:
         if not bench.wait_phase("ready"):
             raise FightError("the sandbox did not load", tmp)
         if bench.eval1(f"begin({seed}, '{answer}', {danger}, '{room}', {sword})") is not True:
@@ -195,13 +228,7 @@ def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
     except TimeoutError as e:
         raise FightError(str(e), tmp)
     finally:
-        proc.terminate()
-        try:
-            proc.wait(5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-        log.close()
+        stop_loader(proc, log)
     # What the sound engine said of the audio output: on a machine with
     # none, that it found none
     with open(os.path.join(tmp, "loader.log"), errors="replace") as f:
@@ -298,18 +325,19 @@ def check(results, bands):
     return out
 
 
-def pacing_depths():
-    """Balance.pacing.depths, read from src/Balance.qml"""
-    with open(os.path.join(REPO, "src", "Balance.qml")) as f:
-        m = re.search(r"pacing: \(\{\s*depths: \[([^\]]*)\]", f.read())
-    return [int(d) for d in m.group(1).split(",")] if m else [0, 2, 4]
-
-
 def pacing(args, loader):
     rooms = args.rooms or ["flow", "duel"]
     answers = args.answers or list(PILOTS)
     fights = []
-    depths = args.depths or pacing_depths()
+    # The depths are the game's own (Balance.pacing.depths), read as the
+    # bands are, unless given
+    depths = args.depths
+    if not depths:
+        try:
+            depths = read_pacing(loader)["depths"]
+        except FightError as e:
+            print(f"FAIL {e}; logs in {e.logs}", file=sys.stderr)
+            sys.exit(2)
     for room in rooms:
         for depth in depths:
             for answer in answers:
