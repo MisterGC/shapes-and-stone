@@ -289,6 +289,36 @@ Item {
                                guardianChance: gd.crushChance, crushChance: Balance.enemy.crushChance})
     }
 
+    // ---- a lead's stance, tried as in the dojo (run_reload.py) ----
+    // The duel room stands: the knight and a lead
+    function duelReady() {
+        return game.player !== null && game.fightRoomActive === true
+            && game.enemies.some(e => alive(e) && e.lead)
+    }
+    // Opens the lead as a parry would and strikes it with a swing of the
+    // knight's atk in the opening. Returns whether its stance bar showed,
+    // whether it opened, the seconds the opening lasts, the HP the swing
+    // took and the HP the table says it takes, as JSON
+    function tryOpening() {
+        Clayground.paused = true
+        let p = game.player
+        let lead = game.enemies.find(e => alive(e) && e.lead)
+        for (let e of game.enemies.filter(alive)) e.halt()
+        let bar = false
+        for (let i = 0; i < lead.children.length; i++)
+            if (lead.children[i].objectName === "stanceBar") bar = lead.children[i].visible
+        lead.halted = false
+        lead.open("parry")
+        let opened = lead.opening && lead.aiState === "stagger"
+        let seconds = round3(lead._attackTimer)
+        let hp0 = lead.hp
+        lead.takeDamage(p.atk, p.xWu, p.yWu, false)
+        return JSON.stringify({bar: bar, opened: opened, seconds: seconds, lost: hp0 - lead.hp,
+                               want: Math.floor(Math.max(Balance.minDamage, p.atk - lead.def)
+                                                * Balance.lead.openingDamage),
+                               openingTime: Balance.lead.openingTime})
+    }
+
     // ---- the scripted knight ----
     // Each attack an enemy winds up gets one plan: "parry" waits for the
     // parry window and swings into it, "block" raises the shield towards

@@ -13,8 +13,13 @@ again: the charge must now be full after the new time. Then the fight
 room's tough guardian goes for the knight (Sandbox.tryCrush): at the
 table's enemy.crushChance it must wind up a crushing blow among its
 attacks; with enemy.crushChance set to 1 in the loaded copy and the
-sandbox reloaded, every one of its attacks must be a crushing one. Prints
-one PASS or FAIL line per check and exits with the number of failures.
+sandbox reloaded, every one of its attacks must be a crushing one. Then
+the duel room's lead (issue #271) shows its stance bar, and opened as a
+parry opens it (Sandbox.tryOpening) it staggers for lead.openingTime and
+a swing in the opening does lead.openingDamage times its damage; with
+lead.openingTime changed in the loaded copy and the sandbox reloaded, the
+opening lasts the new time. Prints one PASS or FAIL line per check and
+exits with the number of failures.
 
 Usage:
   run_reload.py [--loader <clayliveloader>]
@@ -38,6 +43,7 @@ STEP = 1 / 60
 NEW_CHARGE_TIME = 0.45
 CRUSH_ATTACKS = 12
 CRUSH_MAX_STEPS = 60 * 60
+NEW_OPENING_TIME = 2.5
 
 
 def wait(predicate, timeout=30.0):
@@ -61,6 +67,13 @@ def try_crush(bench):
     if not wait(lambda: bench.eval1("fightReady()") is True):
         return None
     return json.loads(bench.eval1(f"tryCrush({CRUSH_ATTACKS}, {CRUSH_MAX_STEPS})") or "{}")
+
+
+def try_opening(bench):
+    bench.eval1("applyScenario('duel', 0)")
+    if not wait(lambda: bench.eval1("duelReady()") is True):
+        return None
+    return json.loads(bench.eval1("tryOpening()") or "{}")
 
 
 def reload(bench, balance, pattern, repl):
@@ -147,6 +160,22 @@ def main():
               and crush["crushes"] == crush["attacks"] and crush["crushChance"] == 1,
               f"after the reload every attack of the tough guardian is a crushing one "
               f"({crush and crush['crushes']} of {crush and crush['attacks']})")
+
+        opening = try_opening(bench)
+        check(opening is not None and opening["bar"] and opening["opened"]
+              and abs(opening["seconds"] - opening["openingTime"]) < 1e-6
+              and opening["lost"] == opening["want"],
+              f"in the duel room the lead shows its stance bar ({opening and opening['bar']}), "
+              f"a parry opens it for {opening and opening['seconds']} s (openingTime "
+              f"{opening and opening['openingTime']}) and a swing in the opening takes "
+              f"{opening and opening['lost']} HP ({opening and opening['want']} by the table)")
+        reloaded = reload(bench, balance, r"openingTime: [0-9.]+,", f"openingTime: {NEW_OPENING_TIME},")
+        check(reloaded, f"lead.openingTime set to {NEW_OPENING_TIME} and the sandbox reloaded")
+        opening = try_opening(bench) if reloaded else None
+        check(opening is not None and opening["opened"]
+              and abs(opening["seconds"] - NEW_OPENING_TIME) < 1e-6,
+              f"after the reload the lead's opening lasts {opening and opening['seconds']} s "
+              f"({NEW_OPENING_TIME} expected)")
     except TimeoutError as e:
         print("FAIL", e, "; logs in", tmp, file=sys.stderr)
         failures += 1
