@@ -9,6 +9,7 @@ uses [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Kill chains:** kills in quick succession build a chain. Each kill within 2.5 s of the last climbs the death sound a step of the dungeon song's scale and gets a short crunchy hit stop, and every third kill in a chain adds a momentum pip. A hit taken or a longer pause breaks the chain. ([#270](https://github.com/MisterGC/shapes-and-stone/issues/270))
+- **A room's lead strikes in strings:** each kind of lead - grunt, guardian, spitter - attacks in rhythms of its own, strikes and rests on a steady beat, and the parry ring closes on every beat. Some wind-ups are feints: the ring stops short, holds, then closes. A knight who stands in a lead's reach charging a swing gets struck first, and the hit cancels the charge; a charge built outside its reach and let go in a rest still opens it. ([#272](https://github.com/MisterGC/shapes-and-stone/issues/272))
 
 ## [0.4.2] - 2026-11-06
 

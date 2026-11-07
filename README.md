@@ -144,7 +144,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2044,6 +2044,21 @@ in steps and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
 ```
 
+A lead attacks in strings (issue #272), in the arrow slits' beat notation:
+`lead.strings` holds each lead type's, 1 a strike, 2 a feint, 0 a rest,
+`lead.beat` seconds a beat, and the parry ring closes once per beat. A
+feint's wind-up holds `lead.feintHold` longer, its ring standing at
+`lead.feintRing`, then strikes; a rest is a recovery a charged swing
+opens. A knight within `lead.reach` holding a charge is struck first,
+`enemy.minTelegraph` after it is seen, a rest cut short, and the hit
+cancels the charge. `stringName` and `feintHold` are replicated. The
+strings bench steps every string of every lead type and finds the parry
+window on every beat:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/strings/strings.qml
+```
+
 The ring bench steps a grunt's wind-up in the paused fight room and saves
 it as `ring-0.png`, `ring-50.png` and `ring-100.png` (the parry window
 opening), then the tough guardian's crushing wind-up half way as
@@ -2118,7 +2133,8 @@ heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel
-`masher` and `charge` take at least `duelSlow` seconds or fall, and
+`masher` and `charge` take at least `duelSlow` seconds or fall, hits
+cancel at least `duelCancelled` of `charge`'s charges (#272), and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
 both. The kill chain's lines (issue #270) read the flow fights' sound
 logs: the death sound climbs a step of the dungeon song's scale over a
