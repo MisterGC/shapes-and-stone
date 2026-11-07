@@ -174,6 +174,18 @@ Window {
         let start = {x: p.xWu + 0.5, y: p.yWu - 0.5}
         check(!f.inside(start.x, start.y) && !g.shut,
               "the knight stands outside the room, its way in open (" + g.cell + ")")
+        // Asleep it takes no blow: not one, not a killing one, and the
+        // room stays open, its exit shut
+        let hpAsleep = w.hp
+        w.takeDamage(2100, p.xWu, p.yWu, false)
+        stepN(2)
+        let hpStruck = w.hp
+        w.takeDamage(1000000, p.xWu, p.yWu, true)
+        stepN(2)
+        check(hpStruck === hpAsleep && w.hp === hpAsleep && alive(w) && w.dormant && f.stage === "waiting"
+              && !g.shut && f.gates.find(x => x.exit).shut && f.addsCalled === 0,
+              "asleep, the Warden takes neither a blow nor a killing one (HP " + hpAsleep + " to " + hpStruck
+              + " to " + w.hp + "), the room stays open (stage \"" + f.stage + "\"), its exit shut")
         // On the gate's line the Warden still sleeps; two cells on, in the
         // room, it wakes
         let nx = Math.sign(g.cxWu - start.x), ny = Math.sign(g.cyWu - start.y)

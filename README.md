@@ -2098,8 +2098,8 @@ group): at depth 2, 5, 8 and so on the dungeon's last room, the one the
 exit stairs' shaft leaves from, holds the Hollow Warden alone - no other
 enemy, feature, trap, wooden door or secret room in it. An iron gate
 (`BossGate.qml`) stands in every way into the room and one in the shaft.
-The ways in stand open until every knight still standing is in the room;
-then they shut, the Warden wakes, its name shows as a banner and its HP
+The ways in stand open until every knight still standing is in the room -
+until then the Warden sleeps, and a blow glances off it -; then they shut, the Warden wakes, its name shows as a banner and its HP
 as a bar under the screen. The shaft's gate opens only when it falls, the
 ways in with it; a fall in the room ends the run as anywhere else. The
 Warden is a large hollow stone hexagon, `boss.size` wu a side, and a

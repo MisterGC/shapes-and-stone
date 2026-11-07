@@ -649,7 +649,8 @@ QtObject {
     // tempoGrow * n; its attack and defence are enemy.warden's. An iron
     // gate stands in every way into the room and in the exit shaft. The
     // ways in stand open until every knight still
-    // standing is in the room: they shut, the Warden wakes, its name shows
+    // standing is in the room - until then the Warden sleeps and a blow
+    // glances off it -: they shut, the Warden wakes, its name shows
     // as a banner for banner seconds and its HP as a bar while it stands.
     // The shaft's gate opens only when it falls, and the ways in with it.
     // It is a room's lead (Balance.lead): its stance, its openings, its

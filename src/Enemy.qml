@@ -1810,6 +1810,7 @@ PhysicsItem {
     // parried for a swing into its parry window. This screen judges
     // whether the blow breaks a lead's stance. Returns the damage it does
     function takeDamage(amount, attackerX, attackerY, heavy, parried) {
+        if (dormant) return _glance(attackerX, attackerY)
         let opens = _opens(heavy, parried)
         if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
         // Remote: the hit looks and counts here, the host applies it
@@ -1827,6 +1828,15 @@ PhysicsItem {
         return b.damage
     }
 
+    // A blow off the sleeping Warden's stone: a blocked hit's sparks on
+    // this screen, no damage
+    function _glance(attackerX, attackerY) {
+        if (gameWorld && gameWorld.impact)
+            gameWorld.impact("enemyBlocked", xWu, yWu, attackerX !== undefined ? xWu - attackerX : 0,
+                             attackerY !== undefined ? yWu - attackerY : 0, Balance.boss.hexColor)
+        return 0
+    }
+
     // Host: the knight of node byId struck the enemy; that node drew the
     // hit and counted it, and judged whether it opens a lead (opens)
     function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens) {
@@ -1836,6 +1846,10 @@ PhysicsItem {
     // A blow from this node's knight (byId "") or another node's; opens
     // the cause it breaks a lead's stance with, or ""
     function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+        // Asleep, the Warden's stone takes nothing: its fight begins when
+        // its room shuts, not with a blow from a knight its room let in
+        // while another waits outside
+        if (dormant) return 0
         if (opens && (!lead || opening)) opens = ""
         let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let finalDamage = b.damage

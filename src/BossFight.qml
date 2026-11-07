@@ -193,7 +193,7 @@ Item {
     // Host: the Warden's HP passed a mark (Enemy._bossMarks): its phase 2
     // with the first adds, or the second wave
     function mark(enemy, what) {
-        if (!_owns() || stage === "") return
+        if (!_owns() || stage !== "fight") return
         if (what === "phase") {
             _nextZone = now() + Balance.boss.zone.every / 2
             _callAdds(enemy)
