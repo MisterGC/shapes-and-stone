@@ -53,6 +53,9 @@ RemotePlayer 1.0 RemotePlayer.qml
 Session 1.0 Session.qml
 DepthGauge 1.0 DepthGauge.qml
 Door 1.0 Door.qml
+BossGate 1.0 BossGate.qml
+BossZone 1.0 BossZone.qml
+BossFight 1.0 BossFight.qml
 SecretWall 1.0 SecretWall.qml
 Vein 1.0 Vein.qml
 Hole 1.0 Hole.qml

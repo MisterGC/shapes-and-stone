@@ -146,6 +146,9 @@ ClayWorld2d {
         state: world.duelEngaged ? "duel" : "flow"
     }
 
+    // Its phase 2's light
+    readonly property bool bossLit: bossFight.fighting && bossFight.phase === 2
+
     AmbienceBed {
         id: villageAmbience
         source: "../sound/ambience/village.sfx.json"
@@ -1111,7 +1114,9 @@ ClayWorld2d {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
                                                  size: enemy.widthWu, crush: enemy.crushing,
-                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY})
+                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY,
+                                                 ax: enemy.aimXWu, ay: enemy.aimYWu,
+                                                 reach: Balance.enemy.lungeHitRange + enemy.bulk})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -1170,8 +1175,11 @@ ClayWorld2d {
             return
         }
         // A dash that carried the knight past the enemy dodged it all the same
-        let dx = player.xWu - blow.x, dy = player.yWu - blow.y
-        if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) {
+        // From where a common enemy at its centre would stand, and as far
+        // as its blow reaches (Enemy.bulk)
+        let dx = player.xWu - (blow.ax !== undefined ? blow.ax : blow.x)
+        let dy = player.yWu - (blow.ay !== undefined ? blow.ay : blow.y)
+        if (Math.sqrt(dx * dx + dy * dy) >= (blow.reach || Balance.enemy.lungeHitRange)) {
             _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
@@ -1412,9 +1420,10 @@ ClayWorld2d {
         if (knights === undefined) knights = knightsNow()
         let rand = createRng(deriveSeed(masterSeed, index))
         let rms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax, rand)
-        let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
+        let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand,
+                                  isBossDepth(depthOf(index)))
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
-                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0,
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0, warden: 0,
                     secrets: secretsOf(index, position) }
         for (let e of enemies) {
             out[["weak", "normal", "tough"][e.tier]]++
@@ -1431,7 +1440,8 @@ ClayWorld2d {
         let band = dangerBand(position)
         let n = 0
         try {
-            n = carveDungeon(levelSeed, band, false, createRng(levelSeed)).secrets.length
+            let spec = Object.assign(dungeonSpec(position, null), { boss: isBossDepth(depthOf(index)) })
+            n = carveDungeon(levelSeed, band, false, createRng(levelSeed), spec).secrets.length
         } finally {
             _putCarved(kept)
         }
@@ -1441,7 +1451,7 @@ ClayWorld2d {
     // dungeon is carved only to be read
     function _keepCarved() {
         return { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
-                 loopCorridors: loopCorridors }
+                 loopCorridors: loopCorridors, bossRoom: bossRoom }
     }
     function _putCarved(kept) {
         grid = kept.grid
@@ -1449,6 +1459,7 @@ ClayWorld2d {
         entranceGridX = kept.entranceGridX
         exitGridX = kept.exitGridX
         loopCorridors = kept.loopCorridors
+        bossRoom = kept.bossRoom
     }
     // The witch's reading of the next dungeon, one line per press of E:
     // where it sits in its depth's range, what lives there and, when it
@@ -1568,7 +1579,7 @@ ClayWorld2d {
         let rmin = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMin
         let rmax = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMax
         let rms = planRooms(rmin, rmax, sb.roomSizeMin, sb.roomSizeMax, rand)
-        let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand)
+        let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand, isBossDepth(d))
         let band = dangerBand(pos)
         let out = { enemies: rms.length > 1 ? foes.length / (rms.length - 1) : 0,
                     leads: spawnRolls(d + pos, a.knights).leadShare,
@@ -1663,10 +1674,11 @@ ClayWorld2d {
             let levelSeed = m && m.seed !== undefined ? m.seed
                                                        : deriveSeed(runSeed === undefined ? masterSeed : runSeed, index)
             let spec = dungeonSpec(position, m)
+            let d = m && m.depth !== undefined ? m.depth : depthOf(index)
+            spec.boss = isBossDepth(d)
             let rand = createRng(levelSeed)
             let plan = carveDungeon(levelSeed, spec.band, false, rand, spec)
-            let d = m && m.depth !== undefined ? m.depth : depthOf(index)
-            let foes = rollEnemies(rooms, spec.rolls(d + position, knights), rand)
+            let foes = rollEnemies(rooms, spec.rolls(d + position, knights), rand, spec.boss)
             return { seed: levelSeed, band: spec.band, depth: d, position: position, grid: grid,
                      rooms: rooms, features: plan.features, doors: plan.doors, secrets: plan.secrets,
                      enemies: foes, entranceGridX: entranceGridX, exitGridX: exitGridX }
@@ -2840,6 +2852,17 @@ ClayWorld2d {
             font.bold: true
         }
     }
+    // The Hollow Warden's fight: its gates, adds and zones, its banners and
+    // its HP bar (issue #274)
+    readonly property alias bossFight: bossFightItem
+    BossFight {
+        id: bossFightItem
+        objectName: "bossFight"
+        anchors.fill: parent
+        z: 1000
+        game: world
+        session: session
+    }
     SequentialAnimation {
         id: recordBannerShow
         NumberAnimation { target: recordBannerText; property: "opacity"; to: 1; duration: Balance.record.fade * 1000 }
@@ -3252,6 +3275,7 @@ ClayWorld2d {
             world._stepPlates()
             world._stepSlits()
             world._stepDoors()
+            bossFight.step(world.physics.timeStep)
             world._stepSecrets()
             world._stepVeins()
             world._stepDig()
@@ -3376,7 +3400,9 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
+        // The Warden's phase 2 turns its room's light (Balance.boss.light)
+        ambient: bossLit ? Balance.boss.light.ambient
+                 : fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -3390,7 +3416,8 @@ ClayWorld2d {
         vignette: world.fx ? (campStyled ? campLook.grade.vignette : 0.55) : 0
         vignetteColor: "#000000"
         // Danger rooms run warm, the camps as their look (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : campStyled ? campLook.grade.temperature
+        temperature: !world.fx ? 0 : bossLit ? Balance.boss.light.temperature
+                     : campStyled ? campLook.grade.temperature
                      : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
@@ -3894,6 +3921,8 @@ ClayWorld2d {
         // rock until opened
         initExploredCells()
         let spec = dungeonSpec(dangerPosition, master)
+        // Every Balance.boss.every-th dungeon ends in the Warden's room
+        spec.boss = isBossDepth(depth)
         let plan = carveDungeon(levelSeed, spec.band, featureShowcase, rng, spec)
         let featureList = plan.features
         let doorList = plan.doors
@@ -3928,8 +3957,15 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng))
-            spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
+        let warden = null
+        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng, spec.boss)) {
+            if (e.type === "warden") warden = e
+            else spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
+        }
+
+        // Step 9b: the boss room's gates and the Warden, asleep in its
+        // middle (issue #274)
+        if (warden) placeBossRoom(warden)
 
         // Bind player controls
         if (player) {
@@ -4031,6 +4067,9 @@ ClayWorld2d {
         // Step 2: Place rooms
         placeRooms(spec.roomsMin, spec.roomsMax, Balance.spawn.roomSizeMin,
                    Balance.spawn.roomSizeMax, rand)
+        // A boss dungeon's last room, the one the exit's shaft leaves
+        // from, is the Warden's: no feature, door or secret room in it
+        bossRoom = spec.boss === true && rooms.length > 1 ? rooms[rooms.length - 1] : null
 
         // Step 3: Connect rooms with spanning tree
         connectRooms()
@@ -4144,17 +4183,23 @@ ClayWorld2d {
     // drawn from rand: [{x, y, tier, type, room}] in wu, across the rooms
     // but the first, the knights' start (room counts from 0 there), dealt
     // in turn; the rooms dealLeads picks get their lead first, a tough
-    // enemy, the rest is fodder in the table's mix (dealTiers)
-    function rollEnemies(rms, sb, rand) {
+    // enemy, the rest is fodder in the table's mix (dealTiers). In a boss
+    // dungeon (boss true) the last room holds the Warden alone, last of
+    // them, in its middle: it is that room's lead, so the other rooms get
+    // one lead fewer and the table's share of rooms with a lead holds
+    function rollEnemies(rms, sb, rand, boss) {
         let out = []
         if (rms.length < 2) return out
-        let spawnRooms = rms.slice(1)
+        // A boss dungeon's last room holds the Warden alone
+        boss = boss === true && rms.length > 2
+        let spawnRooms = boss ? rms.slice(1, rms.length - 1) : rms.slice(1)
         // perRoom, when the rolls have it, sets the count: that many to a
         // room, rounded over all of them; the roll is drawn all the same
         let roll = rand()
         let numEnemies = sb.perRoom !== undefined ? Math.round(sb.perRoom * spawnRooms.length)
                                                   : sb.enemiesMin + Math.floor(roll * (sb.enemiesMax - sb.enemiesMin + 1))
-        let leads = dealLeads(spawnRooms.length, Math.min(numEnemies, spawnRooms.length), sb.leadShare, rand)
+        let leads = dealLeads(spawnRooms.length + (boss ? 1 : 0), Math.min(numEnemies, spawnRooms.length),
+                              sb.leadShare, rand, boss ? 1 : 0)
         let tiers = dealTiers(numEnemies - leads.length, numEnemies, sb, rand)
         let fodder = 0
         for (let i = 0; i < numEnemies; i++) {
@@ -4169,6 +4214,11 @@ ClayWorld2d {
             let type = typeRoll < guardianChance ? "guardian"
                 : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
             out.push({x: ex, y: ey, tier: tier, type: type, room: r})
+        }
+        if (boss) {
+            let b = rms[rms.length - 1], s = Balance.boss.size
+            out.push({x: (b.x + b.w / 2) * cellSize - s / 2, y: (b.y + b.h / 2) * cellSize + s / 2,
+                      tier: 2, type: "warden", room: rms.length - 2})
         }
         return out
     }
@@ -4517,6 +4567,7 @@ ClayWorld2d {
         let start = rooms[0]
         if (gx >= start.x && gx < start.x + start.w && gy >= start.y && gy < start.y + start.h)
             return false
+        if (inBossRoom(gx, gy)) return false
         for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             let nx = gx + n[0], ny = gy + n[1]
             if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && grid[ny][nx] === cellHallway)
@@ -5222,6 +5273,9 @@ ClayWorld2d {
             for (let gx = 0; gx < gridWidth; gx++) {
                 let d = doorway(gx, gy)
                 if (!d || rand() >= share) continue
+                // The boss room's ways in get its gates instead
+                if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(n => inBossRoom(gx + n[0], gy + n[1])))
+                    continue
                 out.push(Object.assign({ gx: gx, gy: gy, xWu: (gx + 0.5) * cellSize,
                                          yWu: (gy + 0.5) * cellSize }, d))
             }
@@ -5452,6 +5506,7 @@ ClayWorld2d {
         let cands = []
         for (let ri = 1; ri < rooms.length; ri++) {
             let r = rooms[ri]
+            if (r === bossRoom) continue
             for (let d of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
                 let len = d[0] === 0 ? r.w : r.h
                 for (let i = 1; i < len - 1; i++) {
@@ -5820,11 +5875,13 @@ ClayWorld2d {
     // first occupied of them holding an enemy: share of rooms (rounded),
     // no more than are occupied, picked from those by rand. Dealt, not
     // rolled: how many rooms have a lead is the table's on every seed
-    function dealLeads(rooms, occupied, share, rand) {
+    // less leads fewer than the share gives, for a room whose lead is
+    // known already (the Warden's)
+    function dealLeads(rooms, occupied, share, rand, less) {
         let picks = []
         for (let i = 0; i < occupied; i++) picks.push(i)
         shuffle(picks, rand)
-        return picks.slice(0, Math.min(occupied, Math.round(rooms * (share || 0))))
+        return picks.slice(0, Math.max(0, Math.min(occupied, Math.round(rooms * (share || 0)) - (less || 0))))
     }
     // The tiers of n fodder enemies (0=weak, 1=normal) of a dungeon of
     // total enemies in the table's mix, shuffled: weakChance of total
@@ -5859,12 +5916,100 @@ ClayWorld2d {
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
+    // --- The Hollow Warden (Balance.boss, issue #274) ---
+    // Whether the dungeon at depth d ends in a boss room, and which
+    // appearance of the Warden it holds there: 0 at the first boss depth.
+    // Off a boss depth (the dojo's boss room) the one of the next
+    function isBossDepth(d) {
+        let n = Balance.boss.every
+        return n > 0 && (d + 1) % n === 0
+    }
+    function bossAppearance(d) {
+        return Math.max(0, Math.ceil((d + 1) / Balance.boss.every) - 1)
+    }
+    // Its HP at appearance n for knights at danger d (0 when left out), and
+    // its tempo
+    function wardenHp(n, knights, d) {
+        let b = Balance.boss
+        return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + (d || 0) * Balance.depth.hp)
+                          * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    function wardenTempo(n) { return 1 + n * Balance.boss.tempoGrow }
+    // The Warden at appearance n, its corner at (ex, ey), for knights;
+    // dormant until its room shuts. In a session only the host spawns
+    function spawnWarden(ex, ey, n, knights, dormant) {
+        let ehp = wardenHp(n, knights, danger)
+        let props = {
+            xWu: ex, yWu: ey, widthWu: Balance.boss.size, heightWu: Balance.boss.size,
+            hp: ehp, maxHp: ehp, atk: enemyAtk("warden", danger), def: Balance.enemy.warden.def,
+            tier: 2, enemyType: "warden", tempo: wardenTempo(n), dormant: dormant === true,
+            fromHole: ""
+        }
+        if (!session.connected) _makeEnemy(props)
+        else if (session.isHost) session.spawnEnemy(props)
+    }
+    // A boss dungeon's last room (carveDungeon): {x, y, w, h} in cells,
+    // null in any other dungeon
+    property var bossRoom: null
+    function inBossRoom(gx, gy) {
+        let r = bossRoom
+        return !!r && gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h
+    }
+    // Its gates on every edge where a corridor meets it, the exit's shaft
+    // among them, and the Warden asleep where the plan has it, w
+    // (rollEnemies), its middle (BossFight)
+    function placeBossRoom(w) {
+        let r = bossRoom
+        if (!r) return
+        let edges = []
+        let open = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight && grid[y][x] !== cellWall
+        for (let gy = r.y; gy < r.y + r.h; gy++)
+            for (let gx = r.x; gx < r.x + r.w; gx++)
+                for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    let cx = gx + n[0], cy = gy + n[1]
+                    if (inBossRoom(cx, cy) || !open(cx, cy)) continue
+                    edges.push({ gx: cx, gy: cy, nx: -n[0], ny: -n[1],
+                                 exit: cx === exitGridX && cy === r.y + r.h })
+                }
+        let n = bossAppearance(depth)
+        bossFight.setUp(r, edges, n)
+        spawnWarden(w.x, w.y, n, partyKnights, true)
+        console.log("[Game] The Warden's room at", r.x, r.y, r.w, "x", r.h, "with", edges.length,
+                    "gates, appearance", n)
+    }
+    // The dojo's "bossroom": the knight stands in the corridor's cell of
+    // the boss room's first way in, facing the room; a few steps on and
+    // the room shuts
+    function toBossDoor() {
+        let g = bossFight.gates.find(x => !x.exit)
+        if (!player || !g) return
+        let gx = parseInt(g.cell.split(",")[0]), gy = parseInt(g.cell.split(",")[1])
+        let x = (gx + 0.5) * cellSize, y = (gy + 0.5) * cellSize
+        player.xWu = x - player.widthWu / 2
+        player.yWu = y + player.heightWu / 2
+        player.facingAngle = Math.atan2(g.cyWu - y, g.cxWu - x) * 180 / Math.PI
+        revealAroundPlayer()
+        snapCamera()
+    }
+    // The camera on the knight at once, not easing over from where it
+    // looked: after a scenario or a bench moved the knight
+    function snapCamera() {
+        let m = gameCamera.mode
+        gameCamera.mode = ClayWorld2dCamera.Follow
+        gameCamera._update()
+        gameCamera.mode = m
+    }
+    // The Warden's HP passed a mark, and its fall (Enemy)
+    function bossMark(enemy, what) { bossFight.mark(enemy, what) }
+    function bossFell(enemy) { bossFight.fell(enemy) }
+
     // knights: the knights the dungeon is built for, 1 when left out;
     // fromHole the spawn hole it crawls out of, "gx,gy" (issue #157)
     function spawnEnemy(ex, ey, tier, type, knights, fromHole) {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
+        if (type === "warden") return spawnWarden(ex, ey, bossAppearance(depth), knights, false)
         let stats = Balance.enemy[type]
         let ehp = enemyHp(type, tier, knights, danger)
         let eatk = enemyAtk(type, danger)
@@ -6121,6 +6266,8 @@ ClayWorld2d {
 
     function clearDungeon() {
         fishing.reset()
+        bossFight.clear()
+        bossRoom = null
         _attackRng = null
         exitSensor = null
         exitStairs = null
@@ -8614,7 +8761,11 @@ ClayWorld2d {
     property var fightRoomRoster: Balance.spawn.fightRoom
     property var _fightLineup: null
     function _spawnFightRoomEnemies() {
-        for (let e of (_fightLineup || fightRoomRoster))
+        let lineup = _fightLineup || fightRoomRoster
+        // The dojo's boss room: the fight room is the Warden's, no gates
+        if (lineup.some(e => e.type === "warden"))
+            bossFight.beginArena(rooms[0], bossAppearance(depth))
+        for (let e of lineup)
             spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 
@@ -8636,7 +8787,10 @@ ClayWorld2d {
     // hole, a miner and a lost traveller before its rock face and a special
     // "flow" and "duel" are the fight room with the pacing bench's rooms
     // (Balance.pacing): fodder only, and a room's lead alone
-    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "features", "deep"] }
+    // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
+    // .boss), "bossroom" the dungeon at the boss depth's danger with the
+    // knight at the Warden's door (Balance.boss)
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8645,6 +8799,9 @@ ClayWorld2d {
     function applyScenario(name, atDanger, seed) {
         let dg = Math.max(0, Number(atDanger) || 0)
         let d = Math.floor(dg)
+        // The Warden's room is in a boss dungeon: the first at or past d
+        if (name === "bossroom")
+            while (!isBossDepth(d)) { d++; dg++ }
         _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
         _setKnights(knightsNow())
         muted = true
@@ -8668,8 +8825,12 @@ ClayWorld2d {
         _startRunRecord()
         if (name === "fight")
             enterFightRoom()
-        else if (name === "flow" || name === "duel")
+        else if (name === "flow" || name === "duel" || name === "boss")
             enterFightRoom(Balance.pacing[name])
+        else if (name === "bossroom") {
+            generateDungeon()
+            toBossDoor()
+        }
         else if (name === "deep")
             enterDeepRoom()
         else if (name === "village")
