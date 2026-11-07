@@ -586,11 +586,12 @@ ClayWorld2d {
         logSound("music/dungeon", "sting", 0, 0, 1)
     }
     // A lead opened, on this screen (Enemy.opening): within this knight's
-    // reach the sting
+    // reach the sting and the slow motion
     function leadOpened(enemy) {
         if (!player || !enemy) return
         if (Math.hypot(enemy.xWu - player.xWu, enemy.yWu - player.yWu) > Balance.music.reach) return
         playSting()
+        slowMotion(Balance.duel.slowTime, Balance.duel.slowScale)
     }
 
     // The NPCs' greetings are voiced lines of the sound factory
@@ -826,6 +827,45 @@ ClayWorld2d {
     }
     function _freeze(ms, scale) {
         if (world.hitStop) world.hitStop(ms, scale === undefined ? 0 : scale)
+    }
+
+    // A slow motion on the physics clock (Balance.duel): the physics runs
+    // at scale for seconds of simulated time, counted on the physics steps
+    // (slowLeft), so a pause holds it and a bench that steps the world
+    // sees it last the same steps on every run. In a session the
+    // simulation must not stall for the others: there it is the picture's,
+    // a view hit stop of seconds / scale of the wall clock
+    property real slowLeft: 0
+    property real slowScale: 1
+    readonly property bool slowing: slowLeft > 0
+    function slowMotion(seconds, scale) {
+        if (!(seconds > 0) || !(scale > 0) || scale >= 1) return
+        if (hitStopMode === "view") {
+            _freeze(seconds / scale * 1000, scale)
+            return
+        }
+        slowScale = slowing ? Math.min(slowScale, scale) : scale
+        slowLeft = Math.max(slowLeft, seconds)
+    }
+    function _stepSlowMotion(dt) {
+        if (slowLeft <= 0) return
+        // A step's share of a second is not exact: what is left of one
+        // step at most a millionth of a second over ends here too
+        slowLeft = slowLeft - dt < 1e-6 ? 0 : slowLeft - dt
+        if (slowLeft === 0) slowScale = 1
+    }
+    // Workaround: ClayWorld2d's hitStop() ends on the wall clock and its
+    // physics time scale is the global one times the hit stop's, with no
+    // slow motion of the game's own (clayground#506). While one runs this
+    // binds the scale to the same product times slowScale, the hit stop's
+    // share read from ClayWorld2d's _hitStopScale, and gives ClayWorld2d's
+    // binding back when it ends
+    Binding {
+        target: world.physics
+        property: "timeScale"
+        when: world.slowing && world.hitStopMode !== "view"
+        value: Clayground.timeScale * world._hitStopScale * world.slowScale
+        restoreMode: Binding.RestoreBindingOrValue
     }
 
     Component { id: fxParticleComp; FxParticle {} }
@@ -1793,6 +1833,10 @@ ClayWorld2d {
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
+        canvas.transform = [_viewZoomScale]
+        // The grade draws a texture of the canvas, which leaves its
+        // transform out: it scales the same
+        screenFxItem.transform = [_viewZoomScale]
         _loadRecord()
         campFreed.load()
         _loadVolumes()
@@ -1960,6 +2004,30 @@ ClayWorld2d {
     // The left button's press struck with the pickaxe: its release swings
     // nothing
     property bool _picking: false
+
+    // The view closes in on a locked-on lead (Balance.duel): the canvas -
+    // the room with its lights - and the grade drawn from it scale by
+    // viewZoom round the knight, so the knight stays where it is on screen and every aim
+    // from it points where it did; the HUD beside it keeps its size. The
+    // world's pixelPerUnit stays: a change of it would recreate every
+    // body's fixtures on every frame of the zoom
+    readonly property bool _zoomWanted: !!player && player.lockedOn && player.lockTarget.lead === true
+    property real viewZoom: _zoomWanted ? Balance.duel.zoom : 1
+    Behavior on viewZoom {
+        NumberAnimation { duration: Balance.duel.zoomTime * 1000; easing.type: Easing.InOutQuad }
+    }
+    property Scale _viewZoomScale: Scale { xScale: world.viewZoom; yScale: world.viewZoom }
+    // The knight's centre in the canvas, before its scale, on every frame
+    // the view is zoomed: the camera moves the room under it
+    FrameAnimation {
+        running: world.viewZoom !== 1 && !!world.player
+        onTriggered: {
+            let p = world.player
+            let at = p.parent.mapToItem(world.canvas, p.x + p.width * 0.5, p.y + p.height * 0.5)
+            world._viewZoomScale.origin.x = at.x
+            world._viewZoomScale.origin.y = at.y
+        }
+    }
 
     // Player center in screen coords (for aiming) - map from player's parent to mouseInput coords
     property var playerScreenPos: player ? player.parent.mapToItem(mouseInput, player.x + player.width * 0.5, player.y + player.height * 0.5) : Qt.point(width/2, height/2)
@@ -3120,6 +3188,7 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world.physicsSeconds += world.physics.timeStep
+            world._stepSlowMotion(world.physics.timeStep)
             if (world.followFightOnSteps && world._followingFight)
                 world._followFight(world.physics.timeStep)
             else if (world.followFightOnSteps && world.fightIntensity > 0)

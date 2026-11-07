@@ -648,7 +648,8 @@ PhysicsItem {
         openFlashAnimation.restart()
         if (gameWorld && gameWorld.spawnWord)
             gameWorld.spawnWord(xWu, yWu + 0.5, Balance.lead.word, Balance.lead.flashColor)
-        // The song's sting, on every screen near it (Balance.duel)
+        // The song's sting and the slow motion, on every screen near it
+        // (Balance.duel)
         if (gameWorld && gameWorld.leadOpened) gameWorld.leadOpened(enemy)
     }
 
