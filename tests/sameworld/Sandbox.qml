@@ -227,6 +227,30 @@ Item {
         if (on) e.crushChance = 0
         return true
     }
+    // Host: lead id strikes the string of its type whose feint comes
+    // first (Balance.lead.strings, issue #272) at this node's knight,
+    // which stands beside it with its shield up. The string's name and the
+    // feint's hold, {} without either
+    function strikeString(id) {
+        let e = _byId()[id], p = game.player
+        if (!e || !p || !e.lead) return {}
+        let list = Balance.lead.strings[e.enemyType] || []
+        let i = -1
+        for (let k = 0; k < list.length; k++) {
+            let f = list[k].beats.indexOf(2)
+            if (f >= 0 && (i < 0 || f < list[i].beats.indexOf(2))) i = k
+        }
+        if (i < 0 || !placeBeside(id)) return {}
+        p.isBlocking = true
+        e.target = p
+        e.beginString(i, false)
+        return {name: list[i].name, hold: Balance.lead.feintHold}
+    }
+    // Enemy id's string as this screen shows it: {name, hold}
+    function stringOf(id) {
+        let e = _byId()[id]
+        return e ? {name: e.stringName, hold: e.feintHold} : {}
+    }
     // Whether enemy id is a room's lead on this screen, and open now
     function leadOf(id) { let e = _byId()[id]; return e ? e.lead : null }
     function openingOf(id) { let e = _byId()[id]; return e ? e.opening : null }
