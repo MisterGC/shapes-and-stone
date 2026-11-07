@@ -44,11 +44,15 @@ The same seed and danger give the same numbers.
 pilot of --answers (by default flow and duel, Balance.pacing.depths, and
 charge, masher and skilled), --jobs loaders at a time, prints a report of
 each fight - per enemy its time to kill and hits to kill, the gaps between
-kills, the time engaged, the damage taken, openings, cancelled charges,
-what was heard - and, with --check, one PASS or FAIL line per band of
-Balance.pacing. --json writes every report in full, sound log and music
-trace included. Exits 1 when a band fails under --check, 2 when a fight
-could not be played.
+kills, the kill chains and the longest one's links (Balance.chain), the
+death sound's pitch kill by kill, the time engaged, the damage taken,
+openings, cancelled charges, what was heard - and, with --check, one PASS
+or FAIL line per band of Balance.pacing, and the chain's lines: in the
+flow fights' sound logs the death sound climbs over a 4-kill chain and
+falls back after a break, and each flow fight's counted chains are the
+ones its death sounds tell. --json writes every report in full, sound log
+and music trace included. Exits 1 when a band fails under --check, 2 when
+a fight could not be played.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -260,6 +264,10 @@ def describe(r):
                      f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}")
     if r["killGaps"]:
         lines.append("  gaps between kills: " + ", ".join(f"{g:.2f}" for g in r["killGaps"]) + " s")
+    pitches = death_pitches(r)
+    if pitches:
+        lines.append(f"  chains {r['chains']}, longest {r['longestChain']}; the death sound at "
+                     + ", ".join(f"{p:+d}" for p in pitches) + " semitones")
     cues = Counter(s["cue"] + ("" if not s["pitch"] else f"{s['pitch']:+d}") for s in r["sounds"])
     lines.append(f"  heard: {len(r['sounds'])} sounds - "
                  + ", ".join(f"{c} {n}" for c, n in sorted(cues.items(), key=lambda kv: -kv[1])))
@@ -271,6 +279,72 @@ def describe(r):
                      f"at the start, peak {peak:.2f}, {music[-1]['intensity']:.2f} at the end "
                      f"({len(music)} trace rows)")
     return lines
+
+
+def death_pitches(r):
+    """The pitch of every death sound the fight played, in order"""
+    return [s["pitch"] for s in r["sounds"] if s["what"] == "death"]
+
+
+def climbs(pitches, links):
+    """Where pitches has a chain of links deaths climbing from the burst's
+    own pitch, each a step above the one before: its start, else None"""
+    for i in range(len(pitches) - links + 1):
+        run = pitches[i:i + links]
+        if run[0] == 0 and all(b > a for a, b in zip(run, run[1:])):
+            return i
+    return None
+
+
+def falls_back(pitches):
+    """Where a death sound plays at the burst's own pitch right after one
+    above it, a chain broken: its index, else None"""
+    for i in range(1, len(pitches)):
+        if pitches[i] == 0 and pitches[i - 1] > 0:
+            return i
+    return None
+
+
+def check_chain(results, links=4):
+    """The kill chain's lines (issue #270): in the flow fights' sound logs
+    the death sound climbs over a links-kill chain somewhere and falls back
+    after a break somewhere; and no fight's chains run past its kills"""
+    flows = [r for r in results if r["room"] == "flow"]
+    if not flows:
+        return []
+    def tag(r):
+        return f"flow depth {r['depth']} {r['answer']}"
+    climb = next((r for r in flows if climbs(death_pitches(r), links) is not None), None)
+    fall = next((r for r in flows if falls_back(death_pitches(r)) is not None), None)
+    out = [(climb is not None,
+            f"chain: the death sound climbs over a {links}-kill chain ("
+            + (f"{tag(climb)}: " + ", ".join(f"{p:+d}" for p in death_pitches(climb)) if climb
+               else "in no flow fight") + ")"),
+           (fall is not None,
+            "chain: the death sound falls back after a break ("
+            + (f"{tag(fall)}: " + ", ".join(f"{p:+d}" for p in death_pitches(fall)) if fall
+               else "in no flow fight") + ")")]
+    for r in flows:
+        heard = heard_chains(death_pitches(r))
+        ok = (r["chains"], r["longestChain"]) == (len(heard), max(heard, default=0))
+        out.append((ok, f"{tag(r)}: the counted chains are the ones heard (counted {r['chains']}, "
+                        f"longest {r['longestChain']}; heard {len(heard)}, longest "
+                        f"{max(heard, default=0)})"))
+    return out
+
+
+def heard_chains(pitches):
+    """The chains of two links or more the death sounds tell: a death at a
+    pitch above the one before is the next link, at the top of the scale
+    the top again too; their lengths"""
+    out, links = [], 0
+    for i, p in enumerate(pitches):
+        links = links + 1 if i > 0 and links > 0 and (p > pitches[i - 1] or p == pitches[i - 1] > 0) else 1
+        if links == 2:
+            out.append(2)
+        elif links > 2:
+            out[-1] = links
+    return out
 
 
 def check(results, bands):
@@ -322,7 +396,7 @@ def check(results, bands):
                 out.append((all(r["damageTaken"] < o["damageTaken"] for o in others),
                             f"duel depth {depth} skilled: takes less damage than the others "
                             f"({r['damageTaken']}; {took})"))
-    return out
+    return out + check_chain(results)
 
 
 def pacing(args, loader):

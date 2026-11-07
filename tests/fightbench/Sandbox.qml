@@ -152,6 +152,9 @@ Item {
             whirlHits: r.whirlHits,
             whirlsStarted: whirlsStarted,
             kills: r.kills,
+            // Kill chains of two links or more, and the longest's links
+            chains: r.chains,
+            longestChain: r.longestChain,
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
             knightHp: p ? p.hp : 0,
