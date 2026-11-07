@@ -1,9 +1,17 @@
-# dungeon: the dungeon's music, one segment that loops while the knight is
-# below. The fight's intensity (how many enemies are after the knight,
-# Balance.music) brings in a pulse - kick and snare - from 0.15 to 0.5,
-# and from 0.5 to 1 a battle layer: a horn's counter-line under the tune
-# and brushes on the eighths. A minor, 96 bpm, 16 bars; the last bar sits
-# on E so the loop leads back into A minor.
+# dungeon: the dungeon's music while the knight is below, in two parts.
+# flow loops through the rooms and their quick fights: the fight's
+# intensity (how many enemies are after the knight, Balance.music) brings
+# in a pulse - kick and snare - from 0.15 to 0.5, and from 0.5 to 1 a
+# battle layer: a horn's counter-line under the tune and brushes on the
+# eighths. A minor, 96 bpm, 16 bars; the last bar sits on E so the loop
+# leads back into A minor.
+# duel is where the music moves while a room's lead is engaged (issue
+# #273): no tune, a heartbeat on the kick, a drone on A and E, the bass
+# on the root and a harp's E ticking late in every bar; Am Am F E, Am Am Dm
+# E. Both parts move to the other on the next bar. The sting plays on the
+# next beat on top of either: a brass stab of A3, E4 and A4 over a kick,
+# and the harp's E5 up to A5 - for every parry and every opening of the
+# lead.
 tempo 96
 meter 4
 
@@ -24,6 +32,13 @@ track kick  kick  vel=0.6 transpose=0
 track snare snare vel=0.45 transpose=0
 track horn  brass vel=0.6
 track brush brush vel=0.4 transpose=0
+track heart kick  vel=0.55 transpose=0
+track drone pad   vel=0.6
+track low   bass  vel=0.45
+track tick  harp  vel=0.65
+track stab  brass vel=0.42
+track hit   kick  vel=0.3 transpose=0
+track ring  harp  vel=0.5
 
 let pad[Am] = A3+E4:4
 let pad[F]  = F3+C4:4
@@ -44,6 +59,17 @@ let chords = Am Am F F G G Am Am Dm Dm Am Am F G E E
 let beat = C2! r C2 r
 let back = r C4 r C4!
 let eighths = r:.5 C4:.5~ r:.5 C4:.5 r:.5 C4:.5~ r:.5 C4:.5
+let drone[Am] = A3+E4:4
+let drone[F]  = F3+C4:4
+let drone[Dm] = D3+A3:4
+let drone[E]  = E3+B3:4
+let low[Am] = A1:4
+let low[F]  = F1:4
+let low[Dm] = D2:4
+let low[E]  = E1:4
+let duelChords = Am Am F E Am Am Dm E
+let heart = C2:.5! C2:.5~ r C2:.5! C2:.5~ r
+let tick = r:3 E4:.5 r:.5
 
 pattern Dungeon
   tune: E4:2 A4:1.5 B4:.5 | C5:3 B4 | A4:2 F4:2 | C5:4 |
@@ -59,7 +85,22 @@ pattern Dungeon
         D4:2 F4:2 | A3:4 | C4:2 E4:2 | E4:2 C4:2 | C4:2 A3:2 | B3:2 G3:2 | B3:2 D4:2 | G#3:4
   brush: $eighths*16
 
-segment explore: Dungeon
-start explore
+pattern Duel
+  heart: $heart*8
+  drone: $drone[$duelChords]
+  low: $low[$duelChords]
+  tick: $tick*8
+
+pattern Sting
+  stab: A3+E4+A4:.5! r:3.5
+  hit: C2:.5! r:3.5
+  ring: E5:.25 A5:.75 r:3
+
+segment flow: Dungeon
+segment duel: Duel
+start flow
+transition flow -> duel sync=bar
+transition duel -> flow sync=bar
+stinger sting: Sting sync=beat
 layer pulse: kick snare intensity=0.15..0.5 fade=4
 layer battle: horn brush intensity=0.5..1 fade=4

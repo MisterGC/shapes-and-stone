@@ -95,8 +95,8 @@ Window {
             let s = song()
             check(game.fightersNear === 0 && game.fightIntensity === 0 && s.intensity === 0,
                   "no enemy after the knight: the dungeon song plays at intensity 0 (" + s.intensity + ")")
-            check(s.loaded && s.version === 2 && s.segment === "explore", "it is the dungeon song, in its "
-                  + s.segment + " segment")
+            check(s.loaded && s.version === 2 && s.segment === "flow",
+                  "it is the dungeon song, in its " + s.segment + " part")
             set(3, 2)
         }],
         [300, () => {
@@ -110,7 +110,7 @@ Window {
             let s = song()
             check(game.fightIntensity === 1 && s.intensity === 1, "within a second it is full: "
                   + s.intensity.toFixed(2))
-            check(s.playing && s.segment === "explore", "the song plays on through the change")
+            check(s.playing && s.segment === "flow", "the song plays on through the change")
             // A render plays at the player's volume: heard for the two renders
             game.muted = false
             let quiet = s.renderOffline(8, [{ at: 0, intensity: 0 }])
@@ -177,7 +177,7 @@ Window {
                   + game.fightIntensity.toFixed(3) + " in 10 steps (" + eased.toFixed(3) + ")")
             let rows = game.musicTrace.slice(from)
             let moved = rows.find(m => Math.abs(m.intensity - lastIntensity) >= game.musicTraceStep)
-            check(moved !== undefined && moved.song === "music/dungeon" && moved.segment === "explore"
+            check(moved !== undefined && moved.song === "music/dungeon" && moved.segment === "flow"
                   && moved.playing === true && moved.t > 0 && moved.t <= r3(game.physicsSeconds),
                   "the music trace gets a row once the intensity has moved musicTraceStep: "
                   + JSON.stringify(moved) + ", " + rows.length + " rows")
