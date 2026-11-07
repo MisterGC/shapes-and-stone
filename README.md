@@ -266,7 +266,10 @@ The joiner's knight answers one of the host's enemies: it stands until the
 enemy walks into its reach and swings, parries it, blocks, blocks
 perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it as it closes in and
 kills it while the host's knight kills another; the host gives that enemy
-200 HP first, so it stands until the kill. Each answer counts once,
+200 HP first, so it stands until the kill. After the first parry the host
+makes that enemy a room's lead for a moment and the joiner's knight
+parries it again: the host receives the blow as one that opens the lead,
+and the lead opens on both screens. Each answer counts once,
 on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
@@ -1997,6 +2000,26 @@ run's seed and the level, so a seed plays the same fight. Its AI state is
 wind-up; the blow carries `crush` to the knight's screen, which judges it.
 The `crush` group of the table holds its look, its growl and its hit
 feedback (`impact("crushBlow")`).
+A room's lead, its tough enemy, has a stance (issue #271, the table's
+`lead` group): it takes no knockback, no hit, shove or shield dash
+staggers it, and it keeps winding up under hits. Its HP is the tough tier's
+(`enemy.tierHp`), many times a normal enemy's: it falls in its openings,
+not to a few swings. A blow outside an
+opening does only `lead.chip` of its damage and wears `lead.wear` off its
+stance, a charged swing `lead.heavyWear`; with no blow for
+`lead.regenDelay` seconds the stance comes back. A parry, a perfect block,
+a charged swing landed while it recovers from its lunge (`lead.recovery`
+seconds, shorter than a full charge: a charge the lunge cancelled is not
+full again in time) or a stance worn to 0 breaks it: an opening, a stagger
+of `lead.openingTime` seconds in which every blow does `lead.openingDamage`
+times its damage. The blow that opens it lands whole, and after the
+opening the stance is full again. A swing parries a lead only when it
+began in the parry window (`lead.parryStart` steps before it lands): a
+swing under way that the lunge runs into is a blow like any other. The
+stance shows as a bar under the lead, an opening as a flash, a ring, the
+word `lead.word` and the stagger. In a session the host's lead keeps the
+stance: `lead`, `stance` and `opening` are replicated, the knight's own
+screen judges whether its blow opens the lead, and the host opens it.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -2070,17 +2093,17 @@ python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel
 It prints each fight: per enemy its hits to kill and its time to kill,
 from the first blow that landed and from the moment it engaged; the gaps
 between kills, the time engaged, the damage taken, the openings (an enemy
-staggered by a parry, a perfect block or a broken guard) and the charges a
+staggered by a parry, a perfect block or a broken guard; a lead's by what
+broke its stance: `parry`, `perfect`, `heavy` or `worn`) and the charges a
 hit cancelled; and what a player would have heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel
 `masher` and `charge` take at least `duelSlow` seconds or fall, and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
-both. Until the fights have their two rhythms (#266) the duel bands fail,
-and the CI job `slow-benches` runs `--check` without failing the build;
-the change that makes them pass makes it fail on red. Its report is kept
-as the run's `pacing` artifact.
+both. Since the lead's stance (#271) every band passes, and the CI job
+`slow-benches` fails on a red one. Its report is kept as the run's
+`pacing` artifact.
 
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
@@ -2110,11 +2133,18 @@ charged swing is tried there too: hold the left button while the guardian
 comes and let go once the ring has flashed. So is the crushing blow: the
 room's guardian is tough and winds one up now and then, and
 `crushChance: 1` in the table's `enemy` group, saved and reloaded, makes
-every attack of a tough enemy a crushing one. The reload bench does both
-through the inspector: it changes `knight.chargeTime` in the loaded copy
-of the table, reloads and checks that the charge fills in the new time,
-and it counts the guardian's crushing blows among its attacks before and
-after setting `enemy.crushChance` to 1:
+every attack of a tough enemy a crushing one. The lead's stance is tried
+in the `duel` scenario: parry the lead's lunge, or perfect-block it, and
+it opens; an edit of the table's `lead` group changes the next opening
+after a reload. The reload bench does all three through the inspector: it
+changes `knight.chargeTime` in the loaded copy of the table, reloads and
+checks that the charge fills in the new time, it counts the guardian's
+crushing blows among its attacks before and after setting
+`enemy.crushChance` to 1, and in the duel room it opens the lead, checks
+its stance bar, the opening's length and damage, and the new length after
+setting `lead.openingTime` to 2.5. The fight room's tough guardian is
+that room's lead; the charge it tries is let go at it with its stance
+taken away:
 
 ```
 python3 tests/fightbench/run_reload.py
