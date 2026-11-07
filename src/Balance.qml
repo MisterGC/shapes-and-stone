@@ -69,7 +69,11 @@ QtObject {
         // heavyArc and heavyRange times attackRange, through a guardian's
         // shield (it staggers), knocking back heavyKnockback times as far.
         // Released before full, a normal swing; full, the charge is kept
-        // until the button is let go. A hit cancels it
+        // until the button is let go. A hit cancels it. Once the heavy
+        // swing's arc has faded the knight recovers heavyRecovery seconds
+        // before it swings again (a parry with it takes that away, as a
+        // parry does a swing's cooldown); a heavy swing that hit no enemy
+        // leaves it open for that time, no shield and no dash
         chargeStart: 0.2,
         chargeTime: 0.6,
         chargeSpeed: 0.55,
@@ -77,6 +81,7 @@ QtObject {
         heavyArc: 180,
         heavyRange: 1.25,
         heavyKnockback: 2,
+        heavyRecovery: 0.5,
         // Whirlwind: Q with full momentum (Balance.momentum) spins the
         // knight forward, whirlSpeed for whirlDuration seconds along its
         // way or facing, no damage taken, and hits every standing enemy
