@@ -412,10 +412,13 @@ QtObject {
         // Enemies per dungeon at depth 0, rolled evenly from min to max
         enemiesMin: 10,
         enemiesMax: 15,
-        // Tier mix of a dungeon, dealt not rolled: weakChance of its enemies
-        // (rounded) are weak, those above normalChance tough, the rest normal
+        // A room's lead (issue #269): the one tough enemy a room may hold.
+        // leadShare of the rooms but the start room (rounded) have one, the
+        // rooms dealt, not rolled, among those that hold an enemy; no other
+        // enemy of a dungeon is tough. The rest is fodder: weakChance of all
+        // its enemies (rounded) are weak, the rest normal
+        leadShare: 0.33,
         weakChance: 0.2,
-        normalChance: 0.8,
         // Type rolls: guardian first, then spitter, else grunt
         guardianChance: 0.15,
         guardianChanceTough: 0.4,
@@ -442,9 +445,10 @@ QtObject {
         enemiesCap: 26,
         // Fewer weak: weakChance falls by this, not below 0
         weakChance: -0.05,
-        // More tough: the tough share (above normalChance) grows by this
-        toughChance: 0.08,
-        toughCap: 0.6,
+        // More leads: the share of rooms with a lead grows by this, up to
+        // the cap - one room in three at depth 0, every room from depth 8
+        leadShare: 0.09,
+        leadCap: 1,
         // More guardians and spitters: added to their chances (a tough
         // guardian's too), each up to the cap
         guardianChance: 0.03,
@@ -1038,6 +1042,7 @@ QtObject {
     readonly property var dungeonMaster: ({
         settings: [
             { key: "enemies", label: "Enemies per room", step: 0.1, min: 0, max: 8, decimals: 2 },
+            { key: "leads", label: "Rooms with a lead", step: 0.05, min: 0, max: 1, decimals: 2 },
             { key: "spikes", label: "Spike plates per room", step: 0.1, min: 0, max: 4, decimals: 2,
               kinds: ["spike"] },
             { key: "slits", label: "Arrow slits per room", step: 0.1, min: 0, max: 4, decimals: 2,
