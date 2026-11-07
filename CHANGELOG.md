@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Kill chains:** kills in quick succession build a chain. Each kill within 2.5 s of the last climbs the death sound a step of the dungeon song's scale and gets a short crunchy hit stop, and every third kill in a chain adds a momentum pip. A hit taken or a longer pause breaks the chain. ([#270](https://github.com/MisterGC/shapes-and-stone/issues/270))
+
 ## [0.4.2] - 2026-11-06
 
 Every control can be rebound, for mouse and keyboard and for a gamepad, on a new Control Input page; the game says when a gamepad connects or leaves; and in the browser a gamepad plays in Firefox too. Built on Clayground v2026.11.1.

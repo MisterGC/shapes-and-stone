@@ -205,8 +205,10 @@ impact bench starts a host and a joiner in one process, joins them over LAN,
 lands every kind of hit on each side, then a block alone and a perfect
 block alone, then a real hit on the joiner's knight and its shield run
 dry - the screen flash, the HP chunk and the mana bar's flash stay on the
-joiner's screen, and the host draws the shards - and exits with the number
-of failed checks:
+joiner's screen, and the host draws the shards - then a kill chain on each
+side, two kills in quick succession: the chained kill's hit stop is the
+killer's alone and its death sound a step higher - and exits with the
+number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
@@ -2058,15 +2060,20 @@ python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel
 
 It prints each fight: per enemy its hits to kill and its time to kill,
 from the first blow that landed and from the moment it engaged; the gaps
-between kills, the time engaged, the damage taken, the openings (an enemy
-staggered by a parry, a perfect block or a broken guard) and the charges a
-hit cancelled; and what a player would have heard. `--check` adds one PASS
+between kills, the kill chains and the longest one's links, the death
+sound's pitch kill by kill, the time engaged, the damage taken, the
+openings (an enemy staggered by a parry, a perfect block or a broken
+guard) and the charges a hit cancelled; and what a player would have
+heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel
 `masher` and `charge` take at least `duelSlow` seconds or fall, and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
-both. Until the fights have their two rhythms (#266) the duel bands fail,
+both. The kill chain's lines (issue #270) read the flow fights' sound
+logs: the death sound climbs a step of the dungeon song's scale over a
+4-kill chain in one of them and falls back after a break in one, and each
+fight's counted chains are the ones its death sounds tell. Until the fights have their two rhythms (#266) the duel bands fail,
 and the CI job `slow-benches` runs `--check` without failing the build;
 the change that makes them pass makes it fail on red. Its report is kept
 as the run's `pacing` artifact.
@@ -2307,6 +2314,7 @@ Melee attacks have swing recovery (cooldown between attacks):
 - **Timing**: Dodge during enemy telegraph, attack during recovery
 - **Blocking**: Active decision — trade mana for damage reduction
 - **Prioritization**: Choose targets wisely (Spitters first? Focus Dasher mid-charge?)
+- **Kill chains**: a kill within `Balance.chain.window` (2.5 s) of the last one adds to the chain - its death sound climbs a step of the dungeon song's A minor, it gets a short crunchy hit stop on the killer's screen, and every third link adds a momentum pip. A hit taken, or a pause longer than the window, breaks the chain
 
 ---
 
