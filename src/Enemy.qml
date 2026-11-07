@@ -941,9 +941,12 @@ PhysicsItem {
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
                 if (enemyType === "grunt" && !_committed && canSee && dist < Balance.enemy.circleRange) {
+                    // Rolled from the level's attack rolls, so a seed
+                    // circles the same way every time
                     let ct = Balance.enemy.circleTime
-                    _circleT = ct[0] + Math.random() * (ct[1] - ct[0])
-                    _circleDir = Math.random() < 0.5 ? 1 : -1
+                    let roll = gameWorld && gameWorld.rollAttack ? () => gameWorld.rollAttack() : Math.random
+                    _circleT = ct[0] + roll() * (ct[1] - ct[0])
+                    _circleDir = roll() < 0.5 ? 1 : -1
                     aiState = "circle"
                     break
                 }
