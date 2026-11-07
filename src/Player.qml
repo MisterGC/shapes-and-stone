@@ -818,20 +818,30 @@ PhysicsItem {
         if (fallen) return "ignored"
         if (isDashing) return "dodged"
         if (graceLeft > 0) return "ignored"
-        if (isBlocking && isShieldFacing(fromX, fromY, 0)) {
-            if (perfectGuard) return _perfectBlock(fromX, fromY, 0)
-            view.block()
-            acted("block")
-            if (gameWorld) {
-                let s = getShieldWorldPos()
-                gameWorld.playBlock()
-                gameWorld.impact("projectileDeflected", s.x, s.y, alongX, alongY)
-                gameWorld.countFight("block")
-            }
-            payBlock()
-            return "blocked"
-        }
+        let shield = shieldShot(fromX, fromY, 0, alongX, alongY)
+        if (shield !== "") return shield
         return takeDamage(amount, fromX, fromY, 0, false, alongX, alongY)
+    }
+
+    // A thing flying at the knight - an arrow, a spitter's shot - from
+    // the corner (fromX, fromY) of a thing size Wu in size, along (alongX,
+    // alongY): the raised shield facing it takes it whole, "perfect" when
+    // raised just before it (perfectGuard), which sends it back, else
+    // "blocked" at the shield's mana cost; "" when the shield does not
+    // stop it
+    function shieldShot(fromX, fromY, size, alongX, alongY) {
+        if (!isBlocking || !isShieldFacing(fromX, fromY, size)) return ""
+        if (perfectGuard) return _perfectBlock(fromX, fromY, size)
+        view.block()
+        acted("block")
+        if (gameWorld) {
+            let s = getShieldWorldPos()
+            gameWorld.playBlock()
+            gameWorld.impact("projectileDeflected", s.x, s.y, alongX, alongY)
+            gameWorld.countFight("block")
+        }
+        payBlock()
+        return "blocked"
     }
 
     // Thrown back along the blow (takeDamage), knockback wu: a knockback
