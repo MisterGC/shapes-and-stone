@@ -519,9 +519,12 @@ QtObject {
         // Duel: "masher" and "charge" take at least duelSlow seconds to
         // kill the lead, from the moment it engages, or fall; "skilled"
         // kills it within duelSkilled seconds and does not fall, and takes
-        // less damage than either of the others
+        // less damage than either of the others. A lead strikes a knight
+        // charging in its reach first (lead.reach): hits cancel at least
+        // duelCancelled of "charge"'s charges
         duelSlow: 20,
-        duelSkilled: [6, 15]
+        duelSkilled: [6, 15],
+        duelCancelled: 1
     })
 
     // A room's lead has a stance (issue #271): it takes no knockback, no

@@ -387,6 +387,12 @@ def check(results, bands):
             what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
             out.append((ok, f"duel depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
                             f"or falls ({what})"))
+            # The lead strikes a knight charging in its reach first (#272)
+            if pilot == "charge":
+                least = bands["duelCancelled"]
+                out.append((r["cancelledCharges"] >= least,
+                            f"duel depth {depth} charge: hits cancel at least {least} "
+                            f"{'charge' if least == 1 else 'charges'} ({r['cancelledCharges']})"))
         r = by.get("skilled")
         if r:
             t = lead_time(r)
