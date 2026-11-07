@@ -152,6 +152,10 @@ Item {
             parries: r.parries,
             blocks: r.blocks,
             perfectBlocks: r.perfectBlocks,
+            // Shots a perfect block sent back, and the ones that hit an
+            // enemy (Balance.projectile)
+            shotsBack: r.shotsBack,
+            shotBackHits: r.shotBackHits,
             crushBlows: crushBlows,
             crushed: r.crushed,
             heavySwings: heavySwings,
@@ -364,7 +368,8 @@ Item {
     // steps from landing and raises it then. The answer "mix" rolls the
     // plan from the seed between parry and block; "block", "parry" and
     // "perfect" always pick that one; a crushing blow (aiState "crush") gets
-    // the same plans, and a parry finds no window. A shot is always blocked. "heavy"
+    // the same plans, and a parry finds no window. A shot is always
+    // blocked, by "perfect" perfectly, which sends it back. "heavy"
     // meets attacks as "mix" does; it answers a guardian's shield with a
     // charged heavy swing instead of a shield dash: it holds the left
     // button on its way in and lets go once the charge is full and the
@@ -377,8 +382,8 @@ Item {
     // it is in the heavy swing's reach, then presses again. "masher" never
     // raises the shield either: it walks at the nearest enemy and clicks on
     // every step it can swing. "skilled" parries every lunge and
-    // perfect-blocks every crushing blow, blocks a shot - walking on at
-    // the nearest enemy behind the shield -, breaks a
+    // perfect-blocks every crushing blow and every shot, sending it back -
+    // walking on at the nearest enemy meanwhile -, breaks a
     // guardian's guard with the shield dash, and swings only into an
     // opening: an enemy within reach that is not winding up or lunging
     property var _plans: new Map()
@@ -514,19 +519,31 @@ Item {
         } }
     }
     // A spitter's shot on its way: shield up towards it a moment, standing
-    // or, with towards, walking at that enemy behind it. Returns whether
-    // the shield is up for one
-    function answerShot(p, dt, towards) {
+    // or, with towards, walking at that enemy behind it. With perfect the
+    // shield stays down until the shot is perfectFrom wu off, centre to
+    // centre, and comes up then: a perfect block that sends it back
+    // (Balance.projectile), the shield down again soon after, ready for the
+    // next. A shot sent back is none to answer. Returns whether the knight
+    // is answering one
+    readonly property real perfectFrom: 0.9
+    function answerShot(p, dt, towards, perfect) {
         let shot = null, shotDist = 1e9
         for (let o of game.room.children) {
-            if (o.objectName !== "projectile" || o.destroyed !== false) continue
+            if (o.objectName !== "projectile" || o.destroyed !== false || o.back) continue
             let d = distTo(p, o.xWu, o.yWu)
             if (d < 3 && d < shotDist) { shot = o; shotDist = d }
         }
         if (shot) {
             letGo(p)
-            _blockLeft = 0.3
             face(p, shot)
+            let cd = Math.hypot(shot.xWu + shot.widthWu / 2 - p.xWu - p.widthWu / 2,
+                                shot.yWu - shot.heightWu / 2 - p.yWu + p.heightWu / 2)
+            if (perfect === true && !p.isBlocking && cd > perfectFrom) {
+                if (towards) moveTowards(p, towards.xWu, towards.yWu, 1)
+                else stand(p)
+                return true
+            }
+            _blockLeft = perfect === true ? 0.1 : 0.3
         }
         if (_blockLeft > 0) {
             _blockLeft -= dt
@@ -594,8 +611,9 @@ Item {
             return
         }
 
-        // 2. A spitter's shot on its way: shield up towards it a moment
-        if (answerShot(p, dt)) return
+        // 2. A spitter's shot on its way: shield up towards it a moment,
+        // "perfect" just before it meets the knight
+        if (answerShot(p, dt, null, answer === "perfect")) return
 
         // 3. Go for the nearest enemy
         let near = nearest(p, foes), target = near.e, targetDist = near.d
@@ -682,7 +700,7 @@ Item {
             return
         }
         let near = nearest(p, foes), target = near.e
-        if (answerShot(p, dt, near.d > 1.3 ? target : null)) return
+        if (answerShot(p, dt, near.d > 1.3 ? target : null, true)) return
         letGo(p)
         face(p, target)
         if (shieldDash(p, target, near.d)) return

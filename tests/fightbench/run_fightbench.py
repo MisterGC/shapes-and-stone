@@ -24,14 +24,16 @@ One fight prints its report as JSON. --answer is how the scripted knight
 meets a grunt's or a guardian's attack: "mix" parries or blocks as the
 seed rolls, "block" always blocks, "parry" always parries, "perfect"
 raises the shield 4 physics steps before each lunge lands, a perfect
-block, "heavy" meets attacks as "mix" does but charges a heavy swing at a
-guardian instead of shield-dashing it, "whirlwind" fights as "mix" does
+block, and just before each shot meets the knight, which sends it back
+(Balance.projectile), "heavy" meets attacks as "mix" does but charges a
+heavy swing at a guardian instead of shield-dashing it, "whirlwind"
+fights as "mix" does
 and, once its momentum is full, whirls (Q) at the nearest enemy within
 reach. The report counts the whirlwinds that landed (hit an enemy), their
 hits and the ones begun. The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
-perfect-blocks and strikes in openings. --room is who stands in the fight
-room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
+perfect-blocks - crushing blows and shots, which it sends back - and
+strikes in openings. --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
 only, "duel" a room's lead alone and "boss" the Hollow Warden alone, its
 adds coming in its phase 2 (Balance.pacing, Balance.boss). --sword is the
 knight's sword level: by default 0 in the mixed room and in flow and duel
@@ -47,7 +49,8 @@ charge, masher and skilled), --jobs loaders at a time, prints a report of
 each fight - per enemy its time to kill and hits to kill, the gaps between
 kills, the kill chains and the longest one's links (Balance.chain), the
 death sound's pitch kill by kill, the time engaged, the damage taken,
-openings, cancelled charges, what was heard - and, with --check, one PASS
+openings, cancelled charges, the shots sent back and the ones of them that
+hit an enemy, what was heard - and, with --check, one PASS
 or FAIL line per band of Balance.pacing, and the chain's lines: in the
 flow fights' sound logs the death sound climbs over a 4-kill chain and
 falls back after a break, and each flow fight's counted chains are the
@@ -262,7 +265,8 @@ def describe(r):
     lines = [f"{r['room']} depth {r['depth']} sword {r['sword']} {r['answer']}: "
              f"{r['outcome']} after {r['seconds']:.2f} s, damage taken {r['damageTaken']}, "
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
-             f"engaged {r['engagedSeconds']:.2f} s"]
+             f"engaged {r['engagedSeconds']:.2f} s, shots sent back {r.get('shotsBack', 0)} "
+             f"({r.get('shotBackHits', 0)} hit)"]
     for e in r["enemies"]:
         # A lead's openings by what broke its stance (Balance.lead)
         opened = e.get("opened") or {}
