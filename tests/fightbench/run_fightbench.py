@@ -282,6 +282,12 @@ def describe(r):
         lines.append(f"  music: {', '.join(states)}; intensity {music[0]['intensity']:.2f} "
                      f"at the start, peak {peak:.2f}, {music[-1]['intensity']:.2f} at the end "
                      f"({len(music)} trace rows)")
+        spans = duel_spans(music, "state")
+        played = duel_spans(music, "segment")
+        lines.append("  duel part: " + (", ".join(fmt_span(a, b) for a, b in spans) if spans else "none")
+                     + "; played " + (", ".join(fmt_span(a, b) for a, b in played) if played else "never")
+                     + f"; growls {sum(1 for x in r['sounds'] if x['what'] == 'growl' and x['cue'] == GROWL)}"
+                     + f", stings {sum(1 for x in r['sounds'] if x['what'] == 'sting')}")
     return lines
 
 
@@ -351,6 +357,30 @@ def heard_chains(pitches):
     return out
 
 
+# The duel's sounds (issue #273): the lead's growl and the song's sting
+GROWL = "sfx/lead_growl"
+
+
+def duel_spans(music, key):
+    """The spans of the physics clock in which the music trace's key
+    ("state", what the game asks for, or "segment", what the song plays) is
+    the duel part: [(from, to)], to None while it lasts to the end"""
+    spans, at = [], None
+    for m in music:
+        if m[key] == "duel" and at is None:
+            at = m["t"]
+        elif m[key] != "duel" and at is not None:
+            spans.append((at, m["t"]))
+            at = None
+    if at is not None:
+        spans.append((at, None))
+    return spans
+
+
+def fmt_span(a, b):
+    return f"{a:.2f}-{'end' if b is None else f'{b:.2f}'} s"
+
+
 def check(results, bands):
     """One (ok, line) per band of Balance.pacing for the fights played"""
     out = []
@@ -370,11 +400,16 @@ def check(results, bands):
         out.append((cleared and gap <= bands["flowGap"],
                     f"{tag}: no gap between kills over {bands['flowGap']} s "
                     f"(longest {gap:.2f} s{'' if cleared else ', not cleared'})"))
+        spans = duel_spans(r["music"], "state")
+        out.append((not spans, f"{tag}: the song stays in its flow part "
+                               f"({'duel ' + ', '.join(fmt_span(a, b) for a, b in spans) if spans else 'flow only'})"))
     duels = {}
     for r in results:
         if r["room"] == "duel":
             duels.setdefault(r["depth"], {})[r["answer"]] = r
     for depth, by in sorted(duels.items()):
+        for pilot, r in sorted(by.items()):
+            out.extend(check_duel_sound(r, f"duel depth {depth} {pilot}"))
         def lead_time(r):
             leads = [e for e in r["enemies"] if e["tier"] == 2] or r["enemies"]
             return leads[0]["ttkEngaged"]
@@ -407,6 +442,38 @@ def check(results, bands):
                             f"duel depth {depth} skilled: takes less damage than the others "
                             f"({r['damageTaken']}; {took})"))
     return out + check_chain(results)
+
+
+def check_duel_sound(r, tag):
+    """(ok, line) for how a duel sounds (issue #273): the song's state is its
+    duel part from the lead's engagement to its fall and its flow part
+    after, the lead growls once as it engages, and every opening stings"""
+    out = []
+    leads = [e for e in r["enemies"] if e.get("lead")]
+    if not leads or leads[0]["engagedAt"] is None:
+        return [(False, f"{tag}: the lead engaged (no lead, or it never engaged)")]
+    lead, step = leads[0], 0.05
+    spans = duel_spans(r["music"], "state")
+    start, end = spans[0] if spans else (None, None)
+    died = lead["diedAt"]
+    # The state follows on the step after the fall: a lead that fell on
+    # the fight's last step, after which the bench steps no more, leaves
+    # the duel part to the end
+    last = died is not None and died >= r["seconds"] - step
+    ok = (len(spans) == 1 and abs(start - lead["engagedAt"]) <= step
+          and (died is None or (end is None and last) or (end is not None and abs(end - died) <= step)))
+    out.append((ok, f"{tag}: the song's state is its duel part from the lead's engagement at "
+                    f"{lead['engagedAt']:.2f} s {'to its fall at ' + format(died, '.2f') + ' s' if died is not None else 'on'}"
+                    f" ({', '.join(fmt_span(a, b) for a, b in spans) if spans else 'never'}"
+                    f"{', the fight ends on its fall' if last and end is None else ''})"))
+    growls = [x for x in r["sounds"] if x["cue"] == GROWL]
+    out.append((len(growls) == 1 and growls[0]["t"] <= lead["engagedAt"] + step,
+                f"{tag}: the lead growls once as it engages "
+                f"({', '.join(format(x['t'], '.2f') + ' s' for x in growls) or 'never'})"))
+    stings = [x for x in r["sounds"] if x["what"] == "sting"]
+    out.append((len(stings) >= lead["openings"],
+                f"{tag}: a sting for every opening ({len(stings)} stings, {lead['openings']} openings)"))
+    return out
 
 
 def pacing(args, loader):

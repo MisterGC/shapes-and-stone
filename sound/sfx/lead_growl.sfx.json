@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "name": "lead_growl",
+  "variation": { "seed": 273, "pool": 3 },
+  "layers": [
+    { "name": "snarl", "role": "transient", "source": "square", "freq": 164.81, "length": 120,
+      "gain": -14, "envelope": { "attack": 5, "decay": 110, "sustain": 0, "release": 0 },
+      "pitch": { "start": 2, "end": 0, "time": 100 },
+      "filter": { "type": "lowpass", "cutoff": 1200 } },
+    { "name": "chest", "role": "body", "source": "sawtooth", "freq": 110, "length": 900,
+      "gain": -8, "envelope": { "attack": 40, "decay": 500, "sustain": 0.55, "release": 300 },
+      "pitch": { "start": 0, "end": -5, "time": 900 },
+      "lfo": { "target": "volume", "shape": "smooth_random", "rate": 32, "depth": 0.55 },
+      "filter": { "type": "lowpass", "cutoff": 700, "resonance": 0.3 },
+      "drive": 6,
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "throat", "role": "body", "source": "sawtooth", "freq": 220, "length": 900,
+      "gain": -10, "envelope": { "attack": 40, "decay": 500, "sustain": 0.5, "release": 300 },
+      "pitch": { "start": 0, "end": -5, "time": 900 },
+      "lfo": { "target": "volume", "shape": "smooth_random", "rate": 32, "depth": 0.6 },
+      "filter": { "type": "bandpass", "cutoff": 900, "resonance": 0.5 },
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "rasp", "role": "body", "source": "noise", "length": 850, "gain": -19,
+      "noise": { "color": "pink" },
+      "envelope": { "attack": 30, "decay": 450, "sustain": 0.4, "release": 300 },
+      "lfo": { "target": "volume", "shape": "smooth_random", "rate": 32, "depth": 0.7 },
+      "filter": { "type": "bandpass", "cutoff": 1400, "resonance": 0.35 } }
+  ]
+}

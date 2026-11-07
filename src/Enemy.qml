@@ -215,6 +215,8 @@ PhysicsItem {
     // AI state: patrol, chase, telegraph, crush, lunge, stagger, recovery,
     // kite, shoot
     property string aiState: "patrol"
+    // The state before the last change, for the lead's growl
+    property string _wasState: "patrol"
 
     // The crushing blow (issue #80): a tough grunt or guardian winds one up
     // instead of a lunge at this share of its attacks - aiState "crush",
@@ -690,6 +692,9 @@ PhysicsItem {
         openFlashAnimation.restart()
         if (gameWorld && gameWorld.spawnWord)
             gameWorld.spawnWord(xWu, yWu + 0.5, Balance.lead.word, Balance.lead.flashColor)
+        // The song's sting and the slow motion, on every screen near it
+        // (Balance.duel)
+        if (gameWorld && gameWorld.leadOpened) gameWorld.leadOpened(enemy)
     }
 
     // Guardian shield arc
@@ -765,6 +770,12 @@ PhysicsItem {
         } else if (aiState !== "lunge") {
             crushing = false
         }
+        // A room's lead growls as it spots the knight: from its patrol into
+        // the hunt, on every screen (Balance.duel)
+        if (lead && _wasState === "patrol" && aiState !== "patrol" && aiState !== "idle"
+                && gameWorld && gameWorld.playLeadGrowl)
+            gameWorld.playLeadGrowl(xWu, yWu)
+        _wasState = aiState
         // A wind-up starts the parry ring: its length where the AI runs, a
         // count of steps where it is shown
         if (aiState === "telegraph" || aiState === "crush" || aiState === "shoot" || aiState === "bash") {
