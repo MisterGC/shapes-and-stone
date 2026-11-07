@@ -1239,6 +1239,22 @@
       },
       "delivered": "2026-11-07T18:34:44.600410+00:00",
       "verdict": null
+    },
+    "music/boss": {
+      "category": "music",
+      "brief": "the Hollow Warden's fight, from the moment its room shuts until it falls, in place of the dungeon's song; A minor, 104 bpm, two parts of 8 bars that move to each other on the next bar. one, its phase 1: a low choir on the chord, the bass tolling the root and a kick on 1 and 3, a piano's bell on each bar's first beat and a brass call A3 E4 answered every other bar, Am Am F E Am Am Dm E. two, from its phase 2 on: the bass running in eighths, kick, snare and a hat driving, strings on the chord and the brass climbing to A4 and C5, Am F Dm E Am F G E. The delivered render is one pass of part one, then one of part two",
+      "mode": "live",
+      "source": "music/boss.song.json",
+      "render": "music/boss.wav",
+      "report": "music/boss.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "model": "warm",
+        "version": "2026.11.1 (clayground f291eff)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-07T21:13:15.249485+00:00",
+      "verdict": null
     }
   }
 }

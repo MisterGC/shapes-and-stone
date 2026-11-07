@@ -100,7 +100,7 @@ ClayWorld2d {
     property var _traced: null
     function _traceMusic() {
         if (!logSounds) return
-        let song = levelType === "dungeon" ? dungeonMusic : villageMusic
+        let song = levelType === "dungeon" ? (bossSong ? bossMusic : dungeonMusic) : villageMusic
         let row = { song: cueOf(song.source), state: song.state, segment: song.segment,
                     intensity: Math.round(song.intensity * 1000) / 1000, playing: song.playing }
         let was = _traced
@@ -146,6 +146,28 @@ ClayWorld2d {
         state: world.duelEngaged ? "duel" : "flow"
     }
 
+    // The Hollow Warden's song (issue #274) plays from the moment its
+    // room shuts until it falls, in place of the dungeon's: its part one,
+    // and two from the Warden's phase 2 on, moving on the next bar
+    SongMusic {
+        id: bossMusic
+        source: "../sound/music/boss.song.json"
+        level: muted ? 0 : 0.25 * musicVolume
+        state: bossFight.phase === 2 ? "two" : "one"
+    }
+    readonly property bool bossSong: bossFight.fighting && levelType === "dungeon"
+    onBossSongChanged: {
+        if (bossSong) {
+            dungeonMusic.halt()
+            bossMusic.start()
+        } else {
+            bossMusic.halt()
+            if (levelType === "dungeon" && screen === "game") dungeonMusic.start()
+        }
+    }
+    // The songs' players, for a bench
+    function bossSongPlayer() { return bossMusic }
+    function dungeonMusicWanted() { return dungeonMusic.wanted }
     // Its phase 2's light
     readonly property bool bossLit: bossFight.fighting && bossFight.phase === 2
 
