@@ -255,9 +255,13 @@ def describe(r):
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s"]
     for e in r["enemies"]:
-        lines.append(f"  {e['type']} ({TIERS[e['tier']]}, {e['hp']} HP): hits {e['hits']}, "
+        # A lead's openings by what broke its stance (Balance.lead)
+        opened = e.get("opened") or {}
+        by = (" (" + ", ".join(f"{c} {n}" for c, n in sorted(opened.items())) + ")") if opened else ""
+        lead = ", lead" if e.get("lead") else ""
+        lines.append(f"  {e['type']} ({TIERS[e['tier']]}{lead}, {e['hp']} HP): hits {e['hits']}, "
                      f"ttk {fmt_s(e['ttk'])} from its first hit, {fmt_s(e['ttkEngaged'])} "
-                     f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}")
+                     f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}{by}")
     if r["killGaps"]:
         lines.append("  gaps between kills: " + ", ".join(f"{g:.2f}" for g in r["killGaps"]) + " s")
     cues = Counter(s["cue"] + ("" if not s["pitch"] else f"{s['pitch']:+d}") for s in r["sounds"])

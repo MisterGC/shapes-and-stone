@@ -91,10 +91,14 @@ Item {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind") bench.whirlsStarted++
         })
-        for (let e of game.enemies.filter(alive))
-            _foes.push({ ref: e, type: e.enemyType, tier: e.tier, hp: e.maxHp, lastHp: e.hp,
-                         lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
-                         hits: 0, openings: 0 })
+        for (let e of game.enemies.filter(alive)) {
+            let f = { ref: e, type: e.enemyType, tier: e.tier, lead: e.lead, hp: e.maxHp, lastHp: e.hp,
+                      lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
+                      hits: 0, openings: 0, opened: {} }
+            // A lead's openings by what broke its stance (Enemy.open)
+            e.opened.connect(cause => f.opened[cause] = (f.opened[cause] || 0) + 1)
+            _foes.push(f)
+        }
         return game.player !== null
     }
     // The sword level a knight usually has at depth d: the highest the
@@ -118,9 +122,9 @@ Item {
         let r = record
         let p = game.player
         let foes = _foes.map(f => ({
-            type: f.type, tier: f.tier, hp: f.hp,
+            type: f.type, tier: f.tier, lead: f.lead, hp: f.hp,
             engagedAt: f.engagedAt, firstHitAt: f.firstHitAt, diedAt: f.diedAt,
-            hits: f.hits, openings: f.openings,
+            hits: f.hits, openings: f.openings, opened: f.opened,
             // From the first blow that landed to its death
             ttk: f.diedAt !== null && f.firstHitAt !== null ? round3(f.diedAt - f.firstHitAt) : null,
             // From the moment it went for the knight to its death
@@ -169,7 +173,8 @@ Item {
 
     // ---- what the bench sees of each enemy, every step ----
     // A blow that landed is HP lost; an opening is a stagger it went into
-    // (a parry, a perfect block, a broken guard); it engaged on the first
+    // (a parry, a perfect block, a broken guard), and a lead's are counted
+    // by what broke its stance too (opened); it engaged on the first
     // step it was neither patrolling nor idle - chasing, circling, winding
     // up, striking, recovering, staggered; it died on the step it was
     // gone, the blow that killed it one more hit. Time engaged is the
