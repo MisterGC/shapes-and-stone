@@ -205,8 +205,10 @@ impact bench starts a host and a joiner in one process, joins them over LAN,
 lands every kind of hit on each side, then a block alone and a perfect
 block alone, then a real hit on the joiner's knight and its shield run
 dry - the screen flash, the HP chunk and the mana bar's flash stay on the
-joiner's screen, and the host draws the shards - and exits with the number
-of failed checks:
+joiner's screen, and the host draws the shards - then a kill chain on each
+side, two kills in quick succession: the chained kill's hit stop is the
+killer's alone and its death sound a step higher - and exits with the
+number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/impacts/impacts.qml
@@ -2107,18 +2109,23 @@ python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel
 
 It prints each fight: per enemy its hits to kill and its time to kill,
 from the first blow that landed and from the moment it engaged; the gaps
-between kills, the time engaged, the damage taken, the openings (an enemy
-staggered by a parry, a perfect block or a broken guard; a lead's by what
-broke its stance: `parry`, `perfect`, `heavy` or `worn`) and the charges a
-hit cancelled; and what a player would have heard. `--check` adds one PASS
+between kills, the kill chains and the longest one's links, the death
+sound's pitch kill by kill, the time engaged, the damage taken, the
+openings (an enemy staggered by a parry, a perfect block or a broken
+guard; a lead's by what broke its stance: `parry`, `perfect`, `heavy` or
+`worn`) and the charges a hit cancelled; and what a player would have
+heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel
 `masher` and `charge` take at least `duelSlow` seconds or fall, and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
-both. Since the lead's stance (#271) every band passes, and the CI job
-`slow-benches` fails on a red one. Its report is kept as the run's
-`pacing` artifact.
+both. The kill chain's lines (issue #270) read the flow fights' sound
+logs: the death sound climbs a step of the dungeon song's scale over a
+4-kill chain in one of them and falls back after a break in one, and each
+fight's counted chains are the ones its death sounds tell. Since the
+lead's stance (#271) every band passes, and the CI job `slow-benches`
+fails on a red one. Its report is kept as the run's `pacing` artifact.
 
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
@@ -2151,15 +2158,17 @@ room's guardian is tough and winds one up now and then, and
 every attack of a tough enemy a crushing one. The lead's stance is tried
 in the `duel` scenario: parry the lead's lunge, or perfect-block it, and
 it opens; an edit of the table's `lead` group changes the next opening
-after a reload. The reload bench does all three through the inspector: it
+after a reload. The reload bench does all four through the inspector: it
 changes `knight.chargeTime` in the loaded copy of the table, reloads and
 checks that the charge fills in the new time, it counts the guardian's
 crushing blows among its attacks before and after setting
-`enemy.crushChance` to 1, and in the duel room it opens the lead, checks
+`enemy.crushChance` to 1, in the duel room it opens the lead, checks
 its stance bar, the opening's length and damage, and the new length after
-setting `lead.openingTime` to 2.5. The fight room's tough guardian is
-that room's lead; the charge it tries is let go at it with its stance
-taken away:
+setting `lead.openingTime` to 2.5, and in the `flow` scenario it strikes
+two enemies down 2 s apart, a chain at `chain.window` 2.5 s and two lone
+kills after setting it to 1.5. The fight room's tough guardian is that
+room's lead; the charge it tries is let go at it with its stance taken
+away:
 
 ```
 python3 tests/fightbench/run_reload.py
@@ -2363,6 +2372,7 @@ Melee attacks have swing recovery (cooldown between attacks):
 - **Timing**: Dodge during enemy telegraph, attack during recovery
 - **Blocking**: Active decision — trade mana for damage reduction
 - **Prioritization**: Choose targets wisely (Spitters first? Focus Dasher mid-charge?)
+- **Kill chains**: a kill within `Balance.chain.window` (2.5 s) of the last one adds to the chain - its death sound climbs a step of the dungeon song's A minor, it gets a short crunchy hit stop on the killer's screen, and every third link adds a momentum pip. A hit taken, or a pause longer than the window, breaks the chain
 
 ---
 

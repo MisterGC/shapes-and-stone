@@ -484,10 +484,11 @@ ClayWorld2d {
         return remoteMaxGain * Math.max(0, 1 - d / remoteHearingWu)
     }
 
-    // xWu, yWu: where it sounds, the knight's own place when left out
-    function playDeathBurst(xWu, yWu) {
-        deathBurstSound.play()
-        logSound("sfx/burst", "death", 0, _distTo(xWu, yWu), 1)
+    // xWu, yWu: where it sounds, the knight's own place when left out;
+    // pitch: semitones off the burst's own, a kill chain's step
+    function playDeathBurst(xWu, yWu, pitch) {
+        deathBurstSound.play(1, pitch || 0)
+        logSound("sfx/burst", "death", pitch || 0, _distTo(xWu, yWu), 1)
     }
 
     Sound {
@@ -621,7 +622,8 @@ ClayWorld2d {
     // --- Impact feedback --------------------------------------------------
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
-    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, chainKill (a death
+    //         that chains, killLanded), playerHit, playerBlocked,
     //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
     //         projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
@@ -663,6 +665,7 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
         case "enemyDeath":
+        case "chainKill":
             spawnShards(x, y, nx, ny, 12, color, 0.3)
             spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
             spawnRing(x, y, Qt.lighter(color, 1.4))
@@ -724,6 +727,13 @@ ClayWorld2d {
             break
         case "enemyDeath":
             _trauma(0.4); _kick(nx * 0.2, ny * 0.2); _freeze(90)
+            break
+        case "chainKill":
+            // A kill chained to the last one: crunchier, longer the longer
+            // the chain (Balance.chain)
+            _trauma(Balance.chain.trauma); _kick(nx * 0.2, ny * 0.2)
+            _freeze(chainFreeze(chainLinks) * 1000, Balance.chain.freezeScale)
+            chainStops++
             break
         case "playerHit":
             _trauma(0.5); _kick(nx * 0.25, ny * 0.25); _freeze(75)
@@ -924,9 +934,7 @@ ClayWorld2d {
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
-            impact("enemyDeath", kill.x, kill.y, kill.dx, kill.dy, kill.color)
-            playDeathBurst(kill.x, kill.y)
-            countFight("kill")
+            killLanded(kill.x, kill.y, kill.dx, kill.dy, kill.color)
         }
         onGoldSpawned: (objectId, props) => goldClaims.make(props, objectId)
         onGoldDespawned: (objectId) => goldClaims.remove(objectId)
@@ -2872,8 +2880,12 @@ ClayWorld2d {
         target: player
         function onActed(action) {
             session.sendAction(action)
-            // A hit on a knight lifting an ally up starts the lift over
-            if (action === "hurt") player.reviveProgress = 0
+            // A hit on a knight lifting an ally up starts the lift over,
+            // and breaks its kill chain
+            if (action === "hurt") {
+                player.reviveProgress = 0
+                breakChain()
+            }
         }
     }
 
@@ -3014,6 +3026,10 @@ ClayWorld2d {
         property int whirlwinds: 0
         property int whirlHits: 0
         property int kills: 0
+        // Kill chains of two links or more (Balance.chain), and the
+        // longest one's links
+        property int chains: 0
+        property int longestChain: 0
         property int deaths: 0
         // Fallen allies this knight lifted up, and the times an ally lifted
         // it up (a rise at camp is neither)
@@ -3026,14 +3042,45 @@ ClayWorld2d {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
-        r.kills = 0; r.deaths = 0; r.lifts = 0; r.lifted = 0
+        r.kills = 0; r.chains = 0; r.longestChain = 0
+        r.deaths = 0; r.lifts = 0; r.lifted = 0
         r.seconds = 0; r.clearSeconds = -1
+        breakChain()
     }
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
-    // enemy it hit), kill, fall, lift (this knight lifted an ally up) or
-    // lifted (an ally lifted it up)
+    // enemy it hit), kill, chain (a kill made a chain amount links long),
+    // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
+    // it up)
+    // --- The kill chain (Balance.chain, issue #270) ---
+    // This node's knight's chain: its links so far and the physics time of
+    // its last kill. A kill is landed on the killer's node alone - one by
+    // this node's knight on an enemy here, or one the host reports - so
+    // the chain, its sound and its hit stop are the killer's
+    property int chainLinks: 0
+    property real _chainAt: 0
+    // The chain hit stops this screen made, for a bench
+    property int chainStops: 0
+    function killLanded(x, y, dx, dy, color) {
+        let c = Balance.chain
+        chainLinks = chainLinks > 0 && physicsSeconds - _chainAt <= c.window ? chainLinks + 1 : 1
+        _chainAt = physicsSeconds
+        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color)
+        playDeathBurst(x, y, c.pitches[Math.min(chainLinks, c.pitches.length) - 1])
+        countFight("kill")
+        if (chainLinks >= 2) countFight("chain", chainLinks)
+        if (player && chainLinks % c.pipEvery === 0)
+            player.momentum = Math.min(Balance.momentum.max, player.momentum + 1)
+    }
+    // A hit taken or a new fight record: the next kill starts a chain
+    function breakChain() { chainLinks = 0 }
+    // The hit stop of a chain's link-th kill, in seconds
+    function chainFreeze(link) {
+        let c = Balance.chain
+        return Math.min(c.freezeMax, c.freeze + c.freezeStep * Math.max(0, link - 2))
+    }
+
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
@@ -3048,6 +3095,10 @@ ClayWorld2d {
         case "fall": r.deaths++; break
         case "lift": r.lifts++; break
         case "lifted": r.lifted++; break
+        case "chain":
+            if (amount === 2) r.chains++
+            r.longestChain = Math.max(r.longestChain, amount)
+            break
         case "kill":
             r.kills++
             runKills++

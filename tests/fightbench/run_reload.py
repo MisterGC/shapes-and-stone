@@ -18,7 +18,11 @@ the duel room's lead (issue #271) shows its stance bar, and opened as a
 parry opens it (Sandbox.tryOpening) it staggers for lead.openingTime and
 a swing in the opening does lead.openingDamage times its damage; with
 lead.openingTime changed in the loaded copy and the sandbox reloaded, the
-opening lasts the new time. Prints one PASS or FAIL line per check and
+opening lasts the new time. Then in the flow scenario the knight strikes
+two enemies down CHAIN_GAP seconds apart (Sandbox.tryChain): within
+Balance.chain.window they chain, the second death sound a step higher;
+with chain.window set below the gap in the loaded copy and the sandbox
+reloaded, they no longer do. Prints one PASS or FAIL line per check and
 exits with the number of failures.
 
 Usage:
@@ -44,6 +48,8 @@ NEW_CHARGE_TIME = 0.45
 CRUSH_ATTACKS = 12
 CRUSH_MAX_STEPS = 60 * 60
 NEW_OPENING_TIME = 2.5
+CHAIN_GAP = 2.0
+NEW_CHAIN_WINDOW = 1.5
 
 
 def wait(predicate, timeout=30.0):
@@ -74,6 +80,13 @@ def try_opening(bench):
     if not wait(lambda: bench.eval1("duelReady()") is True):
         return None
     return json.loads(bench.eval1("tryOpening()") or "{}")
+
+
+def try_chain(bench):
+    bench.eval1("applyScenario('flow', 0)")
+    if not wait(lambda: bench.eval1("fightReady()") is True):
+        return None
+    return json.loads(bench.eval1(f"tryChain({round(CHAIN_GAP / STEP)})") or "{}")
 
 
 def reload(bench, balance, pattern, repl):
@@ -176,6 +189,21 @@ def main():
               and abs(opening["seconds"] - NEW_OPENING_TIME) < 1e-6,
               f"after the reload the lead's opening lasts {opening and opening['seconds']} s "
               f"({NEW_OPENING_TIME} expected)")
+        chain = try_chain(bench)
+        check(chain is not None and chain["window"] > CHAIN_GAP and chain["links"] == 2
+              and len(chain["pitches"]) == 2 and chain["pitches"][1] > chain["pitches"][0] == 0,
+              f"in the flow room two kills {CHAIN_GAP} s apart chain (chain.window "
+              f"{chain and chain['window']} s, links {chain and chain['links']}, death sound at "
+              f"{chain and chain['pitches']})")
+        reloaded = reload(bench, balance, r"(chain: \(\{\s*window: )[0-9.]+,",
+                          rf"\g<1>{NEW_CHAIN_WINDOW},")
+        check(reloaded, f"chain.window set to {NEW_CHAIN_WINDOW} and the sandbox reloaded")
+        chain = try_chain(bench) if reloaded else None
+        check(chain is not None and chain["window"] == NEW_CHAIN_WINDOW and chain["links"] == 1
+              and chain["pitches"] == [0, 0],
+              f"after the reload the same two kills do not chain (chain.window "
+              f"{chain and chain['window']} s, links {chain and chain['links']}, death sound at "
+              f"{chain and chain['pitches']})")
     except TimeoutError as e:
         print("FAIL", e, "; logs in", tmp, file=sys.stderr)
         failures += 1

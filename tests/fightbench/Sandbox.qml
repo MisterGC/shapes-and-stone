@@ -156,6 +156,9 @@ Item {
             whirlHits: r.whirlHits,
             whirlsStarted: whirlsStarted,
             kills: r.kills,
+            // Kill chains of two links or more, and the longest's links
+            chains: r.chains,
+            longestChain: r.longestChain,
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
             knightHp: p ? p.hp : 0,
@@ -258,6 +261,26 @@ Item {
         Clayground.physicsStep(1)
         return JSON.stringify({fullSteps: n, staggered: gd.aiState === "stagger",
                                lost: hp0 - gd.hp, chargeTime: Balance.knight.chargeTime})
+    }
+
+    // ---- the kill chain, tried as in the dojo (run_reload.py) ----
+    // Every enemy stands still; the knight strikes one down, then gapSteps
+    // physics steps later another. The links the second kill made, the
+    // death sound's pitches and Balance.chain.window
+    function tryChain(gapSteps) {
+        Clayground.paused = true
+        let p = game.player
+        let foes = game.enemies.filter(alive)
+        for (let e of foes) e.halt()
+        game.breakChain()
+        game.logSounds = true
+        game.clearSoundLog()
+        foes[0].takeDamage(100000, p.xWu, p.yWu)
+        Clayground.physicsStep(gapSteps)
+        foes[1].takeDamage(100000, p.xWu, p.yWu)
+        Clayground.physicsStep(1)
+        return JSON.stringify({links: game.chainLinks, window: Balance.chain.window,
+                               pitches: game.soundLog.filter(l => l.what === "death").map(l => l.pitch)})
     }
 
     // ---- the crushing blow, tried as in the dojo (run_reload.py) ----
