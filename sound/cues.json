@@ -1224,6 +1224,21 @@
           "render": "ambience/village.wav"
         }
       ]
+    },
+    "sfx/lead_growl": {
+      "category": "sfx",
+      "brief": "a room's lead spots the knight: a short snarl on E3, then a rough growl falling from A2 to E2, in the dungeon song's A minor; fading with the distance",
+      "mode": "live",
+      "source": "sfx/lead_growl.sfx.json",
+      "render": "sfx/lead_growl.wav",
+      "report": "sfx/lead_growl.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.11.1 (clayground f291eff)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-07T18:34:44.600410+00:00",
+      "verdict": null
     }
   }
 }

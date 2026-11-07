@@ -540,6 +540,24 @@ ClayWorld2d {
         }
     }
 
+    // A room's lead spots the knight: its growl, fading as the scream does
+    SfxPlayer {
+        id: leadGrowlSound
+        source: "../sound/sfx/lead_growl.sfx.json"
+        volume: muted ? 0 : 0.8 * soundVolume
+    }
+    function playLeadGrowl(xWu, yWu) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        if (gain > 0) {
+            leadGrowlSound.play(gain)
+            logSound("sfx/lead_growl", "growl", 0, _distTo(xWu, yWu), gain)
+        }
+    }
+
     // The NPCs' greetings are voiced lines of the sound factory
     // (sound/voice/npc_greetings.voice.json), each a cue of
     // sound/cues.json: an NPC's greetingSound names it,
