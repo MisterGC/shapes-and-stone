@@ -1,0 +1,9 @@
+{"frame":2,"t":19,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":10,\"beat\":0,\"state\":\"telegraph\",\"ring\":0.24,\"window\":false,\"feinting\":false}"}}
+{"frame":3,"t":73,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":30,\"beat\":0,\"state\":\"telegraph\",\"ring\":0.6,\"window\":false,\"feinting\":true}"}}
+{"frame":3,"t":74,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":40,\"beat\":0,\"state\":\"telegraph\",\"ring\":0.6,\"window\":false,\"feinting\":true}"}}
+{"frame":3,"t":73,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":62,\"beat\":0,\"state\":\"lunge\",\"ring\":1,\"window\":true,\"feinting\":false}"}}
+{"frame":3,"t":73,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":90,\"beat\":1,\"state\":\"recovery\",\"ring\":0,\"window\":false,\"feinting\":false}"}}
+{"frame":3,"t":80,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":125,\"beat\":2,\"state\":\"telegraph\",\"ring\":0.38,\"window\":false,\"feinting\":false}"}}
+{"frame":3,"t":77,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":146,\"beat\":2,\"state\":\"lunge\",\"ring\":1,\"window\":true,\"feinting\":false}"}}
+{"frame":3,"t":79,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":170,\"beat\":3,\"state\":\"telegraph\",\"ring\":0.5,\"window\":false,\"feinting\":false}"}}
+{"frame":3,"t":75,"values":{"JSON.stringify(info)":"{\"type\":\"grunt\",\"name\":\"held-two\",\"beats\":[2,0,1,1],\"step\":188,\"beat\":3,\"state\":\"lunge\",\"ring\":1,\"window\":true,\"feinting\":false}"}}
