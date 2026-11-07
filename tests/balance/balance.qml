@@ -3,9 +3,10 @@
 // Reads the whole table the way the inspector does, then builds a dungeon,
 // the fight room and the village and checks that the knight, every enemy,
 // the fight room lineup and the campfire carry the table's values; at
-// depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix and
-// harder blows, as the table's depth group says; tough grunts and
-// guardians, and no other enemy, wind up a crushing blow at
+// depth 0, 2 and 4 the dungeon holds more enemies, more rooms with a
+// lead, its one tough enemy (issue #269), and harder blows, as the
+// table's depth group says; tough grunts and guardians, and no other
+// enemy, wind up a crushing blow at
 // enemy.crushChance, for enemy.crushWindUp, and one on a held shield
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
 // shield for enemy.crushLockout; the smith sells level I of the sword,
@@ -93,10 +94,12 @@ Window {
         check(game.depth === d && n >= sb.enemiesMin && n <= sb.enemiesMax,
               "at depth " + d + " the dungeon spawns " + n + " enemies, within "
               + sb.enemiesMin + " to " + sb.enemiesMax)
-        check(weak === Math.round(n * sb.weakChance)
-              && tough === Math.min(n - weak, Math.round(n * (1 - sb.normalChance))),
+        let spawnRooms = game.rooms.length - 1
+        let leads = Math.min(n, spawnRooms, Math.round(spawnRooms * sb.leadShare))
+        check(tough === leads && weak === Math.min(n - leads, Math.round(n * sb.weakChance)),
               "at depth " + d + " its tier mix is the table's (" + weak + " weak, "
-              + tough + " tough, average tier " + avg.toFixed(2) + ")")
+              + tough + " tough, one to each of " + leads + " of " + spawnRooms
+              + " rooms, average tier " + avg.toFixed(2) + ")")
         let wrong = es.filter(e => !checkEnemy(e))
         check(wrong.length === 0, "at depth " + d + " every enemy carries the table's stats ("
               + wrong.map(e => e.enemyType + "/" + e.tier + " atk " + e.atk).join(", ") + ")")
