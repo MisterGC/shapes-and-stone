@@ -57,6 +57,7 @@ QUICK = [
     ("spikes", "spikes/spikes.qml", []),
     ("deep", "deep/deep.qml", []),
     ("dungeonmaster", "dungeonmaster/dungeonmaster.qml", []),
+    ("leads", "leads/leads.qml", []),
     ("clock", "clock/clock.qml", []),
     ("hitstop", "hitstop/hitstop.qml", []),
     ("answer", "answer/answer.qml", []),
