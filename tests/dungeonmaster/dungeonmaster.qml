@@ -8,9 +8,11 @@
 // it and give it back. Copy settings puts the settings set on the
 // clipboard as JSON, Paste settings reads it back. The bench sets every
 // row - 2 enemies, 1 spike plate, 1 arrow slit and 2 breakables per room,
-// 8 rooms, base depth 1, relative difficulty 0.2 - presses G twice (the
-// second time a new seed) and checks the preview: the asked rooms and,
-// in every room but the start room, the asked counts. Enter goes: the
+// a lead in half the rooms, 8 rooms, base depth 1, relative difficulty
+// 0.2 - presses G twice (the second time a new seed) and checks the
+// preview: the asked rooms and, in every room but the start room, the
+// asked counts, a lead (one tough enemy) in 4 of the 7 and none in the
+// others (issue #269). Enter goes: the
 // dungeon built is the one the preview showed, the same grid, rooms,
 // features and enemies, at depth 1 + 0.2. A second game started on the
 // same store finds the settings and the mode kept. The village after it
@@ -39,7 +41,8 @@ Window {
     property var game: null
     property int failures: 0
     property var shown: null
-    property var asked: ({ enemies: 2, spikes: 1, slits: 1, rooms: 8, depth: 1, position: 0.2, breakables: 2 })
+    property var asked: ({ enemies: 2, leads: 0.5, spikes: 1, slits: 1, rooms: 8, depth: 1, position: 0.2,
+                           breakables: 2 })
 
     function check(ok, what) {
         console.log("[DungeonMaster]", ok ? "PASS" : "FAIL", what)
@@ -100,10 +103,11 @@ Window {
     // Per room but the start room: [{enemies, spikes, slits, breakables,
     // veins}]; the veins row is left to the game (issue #156)
     function perRoom(rooms, enemies, features) {
-        let out = rooms.map(() => ({ enemies: 0, spikes: 0, slits: 0, breakables: 0, veins: 0 }))
+        let out = rooms.map(() => ({ enemies: 0, tough: 0, spikes: 0, slits: 0, breakables: 0, veins: 0 }))
         for (let e of enemies) {
             let i = roomOf(rooms, Math.floor(e.x / game.cellSize), Math.floor(e.y / game.cellSize))
             if (i >= 0) out[i].enemies++
+            if (i >= 0 && e.tier === 2) out[i].tough++
         }
         for (let f of features) {
             let i = roomOf(rooms, f.gx, f.gy)
@@ -144,6 +148,14 @@ Window {
             enemies: JSON.stringify(p.enemies.map(e => [e.x.toFixed(3), e.y.toFixed(3), e.tier, e.type]))
         }
     }
+    // The asked share of the rooms has its lead, the others none
+    function checkLeads(rooms, where) {
+        let want = Math.round(asked.leads * rooms.length)
+        let have = rooms.filter(r => r.tough === 1).length
+        check(have === want && rooms.every(r => r.tough <= 1),
+              where + " " + have + " of " + rooms.length + " rooms have a lead, the asked " + want + ", none two ("
+              + rooms.map(r => r.tough).join(" ") + ")")
+    }
     function same(a, b, what) {
         for (let k of ["grid", "rooms", "features", "enemies"])
             check(a[k] === b[k], what + ": the same " + k + (a[k] === b[k] ? "" : " (" + a[k].length + " vs " + b[k].length + " chars)"))
@@ -174,6 +186,8 @@ Window {
                           + kinds.crystal.perRoom[band]),
                   "the feature rows show the band's per room (" + row("spikes").text + ", "
                   + row("slits").text + ", " + row("breakables").text + ")")
+            check(!row("leads").set && near(row("leads").value, game.spawnRolls(game.dangerPosition, 1).leadShare),
+                  "the leads row shows the table's share of rooms with a lead (" + row("leads").text + ")")
             check(row("depth").value === 0 && near(row("position").value, game.dangerPosition),
                   "base depth 0 and the relative difficulty " + row("position").text)
             // A on the first row turns it down a step and sets it
@@ -235,6 +249,7 @@ Window {
                                   breakables: asked.breakables })
             check(shortRooms.length === 0, "every room but the start room holds the asked counts in the preview"
                   + (shortRooms.length ? " - short: " + shortRooms.join(", ") : ""))
+            checkLeads(perRoom(p.rooms, p.enemies, p.features), "in the preview")
             check(p.depth === asked.depth && near(p.position, asked.position),
                   "the preview is at base depth " + p.depth + " and position " + p.position)
             press(Qt.Key_Return)
@@ -243,7 +258,8 @@ Window {
             check(game.masterAsk === null, "Enter goes: the panel is gone, the knight in the dungeon")
             same(built(), planned(bench.shown), "the dungeon entered is the one the preview showed")
             let p = bench.shown
-            let objs = perRoom(game.rooms, game.enemies.filter(e => e && !e.destroyed).map(e => ({ x: e._spawnXWu, y: e._spawnYWu })),
+            let objs = perRoom(game.rooms, game.enemies.filter(e => e && !e.destroyed)
+                               .map(e => ({ x: e._spawnXWu, y: e._spawnYWu, tier: e.tier })),
                                game.breakables.map(b => cellOf("urn", b.cell))
                                .concat(game.plates.map(o => cellOf("spike", o.cell)))
                                .concat(game.slits.map(o => cellOf("slit", o.cell))))
@@ -251,6 +267,7 @@ Window {
                                         breakables: asked.breakables })
             check(shortRooms.length === 0, "the built dungeon's enemies, breakables, plates and slits: the asked counts per room"
                   + (shortRooms.length ? " - short: " + shortRooms.join(", ") : ""))
+            checkLeads(objs, "in the dungeon built")
             check(game.levelIndex === 0 && game.depth === 0 && game.dangerDepth === 1 && near(game.danger, 1.2),
                   "the run stays at depth 0, its danger counts from base depth 1: " + game.danger.toFixed(3))
             check(game.masterSeed === game.scenarioSeed && game.levelSeedNow() === p.seed,
