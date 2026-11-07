@@ -8316,6 +8316,10 @@ ClayWorld2d {
         recordPassed = true
         levelIndex = levelIndexOf(d, type)
         levelType = type
+        // Its music and ambience, as a game started from the title plays
+        // them: a level type the game was in already starts none
+        if (type === "village") { villageAmbience.start(); villageMusic.start() }
+        else { dungeonAmbience.start(); dungeonMusic.start() }
         _startRunRecord()
         if (name === "fight")
             enterFightRoom()
