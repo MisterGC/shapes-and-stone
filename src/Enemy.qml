@@ -1053,9 +1053,13 @@ PhysicsItem {
             _endString()
             return
         }
-        let len = Math.max(0.01, dist)
-        _dirToTargetX = dx / len
-        _dirToTargetY = dy / len
+        if (shot) {
+            aimShot(target)
+        } else {
+            let len = Math.max(0.01, dist)
+            _dirToTargetX = dx / len
+            _dirToTargetY = dy / len
+        }
         // A punishing blow comes at once: no feint
         let hold = b === 2 && first !== "punish" ? l.feintHold : 0
         let w = first === "punish" ? Balance.enemy.minTelegraph
@@ -1309,9 +1313,7 @@ PhysicsItem {
             if (_shootTimer <= 0 && dist <= shootRange) {
                 _shootTimer = shootCooldown
                 _attackTimer = telegraphTime(Balance.enemy.shootWindUp)
-                let len = Math.max(0.01, dist)
-                _dirToTargetX = dx / len
-                _dirToTargetY = dy / len
+                aimShot(target)
                 aiState = "shoot"
             }
             break
@@ -1492,9 +1494,20 @@ PhysicsItem {
         else stagger(perfectStagger())
     }
 
+    // A shot flies centre to centre: from its centre at the knight's. Aimed
+    // corner to corner it passed a knight standing at a slant up to half
+    // its width off its centre, along its side and past the shield's arc
+    function aimShot(knight) {
+        let c = _centreOf(knight)
+        let dx = c.x - centreXWu, dy = c.y - centreYWu
+        let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
+        _dirToTargetX = dx / len
+        _dirToTargetY = dy / len
+    }
     function fireProjectile() {
         if (gameWorld && gameWorld.spawnProjectile) {
-            gameWorld.spawnProjectile(xWu, yWu, _dirToTargetX, _dirToTargetY, atk)
+            let half = Balance.projectile.size / 2
+            gameWorld.spawnProjectile(centreXWu - half, centreYWu + half, _dirToTargetX, _dirToTargetY, atk)
             if (gameWorld.playSpitShot) gameWorld.playSpitShot(xWu, yWu)
             console.log("[Enemy] Spitter fired projectile!")
         }

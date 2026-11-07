@@ -206,10 +206,7 @@ Item {
         let e = _byId()[id], k = own ? game.player : null
         if (!own) for (let n in session.remotePlayers) k = session.remotePlayers[n]
         if (!e || !k) return ""
-        let dx = k.xWu - e.xWu, dy = k.yWu - e.yWu
-        let len = Math.max(0.01, Math.hypot(dx, dy))
-        e._dirToTargetX = dx / len
-        e._dirToTargetY = dy / len
+        e.aimShot(k)
         e.fireProjectile()
         return "shot" + game._shotCount
     }
