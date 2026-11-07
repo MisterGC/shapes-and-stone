@@ -322,7 +322,12 @@ it, where it came from, and a person's verdict once it has been heard.
   enemies within reach are after the knight, out of three
   (`Balance.music`), eased up fast and down slowly. A pulse of kick and
   snare comes in from 0.15 to 0.5, a horn's counter-line and brushes from
-  0.5 to 1.
+  0.5 to 1. That is its `flow` part; while a room's lead is engaged it
+  moves to its `duel` part on the next bar (issue #273): a heartbeat on
+  the kick, a drone on A and E, the bass on the root and a harp's E ticking
+  late in each bar. Its `sting`, a brass stab of A3, E4 and A4 with the
+  harp's E5 up to A5, plays on the next beat for every parry and every
+  opening in a duel.
 - **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
   the knight's whirlwind shout are lines of the voice scripts
   `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
@@ -397,7 +402,14 @@ song's intensity rises fast, falls slowly, ignores enemies out of reach and
 is 0 in the camp. It checks what a bench hears too: muted, a sound played is
 a row of `soundLog` with its cue, pitch, distance, gain and time; with
 `followFightOnSteps` the intensity stands until a physics step runs, and
-`musicTrace` gets a row once it has moved:
+`musicTrace` gets a row once it has moved. And a duel: a room's lead
+patrolling near the knight is none, as it spots the knight it growls once
+and the song's state is its duel part on the next physics step, the song
+plays that part from its next bar, a parry stings once, the lead's opening
+stings and plays the slow motion for its steps, and its fall brings the
+flow part back. With no audio output, as on CI's runner, the song's
+playhead stands and its segment never moves (clayground#507): the bench
+then prints a SKIP line for that one check:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
@@ -2020,6 +2032,22 @@ stance shows as a bar under the lead, an opening as a flash, a ring, the
 word `lead.word` and the stagger. In a session the host's lead keeps the
 stance: `lead`, `stance` and `opening` are replicated, the knight's own
 screen judges whether its blow opens the lead, and the host opens it.
+A duel sounds and looks like one (issue #273, the table's `duel` group):
+a lead growls as it spots the knight (`sfx/lead_growl`), and while one
+within `music.reach` is after the knight the dungeon song plays its duel
+part, its flow part again once the lead has fallen. Every parry or perfect
+block in the duel and every opening of a lead within reach plays the
+song's sting, one in `duel.stingGap` seconds. A target lock (F) on a lead
+closes the view in to `duel.zoom` times its size round the knight, the HUD
+as it was. An opening plays a slow motion: the physics at
+`duel.slowScale` for `duel.slowTime` seconds of the physics clock, so a
+bench that steps the world sees it last the same steps on every run
+(Clayground's `hitStop()` ends on the wall clock; until clayground#506
+gives a slow motion of its own the game binds the physics' time scale
+itself). In a session the slow motion is the picture's, as the hit stop
+is, so the host's simulation never slows for the others; every screen
+follows its own knight's duel from the replicated `lead` and `aiState`,
+growls and stings for the openings near it.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -2101,7 +2129,14 @@ in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel
 `masher` and `charge` take at least `duelSlow` seconds or fall, and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
-both. Since the lead's stance (#271) every band passes, and the CI job
+both. How a duel sounds is checked too (issue #273): in the flow room the
+song's state stays its flow part; in the duel, for every pilot, it is the
+duel part from the lead's engagement to its fall, the lead growls once as
+it engages and every opening has its sting. The report's `duel part` line
+gives the spans of the physics clock the state asks for the duel part,
+the spans the song played it (on the audio output's clock: the song moves
+on its next bar of real time, and the bench runs faster than that) and the
+growls and stings heard. Since the lead's stance (#271) every band passes, and the CI job
 `slow-benches` fails on a red one. Its report is kept as the run's
 `pacing` artifact.
 
@@ -2136,7 +2171,12 @@ room's guardian is tough and winds one up now and then, and
 every attack of a tough enemy a crushing one. The lead's stance is tried
 in the `duel` scenario: parry the lead's lunge, or perfect-block it, and
 it opens; an edit of the table's `lead` group changes the next opening
-after a reload. The reload bench does all three through the inspector: it
+after a reload. The duel's sound and look are tried there too: the lead
+growls as it spots the knight and the music moves to its duel part (`eval
+logSounds = true` and `eval soundLog` show the growl and the stings), F
+locks on it and closes the view in, and an opening plays the slow motion;
+an edit of the table's `duel` group changes them after a reload. The
+dojo starts muted: M lets them be heard. The reload bench does all three through the inspector: it
 changes `knight.chargeTime` in the loaded copy of the table, reloads and
 checks that the charge fills in the new time, it counts the guardian's
 crushing blows among its attacks before and after setting
