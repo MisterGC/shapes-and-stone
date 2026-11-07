@@ -14,7 +14,12 @@
 // A real hit on the joiner's knight flashes the joiner's screen and leaves
 // the lost HP as a chunk on its HP bar, neither on the host's; the
 // joiner's shield run dry flashes the joiner's mana bar, not the host's,
-// and the host draws its shards on the joiner's knight.
+// and the host draws its shards on the joiner's knight. A kill chain
+// (issue #270): the joiner kills two of the host's enemies in quick
+// succession, the host applying the blows as in any session, then the host
+// two of its own; the second kill's crunchy hit stop is the killer's
+// alone, the other screen neither hit-stops nor counts a chain, and the
+// killer's death sound climbs a step of Balance.chain.pitches.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -23,6 +28,7 @@
 import QtQuick
 import QtQuick.Window
 import Clayground.Network
+import "../../src"
 
 Window {
     id: bench
@@ -197,6 +203,51 @@ Window {
               + sent.shook + ", froze " + sent.froze + ", flashed " + sent.flashed + ")")
     }
 
+    // A kill chain landed by `from`'s knight on its copies of the enemies
+    property var killer: null
+    property var watcher: null
+    property var _victims: []
+    property var _stops: null
+    function startChain(from, to) {
+        killer = from
+        watcher = to
+        from.camera.resetShake()
+        to.camera.resetShake()
+        from.breakChain()
+        to.breakChain()
+        from.logSounds = true
+        from.clearSoundLog()
+        _victims = from.enemies.filter(e => e && !e.destroyed).slice(0, 2)
+        check(_victims.length === 2, "two enemies stand for " + (from === host ? "the host" : "the joiner")
+              + "'s chain (" + _victims.length + ")")
+        _stops = {from: from.chainStops, to: to.chainStops}
+        sent = probe(from)
+        seen = probe(to)
+        probes = [sent, seen]
+        killNext()
+    }
+    function killNext() {
+        let e = _victims.shift()
+        if (!e) return
+        let p = killer.player
+        e.takeDamage(100000, p.xWu, p.yWu)
+    }
+    function reportChain(fromName, toName) {
+        probes = []
+        let deaths = killer.soundLog.filter(l => l.what === "death").map(l => l.pitch)
+        killer.logSounds = false
+        let step = Balance.chain.pitches[1]
+        check(killer.chainStops === _stops.from + 1 && sent.froze,
+              fromName + " hit-stops for its chain's second kill (chain stops "
+              + _stops.from + " -> " + killer.chainStops + ", froze " + sent.froze + ")")
+        check(watcher.chainStops === _stops.to && watcher.chainLinks === 0 && !seen.froze && !seen.shook,
+              toName + " neither hit-stops nor chains for " + fromName + "'s kills (chain stops "
+              + _stops.to + " -> " + watcher.chainStops + ", links " + watcher.chainLinks
+              + ", froze " + seen.froze + ", shook " + seen.shook + ")")
+        check(deaths.length === 2 && deaths[0] === 0 && deaths[1] === step,
+              fromName + "'s death sound climbs a step for the chained kill (" + deaths.join(", ") + ")")
+    }
+
     // Steps: [condition to wait for (or null), action]
     property var steps: [
         [() => hostNet.networkId !== "", () => {
@@ -295,6 +346,17 @@ Window {
             check(!h.manaFlash, "the host's mana bar does not flash for the joiner's shield (" + h.manaFlash + ")")
             check(h.shards, "the host draws the joiner's shield breaking into shards (" + h.shards + ")")
         }],
+        // A kill chain, the joiner's: two of the host's enemies, one after
+        // the other, struck down on the joiner's screen
+        [600, () => startChain(joiner, host)],
+        [() => killer.chainLinks >= 1, () => killNext()],
+        [() => killer.chainLinks >= 2, () => {}],
+        [300, () => reportChain("the joiner", "the host")],
+        // The host's, on its own enemies
+        [300, () => startChain(host, joiner)],
+        [() => killer.chainLinks >= 1, () => killNext()],
+        [() => killer.chainLinks >= 2, () => {}],
+        [300, () => reportChain("the host", "the joiner")],
         [100, () => {
             console.log("[Impacts] done,", failures, "failed")
             hostNet.leave()
