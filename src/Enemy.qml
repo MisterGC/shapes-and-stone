@@ -1193,7 +1193,7 @@ PhysicsItem {
     function fireProjectile() {
         if (gameWorld && gameWorld.spawnProjectile) {
             gameWorld.spawnProjectile(xWu, yWu, _dirToTargetX, _dirToTargetY, atk)
-            if (gameWorld.playSpitShot) gameWorld.playSpitShot()
+            if (gameWorld.playSpitShot) gameWorld.playSpitShot(xWu, yWu)
             console.log("[Enemy] Spitter fired projectile!")
         }
     }
@@ -1329,7 +1329,7 @@ PhysicsItem {
                 gameWorld.impact("enemyDeath", xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
             else
                 gameWorld.spawnDeathParticles(xWu, yWu)
-            gameWorld.playDeathBurst()
+            gameWorld.playDeathBurst(xWu, yWu)
         }
         destroyed = true
         // Gold where it fell; in a session only the host's enemies die here

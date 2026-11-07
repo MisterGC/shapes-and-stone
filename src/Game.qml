@@ -49,6 +49,70 @@ ClayWorld2d {
             volumeTick.play()
         }
     }
+    // --- What a player would hear (issue #267) ---
+    // With logSounds on, every sound the game plays in the world goes into
+    // soundLog, muted or not, as {t, cue, what, pitch, dist, gain}: t the
+    // seconds on the physics clock (physicsSeconds), cue the sound
+    // factory's cue it plays (sound/cues.json, "sfx/punch_hitting"), what
+    // the moment that sounds ("hit", "heavySwing", "scream"), pitch the
+    // semitones off the cue's own, dist the wu from this knight to where it
+    // sounds (0 for this knight's own, for another's the distance its gain
+    // fades by, remoteGain()) and gain its share 0..1 before the volume
+    // settings. musicTrace follows the songs the same way, {t, song, state,
+    // segment, intensity, playing}: a row when the song, its state, its
+    // segment or whether it plays changes, or its intensity has moved
+    // musicTraceStep or reached 0 or 1. The menus' ticks are not in it.
+    // A bench or the dojo reads both; clearSoundLog() starts them over
+    property bool logSounds: false
+    property var soundLog: []
+    property var musicTrace: []
+    readonly property real musicTraceStep: 0.05
+    // Simulated seconds since the game started, or since a bench set it
+    // to 0: a pause or a hit stop holds it
+    property real physicsSeconds: 0
+    function clearSoundLog() {
+        soundLog = []
+        musicTrace = []
+        _traced = null
+    }
+    function logSound(cue, what, pitch, dist, gain) {
+        if (!logSounds) return
+        let r3 = v => Math.round(v * 1000) / 1000
+        soundLog.push({ t: r3(physicsSeconds), cue: cue, what: what, pitch: pitch || 0,
+                        dist: r3(Math.max(0, dist || 0)), gain: r3(gain === undefined ? 1 : gain) })
+    }
+    // The cue a player's source is, "../sound/sfx/dash.sfx.json" is
+    // "sfx/dash"
+    function cueOf(source) {
+        let s = String(source)
+        let i = s.lastIndexOf("sound/")
+        return (i < 0 ? s : s.slice(i + 6)).replace(/\.sfx\.json$|\.song\.json$|\.wav$/, "")
+    }
+    // How far this knight is from x, y, and how far another knight is
+    // whose sound plays at gain (remoteGain); 0 for this knight's own
+    function _distTo(xWu, yWu) {
+        return player && xWu !== undefined ? Math.hypot(xWu - player.xWu, yWu - player.yWu) : 0
+    }
+    function _gainDist(gain) {
+        return gain === undefined || gain >= remoteMaxGain ? 0
+            : (1 - gain / remoteMaxGain) * remoteHearingWu
+    }
+    property var _traced: null
+    function _traceMusic() {
+        if (!logSounds) return
+        let song = levelType === "dungeon" ? dungeonMusic : villageMusic
+        let row = { song: cueOf(song.source), state: song.state, segment: song.segment,
+                    intensity: Math.round(song.intensity * 1000) / 1000, playing: song.playing }
+        let was = _traced
+        if (was && was.song === row.song && was.state === row.state && was.segment === row.segment
+                && was.playing === row.playing
+                && Math.abs(was.intensity - row.intensity) < musicTraceStep
+                && !(row.intensity !== was.intensity && (row.intensity === 0 || row.intensity === 1)))
+            return
+        _traced = row
+        row = Object.assign({ t: Math.round(physicsSeconds * 1000) / 1000 }, row)
+        musicTrace.push(row)
+    }
     function _loadVolumes() {
         let read = key => {
             let v = parseFloat(records.get(key, "1"))
@@ -96,16 +160,24 @@ ClayWorld2d {
     // are after a knight, from their replicated aiState, so a joined
     // knight hears its own fight; fightIntensity eases towards
     // fightersNear / fullAt, up at rise and down at fall per second, and
-    // is 0 out of a dungeon
+    // is 0 out of a dungeon. It follows on the wall clock; with
+    // followFightOnSteps on the physics steps instead, which a bench that
+    // steps the world sets, so the same steps give the same music
     property int fightersNear: 0
     property real fightIntensity: 0
+    property bool followFightOnSteps: false
+    readonly property bool _followingFight: levelType === "dungeon" && player !== null
     Timer {
         id: fightTimer
         interval: 100
         repeat: true
-        running: world.levelType === "dungeon" && world.player !== null
+        running: world._followingFight && !world.followFightOnSteps
         onTriggered: world._followFight(interval / 1000)
-        onRunningChanged: if (!running) { world.fightersNear = 0; world.fightIntensity = 0 }
+        onRunningChanged: if (!running && !world.followFightOnSteps) world._stopFollowingFight()
+    }
+    function _stopFollowingFight() {
+        fightersNear = 0
+        fightIntensity = 0
     }
     function _followFight(dt) {
         let cfg = Balance.music, near = 0
@@ -163,6 +235,7 @@ ClayWorld2d {
     // gain (0..1) is for sounds of another player's knight, see remoteGain()
     function playImpact(gain) {
         impactSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/punch_hitting", "hit", 0, _gainDist(gain), gain)
     }
 
     SfxPlayer {
@@ -179,6 +252,7 @@ ClayWorld2d {
 
     function playDash(gain) {
         dashSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/dash", "dash", 0, _gainDist(gain), gain)
     }
 
     // The shield's own sound: a metal clang, so a block never sounds like
@@ -189,17 +263,20 @@ ClayWorld2d {
         volume: muted ? 0 : 0.7 * soundVolume
     }
     function playBlock(gain, perfect) {
-        shieldClangSound.play(gain === undefined ? 1 : gain,
-                              perfect ? Balance.perfectBlock.pitch : Balance.block.pitch)
+        let pitch = perfect ? Balance.perfectBlock.pitch : Balance.block.pitch
+        shieldClangSound.play(gain === undefined ? 1 : gain, pitch)
+        logSound("sfx/shield_clang", perfect ? "perfectBlock" : "block", pitch, _gainDist(gain), gain)
     }
 
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+        logSound("sfx/sword_swing", "swing", 0, _gainDist(gain), gain)
     }
     // The charged swing: the swing sample pitched down, heavier
     function playHeavySwing(gain) {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
                                     gain === undefined ? 1 : gain)
+        logSound("sfx/sword_swing", "heavySwing", Balance.heavy.swingPitch, _gainDist(gain), gain)
     }
     // The whirlwind: the swing sample pitched further down, a long spin,
     // The knight's footsteps (Balance.steps), only this node's own
@@ -211,7 +288,9 @@ ClayWorld2d {
     property int _foot: 0
     function playStep() {
         let p = Balance.steps.pitches
-        footstepSound.triggerNote(footstepSound.rootNote + p[_foot++ % p.length], 1)
+        let pitch = p[_foot++ % p.length]
+        footstepSound.triggerNote(footstepSound.rootNote + pitch, 1)
+        logSound("sfx/footstep", "step", pitch, 0, 1)
     }
     // and the knight's shout of a special move, a voiced line
     Sound {
@@ -224,6 +303,8 @@ ClayWorld2d {
                                     gain === undefined ? 1 : gain)
         whirlShoutSound.triggerNote(whirlShoutSound.rootNote + Balance.whirl.shoutPitch,
                                     gain === undefined ? 1 : gain)
+        logSound("sfx/sword_swing", "whirlwind", Balance.whirl.swingPitch, _gainDist(gain), gain)
+        logSound("voice/knight/whirl_shout", "whirlShout", Balance.whirl.shoutPitch, _gainDist(gain), gain)
     }
     // The charge is full: a high tick
     SfxPlayer {
@@ -233,6 +314,7 @@ ClayWorld2d {
     }
     function playChargeFull(gain) {
         chargeTickSound.play(gain === undefined ? 1 : gain, Balance.heavy.tickPitch)
+        logSound("sfx/menu_change", "chargeFull", Balance.heavy.tickPitch, _gainDist(gain), gain)
     }
 
     // A Sound step in the Esc menu: the menu's tick at the new share
@@ -247,7 +329,10 @@ ClayWorld2d {
         source: "../sound/sfx/coin_pickup.sfx.json"
         volume: muted ? 0 : 0.5 * soundVolume
     }
-    function _clink() { coinSound.play() }
+    function _clink() {
+        coinSound.play()
+        logSound("sfx/coin_pickup", "gold", 0, 0, 1)
+    }
 
     // The knight's own hurt: a low thud, never the punch of a sword
     SfxPlayer {
@@ -257,6 +342,7 @@ ClayWorld2d {
     }
     function playHurt(gain) {
         hurtSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/knight_hurt", "hurt", 0, _gainDist(gain), gain)
     }
 
     // The shield breaking at 0 mana, and the right button with no mana
@@ -267,6 +353,7 @@ ClayWorld2d {
     }
     function playShieldBreak(gain) {
         shieldBreakSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/shield_break", "shieldBreak", 0, _gainDist(gain), gain)
     }
     SfxPlayer {
         id: shieldEmptySound
@@ -275,14 +362,17 @@ ClayWorld2d {
     }
     function playShieldEmpty() {
         shieldEmptySound.play(1)
+        logSound("sfx/shield_empty", "shieldEmpty", 0, 0, 1)
     }
     // A spike plate: its click is the menu's tick pitched down, its
     // spikes the swing pitched up (Balance.dungeon.spike...Pitch)
     function playPlateClick() {
         chargeTickSound.play(1, Balance.dungeon.spikeClickPitch)
+        logSound("sfx/menu_change", "plateClick", Balance.dungeon.spikeClickPitch, 0, 1)
     }
     function playSpikesRise() {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
+        logSound("sfx/sword_swing", "spikesRise", Balance.dungeon.spikeRisePitch, 0, 1)
     }
     // A vein (Balance.deep): the pickaxe's chink on the stone, a clean
     // strike's tink, the stone's crumble as it splits and the gem's chime,
@@ -316,10 +406,12 @@ ClayWorld2d {
     }
     function playChink(pitch) {
         chinkSound.play(1, pitch)
+        logSound("sfx/deep_chink", "chink", pitch, 0, 1)
         _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
     }
     function playTink(pitch, gain) {
         tinkSound.play(gain === undefined ? 1 : gain, pitch)
+        logSound("sfx/deep_tink", "tink", pitch, 0, gain)
         _heard("tink+" + pitch)
     }
     // gain 1 when left out; the last one played is crumbleGain
@@ -327,6 +419,7 @@ ClayWorld2d {
     function playCrumble(gain) {
         crumbleGain = gain === undefined ? 1 : gain
         crumbleSound.play(crumbleGain)
+        logSound("sfx/deep_crumble", "crumble", 0, 0, crumbleGain)
         _heard("crumble")
     }
     property var _chimeLeft: []
@@ -365,14 +458,17 @@ ClayWorld2d {
     property var holeSounds: []
     property int holeSoundCount: 0
     function playHoleSound(name, h) {
-        let cfg = Balance.deep.hole, gain = 1
+        let cfg = Balance.deep.hole, gain = 1, dist = 0
         if (player && h) {
             let c = _knightCentre()
-            gain = Math.max(cfg.quietest, 1 - Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y) / cfg.hearReach)
+            dist = Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y)
+            gain = Math.max(cfg.quietest, 1 - dist / cfg.hearReach)
         }
         if (name === "rumble") rumbleSound.play(gain)
         else if (name === "groan") groanSound.play(gain)
         else crumbleSound.play(gain)
+        logSound(name === "rumble" ? "sfx/deep_rumble" : name === "groan" ? "sfx/deep_groan"
+                 : "sfx/deep_crumble", "hole" + name[0].toUpperCase() + name.slice(1), 0, dist, gain)
         holeSounds = holeSounds.slice(1 - veinSoundsKept).concat([name])
         holeSoundCount++
     }
@@ -388,8 +484,10 @@ ClayWorld2d {
         return remoteMaxGain * Math.max(0, 1 - d / remoteHearingWu)
     }
 
-    function playDeathBurst() {
+    // xWu, yWu: where it sounds, the knight's own place when left out
+    function playDeathBurst(xWu, yWu) {
         deathBurstSound.play()
+        logSound("sfx/burst", "death", 0, _distTo(xWu, yWu), 1)
     }
 
     Sound {
@@ -398,8 +496,9 @@ ClayWorld2d {
         volume: muted ? 0 : 0.6 * soundVolume
     }
 
-    function playSpitShot() {
+    function playSpitShot(xWu, yWu) {
         spitterSound.play()
+        logSound("sfx/spitter", "shot", 0, _distTo(xWu, yWu), 1)
     }
 
     // A tough enemy winds up a crushing blow: a low growl, the spitter's
@@ -415,7 +514,10 @@ ClayWorld2d {
             let dx = xWu - player.xWu, dy = yWu - player.yWu
             gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
         }
-        if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+        if (gain > 0) {
+            growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+            logSound("sfx/spitter", "growl", Balance.crush.growlPitch, _distTo(xWu, yWu), gain)
+        }
     }
 
     // A grunt or a guardian winds up its lunge: a goblin's scream, pitched
@@ -432,7 +534,10 @@ ClayWorld2d {
             gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
         }
         let pitch = Balance.scream.tierPitch[Math.max(0, Math.min(2, tier))] || 0
-        if (gain > 0) screamSound.play(gain, pitch)
+        if (gain > 0) {
+            screamSound.play(gain, pitch)
+            logSound("sfx/goblin_scream", "scream", pitch, _distTo(xWu, yWu), gain)
+        }
     }
 
     // The NPCs' greetings are voiced lines of the sound factory
@@ -466,6 +571,7 @@ ClayWorld2d {
         let greeting = _greetings[cue]
         if (!greeting) return
         greeting.play()
+        logSound(cue, "greeting", 0, 0, 1)
         dialoguePanel.lipSync(Qt.resolvedUrl("../sound/" + cue + ".visemes.json"))
     }
 
@@ -817,7 +923,7 @@ ClayWorld2d {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
             impact("enemyDeath", kill.x, kill.y, kill.dx, kill.dy, kill.color)
-            playDeathBurst()
+            playDeathBurst(kill.x, kill.y)
             countFight("kill")
         }
         onGoldSpawned: (objectId, props) => goldClaims.make(props, objectId)
@@ -842,7 +948,7 @@ ClayWorld2d {
         onShotReceived: (shot) => {
             if (screen !== "game") return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
-            playSpitShot()
+            playSpitShot(shot.x, shot.y)
         }
         onStruckReported: (fromId, report) => {
             if (report.source === "shot") _endShot(report.id, report.result)
@@ -2619,6 +2725,7 @@ ClayWorld2d {
         triggeredOnStart: true
         onTriggered: {
             recordChimeSound.play(1, Balance.record.chime[step])
+            world.logSound("sfx/menu_confirm", "recordChime", Balance.record.chime[step], 0, 1)
             if (++step >= Balance.record.chime.length) stop()
         }
     }
@@ -2949,6 +3056,12 @@ ClayWorld2d {
         target: world.physics
         function onStepped() {
             world._physicsSteps++
+            world.physicsSeconds += world.physics.timeStep
+            if (world.followFightOnSteps && world._followingFight)
+                world._followFight(world.physics.timeStep)
+            else if (world.followFightOnSteps && world.fightIntensity > 0)
+                world._stopFollowingFight()
+            world._traceMusic()
             world._pickUpGold()
             world._pickUpPouches()
             world._stepRevive()
@@ -3121,6 +3234,7 @@ ClayWorld2d {
         running: world.lowHealthLevel > 0.05 && screen === "game"
         onTriggered: {
             heartSound.play()
+            world.logSound("sfx/heartbeat", "heartbeat", 0, 0, 1)
             heartBeatAnim.restart()
         }
     }
@@ -3513,6 +3627,7 @@ ClayWorld2d {
             spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
             if (screenFx) screenFxItem.flash("#FFB060", 500, 0.16)
             drinkSound.play()
+            logSound("sfx/potion_drink", "potion", 0, 0, 1)
         } else {
             _healing = false
         }
@@ -4188,6 +4303,7 @@ ClayWorld2d {
         spawnShards(pile.xWu, pile.yWu, nx, ny, 9, "#D8D0BC", 0.14)
         spawnShards(pile.xWu, pile.yWu, nx, ny, 3, "#DDD5C2", 0.22)
         impactSound.play(0.35)
+        logSound("sfx/punch_hitting", "bones", 0, _distTo(pile.xWu, pile.yWu), 0.35)
         pile.destroy()
     }
 
@@ -4383,6 +4499,7 @@ ClayWorld2d {
     function glanceThing(b, nx, ny) {
         spawnSparks(b.cxWu, b.cyWu, -nx, -ny, 6, "#BFF4FF")
         impactSound.play(0.25)
+        logSound("sfx/punch_hitting", "glance", 0, _distTo(b.cxWu, b.cyWu), 0.25)
     }
     // Alone, or the host: b broke for good, its gold drops where it stood
     // and, in a session, every screen is told
@@ -4424,6 +4541,8 @@ ClayWorld2d {
         delete _propCells[c[1] * gridWidth + c[0]]
         _setPathCell(c[0], c[1], true)
         let x = b.cxWu, y = b.cyWu
+        logSound("sfx/punch_hitting", "break", 0, _distTo(x, y),
+                 b.kind === "urn" ? 0.5 : b.kind === "crate" ? 0.6 : 0.7)
         if (b.kind === "urn") {
             spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
             spawnShards(x, y, nx, ny, 4, Qt.lighter(b._clay, 1.3), 0.28)
@@ -4727,8 +4846,10 @@ ClayWorld2d {
     // The shot's twang, fading with the distance from this knight
     function _playArrow(xWu, yWu) {
         let gain = remoteGain(xWu, yWu) / remoteMaxGain
-        if (gain > 0)
+        if (gain > 0) {
             swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.slitShotPitch, 0.6 * gain)
+            logSound("sfx/sword_swing", "arrow", Balance.dungeon.slitShotPitch, _distTo(xWu, yWu), 0.6 * gain)
+        }
     }
 
     // Each physics step: the slits fire on the beats passed since the step
@@ -5021,8 +5142,10 @@ ClayWorld2d {
             spawnShards(d.cxWu, d.cyWu, nx, ny, 10, d._wood, 0.26)
             spawnShards(d.cxWu, d.cyWu, nx, ny, 6, Qt.lighter(d._wood, 1.35), 0.16)
             impactSound.play(0.8)
+            logSound("sfx/punch_hitting", "doorBashed", 0, _distTo(d.cxWu, d.cyWu), 0.8)
         } else {
             impactSound.play(0.2)
+            logSound("sfx/punch_hitting", "door", 0, _distTo(d.cxWu, d.cyWu), 0.2)
         }
     }
     // The host's doors not closed in the level: every door here as they say
@@ -5323,6 +5446,7 @@ ClayWorld2d {
         spawnShards(cx, cy, s.nx, s.ny, 12, "#5A6272", 0.28)
         spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
         impactSound.play(0.7)
+        logSound("sfx/punch_hitting", "secretOpen", 0, _distTo(cx, cy), 0.7)
         shake(0.4)
         runSecrets++
         minimap.requestPaint()
@@ -5358,6 +5482,7 @@ ClayWorld2d {
             let cx = (s.gx + 0.5 + s.nx * 0.5) * cellSize, cy = (s.gy + 0.5 + s.ny * 0.5) * cellSize
             spawnShards(cx, cy, s.nx, s.ny, 6, "#D8CDB6", 0.1)
             impactSound.play(0.25)
+            logSound("sfx/punch_hitting", "secretGlance", 0, _distTo(cx, cy), 0.25)
             secretGlanced(s.cell)
         }
     }
@@ -7862,6 +7987,7 @@ ClayWorld2d {
         let gain = _deepGain(s, cfg.digVolume, cfg.hearReach)
         if (gain > 0.005) {
             tinkSound.play(gain / Balance.deep.tinkVolume, cfg.digPitch)
+            logSound("sfx/deep_tink", "minerDig", cfg.digPitch, _distTo(s.pickXWu, s.pickYWu), gain / Balance.deep.tinkVolume)
             _deepSound("dig")
         }
         if (!_decidesDeep()) return
@@ -7917,8 +8043,9 @@ ClayWorld2d {
             if (run.chord >= 0) {
                 run.chord -= dt
                 if (run.chord < 0) {
-                    travellerChord.play(Math.max(Balance.deep.hole.quietest,
-                                                           _deepGain(s, 1, Balance.deep.hole.hearReach)))
+                    let g = Math.max(Balance.deep.hole.quietest, _deepGain(s, 1, Balance.deep.hole.hearReach))
+                    travellerChord.play(g)
+                    logSound("sfx/deep_freed", "chord", 0, _distTo(s.xWu, s.yWu), g)
                     _deepSound("chord")
                 }
             }
@@ -8044,6 +8171,7 @@ ClayWorld2d {
         campCat.feed(Balance.fishing.kinds[fish.kind].color)
         spawnDamageNumber(campCat.xWu, campCat.yWu + 0.5, "*purrs*", "#E8D8B0")
         purrSound.play()
+        logSound("sfx/cat_purr", "purr", 0, _distTo(campCat.xWu, campCat.yWu), 1)
         return true
     }
     SfxPlayer {

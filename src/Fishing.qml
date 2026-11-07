@@ -133,7 +133,7 @@ Canvas {
         _fromY = c.y
         phase = "cast"
         _phaseT = 0
-        castSound.play()
+        _hear(castSound, "cast")
     }
     function _startWait() {
         phase = "wait"
@@ -146,7 +146,7 @@ Canvas {
             if (t > 0.4) at.push(t)
         }
         _nibbleAt = at.sort((x, y) => x - y)
-        plopSound.play()
+        _hear(plopSound, "plop")
     }
     function _hook() {
         let total = cfg.kinds.reduce((s, k) => s + k.weight, 0)
@@ -165,7 +165,7 @@ Canvas {
         _nextThrash()
         phase = "reel"
         _phaseT = 0
-        biteSound.play()
+        _hear(biteSound, "bite")
     }
     function _nextThrash() {
         let f = cfg.kinds[fish.kind].fight
@@ -218,13 +218,13 @@ Canvas {
             if (_nibbleAt.length > 0 && _phaseT >= _nibbleAt[0]) {
                 _nibbleAt.shift()
                 _sinceNibble = 0
-                plipSound.play()
+                _hear(plipSound, "plip")
             }
             if (_phaseT >= _waitFor) {
                 phase = "bite"
                 _phaseT = 0
                 bitesLeft--
-                biteSound.play()
+                _hear(biteSound, "bite")
             }
             break
         case "bite":
@@ -248,8 +248,8 @@ Canvas {
             let before = _thrashIn
             _thrashIn -= dt
             // The tell: a plip just before it thrashes, time to let go
-            if (before > cfg.tell && _thrashIn <= cfg.tell) plipSound.play()
-            if (_thrashIn <= 0) splashSound.play()
+            if (before > cfg.tell && _thrashIn <= cfg.tell) _hear(plipSound, "plip")
+            if (_thrashIn <= 0) _hear(splashSound, "splash")
         } else {
             _thrashLeft -= dt
             if (_thrashLeft <= 0) _nextThrash()
@@ -264,12 +264,12 @@ Canvas {
                 _click += dt
                 if (_click >= 0.11) {
                     _click = 0
-                    clickSound.play()
+                    _hear(clickSound, "click")
                 }
             }
         }
         if (tension >= 1) {
-            snapSound.play()
+            _hear(snapSound, "snap")
             _say("The line snapped", "#E08060")
             _end()
             return
@@ -277,7 +277,7 @@ Canvas {
         if (progress >= 1) {
             let k = cfg.kinds[fish.kind]
             knight.creel = knight.creel.concat([{ kind: fish.kind, size: fish.size }])
-            landSound.play()
+            _hear(landSound, "land")
             _say(k.name + ", " + fish.size + " cm", k.color)
             phase = "landed"
             _phaseT = 0
@@ -452,6 +452,11 @@ Canvas {
     }
 
     // The sound factory's cues (sound/cues.json), live from their recipes
+    // Each sound goes into the game's sound log too (Game.logSound)
+    function _hear(sound, what) {
+        sound.play()
+        if (game) game.logSound(game.cueOf(sound.source), what, 0, 0, 1)
+    }
     SfxPlayer { id: castSound; source: "../sound/sfx/fish_cast.sfx.json"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
     SfxPlayer { id: plopSound; source: "../sound/sfx/fish_plop.sfx.json"; volume: game && !game.muted ? 0.6 * game.soundVolume : 0 }
     SfxPlayer { id: plipSound; source: "../sound/sfx/fish_plip.sfx.json"; volume: game && !game.muted ? 0.5 * game.soundVolume : 0 }

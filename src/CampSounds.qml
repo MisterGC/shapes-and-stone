@@ -138,6 +138,9 @@ Item {
             // played at another rate (sound/cues.json)
             if (s.sound.layers !== undefined) s.sound.play(g, pitch)
             else s.sound.triggerNote(s.sound.rootNote + pitch, g)
+            if (game.logSounds)
+                game.logSound(game.cueOf(s.sound.source), s.name, pitch,
+                              game.player ? Math.hypot(s.x - game.player.xWu, s.y - game.player.yWu) : 0, g)
             played[s.name] = (played[s.name] || 0) + 1
             lastGain[s.name] = g
         }
