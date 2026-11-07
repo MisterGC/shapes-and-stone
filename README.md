@@ -2109,8 +2109,10 @@ room's guardian is tough and winds one up now and then, and
 every attack of a tough enemy a crushing one. The reload bench does both
 through the inspector: it changes `knight.chargeTime` in the loaded copy
 of the table, reloads and checks that the charge fills in the new time,
-and it counts the guardian's crushing blows among its attacks before and
-after setting `enemy.crushChance` to 1:
+it counts the guardian's crushing blows among its attacks before and
+after setting `enemy.crushChance` to 1, and in the `flow` scenario it
+strikes two enemies down 2 s apart, a chain at `chain.window` 2.5 s and
+two lone kills after setting it to 1.5:
 
 ```
 python3 tests/fightbench/run_reload.py

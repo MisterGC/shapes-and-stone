@@ -255,6 +255,26 @@ Item {
                                lost: hp0 - gd.hp, chargeTime: Balance.knight.chargeTime})
     }
 
+    // ---- the kill chain, tried as in the dojo (run_reload.py) ----
+    // Every enemy stands still; the knight strikes one down, then gapSteps
+    // physics steps later another. The links the second kill made, the
+    // death sound's pitches and Balance.chain.window
+    function tryChain(gapSteps) {
+        Clayground.paused = true
+        let p = game.player
+        let foes = game.enemies.filter(alive)
+        for (let e of foes) e.halt()
+        game.breakChain()
+        game.logSounds = true
+        game.clearSoundLog()
+        foes[0].takeDamage(100000, p.xWu, p.yWu)
+        Clayground.physicsStep(gapSteps)
+        foes[1].takeDamage(100000, p.xWu, p.yWu)
+        Clayground.physicsStep(1)
+        return JSON.stringify({links: game.chainLinks, window: Balance.chain.window,
+                               pitches: game.soundLog.filter(l => l.what === "death").map(l => l.pitch)})
+    }
+
     // ---- the crushing blow, tried as in the dojo (run_reload.py) ----
     // Only the tough guardian goes for the knight, which stands; the others
     // stand still. Steps until the guardian has wound up attacks attacks or
