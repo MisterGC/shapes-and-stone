@@ -1102,13 +1102,28 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
 
 Deeper is harder. Each dungeon is a depth, counted from 0, and the table's
 `depth` group says what each depth adds to the dungeon: two more enemies
-(up to `depth.enemiesCap`), fewer weak and more tough ones, more guardians
-and spitters, and half an attack point per enemy, rounded. A dungeon's
-tier mix is dealt, not rolled: `spawn.weakChance` of its enemies are weak
-and those above `spawn.normalChance` tough, so the mix follows the depth on
-every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
-in the dungeon at depth 4 (the village and the fight room take a depth the
-same way), and the balance bench checks depth 0, 2 and 4 against the table.
+(up to `depth.enemiesCap`), fewer weak ones, more rooms with a lead, more
+guardians and spitters, and half an attack point per enemy, rounded. A
+room's lead is its one tough enemy: no room holds two, and no other
+enemy is tough. `spawn.leadShare` of the rooms but the start room have a
+lead at depth 0 - one in three - and `depth.leadShare` more per depth, up
+to `depth.leadCap`, every room from depth 8. The rest of a dungeon's
+enemies are fodder, weak and normal, so the rooms without a lead fight
+in larger groups as the count grows; a creature out of a hole is fodder
+too. The mix is dealt, not rolled: the share of rooms with a lead, rounded,
+picked among the rooms that hold an enemy, and `spawn.weakChance` of its
+enemies weak, so it follows the depth on every seed. In the dojo,
+`applyScenario("dungeon", 4)` through `eval` lands in the dungeon at
+depth 4 (the village and the fight room take a depth the same way), and
+the balance bench checks depth 0, 2 and 4 against the table. The leads
+bench plans 50 seeds at each of depths 0, 2, 4 and 8, checks that no room
+holds two tough enemies, that each has the table's count of rooms with a
+lead and that a seed planned twice is the same dungeon, then builds the
+dungeon at each depth and checks it is the planned one:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/leads/leads.qml
+```
 
 Each depth is a range of difficulty, and how the last dungeon went picks
 the spot in it. A dungeon's danger is its depth plus a position in [0, 1),
@@ -1797,13 +1812,14 @@ qml -I build/bin/qml tests/freed/freed.qml -- <out dir>
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
 over, kept for the next visit) shows a panel before each dungeon to a solo
 player or the host, never to a joiner. Its rows are the settings of
-`Balance.dungeonMaster` - enemies, spike plates, arrow slits and
-breakables per room, rooms, base depth, relative difficulty (the
+`Balance.dungeonMaster` - enemies per room, the share of rooms with a
+lead, spike plates, arrow slits and breakables per room, rooms, base depth, relative difficulty (the
 danger's position in its depth's range) and veins per room - at the
 values the game would use. W/S picks a row, A/D or the arrows turn it a
 step and set it (gold),
 Backspace or a double click gives it back to the game. G shows the
-dungeon Enter then enters, with its enemies by tier, breakables, spike
+dungeon Enter then enters, with its enemies by tier and how many of them
+lead a room, breakables, spike
 plates, arrow slits, doors and secret rooms; G again rolls a new seed for
 it, and a row turned while a map is shown redraws it on the same seed.
 Enter or Space goes. The settings set hold for that dungeon and the ones
@@ -1821,7 +1837,7 @@ host's panel is up, told that the dungeon master prepares the next
 dungeon. A new setting is a row in `Balance.dungeonMaster`; a
 row with `kinds` sets those features per room with no code. The dungeon
 master bench sets every row, checks the preview's and the built
-dungeon's counts per room, that the dungeon entered is the one previewed,
+dungeon's counts per room and its rooms with a lead, that the dungeon entered is the one previewed,
 that Go with nothing set builds the game's own dungeon, the kept
 settings in a game started again, and Copy and Paste; the master party
 bench plays two dungeons in a session of two processes and checks that
