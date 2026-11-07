@@ -540,7 +540,26 @@ QtObject {
     // recovery seconds, less than a full charge (knight.chargeTime): a
     // charge the lunge cancelled is not full again in time. The stance
     // shows as a bar of barColor under the lead, an opening as a flash of
-    // flashColor, the word word over it, and the stagger
+    // flashColor, the word word over it, and the stagger.
+    // A lead attacks in strings (issue #272), in the arrow slits' beat
+    // notation (dungeon.slitRhythms): strings holds each lead type's, a
+    // name and its beats, 1 a strike, 2 a feint, 0 a rest, one rolled for
+    // each string from the level's attack rolls. A blow - a lunge
+    // landing, a shot leaving - comes beat seconds after the one before,
+    // and the parry ring closes once per beat, on the window; the first
+    // wind-up is the count-in, enemy.windUp (a shot's shootWindUp). A
+    // feint's wind-up holds feintHold seconds longer, its ring standing
+    // at feintRing of the way and the lead still, then strikes. A rest
+    // stands a beat, a recovery a charged swing opens. A strike or a feint
+    // winds up only at a knight within reach wu (a spitter's shootRange),
+    // else the string is over; after it the lead recovers for recovery.
+    // A knight within reach holding a charge, filling or full, is struck
+    // first: the lead begins a string at once - a rest of one cut short,
+    // not its recovery after one -, its first blow wound up for
+    // enemy.minTelegraph and no feint, and the hit cancels the charge.
+    // reach is the knight's own heavy swing's (knight.attackRange times
+    // heavyRange): a charge built outside it and let go on arriving in a
+    // rest or the recovery opens the lead
     readonly property var lead: ({
         parryStart: 9,
         recovery: 0.3,
@@ -553,7 +572,25 @@ QtObject {
         openingDamage: 1.5,
         barColor: "#E8C872",
         flashColor: "#FFE9A8",
-        word: "OPEN"
+        word: "OPEN",
+        beat: 0.7,
+        feintHold: 0.35,
+        feintRing: 0.6,
+        reach: 2.5,
+        strings: {
+            grunt: [
+                { name: "two-and-one", beats: [1, 1, 0, 1] },
+                { name: "held-two", beats: [2, 0, 1, 1] }
+            ],
+            guardian: [
+                { name: "one-and-feint", beats: [1, 0, 2] },
+                { name: "three", beats: [1, 1, 1] }
+            ],
+            spitter: [
+                { name: "volley", beats: [1, 1, 1] },
+                { name: "stutter", beats: [1, 0, 1, 2] }
+            ]
+        }
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that
