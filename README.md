@@ -406,8 +406,10 @@ a row of `soundLog` with its cue, pitch, distance, gain and time; with
 patrolling near the knight is none, as it spots the knight it growls once
 and the song's state is its duel part on the next physics step, the song
 plays that part from its next bar, a parry stings once, the lead's opening
-stings and plays the slow motion for its steps, and its fall brings the
-flow part back. With no audio output, as on CI's runner, the song's
+stings and plays the slow motion for its steps, a lock on the lead closes
+the view in round the knight (on no other enemy), with the session's
+`hitStopMode` `"view"` the slow motion is the picture's and the physics
+runs on, and its fall brings the flow part back. With no audio output, as on CI's runner, the song's
 playhead stands and its segment never moves (clayground#507): the bench
 then prints a SKIP line for that one check:
 

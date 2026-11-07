@@ -20,7 +20,11 @@
 // segment is skipped); a parry in the duel and the lead's opening each
 // sting once, the opening plays the slow motion - the physics at
 // slowScale for slowTime of the physics clock, the same steps every run -
-// and the lead's fall brings the flow part back.
+// a lock on the lead closes the view in to duel.zoom round the knight, which
+// stays where it is on screen, a lock on an enemy that is no lead does not,
+// with hitStopMode "view" (a session's) the opening's slow motion is a hit
+// stop of the picture with the physics at full speed, and the lead's fall
+// brings the flow part back.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -89,6 +93,17 @@ Window {
     property var duelLead: null
     property real segmentWait: 0
     property real positionBefore: 0
+    // The close-in (Balance.duel.zoom): the knight's centre in the game's
+    // own coordinates, through the canvas' scale, and how long to wait for
+    // the zoom to run its zoomTime
+    property point knightAt: Qt.point(0, 0)
+    property var other: null
+    readonly property int zoomWait: Balance.duel.zoomTime * 1000 + 400
+    property point leadAt: Qt.point(0, 0)
+    function onScreen(item) {
+        return item.parent.mapToItem(game, item.x + item.width * 0.5, item.y + item.height * 0.5)
+    }
+    function knightOnScreen() { return onScreen(game.player) }
     function r3(v) { return Math.round(v * 1000) / 1000 }
     function lastSound() { return game.soundLog[game.soundLog.length - 1] }
 
@@ -257,6 +272,57 @@ Window {
             check(still && !game.slowing && game.physics.timeScale === Clayground.timeScale,
                   "it ends on the " + steps + "th physics step (slowTime " + d.slowTime + " s), the time scale "
                   + game.physics.timeScale + " again")
+            // A lock on the lead closes the view in round the knight
+            knightAt = knightOnScreen()
+            leadAt = onScreen(duelLead)
+            game.player.lockTarget = duelLead
+        }],
+        [zoomWait, () => {
+            let d = Balance.duel, at = knightOnScreen(), lead = onScreen(duelLead)
+            check(game.player.lockedOn && Math.abs(game.viewZoom - d.zoom) < 1e-3,
+                  "a lock on the lead closes the view in to " + game.viewZoom.toFixed(3) + " within zoomTime "
+                  + d.zoomTime + " s (duel.zoom " + d.zoom + ")")
+            check(Math.hypot(at.x - knightAt.x, at.y - knightAt.y) <= 1,
+                  "the knight stays where it is on screen: (" + knightAt.x.toFixed(1) + ", " + knightAt.y.toFixed(1)
+                  + ") before, (" + at.x.toFixed(1) + ", " + at.y.toFixed(1) + ") zoomed")
+            let apart = Math.hypot(leadAt.x - knightAt.x, leadAt.y - knightAt.y)
+            let zoomed = Math.hypot(lead.x - at.x, lead.y - at.y)
+            check(apart > 50 && Math.abs(zoomed / apart - d.zoom) < 0.01,
+                  "and the lead 3 wu off is drawn " + (zoomed / apart).toFixed(3) + " times as far from it ("
+                  + apart.toFixed(1) + " px, " + zoomed.toFixed(1) + " px)")
+            game.player.lockTarget = null
+        }],
+        [zoomWait, () => {
+            check(Math.abs(game.viewZoom - 1) < 1e-3, "letting go of the lock opens the view out to "
+                  + game.viewZoom.toFixed(3))
+            // A lock on an enemy that is no lead, 4 wu off, does not
+            other = alive().find(e => e !== duelLead)
+            other.lead = false
+            other.xWu = game.player.xWu
+            other.yWu = game.player.yWu + 4
+            game.player.lockTarget = other
+        }],
+        [zoomWait, () => {
+            check(game.player.lockedOn && game.player.lockTarget === other && Math.abs(game.viewZoom - 1) < 1e-3,
+                  "a lock on an enemy that is no lead leaves the view at " + game.viewZoom.toFixed(3))
+            game.player.lockTarget = null
+            other.xWu = game.player.xWu + 40
+            other.yWu = game.player.yWu + 40
+            // In a session the opening's slow motion is the picture's: a
+            // view hit stop, the simulation at full speed. The lead's
+            // opening runs out first, so it opens again
+            Clayground.physicsStep(Math.ceil(Balance.lead.openingTime * 60) + 6)
+            let wasOpen = duelLead.opening
+            game.hitStopMode = "view"
+            duelLead.xWu = game.player.xWu + 3
+            duelLead.yWu = game.player.yWu
+            duelLead.open("parry")
+            check(!wasOpen && duelLead.opening && game.hitStopActive && !game.slowing
+                  && game.physics.timeScale === Clayground.timeScale,
+                  "with hitStopMode view the opening's slow motion is a hit stop of the picture ("
+                  + game.hitStopActive + "), not of the physics: slowing " + game.slowing + ", time scale "
+                  + game.physics.timeScale)
+            game.hitStopMode = "physics"
             // The lead falls: the flow part again
             duelLead.die()
             Clayground.physicsStep(1)
