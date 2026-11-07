@@ -222,14 +222,17 @@ Item {
     }
     // Holds the left button until the charge is full, counting the physics
     // steps, then lets go at the guardian, which stands in front of the
-    // knight and faces it. The enemies stand still meanwhile. Returns the
-    // steps, whether the guardian staggered and the HP it lost, as JSON
+    // knight and faces it. The enemies stand still meanwhile. The fight
+    // room's tough guardian is its lead (Balance.lead), which a charge
+    // does not stagger: here it is none. Returns the steps, whether the
+    // guardian staggered and the HP it lost, as JSON
     function tryCharge() {
         Clayground.paused = true
         let p = game.player
         let foes = game.enemies.filter(alive)
         for (let e of foes) e.halt()
         let gd = foes.find(e => e.enemyType === "guardian")
+        gd.lead = false
         p.isBlocking = false
         p.moveX = 0
         p.moveY = 0

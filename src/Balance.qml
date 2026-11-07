@@ -324,7 +324,7 @@ QtObject {
         // Base HP by tier: weak, normal, tough. Weak and normal fall to
         // one charged swing or two to three swings (pacing.flowHits), at
         // every depth with depth.hp; tough is a room's lead
-        tierHp: [20, 26, 72],
+        tierHp: [20, 26, 238],
         // Per type: HP on top of the tier, attack, defense, speeds
         grunt: { hpBonus: 2, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
@@ -496,6 +496,38 @@ QtObject {
         // less damage than either of the others
         duelSlow: 20,
         duelSkilled: [6, 15]
+    })
+
+    // A room's lead has a stance (issue #271): it takes no knockback, no
+    // hit staggers it and it keeps winding up under hits. Its stance is
+    // full at 1. A blow outside an opening does chip of its damage and
+    // wears wear off the stance, a charged swing heavyWear; regen comes
+    // back per second once no blow has landed for regenDelay seconds. A
+    // parry, a perfect block, a charged swing landed while it recovers
+    // from its lunge, or its stance worn to 0 breaks it: an opening, a
+    // stagger of openingTime seconds in which every blow does
+    // openingDamage times its damage; the blow that opens it lands whole.
+    // After the opening the stance is full again. A swing parries a lead
+    // only when it began at most parryStart physics steps before it
+    // lands, in the parry window: a swing under way that the lunge runs
+    // into is a blow like any other. After its lunge a lead recovers for
+    // recovery seconds, less than a full charge (knight.chargeTime): a
+    // charge the lunge cancelled is not full again in time. The stance
+    // shows as a bar of barColor under the lead, an opening as a flash of
+    // flashColor, the word word over it, and the stagger
+    readonly property var lead: ({
+        parryStart: 9,
+        recovery: 0.3,
+        chip: 0.1,
+        wear: 0.03,
+        heavyWear: 0.1,
+        regen: 0.1,
+        regenDelay: 1.5,
+        openingTime: 1.5,
+        openingDamage: 1.5,
+        barColor: "#E8C872",
+        flashColor: "#FFE9A8",
+        word: "OPEN"
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that

@@ -906,8 +906,10 @@ ClayWorld2d {
         onEnemyBlowReceived: (fromId, blow) => {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
-            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true)
+            if (blow.kind === "damage")
+                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "")
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
+            else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
@@ -1077,11 +1079,13 @@ ClayWorld2d {
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
-        // a crushing blow's for the full stagger
+        // a crushing blow's for the full stagger, and opens a lead
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
-        if (result === "perfect" && e && !e.destroyed)
-            e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
+        if (result === "perfect" && e && !e.destroyed) {
+            if (e.lead) e.open("perfect")
+            else e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
+        }
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy

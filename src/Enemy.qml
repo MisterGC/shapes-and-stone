@@ -43,12 +43,13 @@ PhysicsItem {
         network: enemy.network
         objectId: enemy.objectId
         properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId",
-                     "windUpLength"]
+                     "windUpLength", "lead", "stance", "opening"]
         interpolate: true
         interpolator.autoDelay: true
         // HP switches with its state, never blended between two of the
-        // host's (clayground#368); so does a wind-up's length
-        steppedProperties: ["hp", "windUpLength"]
+        // host's (clayground#368); so do a wind-up's length and a lead's
+        // stance
+        steppedProperties: ["hp", "windUpLength", "stance"]
         interpolator.angleKeys: ["facingAngle"]
     }
 
@@ -139,6 +140,20 @@ PhysicsItem {
 
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
+    // A room's lead (Balance.lead, issue #271): its tough enemy. It takes
+    // no knockback and no stagger; its stance, from 1 down to 0, wears
+    // under blows, and a parry, a perfect block, a charged swing into its
+    // recovery or a worn stance breaks it: opening is true for the long
+    // stagger that follows. In a session the host's lead keeps the stance
+    // and every screen shows it
+    property bool lead: tier === 2
+    property real stance: 1
+    property bool opening: false
+    // Seconds since a blow last wore the stance; the stance comes back
+    // after Balance.lead.regenDelay of them, kept to steps of 1/20 so the
+    // host sends a new one only now and then
+    property real _stanceRest: 0
+    property real _stanceLeft: 1
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
     // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
     // was built with (issue #157)
@@ -563,6 +578,76 @@ PhysicsItem {
         }
     }
 
+    // A lead's stance (Balance.lead): a bar under it, full at 1. While it
+    // is open the bar is empty and blinks
+    Rectangle {
+        id: stanceBar
+        objectName: "stanceBar"
+        visible: enemy.lead && !enemy.destroyed
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.bottom
+        anchors.topMargin: 3
+        width: parent.width * 1.2
+        height: 3
+        color: "#333333"
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * enemy.stance
+            color: Balance.lead.barColor
+            Behavior on width { NumberAnimation { duration: 100 } }
+        }
+        Rectangle {
+            anchors.fill: parent
+            color: Balance.lead.flashColor
+            opacity: 0
+            SequentialAnimation on opacity {
+                running: enemy.opening
+                loops: Animation.Infinite
+                alwaysRunToEnd: true
+                NumberAnimation { to: 0.9; duration: 120 }
+                NumberAnimation { to: 0; duration: 120 }
+            }
+        }
+    }
+    // An opening flashes the lead and swells a ring off it, on every
+    // screen, with the word over it
+    Rectangle {
+        id: openFlash
+        objectName: "openFlash"
+        parent: parryRing.parent
+        readonly property real size: enemy.width * visual.scale * (1 + 1.4 * grow)
+        property real grow: 0
+        width: size
+        height: size
+        radius: size / 2
+        x: (parent === enemy ? 0 : enemy.x) + (enemy.width - size) / 2
+        y: (parent === enemy ? 0 : enemy.y) + (enemy.height - size) / 2
+        color: "transparent"
+        border.width: Math.max(2, enemy.width * 0.1)
+        border.color: Balance.lead.flashColor
+        opacity: 0
+        visible: opacity > 0.01
+        ParallelAnimation {
+            id: openFlashAnimation
+            NumberAnimation { target: openFlash; property: "grow"; from: 0; to: 1; duration: 350
+                              easing.type: Easing.OutQuad }
+            NumberAnimation { target: openFlash; property: "opacity"; from: 1; to: 0; duration: 350 }
+            SequentialAnimation {
+                PropertyAction { target: hitFlash; property: "color"; value: Balance.lead.flashColor }
+                NumberAnimation { target: hitFlash; property: "opacity"; from: 1; to: 0; duration: 300 }
+                PropertyAction { target: hitFlash; property: "color"; value: "white" }
+            }
+        }
+    }
+    onOpeningChanged: {
+        if (!opening) return
+        openFlashAnimation.restart()
+        if (gameWorld && gameWorld.spawnWord)
+            gameWorld.spawnWord(xWu, yWu + 0.5, Balance.lead.word, Balance.lead.flashColor)
+    }
+
     // Guardian shield arc
     Canvas {
         id: guardianShield
@@ -701,6 +786,8 @@ PhysicsItem {
     property real _knockVy: 0
     readonly property real knockDuration: Balance.enemy.knockbackDuration
     function knockback(dx, dy, speed) {
+        // A room's lead stands its ground: no blow, shove or shield moves it
+        if (lead) return
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
         _knockVx = dx / len * speed
@@ -844,7 +931,7 @@ PhysicsItem {
         // A blow blocked perfectly staggered it: no recovery over that
         if (aiState !== "lunge") return
         aiState = "recovery"
-        attackCooldown = Balance.enemy.recovery
+        attackCooldown = lead ? Balance.lead.recovery : Balance.enemy.recovery
     }
 
     // The knight has fallen: drop the target, stand still and stop thinking.
@@ -852,6 +939,10 @@ PhysicsItem {
     function halt() {
         halted = true
         target = null
+        if (opening) {
+            opening = false
+            _setStance(1)
+        }
         aiState = "idle"
         staggerWobble.stop()
         rotation = 0
@@ -893,6 +984,7 @@ PhysicsItem {
         if (attackCooldown > 0) attackCooldown -= dt
         if (_shootTimer > 0) _shootTimer -= dt
         _pathRecalcTimer -= dt
+        if (lead && !opening) _restStance(dt)
 
         let dx = target.xWu - xWu
         let dy = target.yWu - yWu
@@ -1055,6 +1147,10 @@ PhysicsItem {
             if (_attackTimer <= 0) {
                 staggerWobble.stop()
                 enemy.rotation = 0
+                if (opening) {
+                    opening = false
+                    _setStance(1)
+                }
                 aiState = "chase"
             }
             break
@@ -1166,7 +1262,7 @@ PhysicsItem {
                 // sounds its own block or hurt, so the lunge plays nothing
                 // here
                 if (result === "blocked") recoil(target)
-                if (result === "perfect") stagger(perfectStagger())
+                if (result === "perfect") perfectBlocked()
                 if (result !== "hit") return
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
@@ -1189,6 +1285,12 @@ PhysicsItem {
     function perfectStagger() {
         return crushing ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger
     }
+    // A knight blocked its blow perfectly: a lead's stance breaks, any
+    // other enemy staggers
+    function perfectBlocked() {
+        if (lead) open("perfect")
+        else stagger(perfectStagger())
+    }
 
     function fireProjectile() {
         if (gameWorld && gameWorld.spawnProjectile) {
@@ -1198,8 +1300,10 @@ PhysicsItem {
         }
     }
 
-    // Staggered for seconds, for the table's enemy.stagger without them
+    // Staggered for seconds, for the table's enemy.stagger without them.
+    // A room's lead does not flinch: only an opening (open) staggers it
     function stagger(seconds) {
+        if (lead) return
         let t = seconds === undefined ? Balance.enemy.stagger : seconds
         if (remote) {
             if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger", seconds: t})
@@ -1209,6 +1313,60 @@ PhysicsItem {
         _attackTimer = t
         aiState = "stagger"
         staggerWobble.restart()
+    }
+
+    // A lead's stance breaks (issue #271): cause is what broke it,
+    // "parry", "perfect", "heavy" or "worn". It staggers for
+    // Balance.lead.openingTime, every blow then doing openingDamage times
+    // its damage, and its attack under way is over. Where it is remote the
+    // host breaks it, and every screen shows the opening. An enemy that is
+    // no lead, or a lead already open, stays as it is
+    signal opened(string cause)
+    function open(cause) {
+        if (!lead || opening || destroyed) return
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "open", cause: cause})
+            return
+        }
+        parryWindow = false
+        crushing = false
+        _knockT = 0
+        body.linearVelocity = Qt.point(0, 0)
+        _setStance(0)
+        opening = true
+        _attackTimer = Balance.lead.openingTime
+        aiState = "stagger"
+        staggerWobble.restart()
+        console.log("[Enemy] Lead opened by", cause)
+        opened(cause)
+    }
+    // The stance, kept to steps of 1/20 where it shows
+    function _setStance(v) {
+        _stanceLeft = Math.max(0, Math.min(1, v))
+        stance = Math.round(_stanceLeft * 20) / 20
+    }
+    // A blow outside an opening wears the stance, a charged swing more; a
+    // worn stance breaks
+    function _wearStance(heavy) {
+        _stanceRest = 0
+        _setStance(_stanceLeft - (heavy === true ? Balance.lead.heavyWear : Balance.lead.wear))
+        if (_stanceLeft <= 1e-6) open("worn")
+    }
+    // No blow for regenDelay seconds: the stance comes back
+    function _restStance(dt) {
+        _stanceRest += dt
+        if (_stanceLeft < 1 && _stanceRest >= Balance.lead.regenDelay)
+            _setStance(_stanceLeft + Balance.lead.regen * dt)
+    }
+    // Whether a blow breaks a lead's stance, judged on the striker's
+    // screen: a parry, or a charged swing while it recovers from its
+    // lunge (the whirlwind's blows are heavy too). Its cause, or "" for a
+    // blow that does not
+    function _opens(heavy, parried) {
+        if (!lead || opening) return ""
+        if (parried === true) return "parry"
+        if (heavy === true && aiState === "recovery") return "heavy"
+        return ""
     }
 
     function onCollision(other) {}
@@ -1225,8 +1383,10 @@ PhysicsItem {
 
     // What a blow of amount from (attackerX, attackerY) does: the damage
     // and whether a guardian's shield took it. A heavy blow (the knight's
-    // charged swing) goes through the shield
-    function _blow(amount, attackerX, attackerY, heavy) {
+    // charged swing) goes through the shield. On a lead (Balance.lead) a
+    // blow in an opening does openingDamage times as much, the one that
+    // opens it (opens, its cause) all of it, any other chip of it
+    function _blow(amount, attackerX, attackerY, heavy, opens) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
@@ -1235,6 +1395,10 @@ PhysicsItem {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
         }
+        if (lead && opening)
+            finalDamage = Math.floor(finalDamage * Balance.lead.openingDamage)
+        else if (lead && !opens)
+            finalDamage = Math.max(Balance.minDamage, Math.round(finalDamage * Balance.lead.chip))
         return {damage: finalDamage, blocked: blocked}
     }
 
@@ -1243,35 +1407,38 @@ PhysicsItem {
         return blocked ? "enemyBlocked" : heavy === true ? "heavyHit" : "enemyHit"
     }
 
-    // This node's knight struck the enemy; heavy for its charged swing
-    function takeDamage(amount, attackerX, attackerY, heavy) {
-        if (!remote) {
-            _takeBlow(amount, attackerX, attackerY, "", heavy)
-            return
-        }
+    // This node's knight struck the enemy; heavy for its charged swing,
+    // parried for a swing into its parry window. This screen judges
+    // whether the blow breaks a lead's stance. Returns the damage it does
+    function takeDamage(amount, attackerX, attackerY, heavy, parried) {
+        let opens = _opens(heavy, parried)
+        if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
         // Remote: the hit looks and counts here, the host applies it
-        let b = _blow(amount, attackerX, attackerY, heavy)
+        let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
         let hdy = attackerY !== undefined ? yWu - attackerY : 0
         if (gameWorld) {
             gameWorld.countFight("dealt", b.damage)
             gameWorld.impact(_hitKind(b.blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
             gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY,
-                                          heavy: heavy === true})
+                                          heavy: heavy === true, opens: opens})
         }
         hitFlashAnimation.restart()
         if (_fx) hitSquash.restart()
+        return b.damage
     }
 
     // Host: the knight of node byId struck the enemy; that node drew the
-    // hit and counted it
-    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy) {
-        _takeBlow(amount, attackerX, attackerY, byId, heavy)
+    // hit and counted it, and judged whether it opens a lead (opens)
+    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+        _takeBlow(amount, attackerX, attackerY, byId, heavy, opens || "")
     }
 
-    // A blow from this node's knight (byId "") or another node's
-    function _takeBlow(amount, attackerX, attackerY, byId, heavy) {
-        let b = _blow(amount, attackerX, attackerY, heavy)
+    // A blow from this node's knight (byId "") or another node's; opens
+    // the cause it breaks a lead's stance with, or ""
+    function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+        if (opens && (!lead || opening)) opens = ""
+        let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let finalDamage = b.damage
         let blocked = b.blocked
         let own = byId === ""
@@ -1317,7 +1484,14 @@ PhysicsItem {
             _recalcChasePath()
         }
 
-        if (hp <= 0) die(byId)
+        if (hp <= 0) {
+            die(byId)
+            return finalDamage
+        }
+        // A lead: the blow breaks its stance, or wears it
+        if (opens) open(opens)
+        else if (lead && !opening) _wearStance(heavy)
+        return finalDamage
     }
 
     // byId: the node whose knight killed it, "" for this node's

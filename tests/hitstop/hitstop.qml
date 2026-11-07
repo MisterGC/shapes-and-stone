@@ -82,6 +82,9 @@ Window {
         }],
         [() => game.player && game.enemies.length > 0, () => {
             enemy = game.enemies[0]
+            // A room's lead takes no knockback (Balance.lead): the recoil
+            // is tried on an enemy with no stance
+            enemy.lead = false
             let p = game.player
             // A normal step: single steps run at 1/60 s
             Clayground.paused = true

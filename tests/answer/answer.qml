@@ -102,10 +102,11 @@ Window {
     readonly property int minSteps: Math.round(Balance.enemy.minTelegraph / stepS)
 
     // Only this enemy has the knight as its target, a step from it; it
-    // winds up no crushing blow
+    // winds up no crushing blow, and it is no room's lead
     function only(type) {
         let p = game.player
         let e = game.enemies.find(x => x.enemyType === type && !x.destroyed)
+        e.lead = false
         for (let o of game.enemies) o.target = o === e ? p : null
         for (let o of game.enemies)
             if (o !== e) { o.aiState = "patrol"; o.parryWindow = false }
@@ -170,6 +171,9 @@ Window {
               && ["grunt", "guardian", "spitter"].every(t => game.enemies.some(e => e.enemyType === t)), () => {
             Clayground.paused = true
             let p = game.player
+            // The fight room's tough guardian is its lead (Balance.lead):
+            // the checks before the lead's own are of enemies with no stance
+            for (let e of game.enemies) e.lead = false
 
             // A grunt winds up its lunge for at least the minimum
             let g = only("grunt")
