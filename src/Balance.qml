@@ -418,9 +418,12 @@ QtObject {
         shootWindUp: 0.3
     })
 
+    // A spitter's shot: size wu a side, flying from the spitter's centre
+    // at the knight's
     readonly property var projectile: ({
         speed: 5.0,
-        lifetime: 3.0
+        lifetime: 3.0,
+        size: 0.3
     })
 
     readonly property var spawn: ({

@@ -18,8 +18,8 @@ PhysicsItem {
     // It went, on this screen
     signal gone()
 
-    widthWu: 0.3
-    heightWu: 0.3
+    widthWu: Balance.projectile.size
+    heightWu: Balance.projectile.size
 
     bodyType: Body.Dynamic
     fixedRotation: true
