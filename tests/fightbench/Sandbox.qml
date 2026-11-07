@@ -327,6 +327,32 @@ Item {
                                guardianChance: gd.crushChance, crushChance: Balance.enemy.crushChance})
     }
 
+    // ---- the Warden's room, tried as in the dojo (run_reload.py) ----
+    // The bossroom scenario stands: the knight at the Warden's door, the
+    // Warden asleep in its room (issue #274)
+    function bossRoomReady() {
+        return game.player !== null && game.bossFight.stage === "waiting"
+            && game.enemies.some(e => alive(e) && e.boss)
+    }
+    // Whether item it is on screen: its centre within the game's view
+    function onScreen(it) {
+        let c = it.mapToItem(game, it.width / 2, it.height / 2)
+        return c.x >= 0 && c.x <= game.width && c.y >= 0 && c.y <= game.height
+    }
+    // What a reload into the Warden's room shows: the room's way in and
+    // the Warden on screen, the Warden's HP and tempo against the table
+    // (Game.wardenHp, wardenTempo) for its appearance, as JSON
+    function tryBossRoom() {
+        let f = game.bossFight
+        let w = game.enemies.find(e => alive(e) && e.boss)
+        let g = f.gates.find(x => !x.exit)
+        let n = game.bossAppearance(game.depth)
+        return JSON.stringify({depth: game.depth, stage: f.stage, dormant: w.dormant,
+                               gateOnScreen: onScreen(g), wardenOnScreen: onScreen(w),
+                               hp: w.maxHp, wantHp: game.wardenHp(n, game.partyKnights, game.danger),
+                               tempo: w.tempo, wantTempo: game.wardenTempo(n), tableHp: Balance.boss.hp})
+    }
+
     // ---- a lead's stance, tried as in the dojo (run_reload.py) ----
     // The duel room stands: the knight and a lead
     function duelReady() {
