@@ -390,7 +390,10 @@ checks that each greeting moves its speaker's mouth by the cues of its
 visemes file and rests it on X once the line is over; the fight music bench
 puts enemies after the knight and away again and checks that the dungeon
 song's intensity rises fast, falls slowly, ignores enemies out of reach and
-is 0 in the camp:
+is 0 in the camp. It checks what a bench hears too: muted, a sound played is
+a row of `soundLog` with its cue, pitch, distance, gain and time; with
+`followFightOnSteps` the intensity stands until a physics step runs, and
+`musicTrace` gets a row once it has moved:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
