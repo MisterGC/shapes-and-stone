@@ -321,12 +321,14 @@ QtObject {
     })
 
     readonly property var enemy: ({
-        // Base HP by tier: weak, normal, tough
-        tierHp: [22, 36, 50],
+        // Base HP by tier: weak, normal, tough. Weak and normal fall to
+        // one charged swing or two to three swings (pacing.flowHits), at
+        // every depth with depth.hp; tough is a room's lead
+        tierHp: [20, 26, 72],
         // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 24, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        guardian: { hpBonus: 10, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        spitter: { hpBonus: -6, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        grunt: { hpBonus: 2, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        guardian: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        spitter: { hpBonus: -2, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -449,7 +451,12 @@ QtObject {
         spitterChance: 0.03,
         typeCap: 0.45,
         // Harder blows: added to every enemy's atk, rounded to whole points
-        atk: 0.5
+        atk: 0.5,
+        // Tougher hides: this share of an enemy's HP more, rounded to whole
+        // points. It keeps pace with the smith's sword (shop.swordAtk at
+        // shop.levelDepth): weak and normal enemies stay a charged swing or
+        // two to three swings at every depth (pacing.flowHits)
+        hp: 0.2
     })
 
     // A fight's pace (issue #267): the fight bench's pacing run

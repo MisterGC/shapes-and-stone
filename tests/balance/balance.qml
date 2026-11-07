@@ -3,8 +3,8 @@
 // Reads the whole table the way the inspector does, then builds a dungeon,
 // the fight room and the village and checks that the knight, every enemy,
 // the fight room lineup and the campfire carry the table's values; at
-// depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix and
-// harder blows, as the table's depth group says; tough grunts and
+// depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix,
+// harder blows and enemies with more HP, as the table's depth group says; tough grunts and
 // guardians, and no other enemy, wind up a crushing blow at
 // enemy.crushChance, for enemy.crushWindUp, and one on a held shield
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
@@ -61,9 +61,15 @@ Window {
         return out
     }
 
+    // An enemy's HP in the table at the game's danger: depth.hp of it more
+    // per step
+    function hpOf(type, tier) {
+        let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        return Math.round(base * (1 + game.danger * Balance.depth.hp))
+    }
     function checkEnemy(e) {
         let t = Balance.enemy[e.enemyType]
-        let hp = Balance.enemy.tierHp[e.tier] + t.hpBonus
+        let hp = hpOf(e.enemyType, e.tier)
         let atk = t.atk + Math.round(game.depth * Balance.depth.atk)
         return e.maxHp === hp && e.atk === atk && e.def === t.def
             && near(e.chaseSpeed, t.chaseSpeed) && near(e.patrolSpeed, t.patrolSpeed)
@@ -133,8 +139,7 @@ Window {
             check(wrong.length === 0, "every enemy's HP, attack, defense and timings come from the table ("
                   + wrong.map(e => e.enemyType + "/" + e.tier + " hp " + e.maxHp).join(", ") + ")")
             let weak = game.enemies.filter(e => e.tier === 0)
-            check(weak.length > 0 && weak.every(e => e.maxHp === Balance.enemy.tierHp[0]
-                                                    + Balance.enemy[e.enemyType].hpBonus),
+            check(weak.length > 0 && weak.every(e => e.maxHp === hpOf(e.enemyType, 0)),
                   "a weak enemy spawns weak (" + weak.length + " with the weak tier's HP)")
             checkDepth(0)
             game.applyScenario("dungeon", 2)
