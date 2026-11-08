@@ -15,6 +15,7 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The Hollow Warden sounds like itself:** it wound up with the same goblin scream as every grunt and guardian, only lower. Now its wind-up and its strike ring with a toll of its own, a deep hollow stone toll in the dungeon song's key - the wind-up on a higher note, the strike landing on the low root - so you hear the Warden coming apart from the small ones; its adds and every other enemy keep their scream. ([#287](https://github.com/MisterGC/shapes-and-stone/issues/287))
 - **The Hollow Warden stays beatable when it comes back:** at depth 5 and 8 it fell to no one, since its HP kept climbing with the depth after the smith's best sword. Now it grows a little each time - more HP and a slightly faster rhythm - so a knight who parries its strings beats it in a little over a minute at depth 2, 5 and 8 alike, and mashing or holding a charge still loses to it. ([#289](https://github.com/MisterGC/shapes-and-stone/issues/289))
 - **Grunt and guardian leads fall a third sooner:** a room's tough grunt or guardian has two thirds of the HP it had, so a duel with one is about a third shorter; a tough spitter keeps its HP. Mashing and holding a charge still lose such a duel: a swing begun right after another, and a charged swing, no longer parry a room's lead, so only a deliberate swing timed to the lunge opens it. ([#288](https://github.com/MisterGC/shapes-and-stone/issues/288))
 

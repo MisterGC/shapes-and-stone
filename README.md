@@ -1922,7 +1922,7 @@ follows the host's telegraph and parry window. A grunt or a guardian
 winding up its lunge screams like a goblin, fading with the distance from
 the knight as the crushing blow's growl does, pitched by its tier
 (`scream.tierPitch`, weak to tough) on every screen; a spitter keeps its
-spit. A hit the shield does not
+spit, and the Hollow Warden has a toll of its own. A hit the shield does not
 stop gives the knight `knight.hurtGrace` seconds in which no damage lands; it flickers
 white for as long, and a lunge or a shot in it plays no hit. A hit that
 lands reads as a hurt: the knight flashes red (`hurt.color`) for
@@ -2124,7 +2124,12 @@ room's lead (`Enemy` type `warden`), counted among the rooms with a lead
 (`spawn.leadShare`), and in the dungeon's plan the witch reads: its
 stance, its openings and three
 strings of its own (`lead.strings.warden`) on a beat of `boss.beat`
-seconds. Each appearance is stronger: `boss.hp` times `1 + n *
+seconds. It sounds like none of the small ones (issue #287): its wind-up
+and its strike - the lunge setting off, which every screen sees - play
+its own toll, `sfx/warden_toll`, a hollow stone toll on A1, the wind-up a
+fifth up on E (`boss.toll.windUp`), the strike on A (`boss.toll.strike`),
+at `boss.toll.volume` and fading with the distance as the scream does.
+Each appearance is stronger: `boss.hp` times `1 + n *
 boss.hpGrow` HP for its n-th, with `depth.hp` and `party.hpPerKnight` on
 that as any enemy - `depth.hp` counted only up to `boss.depthUpTo`, since
 the smith's sword stops growing at depth 5 (issue #289) -, and a tempo of
@@ -2302,7 +2307,10 @@ began, the adds it called, the zones it opened and those that hurt the
 knight. The skilled pilot steps out of a zone while it warns. At each of
 `bossDepths` `--check` adds its bands: `skilled` kills the Warden within
 `bossSkilled` seconds of its engagement and does not fall, `masher` and
-`charge` fall or take at least `bossSlow` times as long. The four rooms are the dojo's
+`charge` fall or take at least `bossSlow` times as long. In every boss
+fight the Warden's wind-ups and strikes play its toll and nothing screams
+before its adds come, and in no flow or duel fight is its toll heard
+(issue #287). The four rooms are the dojo's
 scenarios `flow`, `duel`, `guardianduel` and `boss` too: a reload lands in them, and an
 edit of `Balance.pacing` changes who stands there.
 
