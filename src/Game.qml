@@ -8878,11 +8878,13 @@ ClayWorld2d {
     // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
     // hole, a miner and a lost traveller before its rock face and a special
     // "flow" and "duel" are the fight room with the pacing bench's rooms
-    // (Balance.pacing): fodder only, and a room's lead alone
+    // (Balance.pacing): fodder only, and a room's lead alone, a grunt;
+    // "guardianduel" the same with a guardian lead (Balance.pacing
+    // .guardianDuel)
     // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
     // .boss), "bossroom" the dungeon at the boss depth's danger with the
     // knight at the Warden's door (Balance.boss)
-    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "boss", "bossroom", "features", "deep"] }
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8919,6 +8921,8 @@ ClayWorld2d {
             enterFightRoom()
         else if (name === "flow" || name === "duel" || name === "boss")
             enterFightRoom(Balance.pacing[name])
+        else if (name === "guardianduel")
+            enterFightRoom(Balance.pacing.guardianDuel)
         else if (name === "bossroom") {
             generateDungeon()
             toBossDoor()

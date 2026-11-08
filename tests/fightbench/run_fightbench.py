@@ -15,9 +15,9 @@ intensity).
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
                     [--answer mix|block|parry|perfect|heavy|whirlwind|charge|masher|skilled]
-                    [--room mixed|flow|duel|boss] [--sword N]
+                    [--room mixed|flow|duel|guardianduel|boss] [--sword N]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
-  run_fightbench.py --pacing [--check] [--rooms flow duel boss] [--depths 0 2 4]
+  run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel boss] [--depths 0 2 4]
                     [--answers charge masher skilled] [--jobs N] [--json out.json]
 
 One fight prints its report as JSON. --answer is how the scripted knight
@@ -34,7 +34,8 @@ hits and the ones begun. The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
 perfect-blocks - crushing blows and shots, which it sends back - and
 strikes in openings. --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
-only, "duel" a room's lead alone and "boss" the Hollow Warden alone, its
+only, "duel" a room's lead alone, a grunt, "guardianduel" a guardian lead
+alone (issue #288) and "boss" the Hollow Warden alone, its
 adds coming in its phase 2 (Balance.pacing, Balance.boss). --sword is the
 knight's sword level: by default 0 in the mixed room and in flow and duel
 the one a knight usually has at that depth. --danger is the danger the
@@ -44,7 +45,8 @@ at that danger. --depth d is --danger d, the bottom of the depth's range.
 The same seed and danger give the same numbers.
 
 --pacing plays every room of --rooms at every depth of --depths with every
-pilot of --answers (by default flow, duel and boss, Balance.pacing.depths, and
+pilot of --answers (by default flow, duel, guardianduel and boss,
+Balance.pacing.depths, and
 charge, masher and skilled), --jobs loaders at a time, prints a report of
 each fight - per enemy its time to kill and hits to kill, the gaps between
 kills, the kill chains and the longest one's links (Balance.chain), the
@@ -254,6 +256,10 @@ def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
 # ---- the pacing report ----
 
 TIERS = ("weak", "normal", "tough")
+# The pacing rooms, and among them the duel rooms: a grunt lead alone and a
+# guardian lead alone (Balance.pacing.duel, .guardianDuel)
+ROOMS = ("flow", "duel", "guardianduel", "boss")
+DUELS = ("duel", "guardianduel")
 
 
 def fmt_s(v):
@@ -416,13 +422,15 @@ def check(results, bands):
         spans = duel_spans(r["music"], "state")
         out.append((not spans, f"{tag}: the song stays in its flow part "
                                f"({'duel ' + ', '.join(fmt_span(a, b) for a, b in spans) if spans else 'flow only'})"))
+    # Each lead's duel room (issue #288) by depth
     duels = {}
     for r in results:
-        if r["room"] == "duel":
-            duels.setdefault(r["depth"], {})[r["answer"]] = r
-    for depth, by in sorted(duels.items()):
+        if r["room"] in DUELS:
+            duels.setdefault((DUELS.index(r["room"]), r["depth"]), {})[r["answer"]] = r
+    for (i, depth), by in sorted(duels.items()):
+        duel = DUELS[i]
         for pilot, r in sorted(by.items()):
-            out.extend(check_duel_sound(r, f"duel depth {depth} {pilot}"))
+            out.extend(check_duel_sound(r, f"{duel} depth {depth} {pilot}"))
         def lead_time(r):
             leads = [e for e in r["enemies"] if e["tier"] == 2] or r["enemies"]
             return leads[0]["ttkEngaged"]
@@ -433,13 +441,13 @@ def check(results, bands):
             t = lead_time(r)
             ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
             what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
-            out.append((ok, f"duel depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
+            out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
                             f"or falls ({what})"))
             # The lead strikes a knight charging in its reach first (#272)
             if pilot == "charge":
                 least = bands["duelCancelled"]
                 out.append((r["cancelledCharges"] >= least,
-                            f"duel depth {depth} charge: hits cancel at least {least} "
+                            f"{duel} depth {depth} charge: hits cancel at least {least} "
                             f"{'charge' if least == 1 else 'charges'} ({r['cancelledCharges']})"))
         r = by.get("skilled")
         if r:
@@ -447,12 +455,12 @@ def check(results, bands):
             lo, hi = bands["duelSkilled"]
             ok = r["outcome"] == "cleared" and t is not None and lo <= t <= hi
             what = r["outcome"] if t is None else f"{t:.2f} s, {r['outcome']}"
-            out.append((ok, f"duel depth {depth} skilled: kills the lead in {lo}-{hi} s ({what})"))
+            out.append((ok, f"{duel} depth {depth} skilled: kills the lead in {lo}-{hi} s ({what})"))
             others = [by[p] for p in ("masher", "charge") if p in by]
             if others:
                 took = ", ".join(f"{o['answer']} {o['damageTaken']}" for o in others)
                 out.append((all(r["damageTaken"] < o["damageTaken"] for o in others),
-                            f"duel depth {depth} skilled: takes less damage than the others "
+                            f"{duel} depth {depth} skilled: takes less damage than the others "
                             f"({r['damageTaken']}; {took})"))
     return out + check_chain(results) + check_boss(results, bands)
 
@@ -524,7 +532,7 @@ def check_duel_sound(r, tag):
 
 
 def pacing(args, loader):
-    rooms = args.rooms or ["flow", "duel", "boss"]
+    rooms = args.rooms or list(ROOMS)
     answers = args.answers or list(PILOTS)
     fights = []
     # The depths are the game's own (Balance.pacing.depths), read as the
@@ -584,7 +592,7 @@ def main():
                     help="seed of the scripted knight's choices")
     ap.add_argument("--answer", choices=ANSWERS, default="mix",
                     help="how the scripted knight fights")
-    ap.add_argument("--room", choices=("mixed", "flow", "duel", "boss"), default="mixed",
+    ap.add_argument("--room", choices=("mixed",) + ROOMS, default="mixed",
                     help="who stands in the fight room")
     ap.add_argument("--sword", type=int,
                     help="the knight's sword level; default 0 in the mixed room, else the usual one")
@@ -601,7 +609,7 @@ def main():
                     help="play the pacing rooms at their depths with the pacing pilots")
     ap.add_argument("--check", action="store_true",
                     help="with --pacing: fail a fight outside the bands of Balance.pacing")
-    ap.add_argument("--rooms", nargs="+", choices=("flow", "duel", "boss"), help="--pacing: these rooms")
+    ap.add_argument("--rooms", nargs="+", choices=ROOMS, help="--pacing: these rooms")
     ap.add_argument("--depths", nargs="+", type=int, help="--pacing: these depths")
     ap.add_argument("--answers", nargs="+", choices=ANSWERS, help="--pacing: these pilots")
     ap.add_argument("--jobs", type=int, default=max(1, min(4, (os.cpu_count() or 2) // 2)),

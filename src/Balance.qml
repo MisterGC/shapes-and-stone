@@ -520,9 +520,13 @@ QtObject {
             { dx: -3, dy: -3, tier: 1, type: "spitter" },
             { dx: 0, dy: 4, tier: 1, type: "guardian" }
         ],
-        // Duel: a room's lead alone, a tough enemy
+        // Duel: a room's lead alone, a tough enemy; guardianDuel the same
+        // with a guardian lead (issue #288)
         duel: [
             { dx: 0, dy: 4, tier: 2, type: "grunt" }
+        ],
+        guardianDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "guardian" }
         ],
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
@@ -531,7 +535,7 @@ QtObject {
         // the knight does not fall
         flowHits: { charge: [1, 1], masher: [2, 3], skilled: [1, 3] },
         flowGap: 2.5,
-        // Duel: "masher" and "charge" take at least duelSlow seconds to
+        // Duel, either lead: "masher" and "charge" take at least duelSlow seconds to
         // kill the lead, from the moment it engages, or fall; "skilled"
         // kills it within duelSkilled seconds and does not fall, and takes
         // less damage than either of the others. A lead strikes a knight
