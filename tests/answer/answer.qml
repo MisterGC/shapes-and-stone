@@ -542,8 +542,11 @@ Window {
             check(p.graceLeft > 0, "with the shield dropped a hit from the front lands")
             Clayground.physicsStep(graceSteps)
 
-            // A parry gives mana back, and the shield can be raised again
+            // A parry gives mana back, and the shield can be raised again.
+            // A normal grunt falls to one parry (issue #268): with more HP
+            // it stands, as the later steps need it
             let pr = only("grunt")
+            pr.hp = 100
             pr.xWu = p.xWu + 1.5
             pr.yWu = p.yWu
             pr.aiState = "chase"
@@ -1598,8 +1601,6 @@ Window {
             Clayground.paused = true
             let p = game.player
             let k = Balance.knight
-            // An enemy gone leaves an object in game.enemies whose
-            // destroyed is not even false
             let foes = game.enemies.filter(e => e && e.destroyed === false)
             let s = foes.find(e => e.enemyType === "spitter")
             let cx = game._fightRoomCx, cy = game._fightRoomCy
@@ -1758,7 +1759,13 @@ Window {
             waitedMs = 0
             i++
             if (i >= bench.steps.length) stop()
-            step[1]()
+            // A step that throws stops there, its checks after the throw
+            // never run: that is a failure
+            try {
+                step[1]()
+            } catch (err) {
+                bench.check(false, "step " + (i - 1) + " threw: " + err)
+            }
         }
     }
 }
