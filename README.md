@@ -2345,7 +2345,10 @@ setting `lead.openingTime` to 2.5, in the `guardianduel` scenario it
 checks the guardian lead's HP before and after setting
 `enemy.guardian.leadHp` to 0.5, and in the `flow` scenario it strikes
 two enemies down 2 s apart, a chain at `chain.window` 2.5 s and two lone
-kills after setting it to 1.5. The fight room's tough guardian is that
+kills after setting it to 1.5, and in the `bossroom` scenario it has
+the Warden wind up and strike once: its toll at `boss.toll`'s pitches and
+no scream, and the wind-up at the new pitch after setting
+`boss.toll.windUp` to 3. The fight room's tough guardian is that
 room's lead; the charge it tries is let go at it with its stance taken
 away:
 

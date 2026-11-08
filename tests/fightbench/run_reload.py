@@ -29,7 +29,10 @@ reloaded, they no longer do. Then the bossroom scenario (issue #274) puts
 the knight at the Hollow Warden's door: the room's way in and the Warden
 are on screen, the Warden asleep, its HP and tempo the table's; with
 boss.hp changed in the loaded copy and the sandbox reloaded, the Warden
-has the new HP. Prints one PASS or FAIL line per check and exits with the
+has the new HP. Woken there to wind up and strike once (Sandbox.tryToll),
+it plays its own toll, sfx/warden_toll, at boss.toll's pitches and no
+scream (issue #287); with boss.toll.windUp changed in the loaded copy and
+the sandbox reloaded, its wind-up tolls at the new pitch. Prints one PASS or FAIL line per check and exits with the
 number of failures.
 
 Usage:
@@ -60,6 +63,7 @@ CHAIN_GAP = 2.0
 NEW_CHAIN_WINDOW = 1.5
 BOSS_DEPTH = 2
 NEW_BOSS_HP = 4000
+NEW_TOLL_WIND_UP = 3
 
 
 def wait(predicate, timeout=30.0):
@@ -111,6 +115,22 @@ def try_boss_room(bench):
     if not wait(lambda: bench.eval1("bossRoomReady()") is True):
         return None
     return json.loads(bench.eval1("tryBossRoom()") or "{}")
+
+
+def try_toll(bench):
+    bench.eval1(f"applyScenario('bossroom', {BOSS_DEPTH})")
+    if not wait(lambda: bench.eval1("bossRoomReady()") is True):
+        return None
+    return json.loads(bench.eval1("tryToll()") or "{}")
+
+
+def tolled(toll, wind_up):
+    """Whether the Warden's tryToll rows are its toll at wind_up for the
+    wind-up and the table's strike pitch, and no scream"""
+    rows = [(r["cue"], r["what"], r["pitch"]) for r in toll["rows"]]
+    return (rows.count(("sfx/warden_toll", "windUp", wind_up)) == 1
+            and rows.count(("sfx/warden_toll", "strike", toll["strike"])) == 1
+            and not any(r[0] == "sfx/goblin_scream" for r in rows))
 
 
 def reload(bench, balance, pattern, repl):
@@ -258,6 +278,17 @@ def main():
               and boss["gateOnScreen"],
               f"after the reload the Warden has {boss and boss['hp']} HP ({boss and boss['wantHp']} by "
               f"the table at boss.hp {boss and boss['tableHp']}), its way in on screen")
+
+        # The Warden's own toll (issue #287), at the table's pitches
+        toll = try_toll(bench) if boss else None
+        check(toll is not None and tolled(toll, toll["windUp"]),
+              f"the Warden's wind-up and strike toll at boss.toll's +{toll and toll['windUp']} and "
+              f"+{toll and toll['strike']}, no scream ({toll and toll['rows']})")
+        reloaded = reload(bench, balance, r"toll: \{ windUp: -?[0-9]+,", f"toll: {{ windUp: {NEW_TOLL_WIND_UP},")
+        check(reloaded, f"boss.toll.windUp set to {NEW_TOLL_WIND_UP} and the sandbox reloaded")
+        toll = try_toll(bench) if reloaded else None
+        check(toll is not None and toll["windUp"] == NEW_TOLL_WIND_UP and tolled(toll, NEW_TOLL_WIND_UP),
+              f"after the reload the Warden's wind-up tolls at +{NEW_TOLL_WIND_UP} ({toll and toll['rows']})")
     except TimeoutError as e:
         print("FAIL", e, "; logs in", tmp, file=sys.stderr)
         failures += 1

@@ -357,6 +357,22 @@ Item {
                                hp: w.maxHp, wantHp: game.wardenHp(n, game.partyKnights, game.danger),
                                tempo: w.tempo, wantTempo: game.wardenTempo(n), tableHp: Balance.boss.hp})
     }
+    // The sleeping Warden of the bossroom scenario winds up and strikes
+    // once - its aiState set, as a remote screen's is - and the sound log
+    // says what that played (issue #287): its rows and the table's
+    // boss.toll, as JSON. The Warden stands as it stood after
+    function tryToll() {
+        let w = game.enemies.find(e => alive(e) && e.boss)
+        let was = w.aiState, logged = game.logSounds
+        game.logSounds = true
+        game.clearSoundLog()
+        w.aiState = "telegraph"
+        w.aiState = "lunge"
+        w.aiState = was
+        let rows = game.soundLog.map(s => ({cue: s.cue, what: s.what, pitch: s.pitch}))
+        game.logSounds = logged
+        return JSON.stringify({rows: rows, windUp: Balance.boss.toll.windUp, strike: Balance.boss.toll.strike})
+    }
 
     // ---- a lead's stance, tried as in the dojo (run_reload.py) ----
     // The duel room stands: the knight and a lead
