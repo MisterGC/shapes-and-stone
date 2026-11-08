@@ -62,7 +62,9 @@ appearances) unless --depths is given, and at each of them "skilled"
 kills the Warden within bossSkilled seconds of its engagement and does
 not fall, "masher" and "charge" fall or take at least bossSlow times as
 long. The skilled pilot steps out of a floor zone of the Warden's while
-it warns. --json writes every report in full, sound log
+it warns. In every boss fight the Warden's wind-ups and strikes play its
+toll and nothing screams before its adds come; in no flow or duel fight
+is its toll heard (issue #287). --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
 
@@ -464,7 +466,7 @@ def check(results, bands):
                 out.append((all(r["damageTaken"] < o["damageTaken"] for o in others),
                             f"{duel} depth {depth} skilled: takes less damage than the others "
                             f"({r['damageTaken']}; {took})"))
-    return out + check_chain(results) + check_boss(results, bands)
+    return out + check_chain(results) + check_boss(results, bands) + check_warden_sound(results)
 
 
 def check_boss(results, bands):
@@ -501,6 +503,36 @@ def check_boss(results, bands):
                 else f"{t:.2f} s"
             out.append((ok, f"boss depth {depth} sword {r['sword']} {pilot}: falls or takes at least "
                             f"{bands['bossSlow']} times as long as skilled, {least:.2f} s ({what})"))
+    return out
+
+
+# The Warden's own toll (issue #287) and the goblin's scream
+TOLL = "sfx/warden_toll"
+SCREAM = "sfx/goblin_scream"
+
+
+def check_warden_sound(results):
+    """(ok, line) per fight for the Warden's toll (issue #287): in every
+    boss fight its wind-ups and its strikes toll, and nothing screams
+    before its adds come in its phase 2 - until then it stands alone, so a
+    scream would be its own -; in every flow and duel fight the toll is
+    never heard"""
+    out = []
+    for r in results:
+        tag = f"{r['room']} depth {r['depth']} {r['answer']}"
+        tolls = [s for s in r["sounds"] if s["cue"] == TOLL]
+        if r["room"] != "boss":
+            out.append((not tolls, f"{tag}: the Warden's toll is never heard ({len(tolls)})"))
+            continue
+        winds = [s for s in tolls if s["what"] == "windUp"]
+        strikes = [s for s in tolls if s["what"] == "strike"]
+        adds_at = (r.get("boss") or {}).get("phase2At")
+        early = [s for s in r["sounds"] if s["cue"] == SCREAM and (adds_at is None or s["t"] < adds_at)]
+        pitches = sorted({f"{s['pitch']:+d}" for s in tolls})
+        out.append((bool(winds) and bool(strikes) and not early,
+                    f"{tag}: the Warden's wind-ups and strikes toll ({len(winds)} wind-ups, "
+                    f"{len(strikes)} strikes, at {', '.join(pitches) or '-'}), nothing screams before its "
+                    f"adds ({len(early)} screams before {fmt_s(adds_at) if adds_at is not None else 'the end'})"))
     return out
 
 
