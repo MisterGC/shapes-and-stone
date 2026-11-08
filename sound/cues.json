@@ -1255,6 +1255,21 @@
       },
       "delivered": "2026-11-07T21:13:15.249485+00:00",
       "verdict": null
+    },
+    "sfx/warden_toll": {
+      "category": "sfx",
+      "brief": "the Hollow Warden winds up and strikes: a hollow stone toll on A1 (55 Hz) - a knock, the root ringing with its octave and fifth, a grinding groan under it - in the dungeon song's A minor; its wind-up a fifth up on E, its strike on A; fading with the distance",
+      "mode": "live",
+      "source": "sfx/warden_toll.sfx.json",
+      "render": "sfx/warden_toll.wav",
+      "report": "sfx/warden_toll.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.11.1 (clayground f291eff)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-08T19:04:16.695287+00:00",
+      "verdict": null
     }
   }
 }
