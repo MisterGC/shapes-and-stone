@@ -546,14 +546,15 @@ QtObject {
         duelSkilled: [4, 15],
         duelCancelled: 1,
         // Boss (issue #274): the Hollow Warden alone (Balance.boss), its
-        // adds coming in its phase 2, at the boss depths' first
-        // appearance. At bossDepth "skilled" kills it within bossSkilled
-        // seconds of its engagement and does not fall; "masher" falls or
-        // takes at least bossSlow times as long
+        // adds coming in its phase 2, played at bossDepths - its first
+        // three appearances - with the sword the knight usually has there.
+        // At each of them "skilled" kills it within bossSkilled seconds of
+        // its engagement and does not fall; "masher" and "charge" fall or
+        // take at least bossSlow times as long (issue #289)
         boss: [
             { dx: 0, dy: 4, tier: 2, type: "warden" }
         ],
-        bossDepth: 2,
+        bossDepths: [2, 5, 8],
         bossSkilled: [60, 90],
         bossSlow: 2
     })
