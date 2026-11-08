@@ -63,8 +63,13 @@ Window {
     }
 
     // An enemy's HP in the table at the game's danger: depth.hp of it more
-    // per step
+    // per step; the Hollow Warden's is the boss table's for its appearance
+    // (issue #274)
     function hpOf(type, tier) {
+        if (type === "warden") {
+            let b = Balance.boss, n = game.bossAppearance(game.depth)
+            return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + game.danger * Balance.depth.hp))
+        }
         let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
         return Math.round(base * (1 + game.danger * Balance.depth.hp))
     }
@@ -80,9 +85,11 @@ Window {
             && near(e.shieldArc, Balance.enemy.shieldArc)
             && near(e.crushChance, crushChanceOf(e))
     }
-    // Tough grunts and guardians wind up crushing blows, no other enemy
+    // Tough grunts and guardians wind up crushing blows, no other enemy -
+    // not the Warden
     function crushChanceOf(e) {
-        return e.tier === 2 && e.enemyType !== "spitter" ? Balance.enemy.crushChance : 0
+        return e.tier === 2 && (e.enemyType === "grunt" || e.enemyType === "guardian")
+            ? Balance.enemy.crushChance : 0
     }
 
     property var campfire: null
