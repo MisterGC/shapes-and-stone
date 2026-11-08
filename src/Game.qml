@@ -5938,11 +5938,19 @@ ClayWorld2d {
     // An enemy's HP at a danger (0 when left out) in a dungeon built for
     // knights (1 when left out): Balance.depth.hp of it more per step of
     // the danger, and on that Balance.party.hpPerKnight of it more for each
-    // knight beyond the first
+    // knight beyond the first. A tough one, a room's lead, has its type's
+    // leadHp share of it
     function enemyHp(type, tier, knights, d) {
-        let hp = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        let hp = enemyBaseHp(type, tier)
         return Math.round(hp * (1 + (d || 0) * Balance.depth.hp)
                           * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    // An enemy's HP at danger 0 for one knight: its tier's and its type's
+    // bonus, of a lead (tier 2) its type's leadHp share (issue #288)
+    function enemyBaseHp(type, tier) {
+        let t = Balance.enemy[type]
+        let hp = Balance.enemy.tierHp[tier] + t.hpBonus
+        return tier === 2 ? Math.round(hp * t.leadHp) : hp
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
