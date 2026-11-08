@@ -6081,6 +6081,12 @@ ClayWorld2d {
                         objectId !== "" ? (remote ? "shown for " : "run as ") + objectId : "")
             if (!remote) enemy.target = player
             enemies.push(enemy)
+            // A dead enemy leaves the list as it dies: once its item is
+            // gone, what was left of it read destroyed as undefined, not
+            // true, and passed every check for a living one
+            enemy.destroyedChanged.connect(() => {
+                if (enemy.destroyed) world.enemies = world.enemies.filter(x => x !== enemy)
+            })
             if (objectId !== "") _enemyById[objectId] = enemy
             let h = enemy.fromHole !== "" ? holeAt(enemy.fromHole) : null
             if (h) _holeEvent(h, "creature")
