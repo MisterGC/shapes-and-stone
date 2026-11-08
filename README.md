@@ -2040,7 +2040,9 @@ feedback (`impact("crushBlow")`).
 A room's lead, its tough enemy, has a stance (issue #271, the table's
 `lead` group): it takes no knockback, no hit, shove or shield dash
 staggers it, and it keeps winding up under hits. Its HP is the tough tier's
-(`enemy.tierHp`), many times a normal enemy's: it falls in its openings,
+(`enemy.tierHp`), many times a normal enemy's, times its type's
+`enemy.<type>.leadHp`: a grunt or guardian lead has two thirds of it, a
+spitter lead all of it (issue #288). It falls in its openings,
 not to a few swings. A blow outside an
 opening does only `lead.chip` of its damage and wears `lead.wear` off its
 stance, a charged swing `lead.heavyWear`; with no blow for
@@ -2052,7 +2054,10 @@ of `lead.openingTime` seconds in which every blow does `lead.openingDamage`
 times its damage. The blow that opens it lands whole, and after the
 opening the stance is full again. A swing parries a lead only when it
 began in the parry window (`lead.parryStart` steps before it lands): a
-swing under way that the lunge runs into is a blow like any other. The
+swing under way that the lunge runs into is a blow like any other. Nor
+does a swing begun less than `lead.parryRest` steps after the knight's
+swing before it parry a lead, or a charged swing (issue #288): mashing
+and the held charge open no lead, a deliberate swing does. The
 stance shows as a bar under the lead, an opening as a flash, a ring, the
 word `lead.word` and the stagger. In a session the host's lead keeps the
 stance: `lead`, `stance` and `opening` are replicated, the knight's own
@@ -2229,17 +2234,18 @@ The fight bench also measures a fight's pace (issue #267): whether a room
 flows - weak and normal enemies falling to a stroke or two, kill after
 kill - or is a duel that a button-masher loses and a reader of its rhythm
 wins. `--room flow` fills the fight room with fodder only, `--room duel`
-with a room's lead alone, a tough enemy (`Balance.pacing`), and in both the
+with a room's lead alone, a tough grunt, `--room guardianduel` with a
+guardian lead alone (issue #288, `Balance.pacing`), and in each the
 knight has the sword level it usually has at that depth (`--sword` sets
 another). Three more answers are the pacing pilots: `charge` holds a full
 charge and lets go at the nearest enemy, `masher` clicks, `skilled`
 parries, perfect-blocks - crushing blows and shots, which it sends back -
-and strikes in openings. `--pacing` plays both
+and strikes in openings. `--pacing` plays the
 rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all three
 pilots, four loaders at a time, in about 15 s:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel boss] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel boss] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,
@@ -2253,8 +2259,8 @@ sent back and the ones of them that hit an enemy; and what a player would
 have heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
-pilot and no two kills lie more than `flowGap` seconds apart; in the duel
-`masher` and `charge` take at least `duelSlow` seconds or fall, hits
+pilot and no two kills lie more than `flowGap` seconds apart; in either
+duel `masher` and `charge` take at least `duelSlow` seconds or fall, hits
 cancel at least `duelCancelled` of `charge`'s charges (#272), and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
 both. The kill chain's lines (issue #270) read the flow fights' sound
@@ -2291,8 +2297,8 @@ began, the adds it called, the zones it opened and those that hurt the
 knight. The skilled pilot steps out of a zone while it warns. At
 `bossDepth` `--check` adds its bands: `skilled` kills the Warden within
 `bossSkilled` seconds of its engagement and does not fall, `masher` falls
-or takes at least `bossSlow` times as long. The three rooms are the dojo's
-scenarios `flow`, `duel` and `boss` too: a reload lands in them, and an
+or takes at least `bossSlow` times as long. The four rooms are the dojo's
+scenarios `flow`, `duel`, `guardianduel` and `boss` too: a reload lands in them, and an
 edit of `Balance.pacing` changes who stands there.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
@@ -2322,7 +2328,9 @@ checks that the charge fills in the new time, it counts the guardian's
 crushing blows among its attacks before and after setting
 `enemy.crushChance` to 1, in the duel room it opens the lead, checks
 its stance bar, the opening's length and damage, and the new length after
-setting `lead.openingTime` to 2.5, and in the `flow` scenario it strikes
+setting `lead.openingTime` to 2.5, in the `guardianduel` scenario it
+checks the guardian lead's HP before and after setting
+`enemy.guardian.leadHp` to 0.5, and in the `flow` scenario it strikes
 two enemies down 2 s apart, a chain at `chain.window` 2.5 s and two lone
 kills after setting it to 1.5. The fight room's tough guardian is that
 room's lead; the charge it tries is let go at it with its stance taken

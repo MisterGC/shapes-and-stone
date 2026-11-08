@@ -13,6 +13,10 @@ uses [Semantic Versioning](https://semver.org/).
 - **A perfect block sends a spitter's shot back:** raised just before the shot meets it, the shield sends it back along its line, faster. On its way back it hurts no knight; the first enemy it meets takes a blow as hard as the knight's swing, and a room's lead it hits is opened, so a perfect block answers a lead that shoots. A plain block still ends the shot. In co-op the shot flies back on every screen. ([#283](https://github.com/MisterGC/shapes-and-stone/issues/283))
 - **A room's lead strikes in strings:** each kind of lead - grunt, guardian, spitter - attacks in rhythms of its own, strikes and rests on a steady beat, and the parry ring closes on every beat. Some wind-ups are feints: the ring stops short, holds, then closes. A knight who stands in a lead's reach charging a swing gets struck first, and the hit cancels the charge; a charge built outside its reach and let go in a rest still opens it. ([#272](https://github.com/MisterGC/shapes-and-stone/issues/272))
 
+### Changed
+
+- **Grunt and guardian leads fall a third sooner:** a room's tough grunt or guardian has two thirds of the HP it had, so a duel with one is about a third shorter; a tough spitter keeps its HP. Mashing and holding a charge still lose such a duel: a swing begun right after another, and a charged swing, no longer parry a room's lead, so only a deliberate swing timed to the lunge opens it. ([#288](https://github.com/MisterGC/shapes-and-stone/issues/288))
+
 ## [0.4.2] - 2026-11-06
 
 Every control can be rebound, for mouse and keyboard and for a gamepad, on a new Control Input page; the game says when a gamepad connects or leaves; and in the browser a gamepad plays in Firefox too. Built on Clayground v2026.11.1.
