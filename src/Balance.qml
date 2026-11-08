@@ -664,8 +664,12 @@ QtObject {
     // exit stairs' shaft leaves from, and it holds the Warden alone: no
     // other enemy, feature, trap or wooden door. Its n-th appearance (0
     // at the first boss depth) has hp * (1 + hpGrow * n) HP, with depth.hp
-    // and party.hpPerKnight on that as any enemy, and plays at tempo 1 +
-    // tempoGrow * n; its attack and defence are enemy.warden's. An iron
+    // and party.hpPerKnight on that as any enemy - depth.hp counted only up
+    // to the danger depthUpTo: the smith's last sword comes at depth 5
+    // (shop.levelDepth) and gains nothing after it, so past depthUpTo only
+    // hpGrow makes the Warden tougher, and a skilled knight still beats it
+    // at depth 5 and 8 (issue #289) -, and plays at tempo 1 + tempoGrow * n;
+    // its attack and defence are enemy.warden's. An iron
     // gate stands in every way into the room and in the exit shaft. The
     // ways in stand open until every knight still
     // standing is in the room - until then the Warden sleeps and a blow
@@ -692,8 +696,9 @@ QtObject {
         every: 3,
         name: "The Hollow Warden",
         hp: 2500,
-        hpGrow: 0.35,
-        tempoGrow: 0.1,
+        hpGrow: 0.05,
+        depthUpTo: 4,
+        tempoGrow: 0.05,
         // Its size a side, wu; its reach and its blow's reach grow with it
         size: 1.8,
         beat: 1.0,
