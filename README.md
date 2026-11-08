@@ -2126,8 +2126,10 @@ stance, its openings and three
 strings of its own (`lead.strings.warden`) on a beat of `boss.beat`
 seconds. Each appearance is stronger: `boss.hp` times `1 + n *
 boss.hpGrow` HP for its n-th, with `depth.hp` and `party.hpPerKnight` on
-that as any enemy, and a tempo of `1 + n * boss.tempoGrow` that its beats
-are divided by. At `boss.phaseAt` of its HP its phase 2 begins: its core
+that as any enemy - `depth.hp` counted only up to `boss.depthUpTo`, since
+the smith's sword stops growing at depth 5 (issue #289) -, and a tempo of
+`1 + n * boss.tempoGrow` that its beats are divided by: 3500 HP at tempo 1
+at depth 2, 4725 at 1.05 at depth 5, 4950 at 1.1 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
 glows, `boss.adds` weak grunts come out of the floor round it and as many
 more at `boss.waveAt`, it plays `boss.phase2Tempo` times faster - beats,
 feint holds and count-ins -, the room's light turns to `boss.light` and its
@@ -2291,13 +2293,16 @@ and the gain - and `musicTrace` follows the song: its `state`, `segment`,
 steps the music's intensity on the physics clock (`followFightOnSteps`), so
 the same seed gives the same log and trace too. `--json` writes both in
 full. The third room, `boss` (issue #274), is the Hollow Warden alone, its
-adds coming in its phase 2, at the boss depths' first appearance for depth
-0 and 2 and the next one's for 4; its report adds when the Warden's phase 2
+adds coming in its phase 2. It plays at depths 2, 5 and 8
+(`Balance.pacing.bossDepths`, the Warden's first three appearances, issue
+#289), each with the sword the knight usually has there, unless
+`--depths` is given; off a boss depth it is the next appearance's Warden.
+Its report adds when the Warden's phase 2
 began, the adds it called, the zones it opened and those that hurt the
-knight. The skilled pilot steps out of a zone while it warns. At
-`bossDepth` `--check` adds its bands: `skilled` kills the Warden within
-`bossSkilled` seconds of its engagement and does not fall, `masher` falls
-or takes at least `bossSlow` times as long. The four rooms are the dojo's
+knight. The skilled pilot steps out of a zone while it warns. At each of
+`bossDepths` `--check` adds its bands: `skilled` kills the Warden within
+`bossSkilled` seconds of its engagement and does not fall, `masher` and
+`charge` fall or take at least `bossSlow` times as long. The four rooms are the dojo's
 scenarios `flow`, `duel`, `guardianduel` and `boss` too: a reload lands in them, and an
 edit of `Balance.pacing` changes who stands there.
 
