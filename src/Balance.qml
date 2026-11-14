@@ -530,10 +530,21 @@ QtObject {
         ],
         // spitterDuel the same with a spitter lead, the third kind a
         // room's lead can be (spawn.spitterChance); no band of this table
-        // checks it (issue #315)
+        // checks it, the person below plays it (issue #315)
         spitterDuel: [
             { dx: 0, dy: 4, tier: 2, type: "spitter" }
         ],
+        // The person (issue #315): a fourth pilot, "person", plays as
+        // "skilled" does with a person's reaction and misses. It answers
+        // an attack, a shot or a zone of the Warden's no sooner than
+        // reaction seconds after it began - a wind-up begun, a shot
+        // fired, a zone warning - and once it has seen it times its press
+        // to the window as "skilled" does, but misses miss of its parries
+        // and perfect blocks in turn - one in every five for 0.2, the
+        // first one's place picked by the seed - by one window early or
+        // late, as the seed rolls. Its results are reported, not banded:
+        // a win is a fight a person can do (README, "The person pilot")
+        person: { reaction: 0.25, miss: 0.2 },
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
         // one charged swing, two or three swings, parries among them for

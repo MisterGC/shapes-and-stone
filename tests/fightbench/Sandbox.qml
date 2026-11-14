@@ -44,11 +44,11 @@ Item {
     // answer is how the knight fights: "mix", "block", "parry", "perfect",
     // "heavy" (as mix, but it charges at guardians), "whirlwind" (as mix,
     // but it whirls through every enemy), or one of the pacing pilots
-    // "charge", "masher" and "skilled" (Balance.pacing);
+    // "charge", "masher", "skilled" and "person" (Balance.pacing);
     // danger is the danger the fight room is at: its depth and, after the
     // point, the position in the depth's range (Game.applyScenario);
     // room who stands in it: "mixed" (Balance.spawn.fightRoom), "flow",
-    // "duel" or "guardianduel" (Balance.pacing); sword the knight's sword level, -1 for the
+    // "duel", "guardianduel", "spitterduel" or "boss" (Balance.pacing); sword the knight's sword level, -1 for the
     // one it usually has at that depth (usualSword), 0 when left out
     function begin(s, a, d, r, sw) {
         Clayground.paused = true
@@ -72,11 +72,21 @@ Item {
         engagedSeconds = 0
         _phase2At = null
         _foes = []
+        _attacks = new Map()
+        _personPlans = new Map()
+        _shotsSeen = new Map()
+        _shotPlans = new Map()
+        _zonesSeen = new Map()
+        personAnswers = { parry: 0, perfect: 0, shot: 0 }
+        personMissed = { parry: 0, perfect: 0, shot: 0 }
+        personFastest = -1
+        _answerCount = 0
+        _missPhase = answer === "person" ? _rng() : 0
         // What would be heard, on the physics steps: muted, logged
         game.logSounds = true
         game.followFightOnSteps = true
         // The dojo's scenarios: "fight" for the mixed room, "flow", "duel",
-        // "guardianduel"
+        // "guardianduel", "spitterduel", "boss"
         game.applyScenario(room === "mixed" ? "fight" : room, danger)
         // The log's clock from 0, in steps of exactly 1/60 s: the same
         // fight logs the same times
@@ -130,6 +140,8 @@ Item {
             type: f.type, tier: f.tier, lead: f.lead, hp: f.hp,
             engagedAt: f.engagedAt, firstHitAt: f.firstHitAt, diedAt: f.diedAt,
             hits: f.hits, openings: f.openings, opened: f.opened,
+            // The HP it had left, 0 once dead
+            hpLeft: f.diedAt !== null ? 0 : f.lastHp,
             // From the first blow that landed to its death
             ttk: f.diedAt !== null && f.firstHitAt !== null ? round3(f.diedAt - f.firstHitAt) : null,
             // From the moment it went for the knight to its death
@@ -182,6 +194,13 @@ Item {
             boss: game.bossFight.stage === "" ? null : {
                 stage: game.bossFight.stage, phase2At: _phase2At, adds: game.bossFight.addsCalled,
                 zones: game.bossFight.zonesOpened, zoneHits: game.bossFight.zoneHits
+            },
+            // The person's answers and misses by kind, and the fastest it
+            // answered anything, from its start (Balance.pacing.person)
+            person: answer !== "person" ? null : {
+                reaction: Balance.pacing.person.reaction, miss: Balance.pacing.person.miss,
+                answers: personAnswers, missed: personMissed,
+                fastest: personFastest < 0 ? null : round3(personFastest)
             },
             enemies: foes,
             sounds: game.soundLog,
@@ -437,7 +456,9 @@ Item {
     // perfect-blocks every crushing blow and every shot, sending it back -
     // walking on at the nearest enemy meanwhile -, breaks a
     // guardian's guard with the shield dash, and swings only into an
-    // opening: an enemy within reach that is not winding up or lunging
+    // opening: an enemy within reach that is not winding up or lunging.
+    // "person" plays as "skilled" with a person's reaction and misses
+    // (below, issue #315)
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
     // Steps before a lunge lands that the "perfect" plan raises the shield
@@ -488,9 +509,11 @@ Item {
                 bench.trackCharge(game.player)
             }
             bench.countCrushes()
+            bench.perceive()
             if (bench.answer === "charge") bench.pilotCharge()
             else if (bench.answer === "masher") bench.pilotMasher()
             else if (bench.answer === "skilled") bench.pilotSkilled(game.physics.timeStep)
+            else if (bench.answer === "person") bench.pilotPerson(game.physics.timeStep)
             else bench.pilot(game.physics.timeStep)
             if (game.player) bench._chargeSeen = game.player._charge
         }
@@ -610,11 +633,14 @@ Item {
     // A zone of the Warden's (BossFight) warning under the knight: it
     // walks straight out of it, away from its centre, the shield and the
     // button let go. Returns whether it is on its way out
-    function leaveZone(p) {
+    // seen, when given, says which zones the knight has seen: the others
+    // it stands in as if they were not there
+    function leaveZone(p, seen) {
         let f = game.bossFight, t = f.now(), z = Balance.boss.zone
         let cx = p.xWu + p.widthWu / 2, cy = p.yWu - p.heightWu / 2
         for (let q of f.zones) {
             if (t >= q.at) continue
+            if (seen && !seen(q)) continue
             let dx = cx - q.x, dy = cy - q.y, d = Math.sqrt(dx * dx + dy * dy)
             if (d > z.radius + 0.6) continue
             letGo(p)
@@ -760,5 +786,227 @@ Item {
         if (near.d > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
         else stand(p)
         if (near.d <= p.attackRange * 0.9 && !winding(target)) p.attack()
+    }
+
+    // ---- "person": a person's reaction and misses (issue #315) ----
+    // It plays as "skilled" does, but sees an attack, a shot or a zone
+    // only Balance.pacing.person.reaction seconds after it began: an
+    // enemy's wind-up begun (or a lunge begun without one), a shot fired,
+    // a zone warning. Until then it does what it did, and swings at an
+    // enemy that winds up as at any other; once an attack is over it still
+    // waits that long before it swings at that enemy. Once it has seen an
+    // attack it times its press to the window as "skilled" does - the
+    // ring a player reads -, but misses Balance.pacing.person.miss of its
+    // parries and perfect blocks, shots' included: one in every five
+    // answers for 0.2, in turn, the first miss's place picked by the seed
+    // (a roll per answer would leave a short fight to luck). A miss is by
+    // one window early (a swing begun before the parry window, the shield
+    // up before the perfect block's) or late (no press before the blow
+    // lands), as the seed rolls. A shot began with its spitter's wind-up
+    // (aiState "shoot"), which the person sees, not with its flight. The
+    // times are the physics clock's, the game's own: a slow motion gives
+    // it no more.
+    readonly property real reaction: Balance.pacing.person.reaction
+    readonly property real missShare: Balance.pacing.person.miss
+    // Per enemy the attack it is in: {n, at, endedAt, last}, its count,
+    // when it began, when the last one ended and the state it was in
+    property var _attacks: new Map()
+    // Per enemy the plan for its attack: {n, kind, miss, early, pressed}
+    property var _personPlans: new Map()
+    // When each shot (by its object) and each zone (by its id) was first seen
+    property var _shotsSeen: new Map()
+    property var _zonesSeen: new Map()
+    // Answers planned and missed by kind, and the shortest time from an
+    // attack's, a shot's or a zone's start to the person's first answer
+    property var personAnswers: ({ parry: 0, perfect: 0, shot: 0 })
+    property var personMissed: ({ parry: 0, perfect: 0, shot: 0 })
+    property real personFastest: -1
+    // Answers so far, and where in the share's turn the first miss lies
+    property int _answerCount: 0
+    property real _missPhase: 0
+    // Whether the next answer is a miss, and if so whether early
+    function rollMiss() {
+        let n = _answerCount++
+        let miss = Math.floor((n + 1) * missShare + _missPhase) > Math.floor(n * missShare + _missPhase)
+        return { miss: miss, early: _rng() < 0.5 }
+    }
+    readonly property var windUps: ["telegraph", "crush"]
+
+    // What there is to see on this step, with when it began
+    function perceive() {
+        if (answer !== "person") return
+        let t = now()
+        for (let e of game.enemies) {
+            if (!alive(e)) { _attacks.delete(e); continue }
+            let a = _attacks.get(e)
+            if (!a) { a = { n: 0, at: -1, endedAt: -1e9, shotAt: -1, last: e.aiState }; _attacks.set(e, a) }
+            let s = e.aiState
+            let begun = windUps.indexOf(s) >= 0 ? windUps.indexOf(a.last) < 0
+                      : s === "lunge" && a.last !== "lunge" && windUps.indexOf(a.last) < 0
+            if (begun) { a.n++; a.at = t }
+            if (s === "shoot" && a.last !== "shoot") a.shotAt = t
+            if (!winding(e) && winding({ aiState: a.last })) a.endedAt = t
+            a.last = s
+        }
+        for (let o of game.room.children)
+            if (o.objectName === "projectile" && o.destroyed === false && !o.back && !_shotsSeen.has(o))
+                _shotsSeen.set(o, shotBegan(o, t))
+        for (let [o] of Array.from(_shotsSeen))
+            if (o.destroyed !== false) _shotsSeen.delete(o)
+        if (game.bossFight.stage !== "")
+            for (let q of game.bossFight.zones)
+                if (!_zonesSeen.has(q.id)) _zonesSeen.set(q.id, t)
+    }
+    // When shot o, first seen at t, began: the wind-up of the spitter it
+    // left, the nearest one whose wind-up began within a second, else t
+    function shotBegan(o, t) {
+        let at = t, best = 1e9
+        for (let e of game.enemies) {
+            if (!alive(e) || e.enemyType !== "spitter") continue
+            let a = _attacks.get(e)
+            if (!a || a.shotAt < 0 || t - a.shotAt > 1) continue
+            let d = Math.hypot(ex(e) - o.xWu, ey(e) - o.yWu)
+            if (d < best) { best = d; at = Math.min(t, a.shotAt) }
+        }
+        return at
+    }
+    // Whether something that began at at has been seen by now; the first
+    // answer to it counts towards the fastest
+    function seenSince(at) { return at >= 0 && now() - at >= reaction - 1e-6 }
+    function answered(at) {
+        let r = now() - at
+        if (personFastest < 0 || r < personFastest) personFastest = r
+    }
+    // Whether the person takes enemy e to be attacking: an attack it has
+    // seen, or one that ended less than its reaction ago
+    function seemsWinding(e) {
+        let a = _attacks.get(e)
+        if (!a) return false
+        return winding(e) ? seenSince(a.at) : now() - a.endedAt < reaction - 1e-6
+    }
+    // A plan for enemy e's attack, rolled once as the person sees it
+    function personPlan(e) {
+        let a = _attacks.get(e), plan = _personPlans.get(e)
+        if (plan && plan.n === a.n) return plan
+        let kind = e.aiState === "crush" || e.crushing ? "perfect" : "parry"
+        let m = rollMiss()
+        plan = { n: a.n, kind: kind, miss: m.miss, early: m.early, pressed: false }
+        _personPlans.set(e, plan)
+        personAnswers[kind]++
+        if (m.miss) personMissed[kind]++
+        answered(a.at)
+        return plan
+    }
+    // The nearest attack within reach the person has seen, as answerThreat
+    function personThreat(p, foes) {
+        let threat = null, threatDist = 1e9
+        for (let e of foes) {
+            if (e.enemyType === "spitter" || !winding(e)) continue
+            let a = _attacks.get(e)
+            if (!a || !seenSince(a.at)) continue
+            let d = distTo(p, ex(e), ey(e))
+            if (d < 3.5 && d < threatDist) { threat = e; threatDist = d }
+        }
+        return threat ? { e: threat, d: threatDist } : null
+    }
+    function answerPerson(p, threat) {
+        let e = threat.e, plan = personPlan(e)
+        letGo(p)
+        face(p, e)
+        stand(p)
+        let pf = Balance.enemy.parryFrames
+        if (plan.kind === "parry") {
+            p.isBlocking = false
+            if (!plan.miss) {
+                if (e.parryWindow && threat.d <= p.attackRange) p.attack()
+            } else if (plan.early && !plan.pressed && e.aiState === "lunge"
+                       && e._lungeSteps > pf && e._lungeSteps <= 2 * pf && threat.d <= p.attackRange) {
+                // One window early: the swing is under way before it opens
+                p.attack()
+                plan.pressed = true
+            }
+            return
+        }
+        // A perfect block: perfectLead steps before the blow lands, one
+        // window earlier (an ordinary block) or not before it lands
+        let lead = !plan.miss ? perfectLead
+                 : plan.early ? perfectLead + Balance.knight.perfectBlockFrames : -1
+        p.isBlocking = lead >= 0 && e.aiState === "lunge" && e._lungeSteps <= lead
+    }
+    // A shot on its way that the person has seen, as answerShot with
+    // perfect: a perfect block, one window early (the shield up that much
+    // farther off: an ordinary block) or none (it lets the shot hit).
+    // Returns whether the knight is answering one
+    property var _shotPlans: new Map()
+    function personShot(p, dt, towards) {
+        let shot = null, shotDist = 1e9
+        for (let o of game.room.children) {
+            if (o.objectName !== "projectile" || o.destroyed !== false || o.back) continue
+            let at = _shotsSeen.has(o) ? _shotsSeen.get(o) : -1
+            if (!seenSince(at)) continue
+            let d = distTo(p, o.xWu, o.yWu)
+            if (d < 3 && d < shotDist) { shot = o; shotDist = d }
+        }
+        if (shot) {
+            let plan = _shotPlans.get(shot)
+            if (!plan) {
+                plan = rollMiss()
+                _shotPlans.set(shot, plan)
+                personAnswers.shot++
+                if (plan.miss) personMissed.shot++
+                answered(_shotsSeen.get(shot))
+            }
+            if (plan.miss && !plan.early) shot = null
+            else {
+                letGo(p)
+                face(p, shot)
+                let cd = Math.hypot(shot.xWu + shot.widthWu / 2 - p.xWu - p.widthWu / 2,
+                                    shot.yWu - shot.heightWu / 2 - p.yWu + p.heightWu / 2)
+                let from = perfectFrom + (plan.miss ? shot.speed * Balance.knight.perfectBlockFrames / 60 : 0)
+                if (!p.isBlocking && cd > from) {
+                    if (towards) moveTowards(p, towards.xWu, towards.yWu, 1)
+                    else stand(p)
+                    return true
+                }
+                _blockLeft = 0.1
+            }
+        }
+        for (let [o] of Array.from(_shotPlans))
+            if (o.destroyed !== false) _shotPlans.delete(o)
+        if (_blockLeft > 0) {
+            _blockLeft -= dt
+            p.isBlocking = true
+            if (towards) moveTowards(p, towards.xWu, towards.yWu, 1)
+            else stand(p)
+            return true
+        }
+        p.isBlocking = false
+        return false
+    }
+
+    function pilotPerson(dt) {
+        let p = game.player
+        let foes = foesOrRest(p)
+        if (!foes) return
+        if (leaveZone(p, q => {
+                let at = _zonesSeen.has(q.id) ? _zonesSeen.get(q.id) : -1
+                if (!seenSince(at)) return false
+                answered(at)
+                return true
+            })) return
+        let threat = personThreat(p, foes)
+        if (threat) {
+            answerPerson(p, threat)
+            return
+        }
+        let near = nearest(p, foes), target = near.e
+        if (personShot(p, dt, near.d > 1.3 ? target : null)) return
+        letGo(p)
+        face(p, target)
+        if (shieldDash(p, target, near.d)) return
+        if (p.isDashing) return
+        if (near.d > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
+        else stand(p)
+        if (near.d <= p.attackRange * 0.9 && !seemsWinding(target)) p.attack()
     }
 }
