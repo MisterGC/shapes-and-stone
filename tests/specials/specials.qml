@@ -11,7 +11,8 @@
 // costs with the blade (Balance.shop.bladeShare), the whirlwind's card
 // under the keys; it waits for the pick, no count and no "Waiting for the
 // party", the world held. The arrows and the move keys move along the
-// cards, 2 takes the stun: the choice goes, the count starts and lets go.
+// cards, one card a press also with the moves bound to the arrows, and 2
+// takes the stun: the choice goes, the count starts and lets go.
 // The HUD shows the stun and its mana, the hint "Q stun"; neither Q nor
 // the pad's R2 whirls, nothing is spent, and the smith says what the
 // blade gives the stun. In the dungeon after the camp the choice opens on
@@ -233,6 +234,18 @@ Window {
             check(Qt.colorEqual(under.border.color, Balance.specials.pickColor),
                   "the card under the keys is drawn in pickColor (" + under.border.color + ", chosen "
                   + under.chosen + ", selected " + find(solo, "specialChoice").selected + ")")
+            // With the moves on the arrows an arrow moves the choice once,
+            // not by its key and again as the keyboard's stick
+            let bound = solo.controls.bind("moveLeft", "key", Qt.Key_Left)
+                && solo.controls.bind("moveRight", "key", Qt.Key_Right)
+            let from = solo.specialSelected
+            key(solo, Qt.Key_Right)
+            let right = solo.specialSelected - from
+            key(solo, Qt.Key_Left)
+            let left = solo.specialSelected - from - right
+            solo.controls.reset()
+            check(bound && right === 1 && left === -1, "with the moves bound to the arrows Right moves "
+                  + right + " card and Left " + left + " (1 and -1)")
             beatsOf(solo).length = 0
             key(solo, Qt.Key_2)
             pickedAt = solo.introClock
