@@ -49,6 +49,70 @@ ClayWorld2d {
             volumeTick.play()
         }
     }
+    // --- What a player would hear (issue #267) ---
+    // With logSounds on, every sound the game plays in the world goes into
+    // soundLog, muted or not, as {t, cue, what, pitch, dist, gain}: t the
+    // seconds on the physics clock (physicsSeconds), cue the sound
+    // factory's cue it plays (sound/cues.json, "sfx/punch_hitting"), what
+    // the moment that sounds ("hit", "heavySwing", "scream"), pitch the
+    // semitones off the cue's own, dist the wu from this knight to where it
+    // sounds (0 for this knight's own, for another's the distance its gain
+    // fades by, remoteGain()) and gain its share 0..1 before the volume
+    // settings. musicTrace follows the songs the same way, {t, song, state,
+    // segment, intensity, playing}: a row when the song, its state, its
+    // segment or whether it plays changes, or its intensity has moved
+    // musicTraceStep or reached 0 or 1. The menus' ticks are not in it.
+    // A bench or the dojo reads both; clearSoundLog() starts them over
+    property bool logSounds: false
+    property var soundLog: []
+    property var musicTrace: []
+    readonly property real musicTraceStep: 0.05
+    // Simulated seconds since the game started, or since a bench set it
+    // to 0: a pause or a hit stop holds it
+    property real physicsSeconds: 0
+    function clearSoundLog() {
+        soundLog = []
+        musicTrace = []
+        _traced = null
+    }
+    function logSound(cue, what, pitch, dist, gain) {
+        if (!logSounds) return
+        let r3 = v => Math.round(v * 1000) / 1000
+        soundLog.push({ t: r3(physicsSeconds), cue: cue, what: what, pitch: pitch || 0,
+                        dist: r3(Math.max(0, dist || 0)), gain: r3(gain === undefined ? 1 : gain) })
+    }
+    // The cue a player's source is, "../sound/sfx/dash.sfx.json" is
+    // "sfx/dash"
+    function cueOf(source) {
+        let s = String(source)
+        let i = s.lastIndexOf("sound/")
+        return (i < 0 ? s : s.slice(i + 6)).replace(/\.sfx\.json$|\.song\.json$|\.wav$/, "")
+    }
+    // How far this knight is from x, y, and how far another knight is
+    // whose sound plays at gain (remoteGain); 0 for this knight's own
+    function _distTo(xWu, yWu) {
+        return player && xWu !== undefined ? Math.hypot(xWu - player.xWu, yWu - player.yWu) : 0
+    }
+    function _gainDist(gain) {
+        return gain === undefined || gain >= remoteMaxGain ? 0
+            : (1 - gain / remoteMaxGain) * remoteHearingWu
+    }
+    property var _traced: null
+    function _traceMusic() {
+        if (!logSounds) return
+        let song = levelType === "dungeon" ? (bossSong ? bossMusic : dungeonMusic) : villageMusic
+        let row = { song: cueOf(song.source), state: song.state, segment: song.segment,
+                    intensity: Math.round(song.intensity * 1000) / 1000, playing: song.playing }
+        let was = _traced
+        if (was && was.song === row.song && was.state === row.state && was.segment === row.segment
+                && was.playing === row.playing
+                && Math.abs(was.intensity - row.intensity) < musicTraceStep
+                && !(row.intensity !== was.intensity && (row.intensity === 0 || row.intensity === 1)))
+            return
+        _traced = row
+        row = Object.assign({ t: Math.round(physicsSeconds * 1000) / 1000 }, row)
+        musicTrace.push(row)
+    }
     function _loadVolumes() {
         let read = key => {
             let v = parseFloat(records.get(key, "1"))
@@ -71,13 +135,41 @@ ClayWorld2d {
         level: muted ? 0 : 0.4 * musicVolume
     }
 
-    // The dungeon's song follows the fight: its intensity is fightIntensity
+    // The dungeon's song follows the fight: its intensity is fightIntensity,
+    // and while a room's lead is engaged it plays its duel part
+    // (Balance.duel)
     SongMusic {
         id: dungeonMusic
         source: "../sound/music/dungeon.song.json"
         level: muted ? 0 : 0.3 * musicVolume
         intensity: world.fightIntensity
+        state: world.duelEngaged ? "duel" : "flow"
     }
+
+    // The Hollow Warden's song (issue #274) plays from the moment its
+    // room shuts until it falls, in place of the dungeon's: its part one,
+    // and two from the Warden's phase 2 on, moving on the next bar
+    SongMusic {
+        id: bossMusic
+        source: "../sound/music/boss.song.json"
+        level: muted ? 0 : 0.25 * musicVolume
+        state: bossFight.phase === 2 ? "two" : "one"
+    }
+    readonly property bool bossSong: bossFight.fighting && levelType === "dungeon"
+    onBossSongChanged: {
+        if (bossSong) {
+            dungeonMusic.halt()
+            bossMusic.start()
+        } else {
+            bossMusic.halt()
+            if (levelType === "dungeon" && screen === "game") dungeonMusic.start()
+        }
+    }
+    // The songs' players, for a bench
+    function bossSongPlayer() { return bossMusic }
+    function dungeonMusicWanted() { return dungeonMusic.wanted }
+    // Its phase 2's light
+    readonly property bool bossLit: bossFight.fighting && bossFight.phase === 2
 
     AmbienceBed {
         id: villageAmbience
@@ -96,26 +188,44 @@ ClayWorld2d {
     // are after a knight, from their replicated aiState, so a joined
     // knight hears its own fight; fightIntensity eases towards
     // fightersNear / fullAt, up at rise and down at fall per second, and
-    // is 0 out of a dungeon
+    // is 0 out of a dungeon. It follows on the wall clock; with
+    // followFightOnSteps on the physics steps instead, which a bench that
+    // steps the world sets, so the same steps give the same music
     property int fightersNear: 0
     property real fightIntensity: 0
+    // The room's lead in this knight's duel (Balance.duel): within reach
+    // and after a knight - not patrolling, not halted - from its
+    // replicated lead and aiState, so a joined knight hears its own duel;
+    // null when there is none
+    property var duelLead: null
+    readonly property bool duelEngaged: duelLead !== null
+    property bool followFightOnSteps: false
+    readonly property bool _followingFight: levelType === "dungeon" && player !== null
     Timer {
         id: fightTimer
         interval: 100
         repeat: true
-        running: world.levelType === "dungeon" && world.player !== null
+        running: world._followingFight && !world.followFightOnSteps
         onTriggered: world._followFight(interval / 1000)
-        onRunningChanged: if (!running) { world.fightersNear = 0; world.fightIntensity = 0 }
+        onRunningChanged: if (!running && !world.followFightOnSteps) world._stopFollowingFight()
+    }
+    function _stopFollowingFight() {
+        fightersNear = 0
+        fightIntensity = 0
+        duelLead = null
     }
     function _followFight(dt) {
-        let cfg = Balance.music, near = 0
+        let cfg = Balance.music, near = 0, lead = null
         if (player) {
             for (let e of enemies) {
-                if (!e || e.destroyed || cfg.engaged.indexOf(e.aiState) < 0) continue
-                if (Math.hypot(e.xWu - player.xWu, e.yWu - player.yWu) <= cfg.reach) near++
+                if (!e || e.destroyed) continue
+                if (Math.hypot(e.xWu - player.xWu, e.yWu - player.yWu) > cfg.reach) continue
+                if (cfg.engaged.indexOf(e.aiState) >= 0) near++
+                if (e.lead && !lead && e.aiState !== "patrol" && e.aiState !== "idle") lead = e
             }
         }
         fightersNear = near
+        if (duelLead !== lead) duelLead = lead
         let goal = Math.min(1, near / cfg.fullAt)
         let step = (goal > fightIntensity ? cfg.rise : cfg.fall) * dt
         fightIntensity = goal > fightIntensity ? Math.min(goal, fightIntensity + step)
@@ -163,6 +273,7 @@ ClayWorld2d {
     // gain (0..1) is for sounds of another player's knight, see remoteGain()
     function playImpact(gain) {
         impactSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/punch_hitting", "hit", 0, _gainDist(gain), gain)
     }
 
     SfxPlayer {
@@ -179,6 +290,7 @@ ClayWorld2d {
 
     function playDash(gain) {
         dashSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/dash", "dash", 0, _gainDist(gain), gain)
     }
 
     // The shield's own sound: a metal clang, so a block never sounds like
@@ -189,17 +301,20 @@ ClayWorld2d {
         volume: muted ? 0 : 0.7 * soundVolume
     }
     function playBlock(gain, perfect) {
-        shieldClangSound.play(gain === undefined ? 1 : gain,
-                              perfect ? Balance.perfectBlock.pitch : Balance.block.pitch)
+        let pitch = perfect ? Balance.perfectBlock.pitch : Balance.block.pitch
+        shieldClangSound.play(gain === undefined ? 1 : gain, pitch)
+        logSound("sfx/shield_clang", perfect ? "perfectBlock" : "block", pitch, _gainDist(gain), gain)
     }
 
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
+        logSound("sfx/sword_swing", "swing", 0, _gainDist(gain), gain)
     }
     // The charged swing: the swing sample pitched down, heavier
     function playHeavySwing(gain) {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.heavy.swingPitch,
                                     gain === undefined ? 1 : gain)
+        logSound("sfx/sword_swing", "heavySwing", Balance.heavy.swingPitch, _gainDist(gain), gain)
     }
     // The whirlwind: the swing sample pitched further down, a long spin,
     // The knight's footsteps (Balance.steps), only this node's own
@@ -211,7 +326,9 @@ ClayWorld2d {
     property int _foot: 0
     function playStep() {
         let p = Balance.steps.pitches
-        footstepSound.triggerNote(footstepSound.rootNote + p[_foot++ % p.length], 1)
+        let pitch = p[_foot++ % p.length]
+        footstepSound.triggerNote(footstepSound.rootNote + pitch, 1)
+        logSound("sfx/footstep", "step", pitch, 0, 1)
     }
     // and the knight's shout of a special move, a voiced line
     Sound {
@@ -224,6 +341,8 @@ ClayWorld2d {
                                     gain === undefined ? 1 : gain)
         whirlShoutSound.triggerNote(whirlShoutSound.rootNote + Balance.whirl.shoutPitch,
                                     gain === undefined ? 1 : gain)
+        logSound("sfx/sword_swing", "whirlwind", Balance.whirl.swingPitch, _gainDist(gain), gain)
+        logSound("voice/knight/whirl_shout", "whirlShout", Balance.whirl.shoutPitch, _gainDist(gain), gain)
     }
     // The charge is full: a high tick
     SfxPlayer {
@@ -233,6 +352,7 @@ ClayWorld2d {
     }
     function playChargeFull(gain) {
         chargeTickSound.play(gain === undefined ? 1 : gain, Balance.heavy.tickPitch)
+        logSound("sfx/menu_change", "chargeFull", Balance.heavy.tickPitch, _gainDist(gain), gain)
     }
 
     // A Sound step in the Esc menu: the menu's tick at the new share
@@ -247,7 +367,10 @@ ClayWorld2d {
         source: "../sound/sfx/coin_pickup.sfx.json"
         volume: muted ? 0 : 0.5 * soundVolume
     }
-    function _clink() { coinSound.play() }
+    function _clink() {
+        coinSound.play()
+        logSound("sfx/coin_pickup", "gold", 0, 0, 1)
+    }
 
     // The knight's own hurt: a low thud, never the punch of a sword
     SfxPlayer {
@@ -257,6 +380,7 @@ ClayWorld2d {
     }
     function playHurt(gain) {
         hurtSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/knight_hurt", "hurt", 0, _gainDist(gain), gain)
     }
 
     // The shield breaking at 0 mana, and the right button with no mana
@@ -267,6 +391,7 @@ ClayWorld2d {
     }
     function playShieldBreak(gain) {
         shieldBreakSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/shield_break", "shieldBreak", 0, _gainDist(gain), gain)
     }
     SfxPlayer {
         id: shieldEmptySound
@@ -275,14 +400,17 @@ ClayWorld2d {
     }
     function playShieldEmpty() {
         shieldEmptySound.play(1)
+        logSound("sfx/shield_empty", "shieldEmpty", 0, 0, 1)
     }
     // A spike plate: its click is the menu's tick pitched down, its
     // spikes the swing pitched up (Balance.dungeon.spike...Pitch)
     function playPlateClick() {
         chargeTickSound.play(1, Balance.dungeon.spikeClickPitch)
+        logSound("sfx/menu_change", "plateClick", Balance.dungeon.spikeClickPitch, 0, 1)
     }
     function playSpikesRise() {
         swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.spikeRisePitch, 1)
+        logSound("sfx/sword_swing", "spikesRise", Balance.dungeon.spikeRisePitch, 0, 1)
     }
     // A vein (Balance.deep): the pickaxe's chink on the stone, a clean
     // strike's tink, the stone's crumble as it splits and the gem's chime,
@@ -316,10 +444,12 @@ ClayWorld2d {
     }
     function playChink(pitch) {
         chinkSound.play(1, pitch)
+        logSound("sfx/deep_chink", "chink", pitch, 0, 1)
         _heard("chink" + (pitch ? (pitch > 0 ? "+" : "") + pitch : ""))
     }
     function playTink(pitch, gain) {
         tinkSound.play(gain === undefined ? 1 : gain, pitch)
+        logSound("sfx/deep_tink", "tink", pitch, 0, gain)
         _heard("tink+" + pitch)
     }
     // gain 1 when left out; the last one played is crumbleGain
@@ -327,6 +457,7 @@ ClayWorld2d {
     function playCrumble(gain) {
         crumbleGain = gain === undefined ? 1 : gain
         crumbleSound.play(crumbleGain)
+        logSound("sfx/deep_crumble", "crumble", 0, 0, crumbleGain)
         _heard("crumble")
     }
     property var _chimeLeft: []
@@ -365,14 +496,17 @@ ClayWorld2d {
     property var holeSounds: []
     property int holeSoundCount: 0
     function playHoleSound(name, h) {
-        let cfg = Balance.deep.hole, gain = 1
+        let cfg = Balance.deep.hole, gain = 1, dist = 0
         if (player && h) {
             let c = _knightCentre()
-            gain = Math.max(cfg.quietest, 1 - Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y) / cfg.hearReach)
+            dist = Math.hypot(h.mouthXWu - c.x, h.mouthYWu - c.y)
+            gain = Math.max(cfg.quietest, 1 - dist / cfg.hearReach)
         }
         if (name === "rumble") rumbleSound.play(gain)
         else if (name === "groan") groanSound.play(gain)
         else crumbleSound.play(gain)
+        logSound(name === "rumble" ? "sfx/deep_rumble" : name === "groan" ? "sfx/deep_groan"
+                 : "sfx/deep_crumble", "hole" + name[0].toUpperCase() + name.slice(1), 0, dist, gain)
         holeSounds = holeSounds.slice(1 - veinSoundsKept).concat([name])
         holeSoundCount++
     }
@@ -388,8 +522,11 @@ ClayWorld2d {
         return remoteMaxGain * Math.max(0, 1 - d / remoteHearingWu)
     }
 
-    function playDeathBurst() {
-        deathBurstSound.play()
+    // xWu, yWu: where it sounds, the knight's own place when left out;
+    // pitch: semitones off the burst's own, a kill chain's step
+    function playDeathBurst(xWu, yWu, pitch) {
+        deathBurstSound.play(1, pitch || 0)
+        logSound("sfx/burst", "death", pitch || 0, _distTo(xWu, yWu), 1)
     }
 
     Sound {
@@ -398,8 +535,9 @@ ClayWorld2d {
         volume: muted ? 0 : 0.6 * soundVolume
     }
 
-    function playSpitShot() {
+    function playSpitShot(xWu, yWu) {
         spitterSound.play()
+        logSound("sfx/spitter", "shot", 0, _distTo(xWu, yWu), 1)
     }
 
     // A tough enemy winds up a crushing blow: a low growl, the spitter's
@@ -415,7 +553,10 @@ ClayWorld2d {
             let dx = xWu - player.xWu, dy = yWu - player.yWu
             gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
         }
-        if (gain > 0) growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+        if (gain > 0) {
+            growlSound.triggerNote(growlSound.rootNote + Balance.crush.growlPitch, gain)
+            logSound("sfx/spitter", "growl", Balance.crush.growlPitch, _distTo(xWu, yWu), gain)
+        }
     }
 
     // A grunt or a guardian winds up its lunge: a goblin's scream, pitched
@@ -432,7 +573,71 @@ ClayWorld2d {
             gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
         }
         let pitch = Balance.scream.tierPitch[Math.max(0, Math.min(2, tier))] || 0
-        if (gain > 0) screamSound.play(gain, pitch)
+        if (gain > 0) {
+            screamSound.play(gain, pitch)
+            logSound("sfx/goblin_scream", "scream", pitch, _distTo(xWu, yWu), gain)
+        }
+    }
+
+    // The Hollow Warden winds up ("windUp") or strikes ("strike"): its own
+    // toll, pitched by Balance.boss.toll, fading as the scream does
+    SfxPlayer {
+        id: wardenTollSound
+        source: "../sound/sfx/warden_toll.sfx.json"
+        volume: muted ? 0 : Balance.boss.toll.volume * soundVolume
+    }
+    function playWardenToll(xWu, yWu, what) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        let pitch = what === "strike" ? Balance.boss.toll.strike : Balance.boss.toll.windUp
+        if (gain > 0) {
+            wardenTollSound.play(gain, pitch)
+            logSound("sfx/warden_toll", what, pitch, _distTo(xWu, yWu), gain)
+        }
+    }
+
+    // A room's lead spots the knight: its growl, fading as the scream does
+    // (Balance.duel)
+    SfxPlayer {
+        id: leadGrowlSound
+        source: "../sound/sfx/lead_growl.sfx.json"
+        volume: muted ? 0 : Balance.duel.growlVolume * soundVolume
+    }
+    function playLeadGrowl(xWu, yWu) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        if (gain > 0) {
+            leadGrowlSound.play(gain)
+            logSound("sfx/lead_growl", "growl", 0, _distTo(xWu, yWu), gain)
+        }
+    }
+
+    // The dungeon song's sting (Balance.duel): for a parry or a perfect
+    // block of this knight in a duel, and an opening of a lead within its
+    // reach; on the song's next beat, one in stingGap seconds of the
+    // physics clock, so a parry that opens the lead stings once
+    property real _stungAt: -1
+    function playSting() {
+        if (!dungeonMusic.playing) return
+        if (_stungAt >= 0 && physicsSeconds - _stungAt < Balance.duel.stingGap
+                && physicsSeconds >= _stungAt) return
+        _stungAt = physicsSeconds
+        dungeonMusic.playStinger("sting")
+        logSound("music/dungeon", "sting", 0, 0, 1)
+    }
+    // A lead opened, on this screen (Enemy.opening): within this knight's
+    // reach the sting and the slow motion
+    function leadOpened(enemy) {
+        if (!player || !enemy) return
+        if (Math.hypot(enemy.xWu - player.xWu, enemy.yWu - player.yWu) > Balance.music.reach) return
+        playSting()
+        slowMotion(Balance.duel.slowTime, Balance.duel.slowScale)
     }
 
     // The NPCs' greetings are voiced lines of the sound factory
@@ -466,6 +671,7 @@ ClayWorld2d {
         let greeting = _greetings[cue]
         if (!greeting) return
         greeting.play()
+        logSound(cue, "greeting", 0, 0, 1)
         dialoguePanel.lipSync(Qt.resolvedUrl("../sound/" + cue + ".visemes.json"))
     }
 
@@ -515,7 +721,8 @@ ClayWorld2d {
     // --- Impact feedback --------------------------------------------------
     // Every hit in the game reports here, so how a fight feels is tuned in
     // one place. With fx off it falls back to the original shake only.
-    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, playerHit, playerBlocked,
+    //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, chainKill (a death
+    //         that chains, killLanded), playerHit, playerBlocked,
     //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
     //         projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
@@ -557,6 +764,7 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
         case "enemyDeath":
+        case "chainKill":
             spawnShards(x, y, nx, ny, 12, color, 0.3)
             spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
             spawnRing(x, y, Qt.lighter(color, 1.4))
@@ -619,6 +827,13 @@ ClayWorld2d {
         case "enemyDeath":
             _trauma(0.4); _kick(nx * 0.2, ny * 0.2); _freeze(90)
             break
+        case "chainKill":
+            // A kill chained to the last one: crunchier, longer the longer
+            // the chain (Balance.chain)
+            _trauma(Balance.chain.trauma); _kick(nx * 0.2, ny * 0.2)
+            _freeze(chainFreeze(chainLinks) * 1000, Balance.chain.freezeScale)
+            chainStops++
+            break
         case "playerHit":
             _trauma(0.5); _kick(nx * 0.25, ny * 0.25); _freeze(75)
             if (screenFx) screenFx.hurt()
@@ -667,6 +882,45 @@ ClayWorld2d {
     }
     function _freeze(ms, scale) {
         if (world.hitStop) world.hitStop(ms, scale === undefined ? 0 : scale)
+    }
+
+    // A slow motion on the physics clock (Balance.duel): the physics runs
+    // at scale for seconds of simulated time, counted on the physics steps
+    // (slowLeft), so a pause holds it and a bench that steps the world
+    // sees it last the same steps on every run. In a session the
+    // simulation must not stall for the others: there it is the picture's,
+    // a view hit stop of seconds / scale of the wall clock
+    property real slowLeft: 0
+    property real slowScale: 1
+    readonly property bool slowing: slowLeft > 0
+    function slowMotion(seconds, scale) {
+        if (!(seconds > 0) || !(scale > 0) || scale >= 1) return
+        if (hitStopMode === "view") {
+            _freeze(seconds / scale * 1000, scale)
+            return
+        }
+        slowScale = slowing ? Math.min(slowScale, scale) : scale
+        slowLeft = Math.max(slowLeft, seconds)
+    }
+    function _stepSlowMotion(dt) {
+        if (slowLeft <= 0) return
+        // A step's share of a second is not exact: what is left of one
+        // step at most a millionth of a second over ends here too
+        slowLeft = slowLeft - dt < 1e-6 ? 0 : slowLeft - dt
+        if (slowLeft === 0) slowScale = 1
+    }
+    // Workaround: ClayWorld2d's hitStop() ends on the wall clock and its
+    // physics time scale is the global one times the hit stop's, with no
+    // slow motion of the game's own (clayground#506). While one runs this
+    // binds the scale to the same product times slowScale, the hit stop's
+    // share read from ClayWorld2d's _hitStopScale, and gives ClayWorld2d's
+    // binding back when it ends
+    Binding {
+        target: world.physics
+        property: "timeScale"
+        when: world.slowing && world.hitStopMode !== "view"
+        value: Clayground.timeScale * world._hitStopScale * world.slowScale
+        restoreMode: Binding.RestoreBindingOrValue
     }
 
     Component { id: fxParticleComp; FxParticle {} }
@@ -800,8 +1054,10 @@ ClayWorld2d {
         onEnemyBlowReceived: (fromId, blow) => {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
-            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true)
+            if (blow.kind === "damage")
+                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "")
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
+            else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
@@ -816,9 +1072,7 @@ ClayWorld2d {
         onEnemyKillReceived: (kill) => {
             let e = _enemyById[kill.id]
             if (e) e.destroyed = true
-            impact("enemyDeath", kill.x, kill.y, kill.dx, kill.dy, kill.color)
-            playDeathBurst()
-            countFight("kill")
+            killLanded(kill.x, kill.y, kill.dx, kill.dy, kill.color)
         }
         onGoldSpawned: (objectId, props) => goldClaims.make(props, objectId)
         onGoldDespawned: (objectId) => goldClaims.remove(objectId)
@@ -840,12 +1094,12 @@ ClayWorld2d {
         onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
         onShotReceived: (shot) => {
-            if (screen !== "game") return
+            if (screen !== "game" || _shotsBack[shot.id]) return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
-            playSpitShot()
+            playSpitShot(shot.x, shot.y)
         }
         onStruckReported: (fromId, report) => {
-            if (report.source === "shot") _endShot(report.id, report.result)
+            if (report.source === "shot") _shotReported(report)
             else if (report.source === "arrow") _arrowReported(report)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
@@ -902,7 +1156,9 @@ ClayWorld2d {
         if (session.connected)
             session.strikeKnight(knight.nodeId, {id: enemy.objectId, atk: atk, x: x, y: y,
                                                  size: enemy.widthWu, crush: enemy.crushing,
-                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY})
+                                                 dx: enemy._dirToTargetX, dy: enemy._dirToTargetY,
+                                                 ax: enemy.aimXWu, ay: enemy.aimYWu,
+                                                 reach: Balance.enemy.lungeHitRange + enemy.bulk})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -961,8 +1217,11 @@ ClayWorld2d {
             return
         }
         // A dash that carried the knight past the enemy dodged it all the same
-        let dx = player.xWu - blow.x, dy = player.yWu - blow.y
-        if (Math.sqrt(dx * dx + dy * dy) >= Balance.enemy.lungeHitRange) {
+        // From where a common enemy at its centre would stand, and as far
+        // as its blow reaches (Enemy.bulk)
+        let dx = player.xWu - (blow.ax !== undefined ? blow.ax : blow.x)
+        let dy = player.yWu - (blow.ay !== undefined ? blow.ay : blow.y)
+        if (Math.sqrt(dx * dx + dy * dy) >= (blow.reach || Balance.enemy.lungeHitRange)) {
             _struck(blow.id, player.isDashing ? "dodged" : "out of reach")
             return
         }
@@ -971,11 +1230,13 @@ ClayWorld2d {
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
-        // a crushing blow's for the full stagger
+        // a crushing blow's for the full stagger, and opens a lead
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
-        if (result === "perfect" && e && !e.destroyed)
-            e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
+        if (result === "perfect" && e && !e.destroyed) {
+            if (e.lead) e.open("perfect")
+            else e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
+        }
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -1201,9 +1462,10 @@ ClayWorld2d {
         if (knights === undefined) knights = knightsNow()
         let rand = createRng(deriveSeed(masterSeed, index))
         let rms = planRooms(Balance.spawn.roomsMin, Balance.spawn.roomsMax, Balance.spawn.roomSizeMin, Balance.spawn.roomSizeMax, rand)
-        let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand)
+        let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand,
+                                  isBossDepth(depthOf(index)))
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
-                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0,
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0, warden: 0,
                     secrets: secretsOf(index, position) }
         for (let e of enemies) {
             out[["weak", "normal", "tough"][e.tier]]++
@@ -1220,7 +1482,8 @@ ClayWorld2d {
         let band = dangerBand(position)
         let n = 0
         try {
-            n = carveDungeon(levelSeed, band, false, createRng(levelSeed)).secrets.length
+            let spec = Object.assign(dungeonSpec(position, null), { boss: isBossDepth(depthOf(index)) })
+            n = carveDungeon(levelSeed, band, false, createRng(levelSeed), spec).secrets.length
         } finally {
             _putCarved(kept)
         }
@@ -1230,7 +1493,7 @@ ClayWorld2d {
     // dungeon is carved only to be read
     function _keepCarved() {
         return { grid: grid, rooms: rooms, entranceGridX: entranceGridX, exitGridX: exitGridX,
-                 loopCorridors: loopCorridors }
+                 loopCorridors: loopCorridors, bossRoom: bossRoom }
     }
     function _putCarved(kept) {
         grid = kept.grid
@@ -1238,6 +1501,7 @@ ClayWorld2d {
         entranceGridX = kept.entranceGridX
         exitGridX = kept.exitGridX
         loopCorridors = kept.loopCorridors
+        bossRoom = kept.bossRoom
     }
     // The witch's reading of the next dungeon, one line per press of E:
     // where it sits in its depth's range, what lives there and, when it
@@ -1357,9 +1621,10 @@ ClayWorld2d {
         let rmin = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMin
         let rmax = masterPinned.rooms !== undefined ? masterPinned.rooms : sb.roomsMax
         let rms = planRooms(rmin, rmax, sb.roomSizeMin, sb.roomSizeMax, rand)
-        let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand)
+        let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand, isBossDepth(d))
         let band = dangerBand(pos)
         let out = { enemies: rms.length > 1 ? foes.length / (rms.length - 1) : 0,
+                    leads: spawnRolls(d + pos, a.knights).leadShare,
                     rooms: rms.length, depth: depthOf(a.index), position: a.pos }
         for (let row of Balance.dungeonMaster.settings)
             if (row.kinds)
@@ -1451,10 +1716,11 @@ ClayWorld2d {
             let levelSeed = m && m.seed !== undefined ? m.seed
                                                        : deriveSeed(runSeed === undefined ? masterSeed : runSeed, index)
             let spec = dungeonSpec(position, m)
+            let d = m && m.depth !== undefined ? m.depth : depthOf(index)
+            spec.boss = isBossDepth(d)
             let rand = createRng(levelSeed)
             let plan = carveDungeon(levelSeed, spec.band, false, rand, spec)
-            let d = m && m.depth !== undefined ? m.depth : depthOf(index)
-            let foes = rollEnemies(rooms, spec.rolls(d + position, knights), rand)
+            let foes = rollEnemies(rooms, spec.rolls(d + position, knights), rand, spec.boss)
             return { seed: levelSeed, band: spec.band, depth: d, position: position, grid: grid,
                      rooms: rooms, features: plan.features, doors: plan.doors, secrets: plan.secrets,
                      enemies: foes, entranceGridX: entranceGridX, exitGridX: exitGridX }
@@ -1630,6 +1896,10 @@ ClayWorld2d {
 
     Component.onCompleted: {
         console.log("[Game] Component.onCompleted - width:", width, "height:", height)
+        canvas.transform = [_viewZoomScale]
+        // The grade draws a texture of the canvas, which leaves its
+        // transform out: it scales the same
+        screenFxItem.transform = [_viewZoomScale]
         _loadRecord()
         campFreed.load()
         _loadVolumes()
@@ -1797,6 +2067,30 @@ ClayWorld2d {
     // The left button's press struck with the pickaxe: its release swings
     // nothing
     property bool _picking: false
+
+    // The view closes in on a locked-on lead (Balance.duel): the canvas -
+    // the room with its lights - and the grade drawn from it scale by
+    // viewZoom round the knight, so the knight stays where it is on screen and every aim
+    // from it points where it did; the HUD beside it keeps its size. The
+    // world's pixelPerUnit stays: a change of it would recreate every
+    // body's fixtures on every frame of the zoom
+    readonly property bool _zoomWanted: !!player && player.lockedOn && player.lockTarget.lead === true
+    property real viewZoom: _zoomWanted ? Balance.duel.zoom : 1
+    Behavior on viewZoom {
+        NumberAnimation { duration: Balance.duel.zoomTime * 1000; easing.type: Easing.InOutQuad }
+    }
+    property Scale _viewZoomScale: Scale { xScale: world.viewZoom; yScale: world.viewZoom }
+    // The knight's centre in the canvas, before its scale, on every frame
+    // the view is zoomed: the camera moves the room under it
+    FrameAnimation {
+        running: world.viewZoom !== 1 && !!world.player
+        onTriggered: {
+            let p = world.player
+            let at = p.parent.mapToItem(world.canvas, p.x + p.width * 0.5, p.y + p.height * 0.5)
+            world._viewZoomScale.origin.x = at.x
+            world._viewZoomScale.origin.y = at.y
+        }
+    }
 
     // Player center in screen coords (for aiming) - map from player's parent to mouseInput coords
     property var playerScreenPos: player ? player.parent.mapToItem(mouseInput, player.x + player.width * 0.5, player.y + player.height * 0.5) : Qt.point(width/2, height/2)
@@ -2600,6 +2894,17 @@ ClayWorld2d {
             font.bold: true
         }
     }
+    // The Hollow Warden's fight: its gates, adds and zones, its banners and
+    // its HP bar (issue #274)
+    readonly property alias bossFight: bossFightItem
+    BossFight {
+        id: bossFightItem
+        objectName: "bossFight"
+        anchors.fill: parent
+        z: 1000
+        game: world
+        session: session
+    }
     SequentialAnimation {
         id: recordBannerShow
         NumberAnimation { target: recordBannerText; property: "opacity"; to: 1; duration: Balance.record.fade * 1000 }
@@ -2619,6 +2924,7 @@ ClayWorld2d {
         triggeredOnStart: true
         onTriggered: {
             recordChimeSound.play(1, Balance.record.chime[step])
+            world.logSound("sfx/menu_confirm", "recordChime", Balance.record.chime[step], 0, 1)
             if (++step >= Balance.record.chime.length) stop()
         }
     }
@@ -2760,8 +3066,12 @@ ClayWorld2d {
         target: player
         function onActed(action) {
             session.sendAction(action)
-            // A hit on a knight lifting an ally up starts the lift over
-            if (action === "hurt") player.reviveProgress = 0
+            // A hit on a knight lifting an ally up starts the lift over,
+            // and breaks its kill chain
+            if (action === "hurt") {
+                player.reviveProgress = 0
+                breakChain()
+            }
         }
     }
 
@@ -2901,7 +3211,15 @@ ClayWorld2d {
         // Whirlwinds that hit an enemy, and the enemies they hit
         property int whirlwinds: 0
         property int whirlHits: 0
+        // Shots this knight's perfect block sent back, and the ones of them
+        // that hit an enemy (Balance.projectile)
+        property int shotsBack: 0
+        property int shotBackHits: 0
         property int kills: 0
+        // Kill chains of two links or more (Balance.chain), and the
+        // longest one's links
+        property int chains: 0
+        property int longestChain: 0
         property int deaths: 0
         // Fallen allies this knight lifted up, and the times an ally lifted
         // it up (a rise at camp is neither)
@@ -2914,28 +3232,73 @@ ClayWorld2d {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
-        r.kills = 0; r.deaths = 0; r.lifts = 0; r.lifted = 0
+        r.shotsBack = 0; r.shotBackHits = 0
+        r.kills = 0; r.chains = 0; r.longestChain = 0
+        r.deaths = 0; r.lifts = 0; r.lifted = 0
         r.seconds = 0; r.clearSeconds = -1
+        breakChain()
     }
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
-    // enemy it hit), kill, fall, lift (this knight lifted an ally up) or
-    // lifted (an ally lifted it up)
+    // enemy it hit), shotBack (a perfect block sent a shot back),
+    // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
+    // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
+    // it up)
+    // --- The kill chain (Balance.chain, issue #270) ---
+    // This node's knight's chain: its links so far and the physics time of
+    // its last kill. A kill is landed on the killer's node alone - one by
+    // this node's knight on an enemy here, or one the host reports - so
+    // the chain, its sound and its hit stop are the killer's
+    property int chainLinks: 0
+    property real _chainAt: 0
+    // The chain hit stops this screen made, for a bench
+    property int chainStops: 0
+    function killLanded(x, y, dx, dy, color) {
+        let c = Balance.chain
+        chainLinks = chainLinks > 0 && physicsSeconds - _chainAt <= c.window ? chainLinks + 1 : 1
+        _chainAt = physicsSeconds
+        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color)
+        playDeathBurst(x, y, c.pitches[Math.min(chainLinks, c.pitches.length) - 1])
+        countFight("kill")
+        if (chainLinks >= 2) countFight("chain", chainLinks)
+        if (player && chainLinks % c.pipEvery === 0)
+            player.momentum = Math.min(Balance.momentum.max, player.momentum + 1)
+    }
+    // A hit taken or a new fight record: the next kill starts a chain
+    function breakChain() { chainLinks = 0 }
+    // The hit stop of a chain's link-th kill, in seconds
+    function chainFreeze(link) {
+        let c = Balance.chain
+        return Math.min(c.freezeMax, c.freeze + c.freezeStep * Math.max(0, link - 2))
+    }
+
     function countFight(what, amount) {
         let r = fightRecord
         switch (what) {
         case "dealt": r.damageDealt += amount; break
         case "taken": r.damageTaken += amount; break
-        case "parry": r.parries++; break
+        case "parry":
+            r.parries++
+            if (duelEngaged) playSting()
+            break
         case "block": r.blocks++; break
-        case "perfectBlock": r.perfectBlocks++; break
+        case "perfectBlock":
+            r.perfectBlocks++
+            if (duelEngaged) playSting()
+            break
         case "crushed": r.crushed++; break
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
+        case "shotBack": r.shotsBack++; break
+        case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break
         case "lift": r.lifts++; break
         case "lifted": r.lifted++; break
+        case "chain":
+            if (amount === 2) r.chains++
+            r.longestChain = Math.max(r.longestChain, amount)
+            break
         case "kill":
             r.kills++
             runKills++
@@ -2949,12 +3312,20 @@ ClayWorld2d {
         target: world.physics
         function onStepped() {
             world._physicsSteps++
+            world.physicsSeconds += world.physics.timeStep
+            world._stepSlowMotion(world.physics.timeStep)
+            if (world.followFightOnSteps && world._followingFight)
+                world._followFight(world.physics.timeStep)
+            else if (world.followFightOnSteps && world.fightIntensity > 0)
+                world._stopFollowingFight()
+            world._traceMusic()
             world._pickUpGold()
             world._pickUpPouches()
             world._stepRevive()
             world._stepPlates()
             world._stepSlits()
             world._stepDoors()
+            bossFight.step(world.physics.timeStep)
             world._stepSecrets()
             world._stepVeins()
             world._stepDig()
@@ -3079,7 +3450,9 @@ ClayWorld2d {
         id: lighting
         world: world
         active: world.fx && screen === "game"
-        ambient: fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
+        // The Warden's phase 2 turns its room's light (Balance.boss.light)
+        ambient: bossLit ? Balance.boss.light.ambient
+                 : fightRoomActive ? "#1a1824" : levelType === "village" ? campLook.grade.ambient : look.ambient
         // Little additive glow: it washes colours towards white-grey; the
         // light should reveal the shapes' own colours, not tint them
         glow: 0.1
@@ -3093,7 +3466,8 @@ ClayWorld2d {
         vignette: world.fx ? (campStyled ? campLook.grade.vignette : 0.55) : 0
         vignetteColor: "#000000"
         // Danger rooms run warm, the camps as their look (README: Atmosphere Toolkit)
-        temperature: !world.fx ? 0 : campStyled ? campLook.grade.temperature
+        temperature: !world.fx ? 0 : bossLit ? Balance.boss.light.temperature
+                     : campStyled ? campLook.grade.temperature
                      : dangerLook ? look.temperature : 0.12
         // A touch more colour than flat: darkness already mutes everything
         // outside the light, the lit shapes should stay vivid
@@ -3121,6 +3495,7 @@ ClayWorld2d {
         running: world.lowHealthLevel > 0.05 && screen === "game"
         onTriggered: {
             heartSound.play()
+            world.logSound("sfx/heartbeat", "heartbeat", 0, 0, 1)
             heartBeatAnim.restart()
         }
     }
@@ -3513,6 +3888,7 @@ ClayWorld2d {
             spawnDamageNumber(player.xWu, player.yWu, "+" + healed, "#44CC44")
             if (screenFx) screenFxItem.flash("#FFB060", 500, 0.16)
             drinkSound.play()
+            logSound("sfx/potion_drink", "potion", 0, 0, 1)
         } else {
             _healing = false
         }
@@ -3595,6 +3971,8 @@ ClayWorld2d {
         // rock until opened
         initExploredCells()
         let spec = dungeonSpec(dangerPosition, master)
+        // Every Balance.boss.every-th dungeon ends in the Warden's room
+        spec.boss = isBossDepth(depth)
         let plan = carveDungeon(levelSeed, spec.band, featureShowcase, rng, spec)
         let featureList = plan.features
         let doorList = plan.doors
@@ -3629,8 +4007,15 @@ ClayWorld2d {
         placeExitSensor()
 
         // Step 9: Spawn enemies across non-start rooms with tier variation
-        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng))
-            spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
+        let warden = null
+        for (let e of rollEnemies(rooms, spec.rolls(danger, partyKnights), rng, spec.boss)) {
+            if (e.type === "warden") warden = e
+            else spawnEnemy(e.x, e.y, e.tier, e.type, partyKnights)
+        }
+
+        // Step 9b: the boss room's gates and the Warden, asleep in its
+        // middle (issue #274)
+        if (warden) placeBossRoom(warden)
 
         // Bind player controls
         if (player) {
@@ -3676,17 +4061,23 @@ ClayWorld2d {
     // What a dungeon at position is built from, with the master's
     // overrides m (null for the game's own): its band, its rooms' count
     // range, the feature kinds' table and its spawn rolls at a danger for
-    // knights (spawnRolls, with the enemies per room m sets). position
-    // left out is the middle of the range
+    // knights (spawnRolls, with the enemies per room and the share of
+    // rooms with a lead m sets). position left out is the middle of the
+    // range
     function dungeonSpec(position, m) {
         let sb = Balance.spawn
         let spec = { band: position === undefined ? 1 : dangerBand(position),
                      roomsMin: sb.roomsMin, roomsMax: sb.roomsMax, kinds: Balance.dungeon.kinds,
-                     enemiesPerRoom: undefined }
-        spec.rolls = (d, knights) => Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+                     enemiesPerRoom: undefined, leadShare: undefined }
+        spec.rolls = (d, knights) => {
+            let rolls = Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+            if (spec.leadShare !== undefined) rolls.leadShare = spec.leadShare
+            return rolls
+        }
         if (!m) return spec
         if (m.rooms !== undefined) spec.roomsMin = spec.roomsMax = m.rooms
         if (m.enemies !== undefined) spec.enemiesPerRoom = m.enemies
+        if (m.leads !== undefined) spec.leadShare = m.leads
         // A feature row's per room, split between its kinds, at every band
         let kinds = {}
         for (let k in Balance.dungeon.kinds) kinds[k] = Object.assign({}, Balance.dungeon.kinds[k])
@@ -3726,6 +4117,9 @@ ClayWorld2d {
         // Step 2: Place rooms
         placeRooms(spec.roomsMin, spec.roomsMax, Balance.spawn.roomSizeMin,
                    Balance.spawn.roomSizeMax, rand)
+        // A boss dungeon's last room, the one the exit's shaft leaves
+        // from, is the Warden's: no feature, door or secret room in it
+        bossRoom = spec.boss === true && rooms.length > 1 ? rooms[rooms.length - 1] : null
 
         // Step 3: Connect rooms with spanning tree
         connectRooms()
@@ -3836,29 +4230,45 @@ ClayWorld2d {
 
     // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls,
     // or a dungeonSpec's rolls),
-    // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
-    // first, the knights' start, with the table's tier mix
-    function rollEnemies(rms, sb, rand) {
+    // drawn from rand: [{x, y, tier, type, room}] in wu, across the rooms
+    // but the first, the knights' start (room counts from 0 there), dealt
+    // in turn; the rooms dealLeads picks get their lead first, a tough
+    // enemy, the rest is fodder in the table's mix (dealTiers). In a boss
+    // dungeon (boss true) the last room holds the Warden alone, last of
+    // them, in its middle: it is that room's lead, so the other rooms get
+    // one lead fewer and the table's share of rooms with a lead holds
+    function rollEnemies(rms, sb, rand, boss) {
         let out = []
         if (rms.length < 2) return out
-        let spawnRooms = rms.slice(1)
+        // A boss dungeon's last room holds the Warden alone
+        boss = boss === true && rms.length > 2
+        let spawnRooms = boss ? rms.slice(1, rms.length - 1) : rms.slice(1)
         // perRoom, when the rolls have it, sets the count: that many to a
         // room, rounded over all of them; the roll is drawn all the same
         let roll = rand()
         let numEnemies = sb.perRoom !== undefined ? Math.round(sb.perRoom * spawnRooms.length)
                                                   : sb.enemiesMin + Math.floor(roll * (sb.enemiesMax - sb.enemiesMin + 1))
-        let tiers = dealTiers(numEnemies, sb, rand)
+        let leads = dealLeads(spawnRooms.length + (boss ? 1 : 0), Math.min(numEnemies, spawnRooms.length),
+                              sb.leadShare, rand, boss ? 1 : 0)
+        let tiers = dealTiers(numEnemies - leads.length, numEnemies, sb, rand)
+        let fodder = 0
         for (let i = 0; i < numEnemies; i++) {
-            let room = spawnRooms[i % spawnRooms.length]
+            let r = i % spawnRooms.length
+            let room = spawnRooms[r]
             let ex = (room.x + 1 + rand() * (room.w - 2)) * cellSize
             let ey = (room.y + 1 + rand() * (room.h - 2)) * cellSize
-            let tier = tiers[i]
+            let tier = i < spawnRooms.length && leads.indexOf(r) >= 0 ? 2 : tiers[fodder++]
             // Enemy type: guardian, spitter, else grunt
             let typeRoll = rand()
             let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
             let type = typeRoll < guardianChance ? "guardian"
                 : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
-            out.push({x: ex, y: ey, tier: tier, type: type})
+            out.push({x: ex, y: ey, tier: tier, type: type, room: r})
+        }
+        if (boss) {
+            let b = rms[rms.length - 1], s = Balance.boss.size
+            out.push({x: (b.x + b.w / 2) * cellSize - s / 2, y: (b.y + b.h / 2) * cellSize + s / 2,
+                      tier: 2, type: "warden", room: rms.length - 2})
         }
         return out
     }
@@ -4188,6 +4598,7 @@ ClayWorld2d {
         spawnShards(pile.xWu, pile.yWu, nx, ny, 9, "#D8D0BC", 0.14)
         spawnShards(pile.xWu, pile.yWu, nx, ny, 3, "#DDD5C2", 0.22)
         impactSound.play(0.35)
+        logSound("sfx/punch_hitting", "bones", 0, _distTo(pile.xWu, pile.yWu), 0.35)
         pile.destroy()
     }
 
@@ -4206,6 +4617,7 @@ ClayWorld2d {
         let start = rooms[0]
         if (gx >= start.x && gx < start.x + start.w && gy >= start.y && gy < start.y + start.h)
             return false
+        if (inBossRoom(gx, gy)) return false
         for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             let nx = gx + n[0], ny = gy + n[1]
             if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && grid[ny][nx] === cellHallway)
@@ -4383,6 +4795,7 @@ ClayWorld2d {
     function glanceThing(b, nx, ny) {
         spawnSparks(b.cxWu, b.cyWu, -nx, -ny, 6, "#BFF4FF")
         impactSound.play(0.25)
+        logSound("sfx/punch_hitting", "glance", 0, _distTo(b.cxWu, b.cyWu), 0.25)
     }
     // Alone, or the host: b broke for good, its gold drops where it stood
     // and, in a session, every screen is told
@@ -4424,6 +4837,8 @@ ClayWorld2d {
         delete _propCells[c[1] * gridWidth + c[0]]
         _setPathCell(c[0], c[1], true)
         let x = b.cxWu, y = b.cyWu
+        logSound("sfx/punch_hitting", "break", 0, _distTo(x, y),
+                 b.kind === "urn" ? 0.5 : b.kind === "crate" ? 0.6 : 0.7)
         if (b.kind === "urn") {
             spawnShards(x, y, nx, ny, 10, b._clay, 0.2)
             spawnShards(x, y, nx, ny, 4, Qt.lighter(b._clay, 1.3), 0.28)
@@ -4727,8 +5142,10 @@ ClayWorld2d {
     // The shot's twang, fading with the distance from this knight
     function _playArrow(xWu, yWu) {
         let gain = remoteGain(xWu, yWu) / remoteMaxGain
-        if (gain > 0)
+        if (gain > 0) {
             swordSwingSound.triggerNote(swordSwingSound.rootNote + Balance.dungeon.slitShotPitch, 0.6 * gain)
+            logSound("sfx/sword_swing", "arrow", Balance.dungeon.slitShotPitch, _distTo(xWu, yWu), 0.6 * gain)
+        }
     }
 
     // Each physics step: the slits fire on the beats passed since the step
@@ -4906,6 +5323,9 @@ ClayWorld2d {
             for (let gx = 0; gx < gridWidth; gx++) {
                 let d = doorway(gx, gy)
                 if (!d || rand() >= share) continue
+                // The boss room's ways in get its gates instead
+                if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(n => inBossRoom(gx + n[0], gy + n[1])))
+                    continue
                 out.push(Object.assign({ gx: gx, gy: gy, xWu: (gx + 0.5) * cellSize,
                                          yWu: (gy + 0.5) * cellSize }, d))
             }
@@ -5021,8 +5441,10 @@ ClayWorld2d {
             spawnShards(d.cxWu, d.cyWu, nx, ny, 10, d._wood, 0.26)
             spawnShards(d.cxWu, d.cyWu, nx, ny, 6, Qt.lighter(d._wood, 1.35), 0.16)
             impactSound.play(0.8)
+            logSound("sfx/punch_hitting", "doorBashed", 0, _distTo(d.cxWu, d.cyWu), 0.8)
         } else {
             impactSound.play(0.2)
+            logSound("sfx/punch_hitting", "door", 0, _distTo(d.cxWu, d.cyWu), 0.2)
         }
     }
     // The host's doors not closed in the level: every door here as they say
@@ -5134,6 +5556,7 @@ ClayWorld2d {
         let cands = []
         for (let ri = 1; ri < rooms.length; ri++) {
             let r = rooms[ri]
+            if (r === bossRoom) continue
             for (let d of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
                 let len = d[0] === 0 ? r.w : r.h
                 for (let i = 1; i < len - 1; i++) {
@@ -5323,6 +5746,7 @@ ClayWorld2d {
         spawnShards(cx, cy, s.nx, s.ny, 12, "#5A6272", 0.28)
         spawnShards(cx, cy, s.nx, s.ny, 8, "#D8CDB6", 0.12)
         impactSound.play(0.7)
+        logSound("sfx/punch_hitting", "secretOpen", 0, _distTo(cx, cy), 0.7)
         shake(0.4)
         runSecrets++
         minimap.requestPaint()
@@ -5358,6 +5782,7 @@ ClayWorld2d {
             let cx = (s.gx + 0.5 + s.nx * 0.5) * cellSize, cy = (s.gy + 0.5 + s.ny * 0.5) * cellSize
             spawnShards(cx, cy, s.nx, s.ny, 6, "#D8CDB6", 0.1)
             impactSound.play(0.25)
+            logSound("sfx/punch_hitting", "secretGlance", 0, _distTo(cx, cy), 0.25)
             secretGlanced(s.cell)
         }
     }
@@ -5484,45 +5909,157 @@ ClayWorld2d {
     // (1 when left out) beyond the first
     function spawnRolls(d, knights) {
         let sb = Balance.spawn, bd = Balance.depth
-        let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
         let more = Math.floor(d * bd.enemies) + _extraKnights(knights) * Balance.party.enemiesPerKnight
         return {
             enemiesMin: Math.min(bd.enemiesCap, sb.enemiesMin + more),
             enemiesMax: Math.min(bd.enemiesCap, sb.enemiesMax + more),
             weakChance: Math.max(0, sb.weakChance + d * bd.weakChance),
-            normalChance: 1 - tough,
+            leadShare: Math.max(0, Math.min(bd.leadCap, sb.leadShare + d * bd.leadShare)),
             guardianChance: Math.min(bd.typeCap, sb.guardianChance + d * bd.guardianChance),
             guardianChanceTough: Math.min(bd.typeCap, sb.guardianChanceTough + d * bd.guardianChance),
             spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance)
         }
     }
 
-    // The tiers of n enemies (0=weak, 1=normal, 2=tough) in the table's
-    // mix, shuffled: the mix of a dungeon is the table's, not a roll's luck
-    function dealTiers(n, sb, rand) {
-        let weak = Math.round(n * sb.weakChance)
-        let tough = Math.min(n - weak, Math.round(n * (1 - sb.normalChance)))
+    // The rooms with a lead (issue #269), of rooms counted from 0, the
+    // first occupied of them holding an enemy: share of rooms (rounded),
+    // no more than are occupied, picked from those by rand. Dealt, not
+    // rolled: how many rooms have a lead is the table's on every seed
+    // less leads fewer than the share gives, for a room whose lead is
+    // known already (the Warden's)
+    function dealLeads(rooms, occupied, share, rand, less) {
+        let picks = []
+        for (let i = 0; i < occupied; i++) picks.push(i)
+        shuffle(picks, rand)
+        return picks.slice(0, Math.max(0, Math.min(occupied, Math.round(rooms * (share || 0)) - (less || 0))))
+    }
+    // The tiers of n fodder enemies (0=weak, 1=normal) of a dungeon of
+    // total enemies in the table's mix, shuffled: weakChance of total
+    // (rounded) are weak, no more than n, the rest normal. The mix of a
+    // dungeon is the table's, not a roll's luck
+    function dealTiers(n, total, sb, rand) {
+        let weak = Math.min(n, Math.round(total * sb.weakChance))
         let tiers = []
-        for (let i = 0; i < n; i++)
-            tiers.push(i < weak ? 0 : i < n - tough ? 1 : 2)
-        for (let i = n - 1; i > 0; i--) {
+        for (let i = 0; i < n; i++) tiers.push(i < weak ? 0 : 1)
+        return shuffle(tiers, rand)
+    }
+    function shuffle(a, rand) {
+        for (let i = a.length - 1; i > 0; i--) {
             let j = Math.floor(rand() * (i + 1))
-            let t = tiers[i]; tiers[i] = tiers[j]; tiers[j] = t
+            let t = a[i]; a[i] = a[j]; a[j] = t
         }
-        return tiers
+        return a
     }
 
     // An enemy's attack at a danger
     function enemyAtk(type, d) {
         return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
     }
-    // An enemy's HP in a dungeon built for knights (1 when left out):
-    // Balance.party.hpPerKnight of it more for each beyond the first
-    function enemyHp(type, tier, knights) {
-        let hp = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
-        return Math.round(hp * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    // An enemy's HP at a danger (0 when left out) in a dungeon built for
+    // knights (1 when left out): Balance.depth.hp of it more per step of
+    // the danger, and on that Balance.party.hpPerKnight of it more for each
+    // knight beyond the first. A tough one, a room's lead, has its type's
+    // leadHp share of it
+    function enemyHp(type, tier, knights, d) {
+        let hp = enemyBaseHp(type, tier)
+        return Math.round(hp * (1 + (d || 0) * Balance.depth.hp)
+                          * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    // An enemy's HP at danger 0 for one knight: its tier's and its type's
+    // bonus, of a lead (tier 2) its type's leadHp share (issue #288)
+    function enemyBaseHp(type, tier) {
+        let t = Balance.enemy[type]
+        let hp = Balance.enemy.tierHp[tier] + t.hpBonus
+        return tier === 2 ? Math.round(hp * t.leadHp) : hp
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
+
+    // --- The Hollow Warden (Balance.boss, issue #274) ---
+    // Whether the dungeon at depth d ends in a boss room, and which
+    // appearance of the Warden it holds there: 0 at the first boss depth.
+    // Off a boss depth (the dojo's boss room) the one of the next
+    function isBossDepth(d) {
+        let n = Balance.boss.every
+        return n > 0 && (d + 1) % n === 0
+    }
+    function bossAppearance(d) {
+        return Math.max(0, Math.ceil((d + 1) / Balance.boss.every) - 1)
+    }
+    // Its HP at appearance n for knights at danger d (0 when left out), the
+    // danger's depth.hp share counted up to boss.depthUpTo, and its tempo
+    function wardenHp(n, knights, d) {
+        let b = Balance.boss
+        return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + Math.min(d || 0, b.depthUpTo) * Balance.depth.hp)
+                          * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    function wardenTempo(n) { return 1 + n * Balance.boss.tempoGrow }
+    // The Warden at appearance n, its corner at (ex, ey), for knights;
+    // dormant until its room shuts. In a session only the host spawns
+    function spawnWarden(ex, ey, n, knights, dormant) {
+        let ehp = wardenHp(n, knights, danger)
+        let props = {
+            xWu: ex, yWu: ey, widthWu: Balance.boss.size, heightWu: Balance.boss.size,
+            hp: ehp, maxHp: ehp, atk: enemyAtk("warden", danger), def: Balance.enemy.warden.def,
+            tier: 2, enemyType: "warden", tempo: wardenTempo(n), dormant: dormant === true,
+            fromHole: ""
+        }
+        if (!session.connected) _makeEnemy(props)
+        else if (session.isHost) session.spawnEnemy(props)
+    }
+    // A boss dungeon's last room (carveDungeon): {x, y, w, h} in cells,
+    // null in any other dungeon
+    property var bossRoom: null
+    function inBossRoom(gx, gy) {
+        let r = bossRoom
+        return !!r && gx >= r.x && gx < r.x + r.w && gy >= r.y && gy < r.y + r.h
+    }
+    // Its gates on every edge where a corridor meets it, the exit's shaft
+    // among them, and the Warden asleep where the plan has it, w
+    // (rollEnemies), its middle (BossFight)
+    function placeBossRoom(w) {
+        let r = bossRoom
+        if (!r) return
+        let edges = []
+        let open = (x, y) => x >= 0 && x < gridWidth && y >= 0 && y < gridHeight && grid[y][x] !== cellWall
+        for (let gy = r.y; gy < r.y + r.h; gy++)
+            for (let gx = r.x; gx < r.x + r.w; gx++)
+                for (let n of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    let cx = gx + n[0], cy = gy + n[1]
+                    if (inBossRoom(cx, cy) || !open(cx, cy)) continue
+                    edges.push({ gx: cx, gy: cy, nx: -n[0], ny: -n[1],
+                                 exit: cx === exitGridX && cy === r.y + r.h })
+                }
+        let n = bossAppearance(depth)
+        bossFight.setUp(r, edges, n)
+        spawnWarden(w.x, w.y, n, partyKnights, true)
+        console.log("[Game] The Warden's room at", r.x, r.y, r.w, "x", r.h, "with", edges.length,
+                    "gates, appearance", n)
+    }
+    // The dojo's "bossroom": the knight stands in the corridor's cell of
+    // the boss room's first way in, facing the room; a few steps on and
+    // the room shuts
+    function toBossDoor() {
+        let g = bossFight.gates.find(x => !x.exit)
+        if (!player || !g) return
+        let gx = parseInt(g.cell.split(",")[0]), gy = parseInt(g.cell.split(",")[1])
+        let x = (gx + 0.5) * cellSize, y = (gy + 0.5) * cellSize
+        player.xWu = x - player.widthWu / 2
+        player.yWu = y + player.heightWu / 2
+        player.facingAngle = Math.atan2(g.cyWu - y, g.cxWu - x) * 180 / Math.PI
+        revealAroundPlayer()
+        snapCamera()
+    }
+    // The camera on the knight at once, not easing over from where it
+    // looked: after a scenario or a bench moved the knight
+    function snapCamera() {
+        let m = gameCamera.mode
+        gameCamera.mode = ClayWorld2dCamera.Follow
+        gameCamera._update()
+        gameCamera.mode = m
+    }
+    // The Warden's HP passed a mark, and its fall (Enemy)
+    function bossMark(enemy, what) { bossFight.mark(enemy, what) }
+    function bossFell(enemy) { bossFight.fell(enemy) }
 
     // knights: the knights the dungeon is built for, 1 when left out;
     // fromHole the spawn hole it crawls out of, "gx,gy" (issue #157)
@@ -5530,8 +6067,9 @@ ClayWorld2d {
         // A rolled tier 0 is the weak tier, not a missing one
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
+        if (type === "warden") return spawnWarden(ex, ey, bossAppearance(depth), knights, false)
         let stats = Balance.enemy[type]
-        let ehp = enemyHp(type, tier, knights)
+        let ehp = enemyHp(type, tier, knights, danger)
         let eatk = enemyAtk(type, danger)
         let edef = stats.def
         let props = {
@@ -5563,13 +6101,20 @@ ClayWorld2d {
             world: world.physics,
             gameWorld: world,
             categories: catEnemy,
-            collidesWith: catWall | catPlayer | catProp
+            // A shot's sensor: a shot sent back hits it
+            collidesWith: catWall | catPlayer | catProp | catProjectile
         }))
         if (enemy) {
             console.log("[Game] Enemy created -", enemy.enemyType, "tier:", enemy.tier, "hp:", enemy.hp,
                         objectId !== "" ? (remote ? "shown for " : "run as ") + objectId : "")
             if (!remote) enemy.target = player
             enemies.push(enemy)
+            // A dead enemy leaves the list as it dies: once its item is
+            // gone, what was left of it read destroyed as undefined, not
+            // true, and passed every check for a living one
+            enemy.destroyedChanged.connect(() => {
+                if (enemy.destroyed) world.enemies = world.enemies.filter(x => x !== enemy)
+            })
             if (objectId !== "") _enemyById[objectId] = enemy
             let h = enemy.fromHole !== "" ? holeAt(enemy.fromHole) : null
             if (h) _holeEvent(h, "creature")
@@ -5599,28 +6144,73 @@ ClayWorld2d {
     // knight. That node judges it by its knight's own state - hit, blocked,
     // dodged - and reports it, and the shot goes on every screen
     // (issue #18). One that meets no knight bursts on each screen alone.
+    // A perfect block sends it back (issue #283): the knight's node sends
+    // it back from where its shield met it, and every other node sends its
+    // shot of that id back from there too when the report comes. The node
+    // that sent it back judges the enemy it hits and reports that it went.
     property int _shotCount: 0
     property var _shotById: ({})
+    // The shots sent back on this screen, by id: one arriving after its
+    // report flies no more on its way to the knight
+    property var _shotsBack: ({})
     // A shot met a knight: this node's (local) or another's, which reported
-    // it; result as Player.takeDamage's, "blocked" for a deflected one
+    // it; result as Player.takeDamage's, "blocked" for a deflected one,
+    // "perfect" for one a perfect block sent back, which flies on, and
+    // "enemy" for one sent back that hit an enemy
     signal shotEnded(string shotId, string result, bool local)
+    // A perfect block sent shot id back: this node's knight's (local) or
+    // another's, which reported it
+    signal shotSentBack(string shotId, bool local)
     function spawnProjectile(px, py, dirX, dirY, damage) {
         let id = "shot" + (++_shotCount)
         if (session.connected && session.isHost)
             session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage})
         _flyShot(id, px, py, dirX, dirY, damage)
     }
-    // This node's knight met shot id
-    function shotLanded(id, result) {
+    // This node's knight met shot id; sent back ("perfect") from (x, y)
+    function shotLanded(id, result, x, y) {
         shotEnded(id, result, true)
-        if (session.connected) session.reportStruck({source: "shot", id: id, result: result})
+        let report = {source: "shot", id: id, result: result}
+        if (result === "perfect") {
+            let proj = _shotById[id]
+            _shotsBack[id] = true
+            countFight("shotBack")
+            shotSentBack(id, true)
+            report.x = x
+            report.y = y
+            if (proj) { report.dx = proj.dirX; report.dy = proj.dirY }
+        }
+        if (session.connected) session.reportStruck(report)
     }
     // Another node's knight met shot id: it goes here too, its impact is
-    // the other node's
+    // the other node's; sent back, it flies back here too
     function _endShot(id, result) {
         let proj = _shotById[id]
         if (proj && !proj.destroyed) proj.vanish()
         shotEnded(id, result, false)
+    }
+    function _shotReported(r) {
+        if (r.result !== "perfect") {
+            _endShot(r.id, r.result)
+            return
+        }
+        // From where that node's shield met it, the way it flies back. A
+        // shot already gone here flies again from there
+        let proj = _shotById[r.id]
+        if (!proj || proj.destroyed) {
+            _flyShot(r.id, r.x, r.y, -r.dx, -r.dy, 0)
+            proj = _shotById[r.id]
+        }
+        _shotsBack[r.id] = true
+        if (proj) {
+            proj.xWu = r.x
+            proj.yWu = r.y
+            proj.dirX = -r.dx
+            proj.dirY = -r.dy
+            proj.sendBack(false, 0)
+        }
+        shotEnded(r.id, r.result, false)
+        shotSentBack(r.id, false)
     }
     function _flyShot(id, px, py, dirX, dirY, damage) {
         let proj = projectileComponent.createObject(world.room, {
@@ -5635,9 +6225,10 @@ ClayWorld2d {
             // Solid fixture: collides with walls
             categories: catProjectile,
             collidesWith: catWall,
-            // Sensor fixture: detects player
+            // Sensor fixture: detects the knight, and the enemy a shot
+            // sent back hits
             sensorCategories: catProjectile,
-            sensorCollidesWith: catPlayer
+            sensorCollidesWith: catPlayer | catEnemy
         })
         if (proj) {
             _shotById[id] = proj
@@ -5786,6 +6377,8 @@ ClayWorld2d {
 
     function clearDungeon() {
         fishing.reset()
+        bossFight.clear()
+        bossRoom = null
         _attackRng = null
         exitSensor = null
         exitStairs = null
@@ -5882,6 +6475,7 @@ ClayWorld2d {
             try { if (_shotById[id] && !_shotById[id].destroyed) _shotById[id].vanish() } catch(err) {}
         }
         _shotById = {}
+        _shotsBack = {}
 
         grid = []
         rooms = []
@@ -7479,16 +8073,17 @@ ClayWorld2d {
         spawnShards(h.mouthXWu, h.mouthYWu + 0.25, 0, -1, count, Balance.deep.hole.dustColor, 0.09)
     }
     // A creature of the depth crawls out of hole h, in wave w: its kind
-    // and tier from the hole's stream, as the dungeon's enemies are
-    // rolled, standing in its mouth
+    // and tier from the hole's stream, standing in its mouth. It is fodder,
+    // weak at weakChance, else normal: a room's lead comes with the
+    // dungeon, never out of a hole (issue #269)
     function _holeCreature(h, w, rand) {
         if (w > h.wave) {
             if (h.stage === "eyes") _holeTo(h, "waves")
             _holeWave(h, w)
         }
         let sb = spawnRolls(danger, partyKnights)
-        let r = rand(), tier = r < sb.weakChance ? 0 : r < sb.normalChance ? 1 : 2
-        let g = tier === 2 ? sb.guardianChanceTough : sb.guardianChance, k = rand()
+        let tier = rand() < sb.weakChance ? 0 : 1
+        let g = sb.guardianChance, k = rand()
         let type = k < g ? "guardian" : k < g + sb.spitterChance ? "spitter" : "grunt"
         spawnEnemy(h.mouthXWu - 0.4 + (rand() - 0.5) * 0.4, h.mouthYWu - 0.1, tier, type, partyKnights, h.cell)
         _holeDust(h, 5)
@@ -7862,6 +8457,7 @@ ClayWorld2d {
         let gain = _deepGain(s, cfg.digVolume, cfg.hearReach)
         if (gain > 0.005) {
             tinkSound.play(gain / Balance.deep.tinkVolume, cfg.digPitch)
+            logSound("sfx/deep_tink", "minerDig", cfg.digPitch, _distTo(s.pickXWu, s.pickYWu), gain / Balance.deep.tinkVolume)
             _deepSound("dig")
         }
         if (!_decidesDeep()) return
@@ -7917,8 +8513,9 @@ ClayWorld2d {
             if (run.chord >= 0) {
                 run.chord -= dt
                 if (run.chord < 0) {
-                    travellerChord.play(Math.max(Balance.deep.hole.quietest,
-                                                           _deepGain(s, 1, Balance.deep.hole.hearReach)))
+                    let g = Math.max(Balance.deep.hole.quietest, _deepGain(s, 1, Balance.deep.hole.hearReach))
+                    travellerChord.play(g)
+                    logSound("sfx/deep_freed", "chord", 0, _distTo(s.xWu, s.yWu), g)
                     _deepSound("chord")
                 }
             }
@@ -8044,6 +8641,7 @@ ClayWorld2d {
         campCat.feed(Balance.fishing.kinds[fish.kind].color)
         spawnDamageNumber(campCat.xWu, campCat.yWu + 0.5, "*purrs*", "#E8D8B0")
         purrSound.play()
+        logSound("sfx/cat_purr", "purr", 0, _distTo(campCat.xWu, campCat.yWu), 1)
         return true
     }
     SfxPlayer {
@@ -8179,9 +8777,12 @@ ClayWorld2d {
     }
 
     // --- Fight Room ---
-    function enterFightRoom() {
+    // lineup is who stands in it, as Balance.spawn.fightRoom; its roster
+    // (fightRoomRoster) when left out
+    function enterFightRoom(lineup) {
         console.log("[Game] Entering fight room")
         clearDungeon()
+        _fightLineup = lineup || null
         fightRoomActive = true
         let a = _buildArena(15)
 
@@ -8270,8 +8871,13 @@ ClayWorld2d {
     // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo
     // eval can set it to try a fight against one enemy
     property var fightRoomRoster: Balance.spawn.fightRoom
+    property var _fightLineup: null
     function _spawnFightRoomEnemies() {
-        for (let e of fightRoomRoster)
+        let lineup = _fightLineup || fightRoomRoster
+        // The dojo's boss room: the fight room is the Warden's, no gates
+        if (lineup.some(e => e.type === "warden"))
+            bossFight.beginArena(rooms[0], bossAppearance(depth))
+        for (let e of lineup)
             spawnEnemy(_fightRoomCx + e.dx, _fightRoomCy + e.dy, e.tier, e.type)
     }
 
@@ -8291,7 +8897,14 @@ ClayWorld2d {
     // "deep" is a walled room with a vein in its north wall and the knight
     // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
     // hole, a miner and a lost traveller before its rock face and a special
-    function scenarios() { return ["dungeon", "village", "fight", "features", "deep"] }
+    // "flow" and "duel" are the fight room with the pacing bench's rooms
+    // (Balance.pacing): fodder only, and a room's lead alone, a grunt;
+    // "guardianduel" the same with a guardian lead (Balance.pacing
+    // .guardianDuel)
+    // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
+    // .boss), "bossroom" the dungeon at the boss depth's danger with the
+    // knight at the Warden's door (Balance.boss)
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8300,6 +8913,9 @@ ClayWorld2d {
     function applyScenario(name, atDanger, seed) {
         let dg = Math.max(0, Number(atDanger) || 0)
         let d = Math.floor(dg)
+        // The Warden's room is in a boss dungeon: the first at or past d
+        if (name === "bossroom")
+            while (!isBossDepth(d)) { d++; dg++ }
         _setDanger(Math.min(Balance.danger.top, dg - d), dg - d)
         _setKnights(knightsNow())
         muted = true
@@ -8316,9 +8932,21 @@ ClayWorld2d {
         recordPassed = true
         levelIndex = levelIndexOf(d, type)
         levelType = type
+        // Its music and ambience, as a game started from the title plays
+        // them: a level type the game was in already starts none
+        if (type === "village") { villageAmbience.start(); villageMusic.start() }
+        else { dungeonAmbience.start(); dungeonMusic.start() }
         _startRunRecord()
         if (name === "fight")
             enterFightRoom()
+        else if (name === "flow" || name === "duel" || name === "boss")
+            enterFightRoom(Balance.pacing[name])
+        else if (name === "guardianduel")
+            enterFightRoom(Balance.pacing.guardianDuel)
+        else if (name === "bossroom") {
+            generateDungeon()
+            toBossDoor()
+        }
         else if (name === "deep")
             enterDeepRoom()
         else if (name === "village")

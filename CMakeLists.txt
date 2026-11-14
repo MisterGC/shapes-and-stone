@@ -56,7 +56,7 @@ endforeach()
 
 clay_app(shapes_and_stone
 
-    VERSION 0.4.2
+    VERSION 0.5.0
 
     LINK_LIBS
         Qt::Core
@@ -83,6 +83,9 @@ clay_app(shapes_and_stone
         src/ArrowSlit.qml
         src/Arrow.qml
         src/Door.qml
+        src/BossGate.qml
+        src/BossZone.qml
+        src/BossFight.qml
         src/SecretWall.qml
         src/Vein.qml
         src/Hole.qml

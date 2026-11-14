@@ -3,9 +3,10 @@
 // Reads the whole table the way the inspector does, then builds a dungeon,
 // the fight room and the village and checks that the knight, every enemy,
 // the fight room lineup and the campfire carry the table's values; at
-// depth 0, 2 and 4 the dungeon holds more enemies, a higher tier mix and
-// harder blows, as the table's depth group says; tough grunts and
-// guardians, and no other enemy, wind up a crushing blow at
+// depth 0, 2 and 4 the dungeon holds more enemies, more rooms with a
+// lead, its one tough enemy (issue #269), harder blows and enemies with
+// more HP, as the table's depth group says; tough grunts and guardians,
+// and no other enemy, wind up a crushing blow at
 // enemy.crushChance, for enemy.crushWindUp, and one on a held shield
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
 // shield for enemy.crushLockout; the smith sells level I of the sword,
@@ -61,9 +62,22 @@ Window {
         return out
     }
 
+    // An enemy's HP in the table at the game's danger: depth.hp of it more
+    // per step; the Hollow Warden's is the boss table's for its appearance
+    // (issue #274)
+    function hpOf(type, tier) {
+        if (type === "warden") {
+            let b = Balance.boss, n = game.bossAppearance(game.depth)
+            return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + Math.min(game.danger, b.depthUpTo) * Balance.depth.hp))
+        }
+        let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        // A lead has its type's leadHp share of it (issue #288)
+        if (tier === 2) base = Math.round(base * Balance.enemy[type].leadHp)
+        return Math.round(base * (1 + game.danger * Balance.depth.hp))
+    }
     function checkEnemy(e) {
         let t = Balance.enemy[e.enemyType]
-        let hp = Balance.enemy.tierHp[e.tier] + t.hpBonus
+        let hp = hpOf(e.enemyType, e.tier)
         let atk = t.atk + Math.round(game.depth * Balance.depth.atk)
         return e.maxHp === hp && e.atk === atk && e.def === t.def
             && near(e.chaseSpeed, t.chaseSpeed) && near(e.patrolSpeed, t.patrolSpeed)
@@ -73,9 +87,11 @@ Window {
             && near(e.shieldArc, Balance.enemy.shieldArc)
             && near(e.crushChance, crushChanceOf(e))
     }
-    // Tough grunts and guardians wind up crushing blows, no other enemy
+    // Tough grunts and guardians wind up crushing blows, no other enemy -
+    // not the Warden
     function crushChanceOf(e) {
-        return e.tier === 2 && e.enemyType !== "spitter" ? Balance.enemy.crushChance : 0
+        return e.tier === 2 && (e.enemyType === "grunt" || e.enemyType === "guardian")
+            ? Balance.enemy.crushChance : 0
     }
 
     property var campfire: null
@@ -93,10 +109,12 @@ Window {
         check(game.depth === d && n >= sb.enemiesMin && n <= sb.enemiesMax,
               "at depth " + d + " the dungeon spawns " + n + " enemies, within "
               + sb.enemiesMin + " to " + sb.enemiesMax)
-        check(weak === Math.round(n * sb.weakChance)
-              && tough === Math.min(n - weak, Math.round(n * (1 - sb.normalChance))),
+        let spawnRooms = game.rooms.length - 1
+        let leads = Math.min(n, spawnRooms, Math.round(spawnRooms * sb.leadShare))
+        check(tough === leads && weak === Math.min(n - leads, Math.round(n * sb.weakChance)),
               "at depth " + d + " its tier mix is the table's (" + weak + " weak, "
-              + tough + " tough, average tier " + avg.toFixed(2) + ")")
+              + tough + " tough, one to each of " + leads + " of " + spawnRooms
+              + " rooms, average tier " + avg.toFixed(2) + ")")
         let wrong = es.filter(e => !checkEnemy(e))
         check(wrong.length === 0, "at depth " + d + " every enemy carries the table's stats ("
               + wrong.map(e => e.enemyType + "/" + e.tier + " atk " + e.atk).join(", ") + ")")
@@ -133,8 +151,7 @@ Window {
             check(wrong.length === 0, "every enemy's HP, attack, defense and timings come from the table ("
                   + wrong.map(e => e.enemyType + "/" + e.tier + " hp " + e.maxHp).join(", ") + ")")
             let weak = game.enemies.filter(e => e.tier === 0)
-            check(weak.length > 0 && weak.every(e => e.maxHp === Balance.enemy.tierHp[0]
-                                                    + Balance.enemy[e.enemyType].hpBonus),
+            check(weak.length > 0 && weak.every(e => e.maxHp === hpOf(e.enemyType, 0)),
                   "a weak enemy spawns weak (" + weak.length + " with the weak tier's HP)")
             checkDepth(0)
             game.applyScenario("dungeon", 2)

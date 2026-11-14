@@ -11,7 +11,10 @@
 // its veins, their rock faces, their rooms' spawn holes (issue #157) and
 // travellers of the deep (issue #158, #176) the one recorded before there were
 // any (issue #156), but for a torch
-// stepped aside for a vein. A knight
+// stepped aside for a vein; both recorded again with the enemies' HP that
+// grows with the danger (issue #268), with a lead's HP (issue #271) and
+// with a room's lead as its one tough enemy (issue #269), and with the
+// melee leads' HP cut by a third (issue #288). A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -69,10 +72,16 @@ Window {
     // 1.5); the traveller of the deep on the floor in front of the face
     // that took their place (issue #176) from e91af29e at 0.5; the grunt's
     // 60 HP (the duel fights) from 51748fd and 888308f2, b084ab49 and
-    // a1c350e8 without the veins
+    // a1c350e8 without the veins; the tough tier's HP, a room's lead's
+    // (issue #271), from 4ed8fb3e and 467c46b9, c14ac00a and 12950f23
+    // without the veins; a room's lead as its one tough enemy, the rest
+    // fodder (issue #269), from 91e91613 and 89623d1, 899088e7 and
+    // 3354cdcb without the veins; the melee leads' HP cut by a third
+    // (issue #288), from 761ed417 and 7df7a777, 9ec377e3 and bc9b356d
+    // without the veins
     readonly property var today: ({
-        "0.5": { hash: "724f5b8", noVeins: "404dd8c", enemies: 15 },
-        "1.5": { hash: "774b9c3e", noVeins: "eea7aa24", enemies: 18 }
+        "0.5": { hash: "42baf1d6", noVeins: "31919ba2", enemies: 15 },
+        "1.5": { hash: "65eb018", noVeins: "8e4f6282", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
@@ -118,9 +127,12 @@ Window {
         let cap = Balance.depth.enemiesCap
         return [Math.min(cap, Balance.spawn.enemiesMin + more), Math.min(cap, Balance.spawn.enemiesMax + more)]
     }
+    // At the game's danger, depth.hp of it more per step
     function hpOf(type, tier, k) {
         let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
-        return Math.round(base * (1 + perKnight(k, "hpPerKnight")))
+        // A lead has its type's leadHp share of it (issue #288)
+        if (tier === 2) base = Math.round(base * Balance.enemy[type].leadHp)
+        return Math.round(base * (1 + game.danger * Balance.depth.hp) * (1 + perKnight(k, "hpPerKnight")))
     }
 
     // The dojo's knight count; a game without it (before issue #102)

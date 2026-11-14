@@ -69,7 +69,11 @@ QtObject {
         // heavyArc and heavyRange times attackRange, through a guardian's
         // shield (it staggers), knocking back heavyKnockback times as far.
         // Released before full, a normal swing; full, the charge is kept
-        // until the button is let go. A hit cancels it
+        // until the button is let go. A hit cancels it. Once the heavy
+        // swing's arc has faded the knight recovers heavyRecovery seconds
+        // before it swings again (a parry with it takes that away, as a
+        // parry does a swing's cooldown); a heavy swing that hit no enemy
+        // leaves it open for that time, no shield and no dash
         chargeStart: 0.2,
         chargeTime: 0.6,
         chargeSpeed: 0.55,
@@ -77,6 +81,7 @@ QtObject {
         heavyArc: 180,
         heavyRange: 1.25,
         heavyKnockback: 2,
+        heavyRecovery: 0.5,
         // Whirlwind: Q with full momentum (Balance.momentum) spins the
         // knight forward, whirlSpeed for whirlDuration seconds along its
         // way or facing, no damage taken, and hits every standing enemy
@@ -238,6 +243,28 @@ QtObject {
         color: "#FFC85A"
     })
 
+    // The kill chain (issue #270): a kill within window seconds of the
+    // knight's last one, on the physics clock, is the next link of its
+    // chain; a kill later than that starts a new one, and a hit the knight
+    // takes (not one its shield stops) breaks it. Each link's death sound
+    // plays the next of pitches, semitones off the burst's own E: the
+    // dungeon song's A minor, from its E up; past the last it stays there.
+    // A link from the second on gets a crunchy hit stop on the killer's
+    // screen alone: freeze seconds, plus freezeStep for each link past the
+    // second, at most freezeMax, the world at freezeScale, and trauma for
+    // the shake. Every pipEvery-th link adds a momentum pip. A chain is
+    // counted (fightRecord.chains) once it reaches two links
+    readonly property var chain: ({
+        window: 2.5,
+        pitches: [0, 1, 3, 5, 7, 8, 10, 12],
+        freeze: 0.11,
+        freezeStep: 0.02,
+        freezeMax: 0.17,
+        freezeScale: 0,
+        trauma: 0.45,
+        pipEvery: 3
+    })
+
     // The sword-and-shield combo: the right button within window seconds of
     // a normal swing's start bashes with the shield. Every standing enemy
     // within reach times the knight's attackRange and in the swing's arc
@@ -316,12 +343,19 @@ QtObject {
     })
 
     readonly property var enemy: ({
-        // Base HP by tier: weak, normal, tough
-        tierHp: [22, 36, 50],
-        // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 24, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        guardian: { hpBonus: 10, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        spitter: { hpBonus: -6, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // Base HP by tier: weak, normal, tough. Weak and normal fall to
+        // one charged swing or two to three swings (pacing.flowHits), at
+        // every depth with depth.hp; tough is a room's lead
+        tierHp: [20, 26, 238],
+        // Per type: HP on top of the tier, attack, defense, speeds, and
+        // leadHp: the share of its tough HP (tier and hpBonus) a lead of
+        // the type has, rounded to whole points. The melee leads fall a
+        // third sooner than the spitter's (issue #288)
+        grunt: { hpBonus: 2, leadHp: 0.67, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        guardian: { hpBonus: 0, leadHp: 0.67, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        spitter: { hpBonus: -2, leadHp: 1, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // The Hollow Warden (Balance.boss): its HP is the boss table's
+        warden: { hpBonus: 0, leadHp: 1, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -389,9 +423,19 @@ QtObject {
         shootWindUp: 0.3
     })
 
+    // A spitter's shot: size wu a side, flying from the spitter's centre
+    // at the knight's.
+    // A perfect block sends it back (issue #283): from the shield back
+    // along its line at backSpeed, for lifetime seconds from there. It
+    // hurts no knight then, and the first enemy it meets takes backDamage
+    // times the swing (atk) of the knight that sent it back. A lead it
+    // hits is opened, the blow landing whole (Balance.lead)
     readonly property var projectile: ({
         speed: 5.0,
-        lifetime: 3.0
+        lifetime: 3.0,
+        size: 0.3,
+        backSpeed: 10.0,
+        backDamage: 1.0
     })
 
     readonly property var spawn: ({
@@ -405,10 +449,13 @@ QtObject {
         // Enemies per dungeon at depth 0, rolled evenly from min to max
         enemiesMin: 10,
         enemiesMax: 15,
-        // Tier mix of a dungeon, dealt not rolled: weakChance of its enemies
-        // (rounded) are weak, those above normalChance tough, the rest normal
+        // A room's lead (issue #269): the one tough enemy a room may hold.
+        // leadShare of the rooms but the start room (rounded) have one, the
+        // rooms dealt, not rolled, among those that hold an enemy; no other
+        // enemy of a dungeon is tough. The rest is fodder: weakChance of all
+        // its enemies (rounded) are weak, the rest normal
+        leadShare: 0.33,
         weakChance: 0.2,
-        normalChance: 0.8,
         // Type rolls: guardian first, then spitter, else grunt
         guardianChance: 0.15,
         guardianChanceTough: 0.4,
@@ -435,16 +482,246 @@ QtObject {
         enemiesCap: 26,
         // Fewer weak: weakChance falls by this, not below 0
         weakChance: -0.05,
-        // More tough: the tough share (above normalChance) grows by this
-        toughChance: 0.08,
-        toughCap: 0.6,
+        // More leads: the share of rooms with a lead grows by this, up to
+        // the cap - one room in three at depth 0, every room from depth 8
+        leadShare: 0.09,
+        leadCap: 1,
         // More guardians and spitters: added to their chances (a tough
         // guardian's too), each up to the cap
         guardianChance: 0.03,
         spitterChance: 0.03,
         typeCap: 0.45,
         // Harder blows: added to every enemy's atk, rounded to whole points
-        atk: 0.5
+        atk: 0.5,
+        // Tougher hides: this share of an enemy's HP more, rounded to whole
+        // points. It keeps pace with the smith's sword (shop.swordAtk at
+        // shop.levelDepth): weak and normal enemies stay a charged swing or
+        // two to three swings at every depth (pacing.flowHits)
+        hp: 0.2
+    })
+
+    // A fight's pace (issue #267): the fight bench's pacing run
+    // (tests/fightbench/run_fightbench.py --pacing) plays the flow room and
+    // the duel room in the dojo's fight room at each of depths, the knight
+    // with the sword level it usually has there - the highest the smith
+    // has sold by then (shop.levelDepth): 0 at depth 0, I at 2, II at 4 -
+    // and each played by three pilots: "charge" holds a full charge and
+    // lets go at the nearest enemy, "masher" clicks, "skilled" parries,
+    // perfect-blocks and strikes in openings. --check fails a fight outside
+    // these bands
+    readonly property var pacing: ({
+        depths: [0, 2, 4],
+        // Who stands where, offset in wu from the room's centre, as
+        // spawn.fightRoom. Flow: fodder only, weak and normal enemies
+        flow: [
+            { dx: 4, dy: 2, tier: 0, type: "grunt" },
+            { dx: -4, dy: 2, tier: 0, type: "grunt" },
+            { dx: 3, dy: -3, tier: 1, type: "grunt" },
+            { dx: -3, dy: -3, tier: 1, type: "spitter" },
+            { dx: 0, dy: 4, tier: 1, type: "guardian" }
+        ],
+        // Duel: a room's lead alone, a tough enemy; guardianDuel the same
+        // with a guardian lead (issue #288)
+        duel: [
+            { dx: 0, dy: 4, tier: 2, type: "grunt" }
+        ],
+        guardianDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "guardian" }
+        ],
+        // Flow, every pilot: each enemy dies to as many blows that land as
+        // flowHits gives that pilot, from the first number to the second -
+        // one charged swing, two or three swings, parries among them for
+        // "skilled" -, no two kills lie more than flowGap seconds apart, and
+        // the knight does not fall
+        flowHits: { charge: [1, 1], masher: [2, 3], skilled: [1, 3] },
+        flowGap: 2.5,
+        // Duel, either lead: "masher" and "charge" take at least duelSlow seconds to
+        // kill the lead, from the moment it engages, or fall; "skilled"
+        // kills it within duelSkilled seconds and does not fall, and takes
+        // less damage than either of the others. A lead strikes a knight
+        // charging in its reach first (lead.reach): hits cancel at least
+        // duelCancelled of "charge"'s charges
+        duelSlow: 20,
+        // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288)
+        duelSkilled: [4, 15],
+        duelCancelled: 1,
+        // Boss (issue #274): the Hollow Warden alone (Balance.boss), its
+        // adds coming in its phase 2, played at bossDepths - its first
+        // three appearances - with the sword the knight usually has there.
+        // At each of them "skilled" kills it within bossSkilled seconds of
+        // its engagement and does not fall; "masher" and "charge" fall or
+        // take at least bossSlow times as long (issue #289)
+        boss: [
+            { dx: 0, dy: 4, tier: 2, type: "warden" }
+        ],
+        bossDepths: [2, 5, 8],
+        bossSkilled: [60, 90],
+        bossSlow: 2
+    })
+
+    // A room's lead has a stance (issue #271): it takes no knockback, no
+    // hit staggers it and it keeps winding up under hits. Its stance is
+    // full at 1. A blow outside an opening does chip of its damage and
+    // wears wear off the stance, a charged swing heavyWear; regen comes
+    // back per second once no blow has landed for regenDelay seconds. A
+    // parry, a perfect block, a charged swing landed while it recovers
+    // from its lunge, or its stance worn to 0 breaks it: an opening, a
+    // stagger of openingTime seconds in which every blow does
+    // openingDamage times its damage; the blow that opens it lands whole.
+    // After the opening the stance is full again. A swing parries a lead
+    // only when it began at most parryStart physics steps before it
+    // lands, in the parry window: a swing under way that the lunge runs
+    // into is a blow like any other, and only when it began parryRest
+    // physics steps or more after the knight's swing before it and was no
+    // charged swing: mashing and the held charge parry no lead (issue
+    // #288). After its lunge a lead recovers for
+    // recovery seconds, less than a full charge (knight.chargeTime): a
+    // charge the lunge cancelled is not full again in time. The stance
+    // shows as a bar of barColor under the lead, an opening as a flash of
+    // flashColor, the word word over it, and the stagger.
+    // A lead attacks in strings (issue #272), in the arrow slits' beat
+    // notation (dungeon.slitRhythms): strings holds each lead type's, a
+    // name and its beats, 1 a strike, 2 a feint, 0 a rest, one rolled for
+    // each string from the level's attack rolls. A blow - a lunge
+    // landing, a shot leaving - comes beat seconds after the one before,
+    // and the parry ring closes once per beat, on the window; the first
+    // wind-up is the count-in, enemy.windUp (a shot's shootWindUp). A
+    // feint's wind-up holds feintHold seconds longer, its ring standing
+    // at feintRing of the way and the lead still, then strikes. A rest
+    // stands a beat, a recovery a charged swing opens. A strike or a feint
+    // winds up only at a knight within reach wu (a spitter's shootRange),
+    // else the string is over; after it the lead recovers for recovery.
+    // A knight within reach holding a charge, filling or full, is struck
+    // first: the lead begins a string at once - a rest of one cut short,
+    // not its recovery after one -, its first blow wound up for
+    // enemy.minTelegraph and no feint, and the hit cancels the charge.
+    // reach is the knight's own heavy swing's (knight.attackRange times
+    // heavyRange): a charge built outside it and let go on arriving in a
+    // rest or the recovery opens the lead
+    readonly property var lead: ({
+        parryStart: 9,
+        parryRest: 36,
+        recovery: 0.3,
+        chip: 0.1,
+        wear: 0.03,
+        heavyWear: 0.1,
+        regen: 0.1,
+        regenDelay: 1.5,
+        openingTime: 1.5,
+        openingDamage: 1.5,
+        barColor: "#E8C872",
+        flashColor: "#FFE9A8",
+        word: "OPEN",
+        beat: 0.7,
+        feintHold: 0.35,
+        feintRing: 0.6,
+        reach: 2.5,
+        strings: {
+            grunt: [
+                { name: "two-and-one", beats: [1, 1, 0, 1] },
+                { name: "held-two", beats: [2, 0, 1, 1] }
+            ],
+            guardian: [
+                { name: "one-and-feint", beats: [1, 0, 2] },
+                { name: "three", beats: [1, 1, 1] }
+            ],
+            spitter: [
+                { name: "volley", beats: [1, 1, 1] },
+                { name: "stutter", beats: [1, 0, 1, 2] }
+            ],
+            // The Hollow Warden's three (Balance.boss), on its own beat
+            warden: [
+                { name: "toll", beats: [1, 0, 1, 0, 1] },
+                { name: "false-toll", beats: [1, 2, 0, 1] },
+                { name: "landslide", beats: [1, 1, 1, 0, 2] }
+            ]
+        }
+    })
+
+    // A duel sounds and looks like one (issue #273). While a room's lead
+    // within music.reach of the knight is after it - not patrolling, not
+    // halted - the dungeon song plays its duel part, and its flow part
+    // again once the lead has fallen, given up or is out of reach; the
+    // song moves on the next bar. The lead growls as it spots the knight,
+    // at growlVolume, fading with the distance as the scream does. The
+    // song's sting plays on its next beat for every parry and perfect block
+    // of the knight in a duel and every opening of a lead within reach,
+    // one in stingGap seconds of the physics clock. A target lock on a
+    // lead closes the view in to zoom times its size over zoomTime
+    // seconds. An opening plays a slow motion: the physics at slowScale
+    // for slowTime seconds of the physics clock (slowTime / slowScale of
+    // the wall clock); in a session the picture's, as the hit stop's
+    readonly property var duel: ({
+        growlVolume: 0.8,
+        stingGap: 0.25,
+        zoom: 1.15,
+        zoomTime: 0.5,
+        slowScale: 0.3,
+        slowTime: 0.2
+    })
+
+    // The Hollow Warden (issue #274): every every-th dungeon - depth
+    // every - 1, 2 * every - 1, ... - ends in a boss room, the room the
+    // exit stairs' shaft leaves from, and it holds the Warden alone: no
+    // other enemy, feature, trap or wooden door. Its n-th appearance (0
+    // at the first boss depth) has hp * (1 + hpGrow * n) HP, with depth.hp
+    // and party.hpPerKnight on that as any enemy - depth.hp counted only up
+    // to the danger depthUpTo: the smith's last sword comes at depth 5
+    // (shop.levelDepth) and gains nothing after it, so past depthUpTo only
+    // hpGrow makes the Warden tougher, and a skilled knight still beats it
+    // at depth 5 and 8 (issue #289) -, and plays at tempo 1 + tempoGrow * n;
+    // its attack and defence are enemy.warden's. An iron
+    // gate stands in every way into the room and in the exit shaft. The
+    // ways in stand open until every knight still
+    // standing is in the room - until then the Warden sleeps and a blow
+    // glances off it -: they shut, the Warden wakes, its name shows
+    // as a banner for banner seconds and its HP as a bar while it stands.
+    // The shaft's gate opens only when it falls, and the ways in with it.
+    // It is a room's lead (Balance.lead): its stance, its openings, its
+    // three strings (lead.strings.warden) on beat seconds, divided by its
+    // tempo. At phaseAt of its max HP its phase 2 begins: adds weak grunts
+    // come out of the floor round it, adds more at waveAt, it plays
+    // phase2Tempo times faster - beats, feint holds and count-ins - and
+    // every zone.every seconds a zone opens under each knight standing in
+    // the room: a ring of the slits' colour closes on it over zone.warn
+    // seconds, then the floor there hurts zone.damage (zone.grow more per
+    // appearance) to a knight within zone.radius wu of its centre, judged
+    // on that knight's own screen; a shield does not stop it. Phase 2
+    // turns the room's light to light.ambient and light.temperature, shows
+    // its core and moves the boss song (music/boss) from its part one to
+    // two. Beaten, it drops gold gold (goldGrow more per appearance) in
+    // piles drops round where it fell, a victory banner shows for victory
+    // seconds, and every knight is healed to full HP and mana, a fallen
+    // one rises. It sounds like none of the small ones (issue #287): its
+    // wind-up and its strike, the lunge setting off, play its own toll
+    // (sfx/warden_toll, a hollow stone toll on A1) at toll.volume, fading
+    // with the distance as the scream does, the wind-up toll.windUp
+    // semitones off the cue's own, the strike toll.strike
+    readonly property var boss: ({
+        every: 3,
+        name: "The Hollow Warden",
+        hp: 2500,
+        hpGrow: 0.05,
+        depthUpTo: 4,
+        tempoGrow: 0.05,
+        // Its size a side, wu; its reach and its blow's reach grow with it
+        size: 1.8,
+        beat: 1.0,
+        phaseAt: 0.5,
+        phase2Tempo: 1.25,
+        adds: 3,
+        waveAt: 0.25,
+        zone: { every: 3.5, warn: 1.2, radius: 1.3, damage: 18, grow: 4, linger: 0.4 },
+        gold: 120,
+        goldGrow: 60,
+        drops: 8,
+        banner: 3.0,
+        victory: 3.5,
+        light: { ambient: "#1C0606", temperature: 0.35 },
+        hexColor: "#4A4E57",
+        coreColor: "#FF5A2A",
+        gateColor: "#2F3640",
+        toll: { windUp: 7, strike: 0, volume: 0.9 }
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that
@@ -955,6 +1232,7 @@ QtObject {
     readonly property var dungeonMaster: ({
         settings: [
             { key: "enemies", label: "Enemies per room", step: 0.1, min: 0, max: 8, decimals: 2 },
+            { key: "leads", label: "Rooms with a lead", step: 0.05, min: 0, max: 1, decimals: 2 },
             { key: "spikes", label: "Spike plates per room", step: 0.1, min: 0, max: 4, decimals: 2,
               kinds: ["spike"] },
             { key: "slits", label: "Arrow slits per room", step: 0.1, min: 0, max: 4, decimals: 2,

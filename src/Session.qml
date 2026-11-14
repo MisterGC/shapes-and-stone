@@ -53,7 +53,9 @@ Item {
     signal enemySpawned(string objectId, var props)
     signal enemyDespawned(string objectId)
     // Host: another player's knight struck an enemy; blow.kind is "damage"
-    // (amount, x, y), "stagger" (seconds) or "push" (dx, dy, speed)
+    // (amount, x, y, heavy, opens: the cause it breaks a lead's stance
+    // with, or ""), "stagger" (seconds), "open" (cause) or "push" (dx, dy,
+    // speed)
     signal enemyBlowReceived(string fromId, var blow)
     // An enemy of the host's lunged at this node's knight (atk, x, y, size)
     signal knightBlowReceived(var blow)
@@ -168,6 +170,11 @@ Item {
     // null before any
     readonly property var doors: net.connected && net.sessionProperties.doors
                                  ? net.sessionProperties.doors : null
+    // The Hollow Warden's fight in the level the host plays, the session
+    // property "boss" ({seed, level, stage, zones}); null before any
+    // (issue #274)
+    readonly property var boss: net.connected && net.sessionProperties.boss
+                                ? net.sessionProperties.boss : null
     // The secret doors opened in the level the host plays, the session
     // property "secrets" ({seed, level, cells}); null before any
     readonly property var secrets: net.connected && net.sessionProperties.secrets
@@ -571,6 +578,10 @@ Item {
     // Host: the doors not closed in its level, for every node
     function publishDoors(doors) {
         if (net.isHost) net.setSessionProperty("doors", doors)
+    }
+    // Host: the Warden's fight in its level, for every node
+    function publishBoss(boss) {
+        if (net.isHost) net.setSessionProperty("boss", boss)
     }
     // This node's knight opened a secret door: the host opens it for
     // every node. The host's own is taken at once

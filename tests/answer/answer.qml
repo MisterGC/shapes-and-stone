@@ -33,7 +33,10 @@
 // the step knight.chargeTime reaches; a full charge let go of at a guardian
 // facing the knight deals knight.heavySwing times atk through its shield
 // and staggers it; a hit while charging cancels it; held long past full it
-// stays full and its release is a heavy blow. A tough guardian's crushing blow
+// stays full and its release is a heavy blow, followed by
+// knight.heavyRecovery before the next swing once its arc has faded; one
+// that hit no enemy leaves the knight open that long, no shield and no
+// dash, and a held right button raises the shield after. A tough guardian's crushing blow
 // winds up for at least enemy.crushWindUp as aiState "crush", white-hot
 // with a doubled ring, and its lunge opens no parry window; on a held
 // shield it takes enemy.crushMana mana and enemy.crushShare of the damage
@@ -53,6 +56,17 @@
 // wall stops it, a pause and a hit stop hold it. A blow or a shot the shield
 // stops costs knight.blockMana; down knight.manaRegenDelay with nothing
 // spent, mana comes back at knight.manaRegen, and a dash starts that over.
+// A room's lead (Balance.lead) takes lead.chip of a swing and no knockback;
+// a charged swing into its wind-up does not stop it; a parry, a perfect
+// block, a full charge let go while it recovers and a stance worn to 0
+// each open it, a swing in the opening does lead.openingDamage times its
+// damage, the stance comes back after lead.regenDelay, and a swing begun
+// more than lead.parryStart steps before it lands in the window parries
+// nothing.
+// A perfect block sends a spitter's shot back (Balance.projectile): along
+// its line the other way at projectile.backSpeed, through a knight without
+// hurting it, into the spitter for projectile.backDamage times the swing;
+// a plain block ends it; a spitter lead it hits opens, the blow whole.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -99,10 +113,11 @@ Window {
     readonly property int minSteps: Math.round(Balance.enemy.minTelegraph / stepS)
 
     // Only this enemy has the knight as its target, a step from it; it
-    // winds up no crushing blow
+    // winds up no crushing blow, and it is no room's lead
     function only(type) {
         let p = game.player
         let e = game.enemies.find(x => x.enemyType === type && !x.destroyed)
+        e.lead = false
         for (let o of game.enemies) o.target = o === e ? p : null
         for (let o of game.enemies)
             if (o !== e) { o.aiState = "patrol"; o.parryWindow = false }
@@ -167,6 +182,9 @@ Window {
               && ["grunt", "guardian", "spitter"].every(t => game.enemies.some(e => e.enemyType === t)), () => {
             Clayground.paused = true
             let p = game.player
+            // The fight room's tough guardian is its lead (Balance.lead):
+            // the checks before the lead's own are of enemies with no stance
+            for (let e of game.enemies) e.lead = false
 
             // A grunt winds up its lunge for at least the minimum
             let g = only("grunt")
@@ -524,8 +542,11 @@ Window {
             check(p.graceLeft > 0, "with the shield dropped a hit from the front lands")
             Clayground.physicsStep(graceSteps)
 
-            // A parry gives mana back, and the shield can be raised again
+            // A parry gives mana back, and the shield can be raised again.
+            // A normal grunt falls to one parry (issue #268): with more HP
+            // it stands, as the later steps need it
             let pr = only("grunt")
+            pr.hp = 100
             pr.xWu = p.xWu + 1.5
             pr.yWu = p.yWu
             pr.aiState = "chase"
@@ -875,6 +896,67 @@ Window {
             check(afterRelease.length === 1 && afterRelease[0] === "heavy",
                   "its release swings once, heavy (acted "
                   + (afterRelease.join(", ") || "nothing") + ")")
+
+            // Once its arc has faded the heavy swing is followed by
+            // heavyRecovery before the next swing; one that hit is not open
+            let swingSteps = Math.ceil((k.swingDuration + k.swingFade) / stepS)
+            let recoverySteps = Math.round(k.heavyRecovery / stepS)
+            Clayground.physicsStep(swingSteps)
+            let faded = !p.isAttacking
+            let hitOpen = p.openLeft
+            p.attack()
+            let early = p.isAttacking
+            Clayground.physicsStep(recoverySteps - 2)
+            p.attack()
+            let stillEarly = p.isAttacking
+            Clayground.physicsStep(2)
+            p.attack()
+            let after = p.isAttacking
+            check(faded && !early && !stillEarly && after && hitOpen === 0,
+                  "a heavy swing that hit is followed by " + k.heavyRecovery + " s (" + recoverySteps
+                  + " steps) before the next swing (at its fade " + early + ", a step short "
+                  + stillEarly + ", then " + after + ") and leaves the knight not open (" + hitOpen + ")")
+            Clayground.physicsStep(swingSteps + Math.ceil(k.attackCooldown / stepS))
+
+            // One that hit no enemy leaves the knight open for that time:
+            // no shield and no dash, and a held right button raises the
+            // shield once it is over
+            let px = p.xWu, py = p.yWu
+            gr.xWu = p.xWu - 6
+            gr.yWu = p.yWu + 6
+            ready()
+            p.dashCooldown = 0
+            mouse.mousePress(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(fullSteps + 1)
+            mouse.mouseRelease(game, cx, cy, Qt.LeftButton)
+            Clayground.physicsStep(1)
+            let missSwung = p.isHeavy
+            for (let n = 0; p.isAttacking && n < swingSteps; n++) Clayground.physicsStep(1)
+            let open = p.openLeft
+            p.raiseShield()
+            let shieldUp = p.isBlocking
+            p.moveX = 1
+            p.dash()
+            let dashed = p.isDashing
+            Clayground.physicsStep(recoverySteps - 2)
+            let stillOpen = p.openLeft > 0 && !p.isBlocking
+            Clayground.physicsStep(2)
+            let rose = p.isBlocking
+            p.lowerShield()
+            p.dash()
+            let dashedAfter = p.isDashing
+            p.moveX = 0
+            check(missSwung && Math.abs(open - k.heavyRecovery) < 1e-6 && !shieldUp && !dashed && stillOpen,
+                  "a heavy swing that hit nothing leaves the knight open " + open.toFixed(3)
+                  + " s: no shield (" + shieldUp + "), no dash (" + dashed + "), still open a step short ("
+                  + stillOpen + ")")
+            check(rose && dashedAfter,
+                  "once the knight is no longer open the held shield rises (" + rose
+                  + ") and a dash starts (" + dashedAfter + ")")
+            Clayground.physicsStep(Math.ceil((k.dashDuration + k.dashCooldown) / stepS) + 1)
+            p.xWu = px
+            p.yWu = py
+            Clayground.physicsStep(1)
             gr.halted = false
             gr.aiState = "patrol"
             p.acted.disconnect(record)
@@ -1279,6 +1361,353 @@ Window {
                   + p.mana.toFixed(2) + ")")
             console.log("[Answer] mana done,", failures, "failed")
         }],
+        // A room's lead (Balance.lead, issue #271): a grunt with a stance
+        [() => true, () => {
+            Clayground.paused = true
+            let p = game.player
+            let k = Balance.knight
+            let l = Balance.lead
+            let g = only("grunt")
+            g.lead = true
+            g.maxHp = 1000
+            g.hp = 1000
+            g.halt()
+            g.halted = false
+            g.xWu = p.xWu + 1.5
+            g.yWu = p.yWu
+            p.hp = p.maxHp
+            p.graceLeft = 0
+            p.isBlocking = false
+            p.attackCooldown = 0
+            faceIt(p, g)
+
+            // A swing outside an opening chips at it and wears its stance
+            Clayground.physicsStep(2)
+            let hp0 = g.hp
+            p.attack()
+            let n = 0
+            while (g.hp === hp0 && p.isAttacking && n < 60) { Clayground.physicsStep(1); n++ }
+            let chip = Math.max(Balance.minDamage, Math.round(Math.max(Balance.minDamage, p.atk - g.def) * l.chip))
+            check(hp0 - g.hp === chip && Math.abs(g.stance - (1 - l.wear)) < 0.05 + 1e-6
+                  && g._knockT === 0 && g.aiState !== "stagger",
+                  "a swing on a lead takes " + (hp0 - g.hp) + " HP (" + l.chip + " of "
+                  + (p.atk - g.def) + " is " + chip + "), wears its stance to " + g.stance
+                  + " and neither throws it back nor staggers it (" + g.aiState + ")")
+            Clayground.physicsStep(Math.ceil((k.attackCooldown + k.swingFade) / stepS))
+
+            // A charged swing into its wind-up does not stop the attack
+            g.target = null
+            g.aiState = "patrol"
+            p.pressSwing()
+            n = 0
+            while (!p.chargeFull && n < 600) { Clayground.physicsStep(1); n++ }
+            g.target = p
+            g.xWu = p.xWu + 1.5
+            g.yWu = p.yWu
+            g.aiState = "chase"
+            let wound = stepUntil(g, "telegraph")
+            faceIt(p, g)
+            hp0 = g.hp
+            p.releaseSwing()
+            let heavy = p.isHeavy
+            Clayground.physicsStep(1)
+            let heavyChip = Math.max(Balance.minDamage,
+                                     Math.round((Math.floor(p.atk * k.heavySwing) - g.def) * l.chip))
+            let after = g.aiState
+            let lunged = stepUntil(g, "lunge")
+            check(wound && heavy && hp0 - g.hp === heavyChip && after === "telegraph" && lunged
+                  && !g.opening && g._knockT === 0,
+                  "a charged swing into a lead's wind-up takes " + (hp0 - g.hp) + " HP (" + heavyChip
+                  + " by the table) and does not stop the attack: " + after + ", then lunge ("
+                  + lunged + "; wound up " + wound + ", heavy " + heavy + ", open " + g.opening
+                  + ", knock-back " + g._knockT + ")")
+            stepUntil(g, "recovery")
+
+            // A parry opens it: the parry's blow lands whole, then it
+            // staggers for openingTime
+            g.target = null
+            g.aiState = "patrol"
+            Clayground.physicsStep(Math.round(k.hurtGrace / stepS) + 1)
+            p.hp = p.maxHp
+            p.graceLeft = 0
+            p.attackCooldown = 0
+            g.target = p
+            g.xWu = p.xWu + 1.5
+            g.yWu = p.yWu
+            g.aiState = "chase"
+            stepUntil(g, "lunge")
+            n = 0
+            while (!g.parryWindow && g.aiState === "lunge" && n < 600) { Clayground.physicsStep(1); n++ }
+            faceIt(p, g)
+            hp0 = g.hp
+            let parries = game.fightRecord.parries
+            p.attack()
+            Clayground.physicsStep(1)
+            let parryDmg = Math.floor(p.atk * k.parrySwing) - g.def
+            check(game.fightRecord.parries === parries + 1 && g.opening && g.aiState === "stagger"
+                  && Math.abs(g._attackTimer - l.openingTime) <= stepS + 1e-6
+                  && hp0 - g.hp === parryDmg && g.stance === 0,
+                  "a parry opens the lead: " + (hp0 - g.hp) + " HP (" + parryDmg + " whole), "
+                  + g.aiState + " for " + g._attackTimer.toFixed(3) + " s (openingTime "
+                  + l.openingTime + "), its stance " + g.stance)
+
+            // In the opening a swing does openingDamage times its damage
+            Clayground.physicsStep(Math.ceil((k.swingDuration + k.swingFade) / stepS))
+            p.attackCooldown = 0
+            hp0 = g.hp
+            p.attack()
+            Clayground.physicsStep(1)
+            let opened = Math.floor(Math.max(Balance.minDamage, p.atk - g.def) * l.openingDamage)
+            check(g.opening && hp0 - g.hp === opened,
+                  "in the opening a swing takes " + (hp0 - g.hp) + " HP, " + l.openingDamage
+                  + " times " + (p.atk - g.def) + " is " + opened)
+
+            // The opening over, its stance is full again
+            Clayground.physicsStep(Math.ceil(l.openingTime / stepS) + 10)
+            check(!g.opening && g.stance === 1 && g.aiState !== "stagger",
+                  "after the opening the lead stands again with its stance full (" + g.stance
+                  + ", " + g.aiState + ")")
+
+            // What broke its stance, as its opened signal says
+            let causes = []
+            let opener = c => causes.push(c)
+            g.opened.connect(opener)
+            // The knight fresh, the lead going for it 1.5 wu to its right
+            let fresh = () => {
+                p.hp = p.maxHp
+                p.mana = p.maxMana
+                p.graceLeft = 0
+                p.shieldLock = 0
+                p.attackCooldown = 0
+                g.halted = false
+                g.target = p
+                g.attackCooldown = 0
+                g.xWu = p.xWu + 1.5
+                g.yWu = p.yWu
+                g.aiState = "chase"
+            }
+            // A blow of the knight's atk on the lead, standing still and
+            // with no parry window open. Struck as a swing strikes it: a
+            // swing played out here would wait on the hit stop, which runs
+            // on the wall clock while the bench is paused
+            let blow = () => {
+                g.parryWindow = false
+                g.takeDamage(p.atk, p.xWu, p.yWu, false)
+                Clayground.physicsStep(1)
+            }
+
+            // A full charge kept through a lunge that missed and let go
+            // while the lead recovers opens it
+            g.target = null
+            g.aiState = "patrol"
+            p.pressSwing()
+            n = 0
+            while (!p.chargeFull && n < 600) { Clayground.physicsStep(1); n++ }
+            fresh()
+            stepUntil(g, "lunge")
+            // The knight out of the lunge's reach: it misses, the charge stays
+            p.xWu -= 3
+            let recovering = stepUntil(g, "recovery")
+            p.xWu = g.xWu - 1.2
+            p.yWu = g.yWu
+            faceIt(p, g)
+            let kept = p.chargeFull
+            causes = []
+            p.releaseSwing()
+            Clayground.physicsStep(1)
+            check(recovering && kept && causes.join() === "heavy" && g.opening,
+                  "a full charge let go while the lead recovers opens it (recovering " + recovering
+                  + ", charge kept " + kept + ", opened by " + (causes.join() || "nothing") + ")")
+            Clayground.physicsStep(Math.ceil((l.openingTime + k.heavyRecovery) / stepS) + 10)
+
+            // A perfect block of its lunge opens it
+            p.lowerShield()
+            Clayground.physicsStep(k.perfectBlockRearm)
+            fresh()
+            faceIt(p, g)
+            causes = []
+            stepUntil(g, "lunge")
+            n = 0
+            while (g.aiState === "lunge" && n < 600) {
+                faceIt(p, g)
+                if (g._lungeSteps <= 4) p.raiseShield()
+                Clayground.physicsStep(1)
+                n++
+            }
+            check(causes.join() === "perfect" && g.opening && p.hp === p.maxHp,
+                  "a perfect block of the lead's lunge opens it (opened by " + (causes.join() || "nothing")
+                  + ", HP " + p.hp + ")")
+            p.lowerShield()
+            Clayground.physicsStep(Math.ceil(l.openingTime / stepS) + 10)
+
+            // Blows wear its stance; with none for regenDelay it comes back
+            g.halt()
+            fresh()
+            g.halted = true
+            faceIt(p, g)
+            for (let i = 0; i < 5; i++) blow()
+            let worn = g.stance
+            g.halted = false
+            p.xWu -= 3
+            Clayground.physicsStep(Math.ceil((l.regenDelay + 1) / stepS))
+            check(worn <= 1 - 4 * l.wear + 0.05 && g.stance > worn && !g.opening,
+                  "five blows wear the lead's stance to " + worn + ", and with no blow for "
+                  + l.regenDelay + " s it comes back to " + g.stance)
+
+            // Worn to 0, it opens
+            g.halt()
+            fresh()
+            g.halted = true
+            faceIt(p, g)
+            causes = []
+            n = 0
+            while (!g.opening && n < 100) { blow(); n++ }
+            check(causes.join() === "worn" && g.opening && n <= Math.ceil(1 / l.wear) + 1,
+                  "after " + n + " blows its stance is worn to 0 and it opens (opened by "
+                  + (causes.join() || "nothing") + ", wear " + l.wear + " a blow)")
+            g.halt()
+
+            // A swing begun more than parryStart steps before it lands in
+            // the parry window is a blow like any other: it parries nothing
+            fresh()
+            stepUntil(g, "lunge")
+            faceIt(p, g)
+            p.facingAngle += 180
+            p.attack()
+            let begun = p._steps
+            n = 0
+            while (!g.parryWindow && g.aiState === "lunge" && n < 600) { Clayground.physicsStep(1); n++ }
+            faceIt(p, g)
+            hp0 = g.hp
+            parries = game.fightRecord.parries
+            causes = []
+            Clayground.physicsStep(1)
+            let age = p._steps - begun
+            check(age > l.parryStart && hp0 - g.hp === chip && game.fightRecord.parries === parries
+                  && causes.length === 0 && !g.opening,
+                  "a swing begun " + age + " steps before it lands in the parry window (parryStart "
+                  + l.parryStart + ") takes " + (hp0 - g.hp) + " HP (" + chip + ", a blow), parries "
+                  + (game.fightRecord.parries - parries) + " times and opens nothing ("
+                  + (causes.join() || "nothing") + ")")
+            g.opened.disconnect(opener)
+            g.halt()
+            g.lead = false
+            g.target = null
+            Clayground.paused = false
+            console.log("[Answer] lead done,", failures, "failed")
+        }],
+        // A shot sent back (Balance.projectile, issue #283)
+        [() => true, () => {
+            Clayground.paused = true
+            let p = game.player
+            let k = Balance.knight
+            let foes = game.enemies.filter(e => e && e.destroyed === false)
+            let s = foes.find(e => e.enemyType === "spitter")
+            let cx = game._fightRoomCx, cy = game._fightRoomCy
+            // Everyone else stands out of the shot's line
+            for (let o of foes) {
+                o.halt(); o.target = null; o.lead = false
+                if (o !== s) { o.xWu = cx - 3; o.yWu = cy + 3 + foes.indexOf(o) }
+            }
+            let ended = [], back = []
+            let onEnd = (id, result, local) => ended.push(id + " " + result)
+            let onBack = (id, local) => back.push(id)
+            game.shotEnded.connect(onEnd)
+            game.shotSentBack.connect(onBack)
+            let knightCentre = () => ({x: p.xWu + p.widthWu / 2, y: p.yWu - p.heightWu / 2})
+            // The spitter 4 wu east of the knight spits at it; the knight
+            // facing it raises its shield when the shot is near (perfect),
+            // holds it raised long before ("block"); the shot, or null
+            let spitAt = (how) => {
+                p.xWu = cx; p.yWu = cy
+                p.hp = p.maxHp; p.mana = p.maxMana; p.graceLeft = 0; p.shieldLock = 0
+                p.facingAngle = 0
+                s.xWu = cx + 4; s.yWu = cy
+                p.isBlocking = how === "block"
+                Clayground.physicsStep(k.perfectBlockRearm + k.perfectBlockFrames + 2)
+                s.aimShot(p)
+                s.fireProjectile()
+                let id = "shot" + game._shotCount
+                let shot = game._shotById[id]
+                let from = shot ? {x: shot.xWu, y: shot.yWu, dx: shot.dirX, dy: shot.dirY} : null
+                let n = 0
+                while (shot && !shot.destroyed && !shot.back && n < 300) {
+                    let c = knightCentre()
+                    let d = Math.hypot(shot.xWu + shot.widthWu / 2 - c.x, shot.yWu - shot.heightWu / 2 - c.y)
+                    if (how === "perfect" && !p.isBlocking && d <= 0.9) p.isBlocking = true
+                    Clayground.physicsStep(1)
+                    n++
+                }
+                return {id: id, shot: shot, from: from}
+            }
+            // How far (x, y) lies off the line the shot came in on
+            let offLine = (f, x, y) => Math.abs((x - f.x) * f.dy - (y - f.y) * f.dx)
+
+            // Sent back: along its line the other way, faster, a knight
+            // not hurt by it, the spitter hit by backDamage times the swing
+            let rec = game.fightRecord
+            let backs0 = rec.shotsBack, hits0 = rec.shotBackHits
+            let hp0 = s.hp, khp = p.hp
+            let r = spitAt("perfect")
+            let shot = r.shot
+            check(shot && !shot.destroyed && shot.back && ended.indexOf(r.id + " perfect") >= 0
+                  && back.indexOf(r.id) >= 0 && rec.shotsBack === backs0 + 1,
+                  "a perfect block sends the shot back (" + (shot ? (shot.destroyed ? "gone" : shot.back ? "back" : "on its way") : "none")
+                  + ", ended " + ended.join(", ") + ", sent back " + back.join(", ") + ")")
+            if (shot && !shot.destroyed && shot.back) {
+                let f = r.from
+                check(Math.abs(shot.dirX + f.dx) < 1e-6 && Math.abs(shot.dirY + f.dy) < 1e-6
+                      && Math.abs(shot.speed - Balance.projectile.backSpeed) < 1e-6,
+                      "it flies back along its line (" + shot.dirX.toFixed(3) + ", " + shot.dirY.toFixed(3)
+                      + ", it came along " + f.dx.toFixed(3) + ", " + f.dy.toFixed(3)
+                      + ") at " + shot.speed + " wu/s, the table says " + Balance.projectile.backSpeed)
+                // Through a knight it flies on and hurts none
+                shot.onHitPlayer({ getBody: () => ({ target: p }) })
+                check(!shot.destroyed && p.hp === khp, "a shot sent back hurts no knight ("
+                      + khp + " -> " + p.hp + " HP, " + (shot.destroyed ? "gone" : "flying on") + ")")
+                let n = 0, off = 0
+                while (!shot.destroyed && n < 300) {
+                    off = Math.max(off, offLine(f, shot.xWu, shot.yWu))
+                    Clayground.physicsStep(1)
+                    n++
+                }
+                let want = Math.max(Balance.minDamage, Math.round(p.atk * Balance.projectile.backDamage) - s.def)
+                check(hp0 - s.hp === want && off < 0.01
+                      && ended.indexOf(r.id + " enemy") >= 0 && rec.shotBackHits === hits0 + 1,
+                      "it hits the spitter it came from for " + (hp0 - s.hp) + " HP, backDamage "
+                      + Balance.projectile.backDamage + " times the swing less its defence is " + want
+                      + " (" + n + " steps, at most " + off.toFixed(4) + " wu off its line)")
+            }
+
+            // A plain block still ends it
+            ended = []
+            r = spitAt("block")
+            check(r.shot && r.shot.destroyed && !r.shot.back && ended.indexOf(r.id + " blocked") >= 0,
+                  "a plain block ends the shot (" + ended.join(", ") + ")")
+
+            // A lead hit by a shot sent back is opened, as by a parry: the
+            // blow lands whole
+            let causes = []
+            let opener = c => causes.push(c)
+            s.opened.connect(opener)
+            s.lead = true
+            s.hp = s.maxHp = 400
+            hp0 = s.hp
+            r = spitAt("perfect")
+            let n = 0
+            while (r.shot && !r.shot.destroyed && n < 300) { Clayground.physicsStep(1); n++ }
+            let whole = Math.max(Balance.minDamage, Math.round(p.atk * Balance.projectile.backDamage) - s.def)
+            check(s.opening && causes.indexOf("shot") >= 0 && hp0 - s.hp === whole,
+                  "a spitter lead hit by a shot sent back opens (" + (causes.join() || "nothing")
+                  + ", " + s.aiState + ") and takes " + (hp0 - s.hp) + " HP, the whole " + whole)
+            s.opened.disconnect(opener)
+            game.shotEnded.disconnect(onEnd)
+            game.shotSentBack.disconnect(onBack)
+            s.lead = false
+            p.isBlocking = false
+            Clayground.paused = false
+            console.log("[Answer] sent back done,", failures, "failed")
+        }],
         // Torn down before quitting, as the other benches do
         [300, () => game.destroy()],
         [300, () => Qt.exit(failures)]
@@ -1330,7 +1759,13 @@ Window {
             waitedMs = 0
             i++
             if (i >= bench.steps.length) stop()
-            step[1]()
+            // A step that throws stops there, its checks after the throw
+            // never run: that is a failure
+            try {
+                step[1]()
+            } catch (err) {
+                bench.check(false, "step " + (i - 1) + " threw: " + err)
+            }
         }
     }
 }

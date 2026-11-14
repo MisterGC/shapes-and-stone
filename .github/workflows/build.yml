@@ -71,3 +71,60 @@ jobs:
     # windowed and slow ones run by hand (README, "Benches").
     - name: Quick benches
       run: python3 tests/run_quick.py --qml "$QT_ROOT_DIR/bin/qml"
+
+  # The benches that need Clayground's live loader, on a runner of their
+  # own beside the quick ones. The fight bench's pacing run (issue #267)
+  # plays the flow and the duel rooms at the depths of Balance.pacing, the
+  # boss room at its bossDepths, with its three pilots, offscreen and muted on a runner with no audio output
+  # device, and checks the bands. Since a room's lead has its stance (#271)
+  # every band passes, and a red one fails the job.
+  slow-benches:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        submodules: 'recursive'
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ env.QT_VERSION }}
+        host: linux
+        target: desktop
+        arch: linux_gcc_64
+        modules: ${{ env.QT_MODULES }}
+        aqtversion: ${{ env.AQT_VERSION }}
+        cache: true
+
+    - name: Install Linux Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build libxkbcommon-dev libvulkan-dev
+
+    - name: Setup compiler cache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ubuntu-desktop-tools
+        max-size: 1G
+
+    # The game and the live loader only: the other tools are not needed
+    - name: Configure
+      run: |
+        cmake -B build -GNinja -DCMAKE_BUILD_TYPE=Release -DCLAYGROUND_WITH_TOOLS=ON \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache .
+
+    - name: Build
+      run: cmake --build build --target shapes_and_stone clayliveloader
+
+    - name: Fight bench, pacing
+      run: python3 tests/fightbench/run_fightbench.py --pacing --check --json pacing.json
+
+    - name: Keep the pacing report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pacing
+        path: pacing.json
+        if-no-files-found: warn

@@ -6,6 +6,33 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-14
+
+Fights have two rhythms: most rooms are a fast flow of weak enemies that fall to a stroke or two, kill after kill building a chain; a room's lead is a duel, won by reading its strings and striking while it is open, and the music and the view turn to it; and every third dungeon ends in the Hollow Warden's boss room. Built on Clayground v2026.11.1.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser.
+
+Not yet playtested by hand: the Warden at depth 5 and 8, and a duel under the rule that mashing parries no lead; the test pilots played them. The four new sounds - the dungeon song's duel part, the lead's growl, the boss song and the Warden's toll - still wait for a verdict by ear.
+
+### Added
+
+- **Kill chains:** kills in quick succession build a chain. Each kill within 2.5 s of the last climbs the death sound a step of the dungeon song's scale and gets a short crunchy hit stop, and every third kill in a chain adds a momentum pip. A hit taken or a longer pause breaks the chain. ([#270](https://github.com/MisterGC/shapes-and-stone/issues/270))
+- **A room's lead stands its ground:** the one tough enemy a room may hold no longer flinches - no blow knocks it back or staggers it, and it keeps winding up while you hit it. A blow does a tenth of its damage and wears down the stance bar under the lead. A parry, a perfect block, a charged swing landed while it recovers from its attack, or its stance worn down to nothing opens it: it shows OPEN and reels for 1.5 s, and every blow in that time does one and a half times its damage. Mashing and holding a charge parry no lead: a swing begun right after another, and a charged swing, do not count as a parry, so only a deliberate swing timed to its lunge does. A lead has many times the HP of the enemies around it, so it falls in its openings, not to a few swings; a grunt or guardian lead has a third less HP than a spitter lead, so a duel with one does not drag on. In co-op an opening shows on every screen. ([#271](https://github.com/MisterGC/shapes-and-stone/issues/271), [#288](https://github.com/MisterGC/shapes-and-stone/issues/288))
+- **A room's lead strikes in strings:** each kind of lead - grunt, guardian, spitter - attacks in rhythms of its own, strikes and rests on a steady beat, and the parry ring closes on every beat. Some wind-ups are feints: the ring stops short, holds, then closes. A knight who stands in a lead's reach charging a swing gets struck first, and the hit cancels the charge; a charge built outside its reach and let go in a rest still opens it. ([#272](https://github.com/MisterGC/shapes-and-stone/issues/272))
+- **A duel sounds and looks like one:** while a room's lead is after the knight, the dungeon song moves to a duel part - a heartbeat on the kick, a low drone, a harp ticking late in each bar - and back to its flow part once the lead falls, gives up or is out of reach. A lead growls as it spots the knight, and every parry, perfect block and opening in a duel plays a brass sting. A lock on a lead (F, the middle button or L2) closes the view in a little round the knight, and an opening plays a short slow motion; in co-op the slow motion slows only the picture, as the hit stop does. ([#273](https://github.com/MisterGC/shapes-and-stone/issues/273))
+- **A perfect block sends a spitter's shot back:** raised just before the shot meets it, the shield sends it back along its line, faster. On its way back it hurts no knight; the first enemy it meets takes a blow as hard as the knight's swing, and a room's lead it hits is opened, so a perfect block answers a lead that shoots. A plain block still ends the shot. In co-op the shot flies back on every screen. ([#283](https://github.com/MisterGC/shapes-and-stone/issues/283))
+- **The Hollow Warden:** every third dungeon - depth 2, 5, 8 and on - ends in a boss room in front of the exit stairs. Until every knight still standing is in, the Warden sleeps and a blow glances off it; then its gates shut, its name shows as a banner and its HP as a bar. The Warden, a large hollow stone hexagon, duels in three strings of its own, and its wind-up and its strike ring with a deep hollow stone toll in the dungeon song's key - the wind-up on a higher note, the strike on the low root - so you hear it apart from the small ones, which keep their scream. At half its HP its core glows, weak grunts come out of the floor, it plays a quarter faster, the light turns red, its own song moves to a second part, and zones open under the knights that warn with the slits' ring before they hurt. Beaten, it opens the way on, drops a large pile of gold, shows a victory banner and heals every knight to full HP and mana, a fallen one too. Each time it comes back it has 5 % more HP and plays 5 % faster; the depth adds to its HP only up to depth 4, since the smith's sword stops growing at depth 5, so it stays beatable at depth 2, 5 and 8 alike: the test pilot that parries every string beats it in a little over a minute each time, and mashing or holding a charge loses to it. In co-op every screen sees the same Warden, phase and adds. ([#274](https://github.com/MisterGC/shapes-and-stone/issues/274), [#287](https://github.com/MisterGC/shapes-and-stone/issues/287), [#289](https://github.com/MisterGC/shapes-and-stone/issues/289))
+
+### Changed
+
+- **Enemies keep pace with the smith's sword:** a weak or normal enemy falls to one charged swing or two to three swings at every depth, with the sword the smith has usually sold by then. Enemy HP used to stay the same all the way down while the sword added up to 12 attack, so every fight got shorter the deeper you went. Now weak and normal enemies start with less - a weak grunt has 22 HP at depth 0 instead of 46, a normal one 28 instead of 60 - and enemies gain a fifth more HP with each depth. ([#268](https://github.com/MisterGC/shapes-and-stone/issues/268))
+- **A charged swing has its own recovery:** it cost no more than a click, the same 0.5 s before the next swing. Now, once its arc has faded, the knight recovers half a second before it swings again, and a charged swing that hits no enemy leaves the knight without shield, dash or whirlwind for that time. A charged swing that parries takes the recovery away. ([#268](https://github.com/MisterGC/shapes-and-stone/issues/268))
+- **At most one tough enemy per room, its lead:** tough enemies used to grow to 60 % of a dungeon's enemies deep down; with leads now duels, that would make every room a slow one. Now a room holds at most one, its lead, and the rest are weak or normal. One room in three has a lead at depth 0, never the start room, more with each depth and every room from depth 8 on. A dungeon holds as many enemies as before, so the rooms without a lead fight in larger groups, and a creature out of a spawn hole is never tough. The dungeon master panel gets a row, *Rooms with a lead*, that sets the share for the next dungeon. ([#269](https://github.com/MisterGC/shapes-and-stone/issues/269))
+
+### Fixed
+
+- **A shield held toward a spitter stops its shot from a slant too:** the shot flew from the spitter's corner at the knight's corner, so it could pass a knight standing at a slant beside its middle, outside the shield. It now flies from the spitter's middle at the knight's. ([#272](https://github.com/MisterGC/shapes-and-stone/issues/272))
+
 ## [0.4.2] - 2026-11-06
 
 Every control can be rebound, for mouse and keyboard and for a gamepad, on a new Control Input page; the game says when a gamepad connects or leaves; and in the browser a gamepad plays in Firefox too. Built on Clayground v2026.11.1.
@@ -231,7 +258,8 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.5.0
 [0.4.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.2
 [0.4.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.1
 [0.4.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.0
