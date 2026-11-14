@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "name": "stun_bash",
+  "variation": { "seed": 318, "pool": 3 },
+  "layers": [
+    { "name": "thump", "role": "transient", "source": "noise", "length": 70, "gain": -7,
+      "noise": { "color": "pink" },
+      "envelope": { "attack": 0.5, "decay": 60, "sustain": 0, "release": 0 },
+      "filter": { "type": "lowpass", "cutoff": 700, "resonance": 0.2 } },
+    { "name": "body", "role": "body", "source": "sine", "freq": 88, "length": 240, "gain": -5,
+      "envelope": { "attack": 1, "decay": 230, "sustain": 0, "release": 0 },
+      "pitch": { "start": 7, "end": 0, "time": 50 } },
+    { "name": "boss", "role": "body", "source": "triangle", "freq": 392, "length": 220, "gain": -15,
+      "envelope": { "attack": 1, "decay": 210, "sustain": 0, "release": 0 },
+      "vary": { "detune": [-0.15, 0.15] } },
+    { "name": "frost", "role": "tail", "source": "sine", "freq": 1975.5, "length": 650, "gain": -19, "offset": 40,
+      "envelope": { "attack": 15, "decay": 630, "sustain": 0, "release": 0 },
+      "vary": { "detune": [-0.1, 0.1] } },
+    { "name": "glint", "role": "tail", "source": "sine", "freq": 2637, "length": 520, "gain": -22, "offset": 80,
+      "envelope": { "attack": 10, "decay": 500, "sustain": 0, "release": 0 } },
+    { "name": "rime", "role": "tail", "source": "noise", "length": 560, "gain": -24, "offset": 30,
+      "envelope": { "attack": 40, "decay": 520, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 6000, "resonance": 0.1 } }
+  ]
+}

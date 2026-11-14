@@ -1285,6 +1285,21 @@
       },
       "delivered": "2026-11-14T20:08:05.124322+00:00",
       "verdict": null
+    },
+    "sfx/stun_bash": {
+      "category": "sfx",
+      "brief": "the stun special: the knight's shield bashes down, a deep thump with a short iron ring, and frost glints high over it as the enemies around it freeze; once per stun",
+      "mode": "live",
+      "source": "sfx/stun_bash.sfx.json",
+      "render": "sfx/stun_bash.wav",
+      "report": "sfx/stun_bash.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-14T22:09:15.998192+00:00",
+      "verdict": null
     }
   }
 }
