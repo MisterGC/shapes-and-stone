@@ -243,6 +243,28 @@ QtObject {
         color: "#FFC85A"
     })
 
+    // The kill chain (issue #270): a kill within window seconds of the
+    // knight's last one, on the physics clock, is the next link of its
+    // chain; a kill later than that starts a new one, and a hit the knight
+    // takes (not one its shield stops) breaks it. Each link's death sound
+    // plays the next of pitches, semitones off the burst's own E: the
+    // dungeon song's A minor, from its E up; past the last it stays there.
+    // A link from the second on gets a crunchy hit stop on the killer's
+    // screen alone: freeze seconds, plus freezeStep for each link past the
+    // second, at most freezeMax, the world at freezeScale, and trauma for
+    // the shake. Every pipEvery-th link adds a momentum pip. A chain is
+    // counted (fightRecord.chains) once it reaches two links
+    readonly property var chain: ({
+        window: 2.5,
+        pitches: [0, 1, 3, 5, 7, 8, 10, 12],
+        freeze: 0.11,
+        freezeStep: 0.02,
+        freezeMax: 0.17,
+        freezeScale: 0,
+        trauma: 0.45,
+        pipEvery: 3
+    })
+
     // The sword-and-shield combo: the right button within window seconds of
     // a normal swing's start bashes with the shield. Every standing enemy
     // within reach times the knight's attackRange and in the swing's arc

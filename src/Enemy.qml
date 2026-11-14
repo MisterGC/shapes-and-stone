@@ -1324,20 +1324,20 @@ PhysicsItem {
     function die(byId) {
         console.log("[Enemy] Died!")
         let own = !byId
-        if (gameWorld && own) {
-            if (gameWorld.impact)
-                gameWorld.impact("enemyDeath", xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
-            else
-                gameWorld.spawnDeathParticles(xWu, yWu)
-            gameWorld.playDeathBurst(xWu, yWu)
-        }
         destroyed = true
         // Gold where it fell; in a session only the host's enemies die here
         if (gameWorld && gameWorld.dropGold && !remote) gameWorld.dropGold(xWu, yWu, tier)
         if (gameWorld) {
-            // The killer's node draws the death and counts the kill
-            if (own) gameWorld.countFight("kill")
-            else gameWorld.reportKill(byId, enemy, _lastHitDx, _lastHitDy, String(visual.color))
+            // The killer's node draws the death, sounds it, counts the kill
+            // and its chain
+            if (!own)
+                gameWorld.reportKill(byId, enemy, _lastHitDx, _lastHitDy, String(visual.color))
+            else if (gameWorld.killLanded)
+                gameWorld.killLanded(xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
+            else {
+                gameWorld.spawnDeathParticles(xWu, yWu)
+                gameWorld.playDeathBurst(xWu, yWu)
+            }
         }
         // A replicated enemy goes on every node; Game destroys this item
         if (objectId !== "" && gameWorld && gameWorld.despawnEnemy(enemy)) return

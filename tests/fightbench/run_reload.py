@@ -13,7 +13,11 @@ again: the charge must now be full after the new time. Then the fight
 room's tough guardian goes for the knight (Sandbox.tryCrush): at the
 table's enemy.crushChance it must wind up a crushing blow among its
 attacks; with enemy.crushChance set to 1 in the loaded copy and the
-sandbox reloaded, every one of its attacks must be a crushing one. Prints
+sandbox reloaded, every one of its attacks must be a crushing one. Then
+in the flow scenario the knight strikes two enemies down CHAIN_GAP seconds
+apart (Sandbox.tryChain): within Balance.chain.window they chain, the
+second death sound a step higher; with chain.window set below the gap in
+the loaded copy and the sandbox reloaded, they no longer do. Prints
 one PASS or FAIL line per check and exits with the number of failures.
 
 Usage:
@@ -38,6 +42,8 @@ STEP = 1 / 60
 NEW_CHARGE_TIME = 0.45
 CRUSH_ATTACKS = 12
 CRUSH_MAX_STEPS = 60 * 60
+CHAIN_GAP = 2.0
+NEW_CHAIN_WINDOW = 1.5
 
 
 def wait(predicate, timeout=30.0):
@@ -61,6 +67,13 @@ def try_crush(bench):
     if not wait(lambda: bench.eval1("fightReady()") is True):
         return None
     return json.loads(bench.eval1(f"tryCrush({CRUSH_ATTACKS}, {CRUSH_MAX_STEPS})") or "{}")
+
+
+def try_chain(bench):
+    bench.eval1("applyScenario('flow', 0)")
+    if not wait(lambda: bench.eval1("fightReady()") is True):
+        return None
+    return json.loads(bench.eval1(f"tryChain({round(CHAIN_GAP / STEP)})") or "{}")
 
 
 def reload(bench, balance, pattern, repl):
@@ -147,6 +160,22 @@ def main():
               and crush["crushes"] == crush["attacks"] and crush["crushChance"] == 1,
               f"after the reload every attack of the tough guardian is a crushing one "
               f"({crush and crush['crushes']} of {crush and crush['attacks']})")
+
+        chain = try_chain(bench)
+        check(chain is not None and chain["window"] > CHAIN_GAP and chain["links"] == 2
+              and len(chain["pitches"]) == 2 and chain["pitches"][1] > chain["pitches"][0] == 0,
+              f"in the flow room two kills {CHAIN_GAP} s apart chain (chain.window "
+              f"{chain and chain['window']} s, links {chain and chain['links']}, death sound at "
+              f"{chain and chain['pitches']})")
+        reloaded = reload(bench, balance, r"(chain: \(\{\s*window: )[0-9.]+,",
+                          rf"\g<1>{NEW_CHAIN_WINDOW},")
+        check(reloaded, f"chain.window set to {NEW_CHAIN_WINDOW} and the sandbox reloaded")
+        chain = try_chain(bench) if reloaded else None
+        check(chain is not None and chain["window"] == NEW_CHAIN_WINDOW and chain["links"] == 1
+              and chain["pitches"] == [0, 0],
+              f"after the reload the same two kills do not chain (chain.window "
+              f"{chain and chain['window']} s, links {chain and chain['links']}, death sound at "
+              f"{chain and chain['pitches']})")
     except TimeoutError as e:
         print("FAIL", e, "; logs in", tmp, file=sys.stderr)
         failures += 1
