@@ -637,7 +637,11 @@ ClayWorld2d {
         if (!player || !enemy) return
         if (Math.hypot(enemy.xWu - player.xWu, enemy.yWu - player.yWu) > Balance.music.reach) return
         playSting()
-        slowMotion(Balance.duel.slowTime, Balance.duel.slowScale)
+        // ClayWorld2d's slow motion counts the physics clock, so a pause
+        // holds it and a bench that steps the world sees it end on the same
+        // step every run. In a session (hitStopMode "view") it slows the
+        // picture, not the simulation the others share
+        slowMotion(Balance.duel.slowTime * 1000, Balance.duel.slowScale)
     }
 
     // The NPCs' greetings are voiced lines of the sound factory
@@ -882,45 +886,6 @@ ClayWorld2d {
     }
     function _freeze(ms, scale) {
         if (world.hitStop) world.hitStop(ms, scale === undefined ? 0 : scale)
-    }
-
-    // A slow motion on the physics clock (Balance.duel): the physics runs
-    // at scale for seconds of simulated time, counted on the physics steps
-    // (slowLeft), so a pause holds it and a bench that steps the world
-    // sees it last the same steps on every run. In a session the
-    // simulation must not stall for the others: there it is the picture's,
-    // a view hit stop of seconds / scale of the wall clock
-    property real slowLeft: 0
-    property real slowScale: 1
-    readonly property bool slowing: slowLeft > 0
-    function slowMotion(seconds, scale) {
-        if (!(seconds > 0) || !(scale > 0) || scale >= 1) return
-        if (hitStopMode === "view") {
-            _freeze(seconds / scale * 1000, scale)
-            return
-        }
-        slowScale = slowing ? Math.min(slowScale, scale) : scale
-        slowLeft = Math.max(slowLeft, seconds)
-    }
-    function _stepSlowMotion(dt) {
-        if (slowLeft <= 0) return
-        // A step's share of a second is not exact: what is left of one
-        // step at most a millionth of a second over ends here too
-        slowLeft = slowLeft - dt < 1e-6 ? 0 : slowLeft - dt
-        if (slowLeft === 0) slowScale = 1
-    }
-    // Workaround: ClayWorld2d's hitStop() ends on the wall clock and its
-    // physics time scale is the global one times the hit stop's, with no
-    // slow motion of the game's own (clayground#506). While one runs this
-    // binds the scale to the same product times slowScale, the hit stop's
-    // share read from ClayWorld2d's _hitStopScale, and gives ClayWorld2d's
-    // binding back when it ends
-    Binding {
-        target: world.physics
-        property: "timeScale"
-        when: world.slowing && world.hitStopMode !== "view"
-        value: Clayground.timeScale * world._hitStopScale * world.slowScale
-        restoreMode: Binding.RestoreBindingOrValue
     }
 
     Component { id: fxParticleComp; FxParticle {} }
@@ -3313,7 +3278,6 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world.physicsSeconds += world.physics.timeStep
-            world._stepSlowMotion(world.physics.timeStep)
             if (world.followFightOnSteps && world._followingFight)
                 world._followFight(world.physics.timeStep)
             else if (world.followFightOnSteps && world.fightIntensity > 0)

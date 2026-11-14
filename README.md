@@ -417,9 +417,9 @@ plays that part from its next bar, a parry stings once, the lead's opening
 stings and plays the slow motion for its steps, a lock on the lead closes
 the view in round the knight (on no other enemy), with the session's
 `hitStopMode` `"view"` the slow motion is the picture's and the physics
-runs on, and its fall brings the flow part back. With no audio output, as on CI's runner, the song's
-playhead stands and its segment never moves (clayground#507): the bench
-then prints a SKIP line for that one check:
+runs on, and its fall brings the flow part back. With no audio output, as on
+CI's runner, Clayground's sound engine runs on its own clock
+(clayground#507), so the song moves to its duel part there too:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
@@ -2072,10 +2072,9 @@ closes the view in to `duel.zoom` times its size round the knight, the HUD
 as it was. An opening plays a slow motion: the physics at
 `duel.slowScale` for `duel.slowTime` seconds of the physics clock, so a
 bench that steps the world sees it last the same steps on every run
-(Clayground's `hitStop()` ends on the wall clock; until clayground#506
-gives a slow motion of its own the game binds the physics' time scale
-itself). In a session the slow motion is the picture's, as the hit stop
-is, so the host's simulation never slows for the others; every screen
+(Clayground's `slowMotion()`, clayground#506). In a session the slow
+motion is the picture's, as the hit stop is, so the host's simulation
+never slows for the others; every screen
 follows its own knight's duel from the replicated `lead` and `aiState`,
 growls and stings for the openings near it.
 A perfect block sends a spitter's shot back too (issue #283, the table's
