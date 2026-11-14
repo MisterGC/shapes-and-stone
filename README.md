@@ -2332,8 +2332,9 @@ both in `Balance.pacing.person`:
   gives it no more time.
 - **Misses**, `miss: 0.2`: one in every five of its parries and perfect
   blocks (shots included) is mistimed, in turn, the place of the first
-  miss picked by the seed - a roll per answer would leave a fight of ten
-  answers to luck. A miss is one window early - a swing under way before
+  miss picked by the seed, the room and its danger, so the fights of one
+  run miss on answers of their own - a roll per answer would leave a
+  fight of ten answers to luck. A miss is one window early - a swing under way before
   the parry window, the shield up before the perfect block's, an ordinary
   block - or late, no press before the blow lands, as the seed rolls.
   Zones are not missed, only seen late. A spitter's shot begins with the
@@ -2354,8 +2355,10 @@ The pacing run plays it in every room at every depth, and prints a section
 of its own after the fights: one `WIN` or `LOSE` line per fight, a win in
 how many seconds - the room's clear time and, in a duel or the boss room,
 the lead's time from its engagement -, a loss with what still stood and
-its HP. `--check` sets no band on it and it never changes the exit code:
-the bands of the other pilots stay as they are.
+its HP. `--check` sets no band on its wins and losses, and the bands of the
+other pilots stay as they are; it checks the pilot's own rule only: over
+all its fights its misses lie within `missSlack` (0.05) of `miss`, and a
+FAIL there fails the run.
 
 A `WIN` counts as "a person can do this": the person cleared the room
 without falling within the bench's 180 s. A `LOSE` (fell, or still

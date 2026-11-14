@@ -541,10 +541,13 @@ QtObject {
         // fired, a zone warning - and once it has seen it times its press
         // to the window as "skilled" does, but misses miss of its parries
         // and perfect blocks in turn - one in every five for 0.2, the
-        // first one's place picked by the seed - by one window early or
-        // late, as the seed rolls. Its results are reported, not banded:
-        // a win is a fight a person can do (README, "The person pilot")
-        person: { reaction: 0.25, miss: 0.2 },
+        // first one's place picked by the seed, the room and its danger -
+        // by one window early or late, as the seed rolls. Its results are
+        // reported, not banded:
+        // a win is a fight a person can do (README, "The person pilot").
+        // --check fails when its misses over all its fights lie more than
+        // missSlack off miss
+        person: { reaction: 0.25, miss: 0.2, missSlack: 0.05 },
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
         // one charged swing, two or three swings, parries among them for

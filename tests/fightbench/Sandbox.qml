@@ -81,7 +81,7 @@ Item {
         personMissed = { parry: 0, perfect: 0, shot: 0 }
         personFastest = -1
         _answerCount = 0
-        _missPhase = answer === "person" ? _rng() : 0
+        _missPhase = answer === "person" ? missPhaseOf(s, room, danger) : 0
         // What would be heard, on the physics steps: muted, logged
         game.logSounds = true
         game.followFightOnSteps = true
@@ -798,8 +798,9 @@ Item {
     // attack it times its press to the window as "skilled" does - the
     // ring a player reads -, but misses Balance.pacing.person.miss of its
     // parries and perfect blocks, shots' included: one in every five
-    // answers for 0.2, in turn, the first miss's place picked by the seed
-    // (a roll per answer would leave a short fight to luck). A miss is by
+    // answers for 0.2, in turn, the first miss's place picked by the seed,
+    // the room and its danger, so the fights of one run miss on different
+    // answers (a roll per answer would leave a short fight to luck). A miss is by
     // one window early (a swing begun before the parry window, the shield
     // up before the perfect block's) or late (no press before the blow
     // lands), as the seed rolls. A shot began with its spitter's wind-up
@@ -824,6 +825,13 @@ Item {
     // Answers so far, and where in the share's turn the first miss lies
     property int _answerCount: 0
     property real _missPhase: 0
+    // Where in the share's turn the first miss lies, from 0 to 1: the
+    // seed's, the room's and the danger's own, so every fight of a pacing
+    // run, all on one seed, has its misses on answers of its own
+    function missPhaseOf(s, r, d) {
+        let rooms = ["mixed", "flow", "duel", "guardianduel", "spitterduel", "boss"]
+        return game.createRng(game.deriveSeed(s, rooms.indexOf(r) * 1000 + Math.round(d * 100)))()
+    }
     // Whether the next answer is a miss, and if so whether early
     function rollMiss() {
         let n = _answerCount++

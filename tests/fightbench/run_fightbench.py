@@ -70,7 +70,9 @@ toll and nothing screams before its adds come; in no flow or duel fight
 is its toll heard (issue #287). No band checks the spitter duel. The
 person's fights get no band either: a section of their own says of each
 whether the person won - cleared the room without falling - and in how
-many seconds, or how it lost, with its answers and misses (issue #315).
+many seconds, or how it lost, with its answers and misses (issue #315);
+--check tests its own rule instead: its misses over all its fights lie
+within Balance.pacing.person.missSlack of its share.
 --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
@@ -364,6 +366,21 @@ def person_lines(results):
         what += f"; knight HP {r['knightHp']}, damage taken {r['damageTaken']}"
         out.append((won, f"{tag}: {what}; {answers_line(r['person'])}"))
     return out
+
+
+def check_person_misses(results, person):
+    """(ok, line) for the person's misses (issue #315), when it played: over
+    all its fights they lie within missSlack of its share miss - the pilot's
+    own rule, not a band on its wins"""
+    rs = [r for r in results if r["answer"] == PERSON and r.get("person")]
+    answers = sum(sum(r["person"]["answers"].values()) for r in rs)
+    if not rs or not answers:
+        return []
+    missed = sum(sum(r["person"]["missed"].values()) for r in rs)
+    share, slack = person["miss"], person["missSlack"]
+    return [(abs(missed / answers - share) <= slack + 1e-9,
+             f"the person misses {share} of its answers, give or take {slack} "
+             f"({missed} of {answers}, {missed / answers:.2f}, in {len(rs)} fights)")]
 
 
 def death_pitches(r):
@@ -672,8 +689,12 @@ def pacing(args, loader):
         for won, line in person:
             print(("WIN  " if won else "LOSE ") + line)
         print(f"the person wins {sum(1 for won, _ in person if won)} of {len(person)} fights")
+    lines = []
     if args.check and banded:
         lines = check(banded, banded[0]["pacing"])
+    if args.check and person:
+        lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
+    if lines:
         print()
         for ok, line in lines:
             print(("PASS " if ok else "FAIL ") + line)
