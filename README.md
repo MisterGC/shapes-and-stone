@@ -2828,7 +2828,7 @@ rhythm. Its numbers are the table's `boss` group.
 |-----------|-------|
 | **Shape** | Large hollow stone hexagon, a frame turning in its hollow |
 | **Color** | Stone grey (#4A4E57), its core glowing orange-red (#FF5A2A) in phase 2 |
-| **Health** | 2500 at its first appearance, 35 % more each time after, with depth and party |
+| **Health** | 2500 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
 | **Phases** | 2 |
 
 **Phase 1 (100%-50% HP):** three strings of strikes, rests and a feint on
