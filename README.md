@@ -417,9 +417,9 @@ plays that part from its next bar, a parry stings once, the lead's opening
 stings and plays the slow motion for its steps, a lock on the lead closes
 the view in round the knight (on no other enemy), with the session's
 `hitStopMode` `"view"` the slow motion is the picture's and the physics
-runs on, and its fall brings the flow part back. With no audio output, as on CI's runner, the song's
-playhead stands and its segment never moves (clayground#507): the bench
-then prints a SKIP line for that one check:
+runs on, and its fall brings the flow part back. With no audio output, as on
+CI's runner, Clayground's sound engine runs on its own clock
+(clayground#507), so the song moves to its duel part there too:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml

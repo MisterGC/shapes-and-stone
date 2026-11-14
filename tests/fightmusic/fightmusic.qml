@@ -15,10 +15,9 @@
 // musicTrace gets a row once it has moved musicTraceStep.
 // A duel (issue #273, Balance.duel): a room's lead patrolling near the
 // knight is none; as it spots the knight it growls and the song's state is
-// its duel part, which the song moves to on the next bar where an audio
-// output runs it (with none its playhead stands, clayground#507, and the
-// segment is skipped); a parry in the duel and the lead's opening each
-// sting once, the opening plays ClayWorld2d's slow motion
+// its duel part, which the song moves to on the next bar, with or without
+// an audio output (clayground#507); a parry in the duel and the lead's
+// opening each sting once, the opening plays ClayWorld2d's slow motion
 // (clayground#506) - the physics at slowScale for slowTime of the physics
 // clock, the same steps every run -
 // a lock on the lead closes the view in to duel.zoom round the knight, which
@@ -248,18 +247,15 @@ Window {
             segmentWait = Date.now()
             positionBefore = song().position
         }],
-        // The song moves on its next bar, on the audio output's clock
+        // The song moves on its next bar, on the audio output's clock or,
+        // with no output device, on the sound engine's own (clayground#507)
         [() => song().segment === "duel" || Date.now() - segmentWait > 4000, () => {
             let s = song()
-            if (s.segment === "duel")
-                check(true, "the song moves to its duel part on the next bar (" + (Date.now() - segmentWait)
-                      + " ms)")
-            else if (s.position === positionBefore)
-                console.log("[FightMusic] SKIP no audio output runs the song (its playhead stands at "
-                            + s.position + "), so its segment stays " + s.segment + " (clayground#507)")
-            else
-                check(false, "the song moves to its duel part on the next bar: still " + s.segment
-                      + " after 4 s, its playhead moving")
+            check(s.segment === "duel",
+                  s.segment === "duel"
+                  ? "the song moves to its duel part on the next bar (" + (Date.now() - segmentWait) + " ms)"
+                  : "the song moves to its duel part on the next bar: still " + s.segment + " after 4 s, its"
+                    + " playhead " + (s.position === positionBefore ? "standing at " + s.position : "moving"))
             // A parry in the duel stings, and one more at once does not
             let from = game.soundLog.length
             game.countFight("parry")
