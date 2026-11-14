@@ -223,6 +223,16 @@ Item {
         _face(p, e)
         return true
     }
+    // Host: enemy id has at least hp HP, so the bench's swing, parry and
+    // answers to its lunges do not kill it before the last of them (a
+    // normal grunt falls to a parry since issue #268)
+    function sturdy(id, hp) {
+        let e = _byId()[id]
+        if (!e) return false
+        e.maxHp = Math.max(e.maxHp, hp)
+        e.hp = Math.max(e.hp, hp)
+        return true
+    }
     // Host: enemy id dies as if this node's knight killed it
     function kill(id) {
         let e = _byId()[id]

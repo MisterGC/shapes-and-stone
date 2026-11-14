@@ -265,7 +265,8 @@ and the one it has.
 The joiner's knight answers one of the host's enemies: it stands until the
 enemy walks into its reach and swings, parries it, blocks, blocks
 perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it as it closes in and
-kills it while the host's knight kills another. Each answer counts once,
+kills it while the host's knight kills another; the host gives that enemy
+200 HP first, so it stands until the kill. Each answer counts once,
 on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
@@ -1103,7 +1104,12 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
 Deeper is harder. Each dungeon is a depth, counted from 0, and the table's
 `depth` group says what each depth adds to the dungeon: two more enemies
 (up to `depth.enemiesCap`), fewer weak and more tough ones, more guardians
-and spitters, and half an attack point per enemy, rounded. A dungeon's
+and spitters, half an attack point per enemy, rounded, and a fifth more
+HP per enemy (`depth.hp`), rounded, so the smith's sword does not make
+the fights shorter the deeper the knight goes: a weak or normal enemy
+falls to one charged swing or two to three swings at every depth, with
+the sword the knight usually has there (the pacing bench's flow room
+below). A dungeon's
 tier mix is dealt, not rolled: `spawn.weakChance` of its enemies are weak
 and those above `spawn.normalChance` tough, so the mix follows the depth on
 every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
@@ -1937,7 +1943,12 @@ blow: `knight.heavySwing` times atk, within `knight.heavyArc` and
 `knight.heavyRange` times the swing's reach. It goes through a guardian's
 shield, which staggers, and knocks enemies back `knight.heavyKnockback`
 times as far. Let go of before it is full, it is a normal swing; full, the
-charge is kept for as long as the button is held. A hit taken while charging, a raised
+charge is kept for as long as the button is held. Once the heavy blow's
+arc has faded, the knight recovers `knight.heavyRecovery` seconds before
+it swings again; a heavy blow that hit no enemy leaves it open that long,
+no shield and no dash, and a held right button raises the shield once it
+is over. A heavy blow that parries takes the recovery away, as a parry
+does a swing's cooldown. A hit taken while charging, a raised
 shield or a dash cancels it, and its release swings nothing; behind the
 shield or in a dash the button swings at once, as it always did. The
 charge counts the physics steps (Clayground's `InputAction` on the

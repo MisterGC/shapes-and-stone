@@ -183,7 +183,7 @@ Item {
                 soloMin: one.enemiesMin, soloMax: one.enemiesMax,
                 enemies: game.enemies.filter(e => e && !e.destroyed)
                              .map(e => [e.objectId, e.enemyType, e.tier, e.maxHp,
-                                        game.enemyHp(e.enemyType, e.tier, k)])
+                                        game.enemyHp(e.enemyType, e.tier, k, game.danger)])
                              .sort()}
     }
     // The knight in the room after the first, where the floor carries the

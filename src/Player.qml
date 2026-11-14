@@ -127,9 +127,15 @@ PhysicsItem {
     // blow's lockout is over
     property bool _shieldWanted: false
     readonly property bool shieldWanted: _shieldWanted
+    // Seconds the knight stays open after a charged swing that hit no
+    // enemy (knight.heavyRecovery), on the physics clock: no shield and no
+    // dash until then; a held right button raises the shield once it is over
+    property real openLeft: 0
+    // The charged swing under way has hit an enemy
+    property bool _heavyLanded: false
     // No mana, no shield: it cannot be raised, and drops when it runs dry
     onIsBlockingChanged: {
-        if (isBlocking && (mana <= 0 || shieldLock > 0)) {
+        if (isBlocking && (mana <= 0 || shieldLock > 0 || openLeft > 0)) {
             isBlocking = false
             return
         }
@@ -252,6 +258,10 @@ PhysicsItem {
                 shieldLock = shieldLock - dt < 1e-6 ? 0 : shieldLock - dt
                 if (shieldLock === 0 && _shieldWanted && !fallen && mana > 0) isBlocking = true
             }
+            if (openLeft > 0) {
+                openLeft = openLeft - dt < 1e-6 ? 0 : openLeft - dt
+                if (openLeft === 0 && _shieldWanted && !fallen && mana > 0) isBlocking = true
+            }
             if (isBlocking && !fallen) {
                 let left = mana - blockDrain * dt
                 mana = left < 1e-6 ? 0 : left
@@ -269,6 +279,12 @@ PhysicsItem {
             if (isAttacking) {
                 _swingTimer -= dt
                 if (_swingTimer <= 0) {
+                    // A charged swing that hit no enemy leaves the knight
+                    // open for its recovery
+                    if (isHeavy && !_heavyLanded && !fallen) {
+                        openLeft = Balance.knight.heavyRecovery
+                        isBlocking = false
+                    }
                     isAttacking = false
                     isHeavy = false
                 }
@@ -543,6 +559,7 @@ PhysicsItem {
                     if (enemy.enemyType === "guardian" && !parried) enemy.stagger()
                 }
                 enemy.takeDamage(dmg, xWu, yWu, isHeavy)
+                if (isHeavy) _heavyLanded = true
                 _hitThisSwing.add(enemy)
                 hitCount++
                 let mo = Balance.momentum
@@ -934,8 +951,9 @@ PhysicsItem {
     function raiseShield() {
         if (fallen) return
         _shieldWanted = true
-        // Broken by a crushing blow: it rises when the lockout is over
-        if (shieldLock > 0) return
+        // Broken by a crushing blow, or open after a charged swing that
+        // missed: it rises when that is over
+        if (shieldLock > 0 || openLeft > 0) return
         _tryBash()
         if (mana <= 0) {
             _noMana()
@@ -1047,9 +1065,10 @@ PhysicsItem {
         if (gameWorld) gameWorld.playDash()
     }
 
-    // A dash costs dashMana; it cancels a charge
+    // A dash costs dashMana; it cancels a charge. Open after a charged
+    // swing that missed, the knight does not dash
     function dash() {
-        if (fallen || dashCooldown > 0 || isDashing) return
+        if (fallen || dashCooldown > 0 || isDashing || openLeft > 0) return
         if (!_aimDash() || !_afford(dashMana)) return
         _spend(dashMana)
         _startDash()
@@ -1059,7 +1078,7 @@ PhysicsItem {
     // momentum the pips flash, short of the mana the bar does; either way
     // nothing else happens. Returns whether it whirled
     function unleash() {
-        if (fallen || isDashing) return false
+        if (fallen || isDashing || openLeft > 0) return false
         if (momentum < Balance.momentum.max) {
             momentumShort()
             return false
@@ -1113,18 +1132,20 @@ PhysicsItem {
         }
     }
 
-    // The charged swing: a wide heavy blow (Balance.knight.heavy...).
-    // Returns whether it swung
+    // The charged swing: a wide heavy blow (Balance.knight.heavy...),
+    // followed by knight.heavyRecovery seconds before the next swing once
+    // its arc has faded. Returns whether it swung
     function heavyAttack() {
         if (fallen || attackCooldown > 0 || isAttacking) return false
         isAttacking = true
         isHeavy = true
+        _heavyLanded = false
         _swingTimer = attackDuration + Balance.knight.swingFade
         _hitThisSwing = new Set()
         _brokeThisSwing = false
         _glancedThisSwing = new Set()
         _swingEarned = 0
-        attackCooldown = attackCooldownTime
+        attackCooldown = _swingTimer + Balance.knight.heavyRecovery
         view.swing(true)
         acted("heavy")
         if (gameWorld) gameWorld.playHeavySwing()
@@ -1202,6 +1223,7 @@ PhysicsItem {
     onFallenChanged: if (fallen) {
         _cancelCharge()
         momentum = 0
+        openLeft = 0
     }
 
     InputAction {

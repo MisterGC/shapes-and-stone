@@ -11,7 +11,8 @@
 // its veins, their rock faces, their rooms' spawn holes (issue #157) and
 // travellers of the deep (issue #158, #176) the one recorded before there were
 // any (issue #156), but for a torch
-// stepped aside for a vein. A knight
+// stepped aside for a vein; both recorded again with the enemies' HP that
+// grows with the danger (issue #268). A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -71,8 +72,8 @@ Window {
     // 60 HP (the duel fights) from 51748fd and 888308f2, b084ab49 and
     // a1c350e8 without the veins
     readonly property var today: ({
-        "0.5": { hash: "724f5b8", noVeins: "404dd8c", enemies: 15 },
-        "1.5": { hash: "774b9c3e", noVeins: "eea7aa24", enemies: 18 }
+        "0.5": { hash: "4ed8fb3e", noVeins: "c14ac00a", enemies: 15 },
+        "1.5": { hash: "467c46b9", noVeins: "12950f23", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its
@@ -118,9 +119,10 @@ Window {
         let cap = Balance.depth.enemiesCap
         return [Math.min(cap, Balance.spawn.enemiesMin + more), Math.min(cap, Balance.spawn.enemiesMax + more)]
     }
+    // At the game's danger, depth.hp of it more per step
     function hpOf(type, tier, k) {
         let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
-        return Math.round(base * (1 + perKnight(k, "hpPerKnight")))
+        return Math.round(base * (1 + game.danger * Balance.depth.hp) * (1 + perKnight(k, "hpPerKnight")))
     }
 
     // The dojo's knight count; a game without it (before issue #102)

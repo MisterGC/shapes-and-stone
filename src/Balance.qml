@@ -69,7 +69,11 @@ QtObject {
         // heavyArc and heavyRange times attackRange, through a guardian's
         // shield (it staggers), knocking back heavyKnockback times as far.
         // Released before full, a normal swing; full, the charge is kept
-        // until the button is let go. A hit cancels it
+        // until the button is let go. A hit cancels it. Once the heavy
+        // swing's arc has faded the knight recovers heavyRecovery seconds
+        // before it swings again (a parry with it takes that away, as a
+        // parry does a swing's cooldown); a heavy swing that hit no enemy
+        // leaves it open for that time, no shield and no dash
         chargeStart: 0.2,
         chargeTime: 0.6,
         chargeSpeed: 0.55,
@@ -77,6 +81,7 @@ QtObject {
         heavyArc: 180,
         heavyRange: 1.25,
         heavyKnockback: 2,
+        heavyRecovery: 0.5,
         // Whirlwind: Q with full momentum (Balance.momentum) spins the
         // knight forward, whirlSpeed for whirlDuration seconds along its
         // way or facing, no damage taken, and hits every standing enemy
@@ -316,12 +321,14 @@ QtObject {
     })
 
     readonly property var enemy: ({
-        // Base HP by tier: weak, normal, tough
-        tierHp: [22, 36, 50],
+        // Base HP by tier: weak, normal, tough. Weak and normal fall to
+        // one charged swing or two to three swings (pacing.flowHits), at
+        // every depth with depth.hp; tough is a room's lead
+        tierHp: [20, 26, 72],
         // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 24, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        guardian: { hpBonus: 10, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        spitter: { hpBonus: -6, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        grunt: { hpBonus: 2, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        guardian: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        spitter: { hpBonus: -2, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -444,7 +451,12 @@ QtObject {
         spitterChance: 0.03,
         typeCap: 0.45,
         // Harder blows: added to every enemy's atk, rounded to whole points
-        atk: 0.5
+        atk: 0.5,
+        // Tougher hides: this share of an enemy's HP more, rounded to whole
+        // points. It keeps pace with the smith's sword (shop.swordAtk at
+        // shop.levelDepth): weak and normal enemies stay a charged swing or
+        // two to three swings at every depth (pacing.flowHits)
+        hp: 0.2
     })
 
     // A fight's pace (issue #267): the fight bench's pacing run

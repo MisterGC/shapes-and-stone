@@ -5641,11 +5641,14 @@ ClayWorld2d {
     function enemyAtk(type, d) {
         return Balance.enemy[type].atk + Math.round(d * Balance.depth.atk)
     }
-    // An enemy's HP in a dungeon built for knights (1 when left out):
-    // Balance.party.hpPerKnight of it more for each beyond the first
-    function enemyHp(type, tier, knights) {
+    // An enemy's HP at a danger (0 when left out) in a dungeon built for
+    // knights (1 when left out): Balance.depth.hp of it more per step of
+    // the danger, and on that Balance.party.hpPerKnight of it more for each
+    // knight beyond the first
+    function enemyHp(type, tier, knights, d) {
         let hp = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
-        return Math.round(hp * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+        return Math.round(hp * (1 + (d || 0) * Balance.depth.hp)
+                          * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
@@ -5656,7 +5659,7 @@ ClayWorld2d {
         tier = tier === undefined ? 1 : tier
         type = type || "grunt"
         let stats = Balance.enemy[type]
-        let ehp = enemyHp(type, tier, knights)
+        let ehp = enemyHp(type, tier, knights, danger)
         let eatk = enemyAtk(type, danger)
         let edef = stats.def
         let props = {
