@@ -9,7 +9,9 @@
 // and Go play the count's cue (sfx/descent_count), Go an octave up. Once
 // it lets go, Go shows and D moves the knight. The camp has no intro; the
 // dungeon after it has its own, "Depth 1", and the solo pause holds its
-// count.
+// count. It passes the record of depth 0 the bench puts into its store:
+// the record's banner waits while the intro holds and goes up only after
+// it lets go.
 // In a session, a host and a joiner joined over LAN in one process: the
 // count starts once both knights are in the dungeon, both screens show the
 // same name, hold the same count and let go at the same moment of the
@@ -24,6 +26,7 @@ import QtQuick
 import QtQuick.Window
 import QtTest
 import Clayground.Network
+import Clayground.Storage
 import "../../src"
 
 Window {
@@ -59,7 +62,16 @@ Window {
         keys.keyPress(key, Qt.NoModifier, -1)
     }
 
+    // The bench's record, depth 0 on every run, so the dungeon at depth 1
+    // passes it
+    KeyValueStore { id: store; name: "ShapesAndStoneDescentBench" }
+    // Every record banner the solo game raised: its depth, when and
+    // whether the intro held then
+    property var banners: []
+
     Component.onCompleted: {
+        store.remove("bestDepth")
+        store.set("record", JSON.stringify({depth: 0, names: ["Ana"], date: "2026-11-01"}))
         gameComp = Qt.createComponent(Qt.resolvedUrl("../../src/Game.qml"))
         if (gameComp.status !== Component.Ready) {
             console.log("[Descent] FAIL", gameComp.errorString())
@@ -67,6 +79,7 @@ Window {
             return
         }
         solo = makeGame({})
+        solo.recordBanner.connect(d => banners.push({ depth: d, at: Date.now(), held: solo.introHeld }))
         script.start()
     }
     function makeGame(props) {
@@ -245,6 +258,9 @@ Window {
             let depth = shown(solo, "introDepth")
             check(solo.introHeld && depth && depth.text === "Depth 1",
                   "the dungeon after the camp has its own intro (" + (depth ? depth.text : "none") + ")")
+            check(solo.recordPassed && solo._recordWaits && banners.length === 0,
+                  "it passes the record of depth 0, and the record's banner waits while the intro holds ("
+                  + banners.length + " raised)")
         }],
         [300, () => {
             solo.openMenu()
@@ -264,6 +280,10 @@ Window {
                   + held + " ms besides the pause (" + solo.introSeconds * 1000 + " ms)")
             check(seenOf(solo).beats.map(b => b.beat).join(",") === "3,2,1",
                   "after the camp it counts 3, 2, 1 (" + seenOf(solo).beats.map(b => b.beat).join(",") + ")")
+            let b = banners[0]
+            check(banners.length === 1 && b.depth === 1 && !b.held && b.at >= s.freedAt && !solo._recordWaits,
+                  "the record's banner goes up once, after the intro lets go ("
+                  + (b ? "depth " + b.depth + ", " + (b.at - s.freedAt) + " ms after, intro held " + b.held : "none") + ")")
             solo.destroy()
             solo = null
             startSession()
