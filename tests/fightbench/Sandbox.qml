@@ -403,8 +403,10 @@ Item {
     // leadHp (issue #288), as JSON
     function tryDuelLead() {
         Clayground.paused = true
-        let lead = game.enemies.find(e => alive(e) && e.lead)
-        return JSON.stringify({type: lead.enemyType, hp: lead.maxHp,
+        let standing = game.enemies.filter(alive)
+        let lead = standing.find(e => e.lead)
+        return JSON.stringify({type: lead.enemyType, hp: lead.maxHp, tier: lead.tier,
+                               leads: standing.filter(e => e.lead).length, standing: standing.length,
                                want: game.enemyHp(lead.enemyType, lead.tier, game.partyKnights, game.danger),
                                leadHp: Balance.enemy[lead.enemyType].leadHp})
     }

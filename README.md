@@ -2397,7 +2397,8 @@ crushing blows among its attacks before and after setting
 its stance bar, the opening's length and damage, and the new length after
 setting `lead.openingTime` to 2.5, in the `guardianduel` scenario it
 checks the guardian lead's HP before and after setting
-`enemy.guardian.leadHp` to 0.5, and in the `flow` scenario it strikes
+`enemy.guardian.leadHp` to 0.5, in the `spitterduel` scenario that one
+spitter lead of tier 2 stands alone, and in the `flow` scenario it strikes
 two enemies down 2 s apart, a chain at `chain.window` 2.5 s and two lone
 kills after setting it to 1.5, and in the `bossroom` scenario it has
 the Warden wind up and strike once: its toll at `boss.toll`'s pitches and

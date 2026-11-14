@@ -20,8 +20,9 @@ a swing in the opening does lead.openingDamage times its damage; with
 lead.openingTime changed in the loaded copy and the sandbox reloaded, the
 opening lasts the new time. The guardianduel scenario (issue #288) stands
 a guardian lead with the table's HP, its type's leadHp share of the tough
-tier's; with guardian.leadHp changed in the loaded copy and the sandbox
-reloaded, the lead has the new HP. Then in the flow scenario the knight strikes
+tier's, and the spitterduel scenario (issue #315) one spitter lead of tier
+2 alone; with guardian.leadHp changed in the loaded copy and the sandbox
+reloaded, the guardian lead has the new HP. Then in the flow scenario the knight strikes
 two enemies down CHAIN_GAP seconds apart (Sandbox.tryChain): within
 Balance.chain.window they chain, the second death sound a step higher;
 with chain.window set below the gap in the loaded copy and the sandbox
@@ -96,8 +97,8 @@ def try_opening(bench):
     return json.loads(bench.eval1("tryOpening()") or "{}")
 
 
-def try_duel_lead(bench):
-    bench.eval1("applyScenario('guardianduel', 0)")
+def try_duel_lead(bench, scenario="guardianduel"):
+    bench.eval1(f"applyScenario('{scenario}', 0)")
     if not wait(lambda: bench.eval1("duelReady()") is True):
         return None
     return json.loads(bench.eval1("tryDuelLead()") or "{}")
@@ -238,6 +239,15 @@ def main():
               f"the guardianduel scenario stands a {lead and lead['type']} lead of "
               f"{lead and lead['hp']} HP ({lead and lead['want']} by the table, leadHp "
               f"{lead and lead['leadHp']})")
+        # The spitter lead's duel (issue #315): one spitter lead, tough,
+        # alone
+        spitter = try_duel_lead(bench, "spitterduel")
+        check(spitter is not None and spitter["type"] == "spitter" and spitter["tier"] == 2
+              and spitter["leads"] == 1 and spitter["standing"] == 1 and spitter["hp"] == spitter["want"],
+              f"the spitterduel scenario stands one {spitter and spitter['type']} lead of tier "
+              f"{spitter and spitter['tier']}, {spitter and spitter['hp']} HP ({spitter and spitter['want']} "
+              f"by the table), alone ({spitter and spitter['standing']} standing, "
+              f"{spitter and spitter['leads']} leads)")
         reloaded = reload(bench, balance, r"(guardian: \{ hpBonus: -?[0-9]+, leadHp: )[0-9.]+,",
                           rf"\g<1>{NEW_GUARDIAN_LEAD_HP},")
         check(reloaded, f"guardian.leadHp set to {NEW_GUARDIAN_LEAD_HP} and the sandbox reloaded")
