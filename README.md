@@ -79,7 +79,7 @@ gamepad, whichever was used last. By default:
 | Strike (hold to charge, at a vein dig, at a pond cast) | left button | R1 |
 | Shield | right button | L1 |
 | Dash | Space | B |
-| Whirlwind | Q | R2 |
+| Special (the one picked for the dungeon) | Q | R2 |
 | Talk, open a door | E | A |
 | Potion | 1 | X |
 | Draught | 2 | Y |
@@ -144,7 +144,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -750,8 +750,9 @@ through a held block instead of `knight.blockedShare`, a blow it stops
 costs `shop.shieldBlockMana` mana instead of `knight.blockMana`, and shows
 a lighter rim; the lighter harness makes a dash cost `shop.harnessDashMana`
 instead of `knight.dashMana`, the whirlwind's dash too; the balanced blade
-makes a whirlwind cost `shop.bladeWhirlMana`, its dash included, instead
-of `knight.whirlMana`. Each of these is a list with one entry per level.
+makes the special the knight picked cost `shop.bladeShare` of its mana,
+rounded: a whirlwind, its dash included, 15, 12 and 9 instead of
+`knight.whirlMana`'s 20. Each of these is a list with one entry per level.
 The perfect block's window is the same at every level. At each camp the
 smith sells one level, the next above the knight's in one of the four,
 for `shop.upgradePrice` of that level, and then nothing more there; the
@@ -1922,6 +1923,33 @@ hold, the beats and its length, and exits with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/descent/descent.qml
+```
+
+Before the intro counts, the knight picks its special for the dungeon: the
+whirlwind, the stun or the bolt (`Balance.specials`). The choice shows a
+card for each with its name, a line of what it does and the mana it costs
+this knight, under the depth and the name, and the count starts once it is
+made. The arrows, A and D or a pad's stick move along the cards; 1 to 3, a
+click, Enter, Space, E or the pad's A take one. Q or R2 then let loose the
+special picked and nothing else, the HUD shows its name and mana right of
+the mana bar and the controls hint names it. The pick holds for the dungeon
+and the camp after it, and the next choice opens on it. In co-op every
+knight picks its own; a knight that has arrived and still chooses holds the
+count however long it takes, and a knight that has picked shows "Waiting
+for the party" meanwhile. Only the specials in the game are offered, and with one there is
+no choice: today that is the whirlwind alone, so the game shows none until
+the stun (#318) and the bolt (#319) are in. Without an intro (the fight
+room, the dojo's scenarios, a bench that turns it off) the knight keeps the
+special it has, the whirlwind at the start. The Control Input page calls
+the special's button *Special*; it keeps the action id `whirlwind`, under
+which a rebound key is kept. The specials bench offers the specials not in
+the game yet too (`Game.specialsAll`), picks with the keys, the synthetic
+pad and a click, checks what the choice, the HUD, the hint, Q, R2 and the
+smith's blade do with each, then has a host and a joiner each pick their
+own, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/specials/specials.qml
 ```
 
 A grunt does not run straight in: from `enemy.circleRange` on it circles
