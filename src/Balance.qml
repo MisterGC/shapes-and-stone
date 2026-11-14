@@ -1329,6 +1329,40 @@ QtObject {
         step: 0.12
     })
 
+    // Entering a dungeon opens with a descent intro (issue #316): its
+    // depth and its name for lead seconds, then a count of beats (3, 2,
+    // 1), beat seconds each, while the world is held: nothing moves,
+    // strikes or takes damage. Go shows for go seconds once the count
+    // ends; the name fades in over fade seconds. Each beat plays the
+    // count's knock (sfx/descent_count) at volume, the release pitched
+    // goPitch semitones up. In a session the count starts once every
+    // knight has arrived, lag seconds ahead on the session clock so it
+    // reaches every screen before it begins, and ends at the same moment
+    // on every screen; a knight not arrived after waitMax seconds holds
+    // the others no longer, and one that waits waitNote seconds is told
+    // so. The name is an adjective of the dungeon's danger band (as
+    // danger.looks) and a place, both drawn from its level's seed ^ salt,
+    // so every screen of a session shows the same
+    readonly property var intro: ({
+        lead: 0.5,
+        beat: 0.5,
+        beats: 3,
+        go: 0.6,
+        fade: 0.25,
+        volume: 0.7,
+        goPitch: 12,
+        lag: 0.15,
+        waitMax: 6,
+        waitNote: 0.6,
+        salt: 0x64657363,
+        adjectives: [
+            ["Dripping", "Mossy", "Quiet", "Shallow", "Damp", "Lamplit"],
+            ["Pale", "Hollow", "Cold", "Silent", "Grey", "Forgotten"],
+            ["Burning", "Red", "Scorched", "Howling", "Ashen", "Bleeding"]
+        ],
+        places: ["Halls", "Vaults", "Deeps", "Galleries", "Warrens", "Cisterns", "Crypts", "Passages"]
+    })
+
     readonly property var campfire: ({
         healPerSecond: 5.0,
         // Mana comes back here, on top of the rest's knight.manaRegen

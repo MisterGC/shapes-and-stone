@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "descent_count",
+  "variation": { "seed": 316, "pool": 3 },
+  "layers": [
+    { "name": "knock", "role": "transient", "source": "noise", "length": 60, "gain": -9,
+      "noise": { "color": "pink" },
+      "envelope": { "attack": 1, "decay": 50, "sustain": 0, "release": 0 },
+      "filter": { "type": "bandpass", "cutoff": 900, "resonance": 0.3 } },
+    { "name": "drum", "role": "body", "source": "sine", "freq": 110, "length": 260, "gain": -6,
+      "envelope": { "attack": 2, "decay": 240, "sustain": 0, "release": 0 },
+      "pitch": { "start": 5, "end": 0, "time": 60 } },
+    { "name": "ring", "role": "body", "source": "triangle", "freq": 220, "length": 380, "gain": -14,
+      "envelope": { "attack": 4, "decay": 360, "sustain": 0, "release": 0 },
+      "vary": { "detune": [-0.1, 0.1] } },
+    { "name": "fifth", "role": "tail", "source": "sine", "freq": 329.63, "length": 300, "gain": -22,
+      "envelope": { "attack": 4, "decay": 280, "sustain": 0, "release": 0 } }
+  ]
+}

@@ -1812,6 +1812,8 @@ PhysicsItem {
         return blocked ? "enemyBlocked" : heavy === true ? "heavyHit" : "enemyHit"
     }
 
+    // The descent intro holds the world: no blow lands (issue #316)
+    function _held() { return !!gameWorld && gameWorld.introHeld === true }
     // This node's knight struck the enemy; heavy for its charged swing,
     // parried for a swing into its parry window. This screen judges
     // whether the blow breaks a lead's stance. Returns the damage it does
@@ -1828,6 +1830,7 @@ PhysicsItem {
     // This node's knight's blow, opens the cause it breaks a lead's
     // stance with, or ""
     function _struck(amount, attackerX, attackerY, heavy, opens) {
+        if (_held()) return 0
         if (dormant) return _glance(attackerX, attackerY)
         if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
         // Remote: the hit looks and counts here, the host applies it
@@ -1866,7 +1869,7 @@ PhysicsItem {
         // Asleep, the Warden's stone takes nothing: its fight begins when
         // its room shuts, not with a blow from a knight its room let in
         // while another waits outside
-        if (dormant) return 0
+        if (dormant || _held()) return 0
         if (opens && (!lead || opening)) opens = ""
         let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let finalDamage = b.damage

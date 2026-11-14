@@ -1270,6 +1270,21 @@
       },
       "delivered": "2026-11-08T19:04:16.695287+00:00",
       "verdict": null
+    },
+    "sfx/descent_count": {
+      "category": "sfx",
+      "brief": "the descent intro's count as a dungeon opens: a short stone-drum knock on A2 with a ringing A3 and a faint fifth over it, in the dungeon song's A minor; played on each beat of 3, 2, 1 and an octave up on Go",
+      "mode": "live",
+      "source": "sfx/descent_count.sfx.json",
+      "render": "sfx/descent_count.wav",
+      "report": "sfx/descent_count.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-14T20:08:05.124322+00:00",
+      "verdict": null
     }
   }
 }
