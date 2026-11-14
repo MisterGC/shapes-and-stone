@@ -2211,7 +2211,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0 | --danger 0.0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -2241,17 +2241,19 @@ flows - weak and normal enemies falling to a stroke or two, kill after
 kill - or is a duel that a button-masher loses and a reader of its rhythm
 wins. `--room flow` fills the fight room with fodder only, `--room duel`
 with a room's lead alone, a tough grunt, `--room guardianduel` with a
-guardian lead alone (issue #288, `Balance.pacing`), and in each the
+guardian lead alone (issue #288, `Balance.pacing`), `--room spitterduel`
+with a spitter lead alone, the third kind of lead (issue #315), and in each the
 knight has the sword level it usually has at that depth (`--sword` sets
-another). Three more answers are the pacing pilots: `charge` holds a full
+another). Four more answers are the pacing pilots: `charge` holds a full
 charge and lets go at the nearest enemy, `masher` clicks, `skilled`
 parries, perfect-blocks - crushing blows and shots, which it sends back -
-and strikes in openings. `--pacing` plays the
-rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all three
-pilots, four loaders at a time, in about 15 s:
+and strikes in openings, and `person` plays like a person (below).
+`--pacing` plays the
+rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all four
+pilots, four loaders at a time:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel boss] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,
@@ -2309,9 +2311,59 @@ knight. The skilled pilot steps out of a zone while it warns. At each of
 `charge` fall or take at least `bossSlow` times as long. In every boss
 fight the Warden's wind-ups and strikes play its toll and nothing screams
 before its adds come, and in no flow or duel fight is its toll heard
-(issue #287). The four rooms are the dojo's
-scenarios `flow`, `duel`, `guardianduel` and `boss` too: a reload lands in them, and an
+(issue #287). No band checks the spitter duel. The five rooms are the dojo's
+scenarios `flow`, `duel`, `guardianduel`, `spitterduel` and `boss` too: a reload lands in them, and an
 edit of `Balance.pacing` changes who stands there.
+
+**The person pilot** (issue #315). The other pilots play frame-perfectly or mash, so a fight can pass the
+bench and still be too hard for a person: until issue #315 the Warden at
+depth 5 and 8 was only shown to fall to `skilled`. The `person` pilot is
+there so a fight's difficulty can be judged without the owner playing it.
+It plays as `skilled` does, with a person's reaction and a person's misses,
+both in `Balance.pacing.person`:
+
+- **Reaction**, `reaction: 0.25`: it answers an attack, a shot or a zone of
+  the Warden's no sooner than 0.25 s after it began - an enemy's wind-up
+  begun, a shot fired, a zone's warning shown. Until then it does what it
+  did, and may swing at an enemy that is winding up; after an attack it
+  waits as long before it swings at that enemy again. Once it has seen an
+  attack it times its press to the window, as a player reading the ring
+  does. The seconds are the game's physics clock: a duel's slow motion
+  gives it no more time.
+- **Misses**, `miss: 0.2`: one in every five of its parries and perfect
+  blocks (shots included) is mistimed, in turn, the place of the first
+  miss picked by the seed - a roll per answer would leave a fight of ten
+  answers to luck. A miss is one window early - a swing under way before
+  the parry window, the shield up before the perfect block's, an ordinary
+  block - or late, no press before the blow lands, as the seed rolls.
+  Zones are not missed, only seen late. A spitter's shot begins with the
+  spitter's wind-up, which a person sees, not with its flight.
+
+The same seed gives the same run. Each of its fights reports its answers
+and misses by kind and its fastest answer, which is never under 0.25 s.
+Where the numbers come from: 0.25 s and one miss in five are the starting
+point the issue set. A quarter of a second is a little under the median
+of 273 ms reported for Human Benchmark's online reaction test (a click
+when a box turns green; reported by articles quoting the site, not read
+on the site itself), and a fight's wind-ups give some warning that a
+green box does not. One miss in five is a guess for a player who knows the
+fight, not a measurement; the owner's own play is what would correct
+either number.
+
+The pacing run plays it in every room at every depth, and prints a section
+of its own after the fights: one `WIN` or `LOSE` line per fight, a win in
+how many seconds - the room's clear time and, in a duel or the boss room,
+the lead's time from its engagement -, a loss with what still stood and
+its HP. `--check` sets no band on it and it never changes the exit code:
+the bands of the other pilots stay as they are.
+
+A `WIN` counts as "a person can do this": the person cleared the room
+without falling within the bench's 180 s. A `LOSE` (fell, or still
+fighting at 180 s) in a fight meant to be beatable - every flow room,
+every duel, the Warden at depth 2, 5 and 8 - is a finding: a tuning issue
+for that fight, not a reason to change the pilot. A win is not a promise:
+the pilot knows every string, never panics and never strays, so it is the
+least a person needs, and the owner's playtest still judges the rest.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
