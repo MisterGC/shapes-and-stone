@@ -18,6 +18,8 @@ Item {
     Game {
         id: game
         anchors.fill: parent
+        // The descent intro would hold each dungeon's first seconds (issue #316)
+        descentIntro: false
         muted: true
         // A store of its own: the bench keeps neither a record nor the
         // player's dungeon master settings

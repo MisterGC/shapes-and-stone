@@ -20,6 +20,8 @@ Item {
     Game {
         id: game
         anchors.fill: parent
+        // The descent intro would hold each dungeon's first seconds (issue #316)
+        descentIntro: false
         muted: true
         // A record of its own: the bench keeps no best depth of the player's
         recordStoreName: "ShapesAndStoneSlitPartyBench"
