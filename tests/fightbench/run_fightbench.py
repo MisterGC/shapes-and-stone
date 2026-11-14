@@ -14,11 +14,12 @@ intensity).
 
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
-                    [--answer mix|block|parry|perfect|heavy|whirlwind|charge|masher|skilled]
-                    [--room mixed|flow|duel|guardianduel|boss] [--sword N]
+                    [--answer mix|block|parry|perfect|heavy|whirlwind|charge|masher|skilled|person]
+                    [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--sword N]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
-  run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel boss] [--depths 0 2 4]
-                    [--answers charge masher skilled] [--jobs N] [--json out.json]
+  run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel boss]
+                    [--depths 0 2 4] [--answers charge masher skilled person] [--jobs N]
+                    [--json out.json]
 
 One fight prints its report as JSON. --answer is how the scripted knight
 meets a grunt's or a guardian's attack: "mix" parries or blocks as the
@@ -33,9 +34,11 @@ reach. The report counts the whirlwinds that landed (hit an enemy), their
 hits and the ones begun. The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
 perfect-blocks - crushing blows and shots, which it sends back - and
-strikes in openings. --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
+strikes in openings, "person" plays as "skilled" with a person's reaction
+time and misses (Balance.pacing.person, issue #315). --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
 only, "duel" a room's lead alone, a grunt, "guardianduel" a guardian lead
-alone (issue #288) and "boss" the Hollow Warden alone, its
+alone (issue #288), "spitterduel" a spitter lead alone (issue #315) and
+"boss" the Hollow Warden alone, its
 adds coming in its phase 2 (Balance.pacing, Balance.boss). --sword is the
 knight's sword level: by default 0 in the mixed room and in flow and duel
 the one a knight usually has at that depth. --danger is the danger the
@@ -45,9 +48,9 @@ at that danger. --depth d is --danger d, the bottom of the depth's range.
 The same seed and danger give the same numbers.
 
 --pacing plays every room of --rooms at every depth of --depths with every
-pilot of --answers (by default flow, duel, guardianduel and boss,
-Balance.pacing.depths, and
-charge, masher and skilled), --jobs loaders at a time, prints a report of
+pilot of --answers (by default flow, duel, guardianduel, spitterduel and
+boss, Balance.pacing.depths, and
+charge, masher, skilled and person), --jobs loaders at a time, prints a report of
 each fight - per enemy its time to kill and hits to kill, the gaps between
 kills, the kill chains and the longest one's links (Balance.chain), the
 death sound's pitch kill by kill, the time engaged, the damage taken,
@@ -64,7 +67,11 @@ not fall, "masher" and "charge" fall or take at least bossSlow times as
 long. The skilled pilot steps out of a floor zone of the Warden's while
 it warns. In every boss fight the Warden's wind-ups and strikes play its
 toll and nothing screams before its adds come; in no flow or duel fight
-is its toll heard (issue #287). --json writes every report in full, sound log
+is its toll heard (issue #287). No band checks the spitter duel. The
+person's fights get no band either: a section of their own says of each
+whether the person won - cleared the room without falling - and in how
+many seconds, or how it lost, with its answers and misses (issue #315).
+--json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
 
@@ -87,8 +94,11 @@ import uuid
 from collections import Counter
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANSWERS = ("mix", "block", "parry", "perfect", "heavy", "whirlwind", "charge", "masher", "skilled")
-PILOTS = ("charge", "masher", "skilled")
+ANSWERS = ("mix", "block", "parry", "perfect", "heavy", "whirlwind", "charge", "masher", "skilled",
+           "person")
+PILOTS = ("charge", "masher", "skilled", "person")
+# The pilot that plays like a person (issue #315): reported, not banded
+PERSON = "person"
 
 
 class Inspect:
@@ -260,9 +270,10 @@ def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
 # ---- the pacing report ----
 
 TIERS = ("weak", "normal", "tough")
-# The pacing rooms, and among them the duel rooms: a grunt lead alone and a
-# guardian lead alone (Balance.pacing.duel, .guardianDuel)
-ROOMS = ("flow", "duel", "guardianduel", "boss")
+# The pacing rooms, and among them the duel rooms with bands: a grunt lead
+# alone and a guardian lead alone (Balance.pacing.duel, .guardianDuel); the
+# spitter lead's duel (.spitterDuel, issue #315) has none
+ROOMS = ("flow", "duel", "guardianduel", "spitterduel", "boss")
 DUELS = ("duel", "guardianduel")
 
 
@@ -285,6 +296,9 @@ def describe(r):
         lines.append(f"  {e['type']} ({TIERS[e['tier']]}{lead}, {e['hp']} HP): hits {e['hits']}, "
                      f"ttk {fmt_s(e['ttk'])} from its first hit, {fmt_s(e['ttkEngaged'])} "
                      f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}{by}")
+    person = r.get("person")
+    if person:
+        lines.append(f"  the person: {answers_line(person)}")
     boss = r.get("boss")
     if boss:
         lines.append(f"  the Warden: {boss['stage']}, phase 2 from {fmt_s(boss['phase2At'])}, "
@@ -312,6 +326,44 @@ def describe(r):
                      + f"; growls {sum(1 for x in r['sounds'] if x['what'] == 'growl' and x['cue'] == GROWL)}"
                      + f", stings {sum(1 for x in r['sounds'] if x['what'] == 'sting')}")
     return lines
+
+
+def answers_line(person):
+    """The person's answers and misses (issue #315) as text"""
+    a, m = person["answers"], person["missed"]
+    fastest = person.get("fastest")
+    return (f"missed {sum(m.values())} of {sum(a.values())} answers ("
+            + ", ".join(f"{k} {m[k]}/{a[k]}" for k in ("parry", "perfect", "shot"))
+            + "), fastest answer " + ("-" if fastest is None else f"{fastest:.3f} s")
+            + f" after it began (reaction {person['reaction']} s, miss {person['miss']})")
+
+
+def person_lines(results):
+    """(won, line) per fight of the person (issue #315): won is the room
+    cleared without falling; the line says in how many seconds, or how it
+    lost - fell, or still at it when the fight was stopped - and what
+    stood then"""
+    out = []
+    for r in results:
+        if r["answer"] != PERSON:
+            continue
+        tag = f"{r['room']} depth {r['depth']} sword {r['sword']}"
+        leads = [e for e in r["enemies"] if e.get("lead") or e["type"] == "warden"]
+        lead = leads[0] if leads else None
+        won = r["outcome"] == "cleared"
+        if won:
+            what = f"cleared in {r['seconds']:.2f} s"
+            if lead and lead["ttkEngaged"] is not None:
+                what += f", the {lead['type']} lead killed {lead['ttkEngaged']:.2f} s after it engaged"
+        else:
+            what = ("fell" if r["outcome"] == "fallen" else "still fighting") + f" after {r['seconds']:.2f} s"
+            standing = [e for e in r["enemies"] if e["diedAt"] is None]
+            if standing:
+                what += ", standing: " + ", ".join(
+                    f"{e['type']} {e.get('hpLeft', '?')} of {e['hp']} HP" for e in standing)
+        what += f"; knight HP {r['knightHp']}, damage taken {r['damageTaken']}"
+        out.append((won, f"{tag}: {what}; {answers_line(r['person'])}"))
+    return out
 
 
 def death_pitches(r):
@@ -610,8 +662,18 @@ def pacing(args, loader):
             json.dump(ordered, f, indent=2)
             f.write("\n")
     failed = 0
-    if args.check and ordered:
-        lines = check(ordered, ordered[0]["pacing"])
+    # The person's fights are reported, never banded (issue #315)
+    banded = [r for r in ordered if r["answer"] != PERSON]
+    person = person_lines(ordered)
+    if person:
+        p = ordered[0]["pacing"].get("person", {})
+        print(f"\nthe person (reaction {p.get('reaction')} s, misses {p.get('miss')}), not banded: "
+              f"a WIN is a fight a person can do")
+        for won, line in person:
+            print(("WIN  " if won else "LOSE ") + line)
+        print(f"the person wins {sum(1 for won, _ in person if won)} of {len(person)} fights")
+    if args.check and banded:
+        lines = check(banded, banded[0]["pacing"])
         print()
         for ok, line in lines:
             print(("PASS " if ok else "FAIL ") + line)
