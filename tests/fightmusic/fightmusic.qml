@@ -8,6 +8,11 @@
 // intensity follows the game's; the song renders louder at 1 than at 0,
 // its layers in. Two of them giving up let it fall slowly to a third, an
 // enemy chasing beyond reach counts for nothing, and in the camp it is 0.
+// What a bench hears (issue #267): muted, with logSounds on, a sound played
+// is a row of soundLog with its cue, what, pitch, distance, gain and the
+// physicsSeconds it played at; with followFightOnSteps on the intensity
+// stands while no physics step runs and moves with the steps, and
+// musicTrace gets a row once it has moved musicTraceStep.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
 //
@@ -73,6 +78,8 @@ Window {
         return Math.sqrt(sum / Math.max(1, to - from))
     }
     property real lastIntensity: 0
+    function r3(v) { return Math.round(v * 1000) / 1000 }
+    function lastSound() { return game.soundLog[game.soundLog.length - 1] }
 
     property var steps: [
         [() => game.width > 0 && game.screen === "title", () => {
@@ -126,6 +133,57 @@ Window {
             check(game.fightersNear === 0 && game.fightIntensity < lastIntensity,
                   "an enemy chasing beyond reach counts for nothing (" + game.fightersNear + ", "
                   + game.fightIntensity.toFixed(2) + ")")
+            // The sound log, muted: one row per sound played
+            game.logSounds = true
+            game.clearSoundLog()
+            game.physicsSeconds = 0
+            Clayground.physicsStep(3)
+            game.playImpact()
+            let row = lastSound()
+            check(game.soundLog.length === 1 && row.cue === "sfx/punch_hitting" && row.what === "hit"
+                  && row.pitch === 0 && row.dist === 0 && row.gain === 1 && row.t === r3(game.physicsSeconds)
+                  && row.t > 0,
+                  "muted, a blow's sound is a row of the sound log at physicsSeconds: " + JSON.stringify(row))
+            game.playBlock(undefined, true)
+            row = lastSound()
+            check(row.cue === "sfx/shield_clang" && row.what === "perfectBlock"
+                  && row.pitch === Balance.perfectBlock.pitch, "a perfect block's clang logs its pitch: "
+                  + JSON.stringify(row))
+            let p = game.player
+            game.playScream(p.xWu + 3, p.yWu, 2)
+            row = lastSound()
+            check(row.cue === "sfx/goblin_scream" && row.pitch === Balance.scream.tierPitch[2]
+                  && Math.abs(row.dist - 3) < 0.01 && Math.abs(row.gain - (1 - 3 / game.remoteHearingWu)) < 0.01,
+                  "a tough enemy's scream 3 wu off logs its pitch, distance and gain: " + JSON.stringify(row))
+            // The intensity on the physics steps: three enemies chase, and
+            // without a step it stands
+            game.followFightOnSteps = true
+            set(3, 2)
+            lastIntensity = game.fightIntensity
+        }],
+        [400, () => {
+            check(game.fightIntensity === lastIntensity, "with followFightOnSteps the intensity stands "
+                  + "while no physics step runs (" + game.fightIntensity.toFixed(3) + ")")
+            // Stepped one at a time, the three held chasing: their AI
+            // runs on the steps too
+            let from = game.musicTrace.length
+            for (let n = 0; n < 10; n++) {
+                set(3, 2)
+                Clayground.physicsStep(1)
+            }
+            let eased = Math.min(1, lastIntensity + 10 / 60 * Balance.music.rise)
+            check(Math.abs(game.fightIntensity - eased) < 0.01,
+                  "and rises with the steps, at Balance.music.rise: " + lastIntensity.toFixed(3) + " to "
+                  + game.fightIntensity.toFixed(3) + " in 10 steps (" + eased.toFixed(3) + ")")
+            let rows = game.musicTrace.slice(from)
+            let moved = rows.find(m => Math.abs(m.intensity - lastIntensity) >= game.musicTraceStep)
+            check(moved !== undefined && moved.song === "music/dungeon" && moved.segment === "explore"
+                  && moved.playing === true && moved.t > 0 && moved.t <= r3(game.physicsSeconds),
+                  "the music trace gets a row once the intensity has moved musicTraceStep: "
+                  + JSON.stringify(moved) + ", " + rows.length + " rows")
+            game.followFightOnSteps = false
+            game.logSounds = false
+            set(0, 0)
             Clayground.paused = false
             game._enterLevel(game.levelIndex + 1)
         }],

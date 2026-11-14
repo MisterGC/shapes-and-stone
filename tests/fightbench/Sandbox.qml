@@ -1,14 +1,17 @@
 // Fight bench - plays the "fight" scenario with a scripted knight and
-// reports how the fight went (issue #34).
+// reports how the fight went (issues #34, #267).
 //
 // The game runs paused: run_fightbench.py steps it through the inspector,
 // a few physics steps of exactly 1/60 s at a time, so the fight does not
 // depend on how fast the machine renders. The pilot below plays the knight
 // on every step; what it does depends only on the fight and on its seed.
-// The numbers are the game's own fight record (Game.qml).
+// The totals are the game's own fight record (Game.qml); the bench adds
+// what it sees of each enemy on every step, and what the game would have
+// let the player hear: its sound log and music trace (Game.logSounds),
+// muted.
 //
 // Driven by run_fightbench.py (clayliveloader --sbx Sandbox.qml), which
-// calls begin(seed, answer, danger), steps and reads report().
+// calls begin(seed, answer, danger, room, sword), steps and reads report().
 
 import QtQuick
 import Clayground.Common
@@ -32,20 +35,27 @@ Item {
     property int seed: 0
     property string answer: "mix"
     property real danger: 0
+    property string room: "mixed"
+    property int sword: 0
     property int steps: 0
     property var _rng: null
 
     // Pauses the world and enters the fight room; the driver steps from here.
-    // answer is how the knight meets an attack: "mix", "block", "parry",
-    // "perfect", "heavy" (as mix, but it charges at guardians) or
-    // "whirlwind" (as mix, but it whirls through every enemy);
+    // answer is how the knight fights: "mix", "block", "parry", "perfect",
+    // "heavy" (as mix, but it charges at guardians), "whirlwind" (as mix,
+    // but it whirls through every enemy), or one of the pacing pilots
+    // "charge", "masher" and "skilled" (Balance.pacing);
     // danger is the danger the fight room is at: its depth and, after the
-    // point, the position in the depth's range (Game.applyScenario).
-    function begin(s, a, d) {
+    // point, the position in the depth's range (Game.applyScenario);
+    // room who stands in it: "mixed" (Balance.spawn.fightRoom), "flow" or
+    // "duel" (Balance.pacing); sword the knight's sword level, -1 for the
+    // one it usually has at that depth (usualSword), 0 when left out
+    function begin(s, a, d, r, sw) {
         Clayground.paused = true
         seed = s
         answer = a === undefined ? "mix" : a
         danger = d === undefined ? 0 : d
+        room = r === undefined ? "mixed" : r
         steps = 0
         _rng = game.createRng(s)
         _plans = new Map()
@@ -57,17 +67,41 @@ Item {
         crushBlows = 0
         _crushing = new Set()
         whirlsStarted = 0
-        game.applyScenario("fight", danger)
+        cancelledCharges = 0
+        _chargeSeen = ""
+        engagedSeconds = 0
+        _foes = []
+        // What would be heard, on the physics steps: muted, logged
+        game.logSounds = true
+        game.followFightOnSteps = true
+        // The dojo's scenarios: "fight" for the mixed room, "flow", "duel"
+        game.applyScenario(room === "mixed" ? "fight" : room, danger)
+        // The log's clock from 0, in steps of exactly 1/60 s: the same
+        // fight logs the same times
+        game.clearSoundLog()
+        game.physicsSeconds = 0
+        sword = sw === undefined ? 0 : sw < 0 ? usualSword(Math.floor(danger)) : sw
         // The bench tries the moves, not the mana they cost: plenty of it
         if (game.player) {
             game.player.maxMana = 1000
             game.player.mana = 1000
+            game.player.swordLevel = sword
         }
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind") bench.whirlsStarted++
         })
+        for (let e of game.enemies.filter(alive))
+            _foes.push({ ref: e, type: e.enemyType, tier: e.tier, hp: e.maxHp, lastHp: e.hp,
+                         lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
+                         hits: 0, openings: 0 })
         return game.player !== null
+    }
+    // The sword level a knight usually has at depth d: the highest the
+    // smith of a camp before it sold (the camp after depth c sells level L
+    // once c reaches shop.levelDepth[L - 1]), one level a camp
+    function usualSword(d) {
+        return Balance.shop.levelDepth.filter(c => c < d).length
     }
 
     readonly property var record: game.fightRecord
@@ -75,14 +109,33 @@ Item {
     readonly property bool fallen: game.fallen
     readonly property bool done: cleared || fallen
 
+    // Seconds since begin() on the physics clock
+    function now() { return round3(game.physicsSeconds) }
+
     function report() {
+        // A death on the last step is seen now
+        track(0)
         let r = record
         let p = game.player
+        let foes = _foes.map(f => ({
+            type: f.type, tier: f.tier, hp: f.hp,
+            engagedAt: f.engagedAt, firstHitAt: f.firstHitAt, diedAt: f.diedAt,
+            hits: f.hits, openings: f.openings,
+            // From the first blow that landed to its death
+            ttk: f.diedAt !== null && f.firstHitAt !== null ? round3(f.diedAt - f.firstHitAt) : null,
+            // From the moment it went for the knight to its death
+            ttkEngaged: f.diedAt !== null && f.engagedAt !== null ? round3(f.diedAt - f.engagedAt) : null
+        }))
+        let kills = foes.filter(f => f.diedAt !== null).map(f => f.diedAt).sort((a, b) => a - b)
+        let gaps = []
+        for (let i = 1; i < kills.length; i++) gaps.push(round3(kills[i] - kills[i - 1]))
         return {
             seed: seed,
             answer: answer,
+            room: room,
             depth: game.depth,
             danger: round3(game.danger),
+            sword: sword,
             outcome: cleared ? "cleared" : fallen ? "fallen" : "running",
             steps: steps,
             seconds: round3(r.seconds),
@@ -102,10 +155,63 @@ Item {
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
             knightHp: p ? p.hp : 0,
-            knightMana: p ? round3(p.mana) : 0
+            knightMana: p ? round3(p.mana) : 0,
+            openings: foes.reduce((n, f) => n + f.openings, 0),
+            cancelledCharges: cancelledCharges,
+            engagedSeconds: round3(engagedSeconds),
+            killGaps: gaps,
+            enemies: foes,
+            sounds: game.soundLog,
+            music: game.musicTrace
         }
     }
     function round3(v) { return Math.round(v * 1000) / 1000 }
+
+    // ---- what the bench sees of each enemy, every step ----
+    // A blow that landed is HP lost; an opening is a stagger it went into
+    // (a parry, a perfect block, a broken guard); it engaged on the first
+    // step it was neither patrolling nor idle - chasing, circling, winding
+    // up, striking, recovering, staggered; it died on the step it was
+    // gone, the blow that killed it one more hit. Time engaged is the
+    // seconds in which any enemy was engaged
+    property var _foes: []
+    property real engagedSeconds: 0
+    readonly property var calm: ["patrol", "idle"]
+    function track(dt) {
+        let t = now(), engaged = false
+        for (let f of _foes) {
+            if (f.diedAt !== null) continue
+            let e = f.ref
+            if (!alive(e)) {
+                f.diedAt = t
+                if (f.lastHp > 0) {
+                    f.hits++
+                    if (f.firstHitAt === null) f.firstHitAt = t
+                }
+                continue
+            }
+            if (e.hp < f.lastHp) {
+                f.hits++
+                if (f.firstHitAt === null) f.firstHitAt = t
+            }
+            f.lastHp = e.hp
+            let into = calm.indexOf(e.aiState) < 0
+            if (into) engaged = true
+            if (into && f.engagedAt === null) f.engagedAt = t
+            if (e.aiState === "stagger" && f.lastState !== "stagger") f.openings++
+            f.lastState = e.aiState
+        }
+        if (engaged) engagedSeconds += dt
+    }
+
+    // A charge ended without its release: a hit, the shield or a dash
+    // cancelled it while the button was held (Player._cancelCharge)
+    property int cancelledCharges: 0
+    property string _chargeSeen: ""
+    function trackCharge(p) {
+        if ((_chargeSeen === "charging" || _chargeSeen === "full") && p._charge === "spent")
+            cancelledCharges++
+    }
 
     // ---- the charge, tried as in the dojo (run_reload.py) ----
     // The fight room stands: the knight and its grunt, guardian and spitter
@@ -189,6 +295,16 @@ Item {
     // guardian in the heavy swing's reach. "whirlwind" fights as "mix"
     // does and earns momentum by it; with all of it (Balance.momentum) and
     // an enemy within whirlFrom it whirls at that enemy (Q, unleash).
+    //
+    // The pacing pilots (Balance.pacing): "charge" never raises the shield;
+    // it holds a full charge, walks at the nearest enemy and lets go once
+    // it is in the heavy swing's reach, then presses again. "masher" never
+    // raises the shield either: it walks at the nearest enemy and clicks on
+    // every step it can swing. "skilled" parries every lunge and
+    // perfect-blocks every crushing blow, blocks a shot - walking on at
+    // the nearest enemy behind the shield -, breaks a
+    // guardian's guard with the shield dash, and swings only into an
+    // opening: an enemy within reach that is not winding up or lunging
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
     // Steps before a lunge lands that the "perfect" plan raises the shield
@@ -233,9 +349,17 @@ Item {
         enabled: game.player !== null && bench._rng !== null
         function onStepped() {
             bench.steps++
-            if (game.player) bench.countGuardBreaks(game.player)
+            bench.track(game.physics.timeStep)
+            if (game.player) {
+                bench.countGuardBreaks(game.player)
+                bench.trackCharge(game.player)
+            }
             bench.countCrushes()
-            bench.pilot(game.physics.timeStep)
+            if (bench.answer === "charge") bench.pilotCharge()
+            else if (bench.answer === "masher") bench.pilotMasher()
+            else if (bench.answer === "skilled") bench.pilotSkilled(game.physics.timeStep)
+            else bench.pilot(game.physics.timeStep)
+            if (game.player) bench._chargeSeen = game.player._charge
         }
     }
 
@@ -260,44 +384,43 @@ Item {
         p.moveY = -dy / len * speed
     }
     function stand(p) { p.moveX = 0; p.moveY = 0 }
-
-    function pilot(dt) {
-        let p = game.player
-        if (!p || p.fallen || done) {
-            if (p) { stand(p); letGo(p); p.isBlocking = false }
-            return
+    function winding(e) { return e.aiState === "telegraph" || e.aiState === "crush" || e.aiState === "lunge" }
+    function nearest(p, foes) {
+        let target = foes[0], targetDist = distTo(p, target.xWu, target.yWu)
+        for (let e of foes) {
+            let d = distTo(p, e.xWu, e.yWu)
+            if (d < targetDist) { target = e; targetDist = d }
         }
-        let foes = game.enemies.filter(alive)
-        if (foes.length === 0) { stand(p); letGo(p); p.isBlocking = false; return }
+        return { e: target, d: targetDist }
+    }
+    // The standing enemies, or null once there is nothing to fight: the
+    // knight stands then, the button and the shield let go
+    function foesOrRest(p) {
+        let foes = p && !p.fallen && !done ? game.enemies.filter(alive) : []
+        if (foes.length > 0) return foes
+        if (p) { stand(p); letGo(p); p.isBlocking = false }
+        return null
+    }
 
+    // An attack coming at the knight within reach: answered by its plan,
+    // the first time it is seen rolled by planOf(threat). Returns whether
+    // there was one
+    function answerThreat(p, foes, planOf) {
         // Forget plans of attacks that are over
         for (let e of Array.from(_plans.keys()))
-            if (!alive(e) || (e.aiState !== "telegraph" && e.aiState !== "crush" && e.aiState !== "lunge"))
+            if (!alive(e) || !winding(e))
                 _plans.delete(e)
-
-        // 1. An attack coming at the knight: parry or block it
         let threat = null, threatDist = 1e9
         for (let e of foes) {
             if (e.enemyType === "spitter") continue
-            if (e.aiState !== "telegraph" && e.aiState !== "crush" && e.aiState !== "lunge") continue
+            if (!winding(e)) continue
             let d = distTo(p, e.xWu, e.yWu)
             if (d < 3.5 && d < threatDist) { threat = e; threatDist = d }
         }
-        if (threat) {
-            // A guardian winding up within reach of a full charge: the
-            // heavy swing staggers it before its blow
-            if (answer === "heavy" && threat.enemyType === "guardian" && p.chargeFull
-                    && threatDist <= heavyReach(p)) {
-                face(p, threat)
-                stand(p)
-                p.releaseSwing()
-                _held = false
-                return
-            }
+        if (!threat) return null
+        return { e: threat, d: threatDist, answer: () => {
             letGo(p)
-            if (!_plans.has(threat))
-                _plans.set(threat, answer === "perfect" ? "perfect"
-                                   : _rng() < parryChance ? "parry" : "block")
+            if (!_plans.has(threat)) _plans.set(threat, planOf(threat))
             face(p, threat)
             stand(p)
             if (_plans.get(threat) === "parry") {
@@ -308,10 +431,12 @@ Item {
             } else {
                 p.isBlocking = true
             }
-            return
-        }
-
-        // 2. A spitter's shot on its way: shield up towards it a moment
+        } }
+    }
+    // A spitter's shot on its way: shield up towards it a moment, standing
+    // or, with towards, walking at that enemy behind it. Returns whether
+    // the shield is up for one
+    function answerShot(p, dt, towards) {
         let shot = null, shotDist = 1e9
         for (let o of game.room.children) {
             if (o.objectName !== "projectile" || o.destroyed !== false) continue
@@ -326,17 +451,54 @@ Item {
         if (_blockLeft > 0) {
             _blockLeft -= dt
             p.isBlocking = true
-            stand(p)
-            return
+            if (towards) moveTowards(p, towards.xWu, towards.yWu, 1)
+            else stand(p)
+            return true
         }
         p.isBlocking = false
+        return false
+    }
+    // A guardian's shield turns swings: a shield dash breaks its guard.
+    // Returns whether the knight dashed
+    function shieldDash(p, target, targetDist) {
+        if (target.enemyType === "guardian" && target.aiState !== "stagger"
+                && targetDist < 2.5 && p.dashCooldown <= 0 && !p.isDashing) {
+            p.isBlocking = true
+            moveTowards(p, target.xWu, target.yWu, 1)
+            p.dash()
+            return true
+        }
+        return false
+    }
+
+    function pilot(dt) {
+        let p = game.player
+        let foes = foesOrRest(p)
+        if (!foes) return
+
+        // 1. An attack coming at the knight: parry or block it
+        let threat = answerThreat(p, foes, () => answer === "perfect" ? "perfect"
+                                                 : _rng() < parryChance ? "parry" : "block")
+        if (threat) {
+            // A guardian winding up within reach of a full charge: the
+            // heavy swing staggers it before its blow
+            if (answer === "heavy" && threat.e.enemyType === "guardian" && p.chargeFull
+                    && threat.d <= heavyReach(p)) {
+                face(p, threat.e)
+                stand(p)
+                p.releaseSwing()
+                _held = false
+                return
+            }
+            threat.answer()
+            return
+        }
+
+        // 2. A spitter's shot on its way: shield up towards it a moment
+        if (answerShot(p, dt)) return
 
         // 3. Go for the nearest enemy
-        let target = foes[0], targetDist = distTo(p, target.xWu, target.yWu)
-        for (let e of foes) {
-            let d = distTo(p, e.xWu, e.yWu)
-            if (d < targetDist) { target = e; targetDist = d }
-        }
+        let near = nearest(p, foes), target = near.e, targetDist = near.d
         face(p, target)
 
         // A guardian's shield turns swings: a charged heavy swing breaks
@@ -364,19 +526,67 @@ Item {
             return
         }
         letGo(p)
-        // A guardian's shield turns swings: a shield dash breaks its guard
-        if (target.enemyType === "guardian" && target.aiState !== "stagger") {
-            if (targetDist < 2.5 && p.dashCooldown <= 0 && !p.isDashing) {
-                p.isBlocking = true
-                moveTowards(p, target.xWu, target.yWu, 1)
-                p.dash()
-                return
-            }
-        }
+        if (shieldDash(p, target, targetDist)) return
         if (p.isDashing) return
 
         if (targetDist > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
         else stand(p)
         if (targetDist <= p.attackRange * 0.9) p.attack()
+    }
+
+    // "charge": a full charge, let go at the nearest enemy in reach
+    function pilotCharge() {
+        let p = game.player
+        let foes = foesOrRest(p)
+        if (!foes) return
+        p.isBlocking = false
+        let near = nearest(p, foes), target = near.e
+        face(p, target)
+        // A hit cancelled the charge: let go and press anew
+        if (_held && p._charge === "spent") letGo(p)
+        if (!_held) _held = p.pressSwing()
+        if (p.chargeFull && near.d <= heavyReach(p)) {
+            stand(p)
+            p.releaseSwing()
+            _held = false
+            return
+        }
+        if (near.d > heavyReach(p) * 0.8) moveTowards(p, target.xWu, target.yWu, 1)
+        else stand(p)
+    }
+
+    // "masher": at the nearest enemy, a click on every step it can swing
+    function pilotMasher() {
+        let p = game.player
+        let foes = foesOrRest(p)
+        if (!foes) return
+        p.isBlocking = false
+        letGo(p)
+        let near = nearest(p, foes), target = near.e
+        face(p, target)
+        if (near.d > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
+        else stand(p)
+        p.attack()
+    }
+
+    // "skilled": every attack answered, swings only into openings
+    function pilotSkilled(dt) {
+        let p = game.player
+        let foes = foesOrRest(p)
+        if (!foes) return
+        let threat = answerThreat(p, foes, e => e.aiState === "crush" || e.crushing ? "perfect" : "parry")
+        if (threat) {
+            threat.answer()
+            return
+        }
+        let near = nearest(p, foes), target = near.e
+        if (answerShot(p, dt, near.d > 1.3 ? target : null)) return
+        letGo(p)
+        face(p, target)
+        if (shieldDash(p, target, near.d)) return
+        if (p.isDashing) return
+        if (near.d > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
+        else stand(p)
+        if (near.d <= p.attackRange * 0.9 && !winding(target)) p.attack()
     }
 }

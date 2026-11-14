@@ -941,9 +941,12 @@ PhysicsItem {
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
                 if (enemyType === "grunt" && !_committed && canSee && dist < Balance.enemy.circleRange) {
+                    // Rolled from the level's attack rolls, so a seed
+                    // circles the same way every time
                     let ct = Balance.enemy.circleTime
-                    _circleT = ct[0] + Math.random() * (ct[1] - ct[0])
-                    _circleDir = Math.random() < 0.5 ? 1 : -1
+                    let roll = gameWorld && gameWorld.rollAttack ? () => gameWorld.rollAttack() : Math.random
+                    _circleT = ct[0] + roll() * (ct[1] - ct[0])
+                    _circleDir = roll() < 0.5 ? 1 : -1
                     aiState = "circle"
                     break
                 }
@@ -1190,7 +1193,7 @@ PhysicsItem {
     function fireProjectile() {
         if (gameWorld && gameWorld.spawnProjectile) {
             gameWorld.spawnProjectile(xWu, yWu, _dirToTargetX, _dirToTargetY, atk)
-            if (gameWorld.playSpitShot) gameWorld.playSpitShot()
+            if (gameWorld.playSpitShot) gameWorld.playSpitShot(xWu, yWu)
             console.log("[Enemy] Spitter fired projectile!")
         }
     }
@@ -1326,7 +1329,7 @@ PhysicsItem {
                 gameWorld.impact("enemyDeath", xWu, yWu, _lastHitDx, _lastHitDy, visual.color)
             else
                 gameWorld.spawnDeathParticles(xWu, yWu)
-            gameWorld.playDeathBurst()
+            gameWorld.playDeathBurst(xWu, yWu)
         }
         destroyed = true
         // Gold where it fell; in a session only the host's enemies die here
