@@ -940,8 +940,13 @@ PhysicsItem {
     onAiStateChanged: {
         followPath.running = !remote && (aiState === "patrol" || aiState === "chase")
         // A crushing blow from its wind-up to its landing; it growls as
-        // it winds up, on every screen. A lunge's wind-up screams
-        if (aiState === "telegraph" && enemyType !== "spitter"
+        // it winds up, on every screen. A lunge's wind-up screams; the
+        // Warden's tolls instead, and its lunge setting off tolls again
+        if (boss) {
+            if ((aiState === "telegraph" || aiState === "lunge")
+                    && gameWorld && gameWorld.playWardenToll)
+                gameWorld.playWardenToll(xWu, yWu, aiState === "lunge" ? "strike" : "windUp")
+        } else if (aiState === "telegraph" && enemyType !== "spitter"
                 && gameWorld && gameWorld.playScream)
             gameWorld.playScream(xWu, yWu, tier)
         if (aiState === "crush") {

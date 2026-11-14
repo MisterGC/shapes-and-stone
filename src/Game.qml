@@ -579,6 +579,26 @@ ClayWorld2d {
         }
     }
 
+    // The Hollow Warden winds up ("windUp") or strikes ("strike"): its own
+    // toll, pitched by Balance.boss.toll, fading as the scream does
+    SfxPlayer {
+        id: wardenTollSound
+        source: "../sound/sfx/warden_toll.sfx.json"
+        volume: muted ? 0 : Balance.boss.toll.volume * soundVolume
+    }
+    function playWardenToll(xWu, yWu, what) {
+        let gain = 1
+        if (player) {
+            let dx = xWu - player.xWu, dy = yWu - player.yWu
+            gain = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / remoteHearingWu)
+        }
+        let pitch = what === "strike" ? Balance.boss.toll.strike : Balance.boss.toll.windUp
+        if (gain > 0) {
+            wardenTollSound.play(gain, pitch)
+            logSound("sfx/warden_toll", what, pitch, _distTo(xWu, yWu), gain)
+        }
+    }
+
     // A room's lead spots the knight: its growl, fading as the scream does
     // (Balance.duel)
     SfxPlayer {

@@ -692,7 +692,11 @@ QtObject {
     // two. Beaten, it drops gold gold (goldGrow more per appearance) in
     // piles drops round where it fell, a victory banner shows for victory
     // seconds, and every knight is healed to full HP and mana, a fallen
-    // one rises
+    // one rises. It sounds like none of the small ones (issue #287): its
+    // wind-up and its strike, the lunge setting off, play its own toll
+    // (sfx/warden_toll, a hollow stone toll on A1) at toll.volume, fading
+    // with the distance as the scream does, the wind-up toll.windUp
+    // semitones off the cue's own, the strike toll.strike
     readonly property var boss: ({
         every: 3,
         name: "The Hollow Warden",
@@ -716,7 +720,8 @@ QtObject {
         light: { ambient: "#1C0606", temperature: 0.35 },
         hexColor: "#4A4E57",
         coreColor: "#FF5A2A",
-        gateColor: "#2F3640"
+        gateColor: "#2F3640",
+        toll: { windUp: 7, strike: 0, volume: 0.9 }
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that

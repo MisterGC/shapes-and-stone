@@ -183,6 +183,17 @@ Window {
             check(row.cue === "sfx/goblin_scream" && row.pitch === Balance.scream.tierPitch[2]
                   && Math.abs(row.dist - 3) < 0.01 && Math.abs(row.gain - (1 - 3 / game.remoteHearingWu)) < 0.01,
                   "a tough enemy's scream 3 wu off logs its pitch, distance and gain: " + JSON.stringify(row))
+            // The Warden's own toll (issue #287), its wind-up and its strike
+            game.playWardenToll(p.xWu + 3, p.yWu, "windUp")
+            let windUp = lastSound()
+            game.playWardenToll(p.xWu + 3, p.yWu, "strike")
+            row = lastSound()
+            check(windUp.cue === "sfx/warden_toll" && windUp.what === "windUp"
+                  && windUp.pitch === Balance.boss.toll.windUp
+                  && row.cue === "sfx/warden_toll" && row.what === "strike" && row.pitch === Balance.boss.toll.strike
+                  && Math.abs(row.dist - 3) < 0.01 && Math.abs(row.gain - (1 - 3 / game.remoteHearingWu)) < 0.01,
+                  "the Warden's wind-up and strike 3 wu off log its toll, their pitches, distance and gain: "
+                  + JSON.stringify(windUp) + ", " + JSON.stringify(row))
             // The intensity on the physics steps: three enemies chase, and
             // without a step it stands
             game.followFightOnSteps = true
