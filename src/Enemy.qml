@@ -1714,9 +1714,10 @@ PhysicsItem {
     }
 
     // A lead's stance breaks (issue #271): cause is what broke it,
-    // "parry", "perfect", "heavy" or "worn". It staggers for
-    // Balance.lead.openingTime, every blow then doing openingDamage times
-    // its damage, and its attack under way is over. Where it is remote the
+    // "parry", "perfect", "heavy", "worn" or "shot" (a shot sent back,
+    // Balance.projectile). It staggers for Balance.lead.openingTime, every
+    // blow then doing openingDamage times its damage, and its attack under
+    // way is over. Where it is remote the
     // host breaks it, and every screen shows the opening. An enemy that is
     // no lead, or a lead already open, stays as it is
     signal opened(string cause)
@@ -1810,8 +1811,19 @@ PhysicsItem {
     // parried for a swing into its parry window. This screen judges
     // whether the blow breaks a lead's stance. Returns the damage it does
     function takeDamage(amount, attackerX, attackerY, heavy, parried) {
+        return _struck(amount, attackerX, attackerY, heavy, _opens(heavy, parried))
+    }
+    // A shot this node's knight sent back with a perfect block hit it
+    // (Balance.projectile, issue #283), coming from (attackerX,
+    // attackerY): a blow of amount that opens a lead, as a parry does,
+    // landing whole. Returns the damage it does
+    function takeShot(amount, attackerX, attackerY) {
+        return _struck(amount, attackerX, attackerY, false, lead && !opening ? "shot" : "")
+    }
+    // This node's knight's blow, opens the cause it breaks a lead's
+    // stance with, or ""
+    function _struck(amount, attackerX, attackerY, heavy, opens) {
         if (dormant) return _glance(attackerX, attackerY)
-        let opens = _opens(heavy, parried)
         if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
         // Remote: the hit looks and counts here, the host applies it
         let b = _blow(amount, attackerX, attackerY, heavy, opens)

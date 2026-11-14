@@ -276,7 +276,9 @@ on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
 the joiner's knight and reported to the host, and a shot that goes on the
-host's screen when the report arrives. The enemy it answers winds up no
+host's screen when the report arrives. A shot the joiner's knight blocks
+perfectly flies back on both screens from the same place the same way,
+and hurts the host's spitter. The enemy it answers winds up no
 crushing blow: the answers are timed on its parry window, which a
 crushing blow does not open. Then both knights fight for
 eight seconds while each screen records every enemy it shows - its id, position,
@@ -2071,6 +2073,16 @@ itself). In a session the slow motion is the picture's, as the hit stop
 is, so the host's simulation never slows for the others; every screen
 follows its own knight's duel from the replicated `lead` and `aiState`,
 growls and stings for the openings near it.
+A perfect block sends a spitter's shot back too (issue #283, the table's
+`projectile` group): from the shield back along its line at
+`projectile.backSpeed`, its lifetime starting over. On its way back it
+hurts no knight, and the first enemy it meets takes `projectile.backDamage`
+times the swing (`atk`) of the knight that sent it back, with the knight's
+hit sound; a lead it hits opens (cause `shot`), the blow landing whole, so
+a perfect block answers a lead that shoots. A plain block still ends the
+shot. In a session the knight's own screen sends the shot back and
+reports where and which way; every other screen sends its shot of that id
+back from there, and the knight's screen judges the enemy it hits.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
@@ -2195,7 +2207,9 @@ python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|p
 attack: `mix` (the default) parries or blocks as the seed rolls, `block`
 always blocks, `parry` always parries, `perfect` keeps the shield down
 until a lunge is 4 steps from landing and raises it then, a perfect
-block, `heavy` meets attacks as `mix` does but holds the left button at a
+block, and until a shot is 0.9 wu off, which a perfect block sends back
+(the report counts them as `shotsBack`, the ones that hit an enemy as
+`shotBackHits`), `heavy` meets attacks as `mix` does but holds the left button at a
 guardian instead of shield-dashing it and lets the full charge go once the
 guardian is in reach (the report counts them as `heavySwings` and
 `guardBreaks`), `whirlwind` meets attacks as `mix` does but charges a step
@@ -2219,7 +2233,8 @@ with a room's lead alone, a tough enemy (`Balance.pacing`), and in both the
 knight has the sword level it usually has at that depth (`--sword` sets
 another). Three more answers are the pacing pilots: `charge` holds a full
 charge and lets go at the nearest enemy, `masher` clicks, `skilled`
-parries, perfect-blocks and strikes in openings. `--pacing` plays both
+parries, perfect-blocks - crushing blows and shots, which it sends back -
+and strikes in openings. `--pacing` plays both
 rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all three
 pilots, four loaders at a time, in about 15 s:
 
@@ -2232,9 +2247,10 @@ from the first blow that landed and from the moment it engaged; the gaps
 between kills, the kill chains and the longest one's links, the death
 sound's pitch kill by kill, the time engaged, the damage taken, the
 openings (an enemy staggered by a parry, a perfect block or a broken
-guard; a lead's by what broke its stance: `parry`, `perfect`, `heavy` or
-`worn`) and the charges a hit cancelled; and what a player would have
-heard. `--check` adds one PASS
+guard; a lead's by what broke its stance: `parry`, `perfect`, `heavy`,
+`worn` or `shot`), the charges a hit cancelled, the shots a perfect block
+sent back and the ones of them that hit an enemy; and what a player would
+have heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel

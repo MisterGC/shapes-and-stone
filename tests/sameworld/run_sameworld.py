@@ -37,6 +37,10 @@ answers one enemy of the host's, and each answer is checked on both screens:
   its id goes on the host's screen when the result arrives
 - the other way round, the host's knight blocks a shot of that spitter: the
   joiner receives the result, and its shot of that id goes then
+- the joiner's knight raises its shield just before a shot of that spitter
+  meets it (issue #283): its screen sends the shot back, the host sends its
+  shot of that id back from the same place the same way, and the shot sent
+  back hurts the host's spitter, as the joiner's screen judges it
 - it stands in the open, raises its shield and dashes into the enemy as
   it closes in, right after the host killed a third enemy in its reach: the host receives the push and its
   enemy is shoved at least 1 Wu along the direction the push carries
@@ -625,6 +629,7 @@ def shot_answers(H, J, s, settle, check):
     try:
         _shot_answers(H, J, s, jid, res, settle, check)
         res["host"] = _host_shot(H, J, s, settle, check)
+        res["perfect"] = _perfect_shot(H, J, s, jid, settle, check)
         return res
     finally:
         H.eval(["hold(false)"])
@@ -678,6 +683,81 @@ def _host_shot(H, J, s, settle, check):
           f"{(seen - jend[0][0]) if (seen and jend) else '?'} ms from the report, which came "
           f"{(jend[0][0] - end[0]) if jend else '?'} ms after the host judged it"
           + ("" if not flying else "; still flying on the joiner"))
+    return r
+
+
+def _perfect_shot(H, J, s, jid, settle, check):
+    """The joiner's knight raises its shield just before a shot of spitter s
+    meets it: its screen sends the shot back, the host receives the result
+    and sends its shot of that id back from the same place the same way,
+    and the shot sent back hurts the host's s, as the joiner's screen
+    judges it (issue #283)"""
+    r = {"tries": 0}
+    # The host's knight out of the shot's line: on the host's screen the
+    # shot would meet it first
+    others = [i for i in sorted(H.json("enemies()") or {}) if i != s]
+    if others:
+        H.eval([f"placeBeside('{others[0]}')"])
+    end = None
+    for _ in range(5):
+        r["tries"] += 1
+        if s not in (J.json("enemies()") or {}):
+            r["stop"] = f"{s} is gone on the joiner"
+            break
+        if not J.eval1(f"standOff('{s}', 4, 2.5)") or not J.eval1(f"guard('{s}', 'perfectShot')"):
+            r["stop"] = f"no spot 2.5 to 4 Wu in sight of {s}"
+            settle(lambda: False, 0.5)
+            continue
+        r.pop("stop", None)
+        settle(lambda: False, 0.4)
+        settle(lambda: J.eval1("graceLeft()") == 0, 2)
+        hp0 = H.eval1(f"hpOf('{s}')")
+        sid = H.eval1(f"spit('{s}')")
+        if not sid:
+            r["stop"] = f"{s} is gone on the host"
+            break
+        J.eval([f"shotToDodge = '{sid}'"])
+        got = settle(lambda: any(x[1] == sid for x in (J.json("shotEnds") or [])), 3)
+        if got:
+            end = [x for x in J.json("shotEnds") if x[1] == sid][0]
+            r.setdefault("met", []).append(end[2:4])
+            if end[2] == "perfect":
+                break
+            # The shield came up too early or too late on this frame: one
+            # more try
+            end = None
+            J.eval(["guard('', '')"])
+            settle(lambda: False, 0.6)
+    J.eval(["guard('', '')"])
+    r["joiner"] = end
+    check(end is not None and end[3] is True,
+          f"the joiner's screen judges a shot of {s} perfectly blocked as the joiner's knight raises "
+          f"its shield just before it (tries {r['tries']}: {[m[0] for m in r.get('met', [])]}"
+          + (f"; {r['stop']}" if "stop" in r else "") + ")")
+    if not end:
+        return r
+    sid = end[1]
+    got = settle(lambda: any(x[1] == sid for x in (H.json("shotsBack") or [])), 1.0)
+    jback = [x for x in (J.json("shotsBack") or []) if x[1] == sid]
+    hback = [x for x in (H.json("shotsBack") or []) if x[1] == sid]
+    rep = [x for x in (H.json("reports") or []) if x[1] == jid and x[2] == "shot" and x[3] == sid]
+    r.update({"joinerBack": jback, "hostBack": hback, "reported": [x[4] for x in rep]})
+    same = (jback and hback and jback[0][3] and hback[0][3] and jback[0][4] and hback[0][4]
+            and dist(jback[0][3], hback[0][3]) < 0.01 and dist(jback[0][4], hback[0][4]) < 0.01)
+    check(bool(got and jback and jback[0][2] is True and hback and hback[0][2] is False
+               and "perfect" in r["reported"] and same),
+          f"the joiner's perfect block sends {sid} back on both screens, from the same place the same way "
+          f"(joiner {jback[0][3:] if jback else None}, host {hback[0][3:] if hback else None}, "
+          f"the host {(hback[0][0] - jback[0][0]) if (jback and hback) else '?'} ms later)")
+    # The shot sent back reaches s on the joiner's screen, which strikes
+    # the host's s
+    hit = settle(lambda: H.eval1(f"hpOf('{s}')") < hp0, 3)
+    hp1 = H.eval1(f"hpOf('{s}')")
+    jend = [x for x in (J.json("shotEnds") or []) if x[1] == sid and x[2] == "enemy"]
+    r.update({"hp": [hp0, hp1], "hitOnJoiner": bool(jend)})
+    check(bool(hit and jend),
+          f"the shot sent back hits the host's {s} as the joiner's screen judges it "
+          f"({hp0} -> {hp1} HP on the host, " + ("hit" if jend else "no hit") + " on the joiner)")
     return r
 
 
