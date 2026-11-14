@@ -5938,11 +5938,19 @@ ClayWorld2d {
     // An enemy's HP at a danger (0 when left out) in a dungeon built for
     // knights (1 when left out): Balance.depth.hp of it more per step of
     // the danger, and on that Balance.party.hpPerKnight of it more for each
-    // knight beyond the first
+    // knight beyond the first. A tough one, a room's lead, has its type's
+    // leadHp share of it
     function enemyHp(type, tier, knights, d) {
-        let hp = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        let hp = enemyBaseHp(type, tier)
         return Math.round(hp * (1 + (d || 0) * Balance.depth.hp)
                           * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
+    }
+    // An enemy's HP at danger 0 for one knight: its tier's and its type's
+    // bonus, of a lead (tier 2) its type's leadHp share (issue #288)
+    function enemyBaseHp(type, tier) {
+        let t = Balance.enemy[type]
+        let hp = Balance.enemy.tierHp[tier] + t.hpBonus
+        return tier === 2 ? Math.round(hp * t.leadHp) : hp
     }
     function _extraKnights(knights) { return Math.max(0, (knights || 1) - 1) }
 
@@ -8870,11 +8878,13 @@ ClayWorld2d {
     // in reach of it, its gem the depth's (Balance.deep.shapes), its spawn
     // hole, a miner and a lost traveller before its rock face and a special
     // "flow" and "duel" are the fight room with the pacing bench's rooms
-    // (Balance.pacing): fodder only, and a room's lead alone
+    // (Balance.pacing): fodder only, and a room's lead alone, a grunt;
+    // "guardianduel" the same with a guardian lead (Balance.pacing
+    // .guardianDuel)
     // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
     // .boss), "bossroom" the dungeon at the boss depth's danger with the
     // knight at the Warden's door (Balance.boss)
-    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "boss", "bossroom", "features", "deep"] }
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8911,6 +8921,8 @@ ClayWorld2d {
             enterFightRoom()
         else if (name === "flow" || name === "duel" || name === "boss")
             enterFightRoom(Balance.pacing[name])
+        else if (name === "guardianduel")
+            enterFightRoom(Balance.pacing.guardianDuel)
         else if (name === "bossroom") {
             generateDungeon()
             toBossDoor()

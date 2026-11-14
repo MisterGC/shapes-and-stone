@@ -71,6 +71,8 @@ Window {
             return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + game.danger * Balance.depth.hp))
         }
         let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
+        // A lead has its type's leadHp share of it (issue #288)
+        if (tier === 2) base = Math.round(base * Balance.enemy[type].leadHp)
         return Math.round(base * (1 + game.danger * Balance.depth.hp))
     }
     function checkEnemy(e) {

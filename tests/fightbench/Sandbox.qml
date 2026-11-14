@@ -47,8 +47,8 @@ Item {
     // "charge", "masher" and "skilled" (Balance.pacing);
     // danger is the danger the fight room is at: its depth and, after the
     // point, the position in the depth's range (Game.applyScenario);
-    // room who stands in it: "mixed" (Balance.spawn.fightRoom), "flow" or
-    // "duel" (Balance.pacing); sword the knight's sword level, -1 for the
+    // room who stands in it: "mixed" (Balance.spawn.fightRoom), "flow",
+    // "duel" or "guardianduel" (Balance.pacing); sword the knight's sword level, -1 for the
     // one it usually has at that depth (usualSword), 0 when left out
     function begin(s, a, d, r, sw) {
         Clayground.paused = true
@@ -75,7 +75,8 @@ Item {
         // What would be heard, on the physics steps: muted, logged
         game.logSounds = true
         game.followFightOnSteps = true
-        // The dojo's scenarios: "fight" for the mixed room, "flow", "duel"
+        // The dojo's scenarios: "fight" for the mixed room, "flow", "duel",
+        // "guardianduel"
         game.applyScenario(room === "mixed" ? "fight" : room, danger)
         // The log's clock from 0, in steps of exactly 1/60 s: the same
         // fight logs the same times
@@ -362,6 +363,15 @@ Item {
     function duelReady() {
         return game.player !== null && game.fightRoomActive === true
             && game.enemies.some(e => alive(e) && e.lead)
+    }
+    // The lead's type, its HP, the HP the table gives it and its type's
+    // leadHp (issue #288), as JSON
+    function tryDuelLead() {
+        Clayground.paused = true
+        let lead = game.enemies.find(e => alive(e) && e.lead)
+        return JSON.stringify({type: lead.enemyType, hp: lead.maxHp,
+                               want: game.enemyHp(lead.enemyType, lead.tier, game.partyKnights, game.danger),
+                               leadHp: Balance.enemy[lead.enemyType].leadHp})
     }
     // Opens the lead as a parry would and strikes it with a swing of the
     // knight's atk in the opening. Returns whether its stance bar showed,

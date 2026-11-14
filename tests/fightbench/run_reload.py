@@ -18,7 +18,10 @@ the duel room's lead (issue #271) shows its stance bar, and opened as a
 parry opens it (Sandbox.tryOpening) it staggers for lead.openingTime and
 a swing in the opening does lead.openingDamage times its damage; with
 lead.openingTime changed in the loaded copy and the sandbox reloaded, the
-opening lasts the new time. Then in the flow scenario the knight strikes
+opening lasts the new time. The guardianduel scenario (issue #288) stands
+a guardian lead with the table's HP, its type's leadHp share of the tough
+tier's; with guardian.leadHp changed in the loaded copy and the sandbox
+reloaded, the lead has the new HP. Then in the flow scenario the knight strikes
 two enemies down CHAIN_GAP seconds apart (Sandbox.tryChain): within
 Balance.chain.window they chain, the second death sound a step higher;
 with chain.window set below the gap in the loaded copy and the sandbox
@@ -52,6 +55,7 @@ NEW_CHARGE_TIME = 0.45
 CRUSH_ATTACKS = 12
 CRUSH_MAX_STEPS = 60 * 60
 NEW_OPENING_TIME = 2.5
+NEW_GUARDIAN_LEAD_HP = 0.5
 CHAIN_GAP = 2.0
 NEW_CHAIN_WINDOW = 1.5
 BOSS_DEPTH = 2
@@ -86,6 +90,13 @@ def try_opening(bench):
     if not wait(lambda: bench.eval1("duelReady()") is True):
         return None
     return json.loads(bench.eval1("tryOpening()") or "{}")
+
+
+def try_duel_lead(bench):
+    bench.eval1("applyScenario('guardianduel', 0)")
+    if not wait(lambda: bench.eval1("duelReady()") is True):
+        return None
+    return json.loads(bench.eval1("tryDuelLead()") or "{}")
 
 
 def try_chain(bench):
@@ -202,6 +213,19 @@ def main():
               and abs(opening["seconds"] - NEW_OPENING_TIME) < 1e-6,
               f"after the reload the lead's opening lasts {opening and opening['seconds']} s "
               f"({NEW_OPENING_TIME} expected)")
+        lead = try_duel_lead(bench)
+        check(lead is not None and lead["type"] == "guardian" and lead["hp"] == lead["want"],
+              f"the guardianduel scenario stands a {lead and lead['type']} lead of "
+              f"{lead and lead['hp']} HP ({lead and lead['want']} by the table, leadHp "
+              f"{lead and lead['leadHp']})")
+        reloaded = reload(bench, balance, r"(guardian: \{ hpBonus: -?[0-9]+, leadHp: )[0-9.]+,",
+                          rf"\g<1>{NEW_GUARDIAN_LEAD_HP},")
+        check(reloaded, f"guardian.leadHp set to {NEW_GUARDIAN_LEAD_HP} and the sandbox reloaded")
+        after = try_duel_lead(bench) if reloaded else None
+        check(after is not None and after["leadHp"] == NEW_GUARDIAN_LEAD_HP
+              and after["hp"] == after["want"] and lead is not None and after["hp"] < lead["hp"],
+              f"after the reload the guardian lead has {after and after['hp']} HP "
+              f"({after and after['want']} by the table at leadHp {after and after['leadHp']})")
         chain = try_chain(bench)
         check(chain is not None and chain["window"] > CHAIN_GAP and chain["links"] == 2
               and len(chain["pitches"]) == 2 and chain["pitches"][1] > chain["pitches"][0] == 0,

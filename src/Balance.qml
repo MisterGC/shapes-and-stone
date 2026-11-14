@@ -347,12 +347,15 @@ QtObject {
         // one charged swing or two to three swings (pacing.flowHits), at
         // every depth with depth.hp; tough is a room's lead
         tierHp: [20, 26, 238],
-        // Per type: HP on top of the tier, attack, defense, speeds
-        grunt: { hpBonus: 2, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        guardian: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        spitter: { hpBonus: -2, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // Per type: HP on top of the tier, attack, defense, speeds, and
+        // leadHp: the share of its tough HP (tier and hpBonus) a lead of
+        // the type has, rounded to whole points. The melee leads fall a
+        // third sooner than the spitter's (issue #288)
+        grunt: { hpBonus: 2, leadHp: 0.67, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        guardian: { hpBonus: 0, leadHp: 0.67, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        spitter: { hpBonus: -2, leadHp: 1, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // The Hollow Warden (Balance.boss): its HP is the boss table's
-        warden: { hpBonus: 0, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
+        warden: { hpBonus: 0, leadHp: 1, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -517,9 +520,13 @@ QtObject {
             { dx: -3, dy: -3, tier: 1, type: "spitter" },
             { dx: 0, dy: 4, tier: 1, type: "guardian" }
         ],
-        // Duel: a room's lead alone, a tough enemy
+        // Duel: a room's lead alone, a tough enemy; guardianDuel the same
+        // with a guardian lead (issue #288)
         duel: [
             { dx: 0, dy: 4, tier: 2, type: "grunt" }
+        ],
+        guardianDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "guardian" }
         ],
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
@@ -528,14 +535,15 @@ QtObject {
         // the knight does not fall
         flowHits: { charge: [1, 1], masher: [2, 3], skilled: [1, 3] },
         flowGap: 2.5,
-        // Duel: "masher" and "charge" take at least duelSlow seconds to
+        // Duel, either lead: "masher" and "charge" take at least duelSlow seconds to
         // kill the lead, from the moment it engages, or fall; "skilled"
         // kills it within duelSkilled seconds and does not fall, and takes
         // less damage than either of the others. A lead strikes a knight
         // charging in its reach first (lead.reach): hits cancel at least
         // duelCancelled of "charge"'s charges
         duelSlow: 20,
-        duelSkilled: [6, 15],
+        // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288)
+        duelSkilled: [4, 15],
         duelCancelled: 1,
         // Boss (issue #274): the Hollow Warden alone (Balance.boss), its
         // adds coming in its phase 2, at the boss depths' first
@@ -562,7 +570,10 @@ QtObject {
     // After the opening the stance is full again. A swing parries a lead
     // only when it began at most parryStart physics steps before it
     // lands, in the parry window: a swing under way that the lunge runs
-    // into is a blow like any other. After its lunge a lead recovers for
+    // into is a blow like any other, and only when it began parryRest
+    // physics steps or more after the knight's swing before it and was no
+    // charged swing: mashing and the held charge parry no lead (issue
+    // #288). After its lunge a lead recovers for
     // recovery seconds, less than a full charge (knight.chargeTime): a
     // charge the lunge cancelled is not full again in time. The stance
     // shows as a bar of barColor under the lead, an opening as a flash of
@@ -588,6 +599,7 @@ QtObject {
     // rest or the recovery opens the lead
     readonly property var lead: ({
         parryStart: 9,
+        parryRest: 36,
         recovery: 0.3,
         chip: 0.1,
         wear: 0.03,

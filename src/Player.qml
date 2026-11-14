@@ -549,9 +549,11 @@ PhysicsItem {
         for (let enemy of _swingCandidates()) {
             if (!_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
                 // A lead is parried only by a swing begun in its window
-                // (Balance.lead.parryStart), not by one it ran into
+                // (Balance.lead.parryStart), not by one it ran into, and
+                // by none begun within parryRest steps of the swing before
+                // it, nor by a charged one (issue #288)
                 let parried = enemy.parryWindow
-                    && (!enemy.lead || _steps - _swingStep <= Balance.lead.parryStart)
+                    && (!enemy.lead || _parriesLead())
                 let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
                         : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
                 if (parried) dmg = atk * Balance.knight.parrySwing
@@ -984,6 +986,15 @@ PhysicsItem {
     property int _swungAt: -1000000
     // The physics step the swing under way began on, a heavy one's too
     property int _swingStep: -1000000
+    // The step the swing before the last began on
+    property int _prevSwingStep: -1000000
+    // Whether the swing under way parries a lead in its window: a light
+    // swing begun in it and parryRest steps or more after the one before
+    function _parriesLead() {
+        let l = Balance.lead
+        return !isHeavy && _steps - _swingStep <= l.parryStart
+            && _swingStep - _prevSwingStep >= l.parryRest
+    }
     property bool _bashed: true
     // The bash's lunge: seconds left and its start velocity, wu/s (y up)
     property real _lungeT: 0
@@ -1143,6 +1154,7 @@ PhysicsItem {
             _swingEarned = 0
             attackCooldown = attackCooldownTime
             _swungAt = _steps
+            _prevSwingStep = _swingStep
             _swingStep = _steps
             _bashed = false
             view.swing()
@@ -1166,6 +1178,7 @@ PhysicsItem {
         _glancedThisSwing = new Set()
         _swingEarned = 0
         attackCooldown = _swingTimer + Balance.knight.heavyRecovery
+        _prevSwingStep = _swingStep
         _swingStep = _steps
         view.swing(true)
         acted("heavy")
