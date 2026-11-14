@@ -1816,10 +1816,12 @@ ClayWorld2d {
         recordPassed = true
         if (banner && screen === "game") _raiseRecordBanner()
     }
-    // A record passed while the descent intro is up waits for its Go
+    // A record passed while a level is built or its descent intro holds
+    // waits for its Go, or, in a level without an intro, for the level to
+    // stand (_recordAfterIntro). now raises it whatever
     property bool _recordWaits: false
-    function _raiseRecordBanner() {
-        if (introHeld) {
+    function _raiseRecordBanner(now) {
+        if (!now && (resetting || _building || introHeld)) {
             _recordWaits = true
             return
         }
@@ -3729,7 +3731,10 @@ ClayWorld2d {
     // for, the host's in a session; alone they are settled here, before
     // the knight and its record are gone. d.master is the dungeon's
     // overrides, the dungeon master's
+    // True while _enterLevel builds the next level
+    property bool _building: false
     function _enterLevel(newIndex, d) {
+        _building = true
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
                                  potions: player.potions, draughts: player.draughts, creel: player.creel,
@@ -3762,6 +3767,7 @@ ClayWorld2d {
         }
         // A knight still down when the party reaches the camp rises there
         if (session.connected && levelType === "village") _rise("camp")
+        _building = false
         _beginIntro()
     }
 
@@ -3810,6 +3816,7 @@ ClayWorld2d {
     function _beginIntro() {
         if (!descentIntro || levelType !== "dungeon" || fightRoomActive) {
             introLevel = -1
+            _recordAfterIntro()
             return
         }
         introStartsAt = -1
@@ -3878,16 +3885,21 @@ ClayWorld2d {
     }
     onIntroBeatChanged: if (introBeat > 0) _playIntroBeat(0, "beat" + introBeat)
     onIntroHeldChanged: {
+        if (introHeld) return
         // Released: Go, unless the count is long over (a knight that
         // joins the run in this dungeon)
-        if (introHeld || !introOn || introStartsAt < 0) return
-        if (introClock > introStartsAt + (introSeconds + Balance.intro.go) * 1000) return
-        _playIntroBeat(Balance.intro.goPitch, "go")
-        introGoShow.restart()
-        if (recordPassed && _recordWaits) {
-            _recordWaits = false
-            _raiseRecordBanner()
+        if (introOn && introStartsAt >= 0
+                && introClock <= introStartsAt + (introSeconds + Balance.intro.go) * 1000) {
+            _playIntroBeat(Balance.intro.goPitch, "go")
+            introGoShow.restart()
         }
+        if (screen === "game") _recordAfterIntro()
+    }
+    // The record's banner that waited, once no intro holds
+    function _recordAfterIntro() {
+        if (!_recordWaits || introHeld) return
+        _recordWaits = false
+        _raiseRecordBanner(true)
     }
     // The count's knock: the beats on its own pitch, the release up
     SfxPlayer {
