@@ -65,8 +65,8 @@ Window {
     // The bench's record, depth 0 on every run, so the dungeon at depth 1
     // passes it
     KeyValueStore { id: store; name: "ShapesAndStoneDescentBench" }
-    // Every record banner the solo game raised: its depth, when and
-    // whether the intro held then
+    // Every record banner the solo game raised: its depth and whether the
+    // intro held then
     property var banners: []
 
     Component.onCompleted: {
@@ -79,7 +79,7 @@ Window {
             return
         }
         solo = makeGame({})
-        solo.recordBanner.connect(d => banners.push({ depth: d, at: Date.now(), held: solo.introHeld }))
+        solo.recordBanner.connect(d => banners.push({ depth: d, held: solo.introHeld }))
         script.start()
     }
     function makeGame(props) {
@@ -280,10 +280,12 @@ Window {
                   + held + " ms besides the pause (" + solo.introSeconds * 1000 + " ms)")
             check(seenOf(solo).beats.map(b => b.beat).join(",") === "3,2,1",
                   "after the camp it counts 3, 2, 1 (" + seenOf(solo).beats.map(b => b.beat).join(",") + ")")
+            // None went up while it held (checked as it began), and this
+            // one went up with the intro no longer held
             let b = banners[0]
-            check(banners.length === 1 && b.depth === 1 && !b.held && b.at >= s.freedAt && !solo._recordWaits,
+            check(banners.length === 1 && b.depth === 1 && !b.held && !solo._recordWaits,
                   "the record's banner goes up once, after the intro lets go ("
-                  + (b ? "depth " + b.depth + ", " + (b.at - s.freedAt) + " ms after, intro held " + b.held : "none") + ")")
+                  + (b ? "depth " + b.depth + ", intro held " + b.held : "none") + ")")
             solo.destroy()
             solo = null
             startSession()
