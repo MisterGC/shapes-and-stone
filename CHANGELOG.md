@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-14
+
 ## [0.5.0] - 2026-11-14
 
 Fights have two rhythms: most rooms are a fast flow of weak enemies that fall to a stroke or two, kill after kill building a chain; a room's lead is a duel, won by reading its strings and striking while it is open, and the music and the view turn to it; and every third dungeon ends in the Hollow Warden's boss room. Built on Clayground v2026.11.1.
