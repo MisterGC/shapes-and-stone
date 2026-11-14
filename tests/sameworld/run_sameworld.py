@@ -16,6 +16,10 @@ answers one enemy of the host's, and each answer is checked on both screens:
   (clayground#369: a sleeping knight saw no enemy walk in)
 - it parries the enemy late in the parry window it shows: the host's enemy
   staggers, and the lunge's blow, on its way by then, does not land
+- the host makes that enemy a room's lead (issue #271), and the joiner's
+  knight parries it as before: the host receives the parry's blow as one
+  that opens the lead, and the lead opens - its long stagger - on both
+  screens. Then it is no lead again
 - it holds its shield toward the enemy, then raises it just before a lunge
   lands, then dashes at it late in the parry window it shows: the lunge is
   blocked, blocked perfectly, then dodged, as the joiner judges it; the host
@@ -24,6 +28,9 @@ answers one enemy of the host's, and each answer is checked on both screens:
   both screens.
   The host's other enemies stand meanwhile, and a lunge that met the knight
   in its grace after another hit (ignored) is tried again
+- the host makes that enemy a lead again and strikes a string with a feint
+  (issue #272) at its own knight: the joiner shows the string's name and
+  the feint's hold, and no string once the host's is over
 - it stands in sight of a spitter, which the host makes spit at it three
   times: it holds its shield up, dashes into the shot, stands. The shot is
   blocked, dodged, hits; the host receives each result, and the shot with
@@ -395,6 +402,89 @@ def parry(H, J, b, settle, check, late=6):
     check(not landed, f"the parried lunge does not land on the joiner's knight "
           f"({len(landed)} landed, {sum(r[2] == 'parried' for r in near)} dropped as parried, "
           f"{len(near)} blows of {b} from 150 ms before the parry to 600 ms after)")
+    return res
+
+
+def lead_parry(H, J, b, settle, check, late=6):
+    """The host makes enemy b a room's lead (issue #271), and the joiner
+    shows it as one. The joiner's knight swings only into b's parry
+    window, as the joiner shows it, from its late-th frame on: the host
+    receives the parry's blow as one that opens b, and b opens - the long
+    stagger of Balance.lead.openingTime - on both screens. Once the
+    opening is over b is no lead again"""
+    res = {"enemy": b}
+    H.eval([f"makeLead('{b}', true)"])
+    shown = settle(lambda: J.eval1(f"leadOf('{b}')") is True, 3)
+    check(shown, f"the host makes {b} a room's lead, and the joiner shows it as one")
+    openings0 = [(X.json("openings") or {}).get(b, 0) for X in (H, J)]
+    t0 = now_ms()
+    try:
+        if not J.eval1(f"guard('{b}', 'parry', {late})"):
+            check(False, f"the joiner's knight parries the lead {b} ({b} is gone)")
+            return res
+        parried = settle(lambda: J.json("guardLog").get("done"), 15)
+        log = J.json("guardLog")
+        J.eval(["guard('', '')"])
+        res["log"] = log
+        check(parried and "parry" in log,
+              f"the joiner's knight parries the lead {b} ({log.get('swings', 0)} swings into its window)")
+        if not parried or "parry" not in log:
+            return res
+        opened = settle(lambda: all((X.json("openings") or {}).get(b, 0) > n
+                                    for X, n in zip((H, J), openings0)), 1.5)
+        sent = [x[3]["opens"] for x in (H.json("received") or [])
+                if x[1] == b and x[0] >= t0 and x[2] in ("damage", "open") and x[3] and x[3].get("opens")]
+        res["opens"] = sent
+        res["openings"] = [(X.json("openings") or {}).get(b, 0) - n for X, n in zip((H, J), openings0)]
+        check(sent[:1] == ["parry"],
+              f"the host receives the joiner's parry of {b} as a blow that opens the lead ({sent})")
+        check(opened, f"the joiner's parry opens the host's lead {b} on both screens "
+              f"(host {res['openings'][0]}, joiner {res['openings'][1]} openings)")
+        # The opening runs out before b is no lead again
+        seconds = H.eval1("Balance.lead.openingTime") or 0
+        settle(lambda: H.eval1(f"openingOf('{b}')") is False, seconds + 1.0)
+    finally:
+        H.eval([f"makeLead('{b}', false)"])
+        settle(lambda: J.eval1(f"leadOf('{b}')") is False, 3)
+    return res
+
+
+def lead_string(H, J, b, settle, check):
+    """The host makes enemy b a room's lead again and strikes the string
+    of its type whose feint comes first at the host's knight (issue
+    #272), the host's other enemies standing: the joiner shows the
+    string's name and, while the feint holds, its hold; when the host's
+    string is over the joiner shows none"""
+    res = {"enemy": b}
+    H.eval([f"hold(true, '{b}')", f"makeLead('{b}', true)"])
+    try:
+        settle(lambda: J.eval1(f"leadOf('{b}')") is True, 3)
+        want = H.json(f"strikeString('{b}')") or {}
+        res["host"] = want
+        if not want.get("name"):
+            check(False, f"the host's lead {b} strikes a string with a feint ({want})")
+            return res
+        seen = {"name": "", "hold": 0}
+
+        def joiner_saw():
+            j = J.json(f"stringOf('{b}')") or {}
+            if j.get("name") == want["name"]:
+                seen["name"] = j["name"]
+            seen["hold"] = max(seen["hold"], j.get("hold") or 0)
+            return seen["name"] == want["name"] and seen["hold"] > 0
+        settle(joiner_saw, 6)
+        res["joiner"] = dict(seen)
+        check(seen["name"] == want["name"],
+              f"the joiner shows the host's lead {b} striking its string \"{want['name']}\" "
+              f"(joiner: \"{seen['name']}\")")
+        check(abs(seen["hold"] - want["hold"]) < 1e-6,
+              f"the joiner shows its feint's hold, {seen['hold']} s ({want['hold']} by the table)")
+        ended = settle(lambda: (H.json(f"stringOf('{b}')") or {}).get("name") == ""
+                       and (J.json(f"stringOf('{b}')") or {}).get("name") == "", 8)
+        check(ended, f"when the host's string is over the joiner shows {b} striking none")
+    finally:
+        H.eval([f"makeLead('{b}', false)", "hold(false)", "game.player.isBlocking = false"])
+        settle(lambda: J.eval1(f"leadOf('{b}')") is False, 3)
     return res
 
 
@@ -958,7 +1048,9 @@ def run(args, loader, tmp, procs, result, check):
 
         result["hit"] = standing_hit(H, J, b, settle, check)
         result["parry"] = parry(H, J, b, settle, check)
+        result["leadParry"] = lead_parry(H, J, b, settle, check)
         result["lunges"] = lunge_answers(H, J, b, settle, check)
+        result["leadString"] = lead_string(H, J, b, settle, check)
         spitters = [i for i in sorted(H.json("enemies()") or {})
                     if i not in (a, b) and H.eval1(f"typeOf('{i}')") == "spitter"]
         result["shots"] = shot_answers(H, J, spitters[0] if spitters else "", settle, check)

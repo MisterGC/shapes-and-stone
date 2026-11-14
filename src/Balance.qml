@@ -346,7 +346,7 @@ QtObject {
         // Base HP by tier: weak, normal, tough. Weak and normal fall to
         // one charged swing or two to three swings (pacing.flowHits), at
         // every depth with depth.hp; tough is a room's lead
-        tierHp: [20, 26, 72],
+        tierHp: [20, 26, 238],
         // Per type: HP on top of the tier, attack, defense, speeds
         grunt: { hpBonus: 2, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
@@ -418,9 +418,12 @@ QtObject {
         shootWindUp: 0.3
     })
 
+    // A spitter's shot: size wu a side, flying from the spitter's centre
+    // at the knight's
     readonly property var projectile: ({
         speed: 5.0,
-        lifetime: 3.0
+        lifetime: 3.0,
+        size: 0.3
     })
 
     readonly property var spawn: ({
@@ -434,10 +437,13 @@ QtObject {
         // Enemies per dungeon at depth 0, rolled evenly from min to max
         enemiesMin: 10,
         enemiesMax: 15,
-        // Tier mix of a dungeon, dealt not rolled: weakChance of its enemies
-        // (rounded) are weak, those above normalChance tough, the rest normal
+        // A room's lead (issue #269): the one tough enemy a room may hold.
+        // leadShare of the rooms but the start room (rounded) have one, the
+        // rooms dealt, not rolled, among those that hold an enemy; no other
+        // enemy of a dungeon is tough. The rest is fodder: weakChance of all
+        // its enemies (rounded) are weak, the rest normal
+        leadShare: 0.33,
         weakChance: 0.2,
-        normalChance: 0.8,
         // Type rolls: guardian first, then spitter, else grunt
         guardianChance: 0.15,
         guardianChanceTough: 0.4,
@@ -464,9 +470,10 @@ QtObject {
         enemiesCap: 26,
         // Fewer weak: weakChance falls by this, not below 0
         weakChance: -0.05,
-        // More tough: the tough share (above normalChance) grows by this
-        toughChance: 0.08,
-        toughCap: 0.6,
+        // More leads: the share of rooms with a lead grows by this, up to
+        // the cap - one room in three at depth 0, every room from depth 8
+        leadShare: 0.09,
+        leadCap: 1,
         // More guardians and spitters: added to their chances (a tough
         // guardian's too), each up to the cap
         guardianChance: 0.03,
@@ -515,9 +522,81 @@ QtObject {
         // Duel: "masher" and "charge" take at least duelSlow seconds to
         // kill the lead, from the moment it engages, or fall; "skilled"
         // kills it within duelSkilled seconds and does not fall, and takes
-        // less damage than either of the others
+        // less damage than either of the others. A lead strikes a knight
+        // charging in its reach first (lead.reach): hits cancel at least
+        // duelCancelled of "charge"'s charges
         duelSlow: 20,
-        duelSkilled: [6, 15]
+        duelSkilled: [6, 15],
+        duelCancelled: 1
+    })
+
+    // A room's lead has a stance (issue #271): it takes no knockback, no
+    // hit staggers it and it keeps winding up under hits. Its stance is
+    // full at 1. A blow outside an opening does chip of its damage and
+    // wears wear off the stance, a charged swing heavyWear; regen comes
+    // back per second once no blow has landed for regenDelay seconds. A
+    // parry, a perfect block, a charged swing landed while it recovers
+    // from its lunge, or its stance worn to 0 breaks it: an opening, a
+    // stagger of openingTime seconds in which every blow does
+    // openingDamage times its damage; the blow that opens it lands whole.
+    // After the opening the stance is full again. A swing parries a lead
+    // only when it began at most parryStart physics steps before it
+    // lands, in the parry window: a swing under way that the lunge runs
+    // into is a blow like any other. After its lunge a lead recovers for
+    // recovery seconds, less than a full charge (knight.chargeTime): a
+    // charge the lunge cancelled is not full again in time. The stance
+    // shows as a bar of barColor under the lead, an opening as a flash of
+    // flashColor, the word word over it, and the stagger.
+    // A lead attacks in strings (issue #272), in the arrow slits' beat
+    // notation (dungeon.slitRhythms): strings holds each lead type's, a
+    // name and its beats, 1 a strike, 2 a feint, 0 a rest, one rolled for
+    // each string from the level's attack rolls. A blow - a lunge
+    // landing, a shot leaving - comes beat seconds after the one before,
+    // and the parry ring closes once per beat, on the window; the first
+    // wind-up is the count-in, enemy.windUp (a shot's shootWindUp). A
+    // feint's wind-up holds feintHold seconds longer, its ring standing
+    // at feintRing of the way and the lead still, then strikes. A rest
+    // stands a beat, a recovery a charged swing opens. A strike or a feint
+    // winds up only at a knight within reach wu (a spitter's shootRange),
+    // else the string is over; after it the lead recovers for recovery.
+    // A knight within reach holding a charge, filling or full, is struck
+    // first: the lead begins a string at once - a rest of one cut short,
+    // not its recovery after one -, its first blow wound up for
+    // enemy.minTelegraph and no feint, and the hit cancels the charge.
+    // reach is the knight's own heavy swing's (knight.attackRange times
+    // heavyRange): a charge built outside it and let go on arriving in a
+    // rest or the recovery opens the lead
+    readonly property var lead: ({
+        parryStart: 9,
+        recovery: 0.3,
+        chip: 0.1,
+        wear: 0.03,
+        heavyWear: 0.1,
+        regen: 0.1,
+        regenDelay: 1.5,
+        openingTime: 1.5,
+        openingDamage: 1.5,
+        barColor: "#E8C872",
+        flashColor: "#FFE9A8",
+        word: "OPEN",
+        beat: 0.7,
+        feintHold: 0.35,
+        feintRing: 0.6,
+        reach: 2.5,
+        strings: {
+            grunt: [
+                { name: "two-and-one", beats: [1, 1, 0, 1] },
+                { name: "held-two", beats: [2, 0, 1, 1] }
+            ],
+            guardian: [
+                { name: "one-and-feint", beats: [1, 0, 2] },
+                { name: "three", beats: [1, 1, 1] }
+            ],
+            spitter: [
+                { name: "volley", beats: [1, 1, 1] },
+                { name: "stutter", beats: [1, 0, 1, 2] }
+            ]
+        }
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that
@@ -1028,6 +1107,7 @@ QtObject {
     readonly property var dungeonMaster: ({
         settings: [
             { key: "enemies", label: "Enemies per room", step: 0.1, min: 0, max: 8, decimals: 2 },
+            { key: "leads", label: "Rooms with a lead", step: 0.05, min: 0, max: 1, decimals: 2 },
             { key: "spikes", label: "Spike plates per room", step: 0.1, min: 0, max: 4, decimals: 2,
               kinds: ["spike"] },
             { key: "slits", label: "Arrow slits per room", step: 0.1, min: 0, max: 4, decimals: 2,

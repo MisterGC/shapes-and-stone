@@ -77,10 +77,11 @@ Item {
 
     // What Generate showed, counted
     readonly property var counts: {
-        let c = { rooms: 0, enemies: 0, breakables: 0, spike: 0, slit: 0, doors: 0, secrets: 0 }
+        let c = { rooms: 0, enemies: 0, leads: 0, breakables: 0, spike: 0, slit: 0, doors: 0, secrets: 0 }
         if (!preview) return c
         c.rooms = preview.rooms.length
         c.enemies = preview.enemies.length
+        c.leads = preview.enemies.filter(e => e.tier === 2).length
         for (let f of preview.features) {
             if (f.kind === "spike" || f.kind === "slit") c[f.kind]++
             else c.breakables++
@@ -276,7 +277,8 @@ Item {
                     wrapMode: Text.WordWrap
                     text: panel.preview
                           ? "Seed " + panel.preview.seed + " • " + panel.counts.rooms + " rooms • "
-                            + panel.counts.enemies + " enemies • " + panel.counts.breakables
+                            + panel.counts.enemies + " enemies, " + panel.counts.leads + " of them leads • "
+                            + panel.counts.breakables
                             + " breakables • " + panel.counts.spike + " spike plates • "
                             + panel.counts.slit + " arrow slits • " + panel.counts.doors + " doors"
                             + (panel.counts.secrets > 0 ? " • " + panel.counts.secrets + " secret rooms" : "")

@@ -259,9 +259,13 @@ def describe(r):
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s"]
     for e in r["enemies"]:
-        lines.append(f"  {e['type']} ({TIERS[e['tier']]}, {e['hp']} HP): hits {e['hits']}, "
+        # A lead's openings by what broke its stance (Balance.lead)
+        opened = e.get("opened") or {}
+        by = (" (" + ", ".join(f"{c} {n}" for c, n in sorted(opened.items())) + ")") if opened else ""
+        lead = ", lead" if e.get("lead") else ""
+        lines.append(f"  {e['type']} ({TIERS[e['tier']]}{lead}, {e['hp']} HP): hits {e['hits']}, "
                      f"ttk {fmt_s(e['ttk'])} from its first hit, {fmt_s(e['ttkEngaged'])} "
-                     f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}")
+                     f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}{by}")
     if r["killGaps"]:
         lines.append("  gaps between kills: " + ", ".join(f"{g:.2f}" for g in r["killGaps"]) + " s")
     pitches = death_pitches(r)
@@ -383,6 +387,12 @@ def check(results, bands):
             what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
             out.append((ok, f"duel depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
                             f"or falls ({what})"))
+            # The lead strikes a knight charging in its reach first (#272)
+            if pilot == "charge":
+                least = bands["duelCancelled"]
+                out.append((r["cancelledCharges"] >= least,
+                            f"duel depth {depth} charge: hits cancel at least {least} "
+                            f"{'charge' if least == 1 else 'charges'} ({r['cancelledCharges']})"))
         r = by.get("skilled")
         if r:
             t = lead_time(r)

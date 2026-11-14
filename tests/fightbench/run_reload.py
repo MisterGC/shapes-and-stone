@@ -14,11 +14,16 @@ room's tough guardian goes for the knight (Sandbox.tryCrush): at the
 table's enemy.crushChance it must wind up a crushing blow among its
 attacks; with enemy.crushChance set to 1 in the loaded copy and the
 sandbox reloaded, every one of its attacks must be a crushing one. Then
-in the flow scenario the knight strikes two enemies down CHAIN_GAP seconds
-apart (Sandbox.tryChain): within Balance.chain.window they chain, the
-second death sound a step higher; with chain.window set below the gap in
-the loaded copy and the sandbox reloaded, they no longer do. Prints
-one PASS or FAIL line per check and exits with the number of failures.
+the duel room's lead (issue #271) shows its stance bar, and opened as a
+parry opens it (Sandbox.tryOpening) it staggers for lead.openingTime and
+a swing in the opening does lead.openingDamage times its damage; with
+lead.openingTime changed in the loaded copy and the sandbox reloaded, the
+opening lasts the new time. Then in the flow scenario the knight strikes
+two enemies down CHAIN_GAP seconds apart (Sandbox.tryChain): within
+Balance.chain.window they chain, the second death sound a step higher;
+with chain.window set below the gap in the loaded copy and the sandbox
+reloaded, they no longer do. Prints one PASS or FAIL line per check and
+exits with the number of failures.
 
 Usage:
   run_reload.py [--loader <clayliveloader>]
@@ -42,6 +47,7 @@ STEP = 1 / 60
 NEW_CHARGE_TIME = 0.45
 CRUSH_ATTACKS = 12
 CRUSH_MAX_STEPS = 60 * 60
+NEW_OPENING_TIME = 2.5
 CHAIN_GAP = 2.0
 NEW_CHAIN_WINDOW = 1.5
 
@@ -67,6 +73,13 @@ def try_crush(bench):
     if not wait(lambda: bench.eval1("fightReady()") is True):
         return None
     return json.loads(bench.eval1(f"tryCrush({CRUSH_ATTACKS}, {CRUSH_MAX_STEPS})") or "{}")
+
+
+def try_opening(bench):
+    bench.eval1("applyScenario('duel', 0)")
+    if not wait(lambda: bench.eval1("duelReady()") is True):
+        return None
+    return json.loads(bench.eval1("tryOpening()") or "{}")
 
 
 def try_chain(bench):
@@ -161,6 +174,21 @@ def main():
               f"after the reload every attack of the tough guardian is a crushing one "
               f"({crush and crush['crushes']} of {crush and crush['attacks']})")
 
+        opening = try_opening(bench)
+        check(opening is not None and opening["bar"] and opening["opened"]
+              and abs(opening["seconds"] - opening["openingTime"]) < 1e-6
+              and opening["lost"] == opening["want"],
+              f"in the duel room the lead shows its stance bar ({opening and opening['bar']}), "
+              f"a parry opens it for {opening and opening['seconds']} s (openingTime "
+              f"{opening and opening['openingTime']}) and a swing in the opening takes "
+              f"{opening and opening['lost']} HP ({opening and opening['want']} by the table)")
+        reloaded = reload(bench, balance, r"openingTime: [0-9.]+,", f"openingTime: {NEW_OPENING_TIME},")
+        check(reloaded, f"lead.openingTime set to {NEW_OPENING_TIME} and the sandbox reloaded")
+        opening = try_opening(bench) if reloaded else None
+        check(opening is not None and opening["opened"]
+              and abs(opening["seconds"] - NEW_OPENING_TIME) < 1e-6,
+              f"after the reload the lead's opening lasts {opening and opening['seconds']} s "
+              f"({NEW_OPENING_TIME} expected)")
         chain = try_chain(bench)
         check(chain is not None and chain["window"] > CHAIN_GAP and chain["links"] == 2
               and len(chain["pitches"]) == 2 and chain["pitches"][1] > chain["pitches"][0] == 0,

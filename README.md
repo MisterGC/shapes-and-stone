@@ -144,7 +144,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -268,7 +268,10 @@ The joiner's knight answers one of the host's enemies: it stands until the
 enemy walks into its reach and swings, parries it, blocks, blocks
 perfectly and dodges its lunges, blocks, dodges and takes a spitter's shots, shield-pushes it as it closes in and
 kills it while the host's knight kills another; the host gives that enemy
-200 HP first, so it stands until the kill. Each answer counts once,
+200 HP first, so it stands until the kill. After the first parry the host
+makes that enemy a room's lead for a moment and the joiner's knight
+parries it again: the host receives the blow as one that opens the lead,
+and the lead opens on both screens. Each answer counts once,
 on both screens: the same HP, the stagger of a parry and of a perfect
 block, the shove, the death and its
 stain, a parried lunge that does not land, each lunge and shot judged by
@@ -1105,18 +1108,32 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/balance/balance.qml
 
 Deeper is harder. Each dungeon is a depth, counted from 0, and the table's
 `depth` group says what each depth adds to the dungeon: two more enemies
-(up to `depth.enemiesCap`), fewer weak and more tough ones, more guardians
-and spitters, half an attack point per enemy, rounded, and a fifth more
-HP per enemy (`depth.hp`), rounded, so the smith's sword does not make
-the fights shorter the deeper the knight goes: a weak or normal enemy
-falls to one charged swing or two to three swings at every depth, with
-the sword the knight usually has there (the pacing bench's flow room
-below). A dungeon's
-tier mix is dealt, not rolled: `spawn.weakChance` of its enemies are weak
-and those above `spawn.normalChance` tough, so the mix follows the depth on
-every seed. In the dojo, `applyScenario("dungeon", 4)` through `eval` lands
-in the dungeon at depth 4 (the village and the fight room take a depth the
-same way), and the balance bench checks depth 0, 2 and 4 against the table.
+(up to `depth.enemiesCap`), fewer weak ones, more rooms with a lead, more
+guardians and spitters, half an attack point per enemy, rounded, and a
+fifth more HP per enemy (`depth.hp`), rounded, so the smith's sword does
+not make the fights shorter the deeper the knight goes: a weak or normal
+enemy falls to one charged swing or two to three swings at every depth,
+with the sword the knight usually has there (the pacing bench's flow room
+below). A room's lead is its one tough enemy: no room holds two, and no other
+enemy is tough. `spawn.leadShare` of the rooms but the start room have a
+lead at depth 0 - one in three - and `depth.leadShare` more per depth, up
+to `depth.leadCap`, every room from depth 8. The rest of a dungeon's
+enemies are fodder, weak and normal, so the rooms without a lead fight
+in larger groups as the count grows; a creature out of a hole is fodder
+too. The mix is dealt, not rolled: the share of rooms with a lead, rounded,
+picked among the rooms that hold an enemy, and `spawn.weakChance` of its
+enemies weak, so it follows the depth on every seed. In the dojo,
+`applyScenario("dungeon", 4)` through `eval` lands in the dungeon at
+depth 4 (the village and the fight room take a depth the same way), and
+the balance bench checks depth 0, 2 and 4 against the table. The leads
+bench plans 50 seeds at each of depths 0, 2, 4 and 8, checks that no room
+holds two tough enemies, that each has the table's count of rooms with a
+lead and that a seed planned twice is the same dungeon, then builds the
+dungeon at each depth and checks it is the planned one:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/leads/leads.qml
+```
 
 Each depth is a range of difficulty, and how the last dungeon went picks
 the spot in it. A dungeon's danger is its depth plus a position in [0, 1),
@@ -1805,13 +1822,14 @@ qml -I build/bin/qml tests/freed/freed.qml -- <out dir>
 **Dungeon master:** *Dungeon Master: On* on the title (Enter turns it
 over, kept for the next visit) shows a panel before each dungeon to a solo
 player or the host, never to a joiner. Its rows are the settings of
-`Balance.dungeonMaster` - enemies, spike plates, arrow slits and
-breakables per room, rooms, base depth, relative difficulty (the
+`Balance.dungeonMaster` - enemies per room, the share of rooms with a
+lead, spike plates, arrow slits and breakables per room, rooms, base depth, relative difficulty (the
 danger's position in its depth's range) and veins per room - at the
 values the game would use. W/S picks a row, A/D or the arrows turn it a
 step and set it (gold),
 Backspace or a double click gives it back to the game. G shows the
-dungeon Enter then enters, with its enemies by tier, breakables, spike
+dungeon Enter then enters, with its enemies by tier and how many of them
+lead a room, breakables, spike
 plates, arrow slits, doors and secret rooms; G again rolls a new seed for
 it, and a row turned while a map is shown redraws it on the same seed.
 Enter or Space goes. The settings set hold for that dungeon and the ones
@@ -1829,7 +1847,7 @@ host's panel is up, told that the dungeon master prepares the next
 dungeon. A new setting is a row in `Balance.dungeonMaster`; a
 row with `kinds` sets those features per room with no code. The dungeon
 master bench sets every row, checks the preview's and the built
-dungeon's counts per room, that the dungeon entered is the one previewed,
+dungeon's counts per room and its rooms with a lead, that the dungeon entered is the one previewed,
 that Go with nothing set builds the game's own dungeon, the kept
 settings in a game started again, and Copy and Paste; the master party
 bench plays two dungeons in a session of two processes and checks that
@@ -1999,11 +2017,46 @@ run's seed and the level, so a seed plays the same fight. Its AI state is
 wind-up; the blow carries `crush` to the knight's screen, which judges it.
 The `crush` group of the table holds its look, its growl and its hit
 feedback (`impact("crushBlow")`).
+A room's lead, its tough enemy, has a stance (issue #271, the table's
+`lead` group): it takes no knockback, no hit, shove or shield dash
+staggers it, and it keeps winding up under hits. Its HP is the tough tier's
+(`enemy.tierHp`), many times a normal enemy's: it falls in its openings,
+not to a few swings. A blow outside an
+opening does only `lead.chip` of its damage and wears `lead.wear` off its
+stance, a charged swing `lead.heavyWear`; with no blow for
+`lead.regenDelay` seconds the stance comes back. A parry, a perfect block,
+a charged swing landed while it recovers from its lunge (`lead.recovery`
+seconds, shorter than a full charge: a charge the lunge cancelled is not
+full again in time) or a stance worn to 0 breaks it: an opening, a stagger
+of `lead.openingTime` seconds in which every blow does `lead.openingDamage`
+times its damage. The blow that opens it lands whole, and after the
+opening the stance is full again. A swing parries a lead only when it
+began in the parry window (`lead.parryStart` steps before it lands): a
+swing under way that the lunge runs into is a blow like any other. The
+stance shows as a bar under the lead, an opening as a flash, a ring, the
+word `lead.word` and the stagger. In a session the host's lead keeps the
+stance: `lead`, `stance` and `opening` are replicated, the knight's own
+screen judges whether its blow opens the lead, and the host opens it.
 The answer bench single-steps the paused fight room, counts each of these
 in steps and exits with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
+```
+
+A lead attacks in strings (issue #272), in the arrow slits' beat notation:
+`lead.strings` holds each lead type's, 1 a strike, 2 a feint, 0 a rest,
+`lead.beat` seconds a beat, and the parry ring closes once per beat. A
+feint's wind-up holds `lead.feintHold` longer, its ring standing at
+`lead.feintRing`, then strikes; a rest is a recovery a charged swing
+opens. A knight within `lead.reach` holding a charge is struck first,
+`enemy.minTelegraph` after it is seen, a rest cut short, and the hit
+cancels the charge. `stringName` and `feintHold` are replicated. The
+strings bench steps every string of every lead type and finds the parry
+window on every beat:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/strings/strings.qml
 ```
 
 The ring bench steps a grunt's wind-up in the paused fight room and saves
@@ -2074,20 +2127,21 @@ from the first blow that landed and from the moment it engaged; the gaps
 between kills, the kill chains and the longest one's links, the death
 sound's pitch kill by kill, the time engaged, the damage taken, the
 openings (an enemy staggered by a parry, a perfect block or a broken
-guard) and the charges a hit cancelled; and what a player would have
+guard; a lead's by what broke its stance: `parry`, `perfect`, `heavy` or
+`worn`) and the charges a hit cancelled; and what a player would have
 heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in the duel
-`masher` and `charge` take at least `duelSlow` seconds or fall, and
+`masher` and `charge` take at least `duelSlow` seconds or fall, hits
+cancel at least `duelCancelled` of `charge`'s charges (#272), and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
 both. The kill chain's lines (issue #270) read the flow fights' sound
 logs: the death sound climbs a step of the dungeon song's scale over a
 4-kill chain in one of them and falls back after a break in one, and each
-fight's counted chains are the ones its death sounds tell. Until the fights have their two rhythms (#266) the duel bands fail,
-and the CI job `slow-benches` runs `--check` without failing the build;
-the change that makes them pass makes it fail on red. Its report is kept
-as the run's `pacing` artifact.
+fight's counted chains are the ones its death sounds tell. Since the
+lead's stance (#271) every band passes, and the CI job `slow-benches`
+fails on a red one. Its report is kept as the run's `pacing` artifact.
 
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
@@ -2117,13 +2171,20 @@ charged swing is tried there too: hold the left button while the guardian
 comes and let go once the ring has flashed. So is the crushing blow: the
 room's guardian is tough and winds one up now and then, and
 `crushChance: 1` in the table's `enemy` group, saved and reloaded, makes
-every attack of a tough enemy a crushing one. The reload bench does both
-through the inspector: it changes `knight.chargeTime` in the loaded copy
-of the table, reloads and checks that the charge fills in the new time,
-it counts the guardian's crushing blows among its attacks before and
-after setting `enemy.crushChance` to 1, and in the `flow` scenario it
-strikes two enemies down 2 s apart, a chain at `chain.window` 2.5 s and
-two lone kills after setting it to 1.5:
+every attack of a tough enemy a crushing one. The lead's stance is tried
+in the `duel` scenario: parry the lead's lunge, or perfect-block it, and
+it opens; an edit of the table's `lead` group changes the next opening
+after a reload. The reload bench does all four through the inspector: it
+changes `knight.chargeTime` in the loaded copy of the table, reloads and
+checks that the charge fills in the new time, it counts the guardian's
+crushing blows among its attacks before and after setting
+`enemy.crushChance` to 1, in the duel room it opens the lead, checks
+its stance bar, the opening's length and damage, and the new length after
+setting `lead.openingTime` to 2.5, and in the `flow` scenario it strikes
+two enemies down 2 s apart, a chain at `chain.window` 2.5 s and two lone
+kills after setting it to 1.5. The fight room's tough guardian is that
+room's lead; the charge it tries is let go at it with its stance taken
+away:
 
 ```
 python3 tests/fightbench/run_reload.py

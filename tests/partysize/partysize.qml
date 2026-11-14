@@ -12,7 +12,8 @@
 // travellers of the deep (issue #158, #176) the one recorded before there were
 // any (issue #156), but for a torch
 // stepped aside for a vein; both recorded again with the enemies' HP that
-// grows with the danger (issue #268). A knight
+// grows with the danger (issue #268), with a lead's HP (issue #271) and
+// with a room's lead as its one tough enemy (issue #269). A knight
 // count changed in a dungeon changes the next dungeon, not this one, and
 // the village's fight room is not scaled. Prints one PASS or FAIL line
 // per check and exits with the number of failures.
@@ -70,10 +71,14 @@ Window {
     // 1.5); the traveller of the deep on the floor in front of the face
     // that took their place (issue #176) from e91af29e at 0.5; the grunt's
     // 60 HP (the duel fights) from 51748fd and 888308f2, b084ab49 and
-    // a1c350e8 without the veins
+    // a1c350e8 without the veins; the tough tier's HP, a room's lead's
+    // (issue #271), from 4ed8fb3e and 467c46b9, c14ac00a and 12950f23
+    // without the veins; a room's lead as its one tough enemy, the rest
+    // fodder (issue #269), from 91e91613 and 89623d1, 899088e7 and
+    // 3354cdcb without the veins
     readonly property var today: ({
-        "0.5": { hash: "4ed8fb3e", noVeins: "c14ac00a", enemies: 15 },
-        "1.5": { hash: "467c46b9", noVeins: "12950f23", enemies: 18 }
+        "0.5": { hash: "761ed417", noVeins: "9ec377e3", enemies: 15 },
+        "1.5": { hash: "7df7a777", noVeins: "bc9b356d", enemies: 18 }
     })
 
     // What the dungeon is made of, as the danger bench reads it: its

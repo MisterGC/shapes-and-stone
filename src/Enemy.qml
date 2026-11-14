@@ -43,12 +43,14 @@ PhysicsItem {
         network: enemy.network
         objectId: enemy.objectId
         properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId",
-                     "windUpLength"]
+                     "windUpLength", "lead", "stance", "opening", "stringName", "feintHold",
+                     "windUps"]
         interpolate: true
         interpolator.autoDelay: true
         // HP switches with its state, never blended between two of the
-        // host's (clayground#368); so does a wind-up's length
-        steppedProperties: ["hp", "windUpLength"]
+        // host's (clayground#368); so do a wind-up's length, a lead's
+        // stance, a feint's hold and the count of wind-ups
+        steppedProperties: ["hp", "windUpLength", "stance", "feintHold", "windUps"]
         interpolator.angleKeys: ["facingAngle"]
     }
 
@@ -139,6 +141,35 @@ PhysicsItem {
 
     // Tier: 0=weak, 1=normal, 2=tough
     property int tier: 1
+    // A room's lead (Balance.lead, issue #271): its tough enemy. It takes
+    // no knockback and no stagger; its stance, from 1 down to 0, wears
+    // under blows, and a parry, a perfect block, a charged swing into its
+    // recovery or a worn stance breaks it: opening is true for the long
+    // stagger that follows. In a session the host's lead keeps the stance
+    // and every screen shows it
+    property bool lead: tier === 2
+    property real stance: 1
+    property bool opening: false
+    // Seconds since a blow last wore the stance; the stance comes back
+    // after Balance.lead.regenDelay of them, kept to steps of 1/20 so the
+    // host sends a new one only now and then
+    property real _stanceRest: 0
+    property real _stanceLeft: 1
+    // A lead attacks in strings (Balance.lead.strings, issue #272): the
+    // beats of the string under way, 1 a strike, 2 a feint, 0 a rest, and
+    // the one it is on, -1 between strings. stringName is its name, ""
+    // between strings, on every screen. feintHold is the hold of the
+    // wind-up under way, 0 for one that is no feint, and windUps counts
+    // the wind-ups, so another screen starts a shot's ring anew when the
+    // next shot of a string winds up in the same aiState
+    property var _string: []
+    property int _beat: -1
+    property string stringName: ""
+    property real feintHold: 0
+    property int windUps: 0
+    // A blow of a string landed: a lunge ("strike" or "feint") or a shot
+    // ("shot"), on beat
+    signal struck(int beat, string kind)
     property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
     // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
     // was built with (issue #157)
@@ -220,16 +251,44 @@ PhysicsItem {
         if (parryWindow) return 1
         let total = windUpLength + _ringLunge
         if (total <= 0) return 1
-        let left = remote ? total - _ringT
+        let base = total - feintHold
+        if (base <= 0) return 1
+        return Math.max(0, Math.min(1, 1 - _feintLeft(_ringLeft(total), base) / base))
+    }
+    // Seconds until the ring closes, of total
+    function _ringLeft(total) {
+        return remote ? total - _ringT
             : aiState === "lunge" ? Math.max(0, _lungeSteps - Balance.enemy.parryFrames) * _ringStep
             : _attackTimer + _ringLunge
-        return Math.max(0, Math.min(1, 1 - left / total))
+    }
+    // A feint's wind-up is feintHold longer than its ring (base): the ring
+    // closes as for a strike up to lead.feintRing, holds there feintHold
+    // seconds, then closes. It holds in the wind-up, never into the
+    // lunge. The seconds left as the ring shows them
+    function _feintCut(base) {
+        return Math.max((1 - Balance.lead.feintRing) * base, _ringLunge)
+    }
+    function _feintLeft(left, base) {
+        if (feintHold <= 0) return left
+        let cut = _feintCut(base)
+        return left > cut + feintHold ? left - feintHold : Math.min(left, cut)
+    }
+    // A feint holds: its ring stands at lead.feintRing, the lead still
+    readonly property bool feinting: {
+        if (feintHold <= 0 || (aiState !== "telegraph" && aiState !== "shoot")) return false
+        let total = windUpLength + _ringLunge
+        let base = total - feintHold
+        if (base <= 0) return false
+        let left = _ringLeft(total), cut = _feintCut(base)
+        return left > cut && left <= cut + feintHold
     }
     Connections {
         target: enemy.world
         enabled: enemy.remote && enemy.ringShows
         function onStepped() { enemy._ringT += enemy.world.timeStep }
     }
+    // The next shot of a string, wound up where the AI runs
+    onWindUpsChanged: if (remote) _ringT = 0
 
     // Internal state
     property real _spawnXWu: 0
@@ -563,6 +622,76 @@ PhysicsItem {
         }
     }
 
+    // A lead's stance (Balance.lead): a bar under it, full at 1. While it
+    // is open the bar is empty and blinks
+    Rectangle {
+        id: stanceBar
+        objectName: "stanceBar"
+        visible: enemy.lead && !enemy.destroyed
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.bottom
+        anchors.topMargin: 3
+        width: parent.width * 1.2
+        height: 3
+        color: "#333333"
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * enemy.stance
+            color: Balance.lead.barColor
+            Behavior on width { NumberAnimation { duration: 100 } }
+        }
+        Rectangle {
+            anchors.fill: parent
+            color: Balance.lead.flashColor
+            opacity: 0
+            SequentialAnimation on opacity {
+                running: enemy.opening
+                loops: Animation.Infinite
+                alwaysRunToEnd: true
+                NumberAnimation { to: 0.9; duration: 120 }
+                NumberAnimation { to: 0; duration: 120 }
+            }
+        }
+    }
+    // An opening flashes the lead and swells a ring off it, on every
+    // screen, with the word over it
+    Rectangle {
+        id: openFlash
+        objectName: "openFlash"
+        parent: parryRing.parent
+        readonly property real size: enemy.width * visual.scale * (1 + 1.4 * grow)
+        property real grow: 0
+        width: size
+        height: size
+        radius: size / 2
+        x: (parent === enemy ? 0 : enemy.x) + (enemy.width - size) / 2
+        y: (parent === enemy ? 0 : enemy.y) + (enemy.height - size) / 2
+        color: "transparent"
+        border.width: Math.max(2, enemy.width * 0.1)
+        border.color: Balance.lead.flashColor
+        opacity: 0
+        visible: opacity > 0.01
+        ParallelAnimation {
+            id: openFlashAnimation
+            NumberAnimation { target: openFlash; property: "grow"; from: 0; to: 1; duration: 350
+                              easing.type: Easing.OutQuad }
+            NumberAnimation { target: openFlash; property: "opacity"; from: 1; to: 0; duration: 350 }
+            SequentialAnimation {
+                PropertyAction { target: hitFlash; property: "color"; value: Balance.lead.flashColor }
+                NumberAnimation { target: hitFlash; property: "opacity"; from: 1; to: 0; duration: 300 }
+                PropertyAction { target: hitFlash; property: "color"; value: "white" }
+            }
+        }
+    }
+    onOpeningChanged: {
+        if (!opening) return
+        openFlashAnimation.restart()
+        if (gameWorld && gameWorld.spawnWord)
+            gameWorld.spawnWord(xWu, yWu + 0.5, Balance.lead.word, Balance.lead.flashColor)
+    }
+
     // Guardian shield arc
     Canvas {
         id: guardianShield
@@ -701,6 +830,8 @@ PhysicsItem {
     property real _knockVy: 0
     readonly property real knockDuration: Balance.enemy.knockbackDuration
     function knockback(dx, dy, speed) {
+        // A room's lead stands its ground: no blow, shove or shield moves it
+        if (lead) return
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
         _knockVx = dx / len * speed
@@ -759,12 +890,22 @@ PhysicsItem {
         case "telegraph":
         case "crush":
             if (_attackTimer <= 0) _startLunge()
+            else if (feinting) body.linearVelocity = Qt.point(0, 0)
             break
         case "shoot":
             if (_attackTimer <= 0) {
                 fireProjectile()
-                aiState = "kite"
+                if (_beat >= 0) {
+                    struck(_beat, feintHold > 0 ? "feint" : "shot")
+                    _nextBeat("")
+                } else {
+                    aiState = "kite"
+                }
             }
+            break
+        case "recovery":
+            // A rest of a string: the next beat when it is over
+            if (_beat >= 0 && _attackTimer <= 0) _nextBeat("")
             break
         case "lunge":
             _stepLunge()
@@ -804,6 +945,7 @@ PhysicsItem {
 
     function _startLunge() {
         if (!target) {
+            _clearString()
             aiState = "chase"
             return
         }
@@ -840,11 +982,120 @@ PhysicsItem {
         }
         parryWindow = false
         body.linearVelocity = Qt.point(0, 0)
+        let beat = _beat
         performAttack()
         // A blow blocked perfectly staggered it: no recovery over that
         if (aiState !== "lunge") return
+        if (beat >= 0) {
+            struck(beat, feintHold > 0 ? "feint" : "strike")
+            _nextBeat("")
+            return
+        }
         aiState = "recovery"
-        attackCooldown = Balance.enemy.recovery
+        attackCooldown = lead ? Balance.lead.recovery : Balance.enemy.recovery
+    }
+
+    // ---- a lead's strings (Balance.lead, issue #272) ----
+    // A string begins: string i of its type, or one rolled from the
+    // level's attack rolls for i -1, so a seed plays the same fight.
+    // punish: it strikes first, at a knight holding a charge within
+    // lead.reach - its first wind-up enemy.minTelegraph; otherwise the
+    // first wind-up is the count-in, enemy.windUp (a shot's shootWindUp)
+    function beginString(i, punish) {
+        let list = Balance.lead.strings[enemyType] || []
+        if (list.length === 0) return false
+        if (i === undefined || i < 0) {
+            let roll = gameWorld && gameWorld.rollAttack ? gameWorld.rollAttack() : Math.random()
+            i = Math.min(list.length - 1, Math.floor(roll * list.length))
+        }
+        _string = list[i].beats
+        stringName = list[i].name
+        _beat = -1
+        _committed = false
+        _nextBeat(punish === true ? "punish" : "first")
+        return true
+    }
+    // The next beat of the string, or its end. first is "first" for the
+    // string's first beat, "punish" for the first of one that strikes
+    // first, "" for every later one. A strike or a feint winds up only at
+    // a knight it still reaches - lead.reach, a spitter's shootRange in
+    // sight -, else the string is over
+    function _nextBeat(first) {
+        _beat++
+        if (_beat >= _string.length) {
+            _endString()
+            return
+        }
+        let b = _string[_beat]
+        let l = Balance.lead
+        if (b === 0) {
+            feintHold = 0
+            _attackTimer = l.beat
+            body.linearVelocity = Qt.point(0, 0)
+            aiState = "recovery"
+            return
+        }
+        let shot = enemyType === "spitter"
+        let dx = target ? target.xWu - xWu : 0, dy = target ? target.yWu - yWu : 0
+        let dist = Math.sqrt(dx * dx + dy * dy)
+        if (!target || dist > (shot ? shootRange : l.reach) || (shot && !_sees(target))) {
+            _endString()
+            return
+        }
+        if (shot) {
+            aimShot(target)
+        } else {
+            let len = Math.max(0.01, dist)
+            _dirToTargetX = dx / len
+            _dirToTargetY = dy / len
+        }
+        // A punishing blow comes at once: no feint
+        let hold = b === 2 && first !== "punish" ? l.feintHold : 0
+        let w = first === "punish" ? Balance.enemy.minTelegraph
+            : first === "first" ? (shot ? Balance.enemy.shootWindUp : windUpDuration)
+            : l.beat - (shot ? 0 : lungeDuration)
+        if (shot) {
+            body.linearVelocity = Qt.point(0, 0)
+            feintHold = hold
+            _attackTimer = telegraphTime(w) + hold
+            windUpLength = _attackTimer
+            windUps++
+            aiState = "shoot"
+        } else {
+            windUp(w, hold)
+        }
+    }
+    // The string is over: it recovers lead.recovery, then goes for the
+    // knight again; a spitter shoots again after its cooldown
+    function _endString() {
+        _clearString()
+        if (enemyType === "spitter") _shootTimer = shootCooldown
+        body.linearVelocity = Qt.point(0, 0)
+        aiState = "recovery"
+        attackCooldown = Balance.lead.recovery
+    }
+    function _clearString() {
+        _string = []
+        _beat = -1
+        stringName = ""
+        feintHold = 0
+    }
+    // A knight holding a charge, filling or full - this node's, or
+    // another node's as its replicated action says
+    function _holdsCharge(knight) {
+        return !!knight && (knight.isCharging === true
+                            || knight.actionState === 4 || knight.actionState === 5)
+    }
+    // Whether a lead strikes first: at its knight, in sight within
+    // lead.reach, holding a charge, as soon as it may attack - in a rest
+    // of a string too, not in its recovery after one
+    function _punishes(dist, canSee) {
+        return lead && canSee && attackCooldown <= 0 && dist <= Balance.lead.reach
+            && _holdsCharge(target)
+    }
+    // An attack at the knight: a lead's string, any other enemy's lunge
+    function _attack() {
+        if (!lead || !beginString(-1, false)) windUp(windUpDuration)
     }
 
     // The knight has fallen: drop the target, stand still and stop thinking.
@@ -852,6 +1103,11 @@ PhysicsItem {
     function halt() {
         halted = true
         target = null
+        _clearString()
+        if (opening) {
+            opening = false
+            _setStance(1)
+        }
         aiState = "idle"
         staggerWobble.stop()
         rotation = 0
@@ -866,6 +1122,7 @@ PhysicsItem {
         targetId = ""
         parryWindow = false
         _attackTimer = 0
+        _clearString()
         if (["telegraph", "crush", "lunge", "shoot", "chase", "kite", "bash"].indexOf(aiState) >= 0) {
             aiState = "patrol"
             followPath.running = false
@@ -893,6 +1150,7 @@ PhysicsItem {
         if (attackCooldown > 0) attackCooldown -= dt
         if (_shootTimer > 0) _shootTimer -= dt
         _pathRecalcTimer -= dt
+        if (lead && !opening) _restStance(dt)
 
         let dx = target.xWu - xWu
         let dy = target.yWu - yWu
@@ -940,6 +1198,10 @@ PhysicsItem {
                 }
             } else {
                 if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
+                if (_punishes(dist, canSee)) {
+                    beginString(-1, true)
+                    break
+                }
                 if (enemyType === "grunt" && !_committed && canSee && dist < Balance.enemy.circleRange) {
                     // Rolled from the level's attack rolls, so a seed
                     // circles the same way every time
@@ -956,7 +1218,7 @@ PhysicsItem {
                     let len = Math.max(0.01, dist)
                     _dirToTargetX = dx / len
                     _dirToTargetY = dy / len
-                    windUp(windUpDuration)
+                    _attack()
                 } else if (_pathRecalcTimer <= 0) {
                     _recalcChasePath()
                     _pathRecalcTimer = Balance.enemy.repathInterval
@@ -972,12 +1234,16 @@ PhysicsItem {
                 break
             }
             _circleT -= dt
+            if (_punishes(dist, canSee)) {
+                beginString(-1, true)
+                break
+            }
             if (dist < lungeRange * Balance.enemy.circleStrikeIn && attackCooldown <= 0) {
                 let len = Math.max(0.01, dist)
                 _dirToTargetX = dx / len
                 _dirToTargetY = dy / len
                 _committed = false
-                windUp(windUpDuration)
+                _attack()
                 break
             }
             if (_circleT <= 0) {
@@ -1023,13 +1289,20 @@ PhysicsItem {
                         -ndy * patrolSpeed, -ndx * patrolSpeed)
                 }
             }
+            // A lead: a charge in reach is shot at once, and it
+            // shoots in strings
+            if (_punishes(dist, canSee)) {
+                beginString(-1, true)
+                break
+            }
+            if (lead && _shootTimer <= 0 && dist <= shootRange && attackCooldown <= 0
+                    && beginString(-1, false))
+                break
             // Shoot when cooldown ready
             if (_shootTimer <= 0 && dist <= shootRange) {
                 _shootTimer = shootCooldown
                 _attackTimer = telegraphTime(Balance.enemy.shootWindUp)
-                let len = Math.max(0.01, dist)
-                _dirToTargetX = dx / len
-                _dirToTargetY = dy / len
+                aimShot(target)
                 aiState = "shoot"
             }
             break
@@ -1044,8 +1317,9 @@ PhysicsItem {
         case "telegraph":
         case "crush":
             // Pull backward (wind-up) — negate Y for world-to-screen;
-            // _stepAttack starts the lunge, which it also runs
-            body.linearVelocity = Qt.point(
+            // _stepAttack starts the lunge, which it also runs. A feint
+            // stands still while it holds
+            body.linearVelocity = feinting ? Qt.point(0, 0) : Qt.point(
                 -_dirToTargetX * windUpSpeed,
                 _dirToTargetY * windUpSpeed)
             break
@@ -1055,14 +1329,24 @@ PhysicsItem {
             if (_attackTimer <= 0) {
                 staggerWobble.stop()
                 enemy.rotation = 0
+                if (opening) {
+                    opening = false
+                    _setStance(1)
+                }
                 aiState = "chase"
             }
             break
 
         case "recovery":
+            // After an attack, or a rest of a string (_stepAttack runs
+            // it), which a knight charging in reach cuts short
             body.linearVelocity = Qt.point(0, 0)
             if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
-            if (attackCooldown <= 0)
+            if (_beat >= 0 && _punishes(dist, canSee)) {
+                beginString(-1, true)
+                break
+            }
+            if (attackCooldown <= 0 && _beat < 0)
                 aiState = "chase"
             break
         }
@@ -1070,11 +1354,14 @@ PhysicsItem {
 
     // Winds up a lunge of seconds, or now and then a crushing blow of
     // Balance.enemy.crushWindUp; the roll is the level's, so a seed plays
-    // the same fight
-    function windUp(seconds) {
+    // the same fight. A feint holds hold seconds more; a crushing blow is
+    // no feint
+    function windUp(seconds, hold) {
         let crush = crushChance > 0 && gameWorld && gameWorld.rollAttack
             && gameWorld.rollAttack() < crushChance
-        _attackTimer = telegraphTime(crush ? Balance.enemy.crushWindUp : seconds)
+        feintHold = crush || !(hold > 0) ? 0 : hold
+        _attackTimer = telegraphTime(crush ? Balance.enemy.crushWindUp : seconds) + feintHold
+        windUps++
         aiState = crush ? "crush" : "telegraph"
     }
 
@@ -1166,7 +1453,7 @@ PhysicsItem {
                 // sounds its own block or hurt, so the lunge plays nothing
                 // here
                 if (result === "blocked") recoil(target)
-                if (result === "perfect") stagger(perfectStagger())
+                if (result === "perfect") perfectBlocked()
                 if (result !== "hit") return
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
@@ -1189,17 +1476,36 @@ PhysicsItem {
     function perfectStagger() {
         return crushing ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger
     }
+    // A knight blocked its blow perfectly: a lead's stance breaks, any
+    // other enemy staggers
+    function perfectBlocked() {
+        if (lead) open("perfect")
+        else stagger(perfectStagger())
+    }
 
+    // A shot flies centre to centre: from its centre at the knight's. Aimed
+    // corner to corner it passed a knight standing at a slant up to half
+    // its width off its centre, along its side and past the shield's arc
+    function aimShot(knight) {
+        let c = _centreOf(knight)
+        let dx = c.x - centreXWu, dy = c.y - centreYWu
+        let len = Math.max(0.01, Math.sqrt(dx * dx + dy * dy))
+        _dirToTargetX = dx / len
+        _dirToTargetY = dy / len
+    }
     function fireProjectile() {
         if (gameWorld && gameWorld.spawnProjectile) {
-            gameWorld.spawnProjectile(xWu, yWu, _dirToTargetX, _dirToTargetY, atk)
+            let half = Balance.projectile.size / 2
+            gameWorld.spawnProjectile(centreXWu - half, centreYWu + half, _dirToTargetX, _dirToTargetY, atk)
             if (gameWorld.playSpitShot) gameWorld.playSpitShot(xWu, yWu)
             console.log("[Enemy] Spitter fired projectile!")
         }
     }
 
-    // Staggered for seconds, for the table's enemy.stagger without them
+    // Staggered for seconds, for the table's enemy.stagger without them.
+    // A room's lead does not flinch: only an opening (open) staggers it
     function stagger(seconds) {
+        if (lead) return
         let t = seconds === undefined ? Balance.enemy.stagger : seconds
         if (remote) {
             if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger", seconds: t})
@@ -1209,6 +1515,61 @@ PhysicsItem {
         _attackTimer = t
         aiState = "stagger"
         staggerWobble.restart()
+    }
+
+    // A lead's stance breaks (issue #271): cause is what broke it,
+    // "parry", "perfect", "heavy" or "worn". It staggers for
+    // Balance.lead.openingTime, every blow then doing openingDamage times
+    // its damage, and its attack under way is over. Where it is remote the
+    // host breaks it, and every screen shows the opening. An enemy that is
+    // no lead, or a lead already open, stays as it is
+    signal opened(string cause)
+    function open(cause) {
+        if (!lead || opening || destroyed) return
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "open", cause: cause})
+            return
+        }
+        parryWindow = false
+        crushing = false
+        _knockT = 0
+        _clearString()
+        body.linearVelocity = Qt.point(0, 0)
+        _setStance(0)
+        opening = true
+        _attackTimer = Balance.lead.openingTime
+        aiState = "stagger"
+        staggerWobble.restart()
+        console.log("[Enemy] Lead opened by", cause)
+        opened(cause)
+    }
+    // The stance, kept to steps of 1/20 where it shows
+    function _setStance(v) {
+        _stanceLeft = Math.max(0, Math.min(1, v))
+        stance = Math.round(_stanceLeft * 20) / 20
+    }
+    // A blow outside an opening wears the stance, a charged swing more; a
+    // worn stance breaks
+    function _wearStance(heavy) {
+        _stanceRest = 0
+        _setStance(_stanceLeft - (heavy === true ? Balance.lead.heavyWear : Balance.lead.wear))
+        if (_stanceLeft <= 1e-6) open("worn")
+    }
+    // No blow for regenDelay seconds: the stance comes back
+    function _restStance(dt) {
+        _stanceRest += dt
+        if (_stanceLeft < 1 && _stanceRest >= Balance.lead.regenDelay)
+            _setStance(_stanceLeft + Balance.lead.regen * dt)
+    }
+    // Whether a blow breaks a lead's stance, judged on the striker's
+    // screen: a parry, or a charged swing while it recovers from its
+    // lunge (the whirlwind's blows are heavy too). Its cause, or "" for a
+    // blow that does not
+    function _opens(heavy, parried) {
+        if (!lead || opening) return ""
+        if (parried === true) return "parry"
+        if (heavy === true && aiState === "recovery") return "heavy"
+        return ""
     }
 
     function onCollision(other) {}
@@ -1225,8 +1586,10 @@ PhysicsItem {
 
     // What a blow of amount from (attackerX, attackerY) does: the damage
     // and whether a guardian's shield took it. A heavy blow (the knight's
-    // charged swing) goes through the shield
-    function _blow(amount, attackerX, attackerY, heavy) {
+    // charged swing) goes through the shield. On a lead (Balance.lead) a
+    // blow in an opening does openingDamage times as much, the one that
+    // opens it (opens, its cause) all of it, any other chip of it
+    function _blow(amount, attackerX, attackerY, heavy, opens) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
@@ -1235,6 +1598,10 @@ PhysicsItem {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
         }
+        if (lead && opening)
+            finalDamage = Math.floor(finalDamage * Balance.lead.openingDamage)
+        else if (lead && !opens)
+            finalDamage = Math.max(Balance.minDamage, Math.round(finalDamage * Balance.lead.chip))
         return {damage: finalDamage, blocked: blocked}
     }
 
@@ -1243,35 +1610,38 @@ PhysicsItem {
         return blocked ? "enemyBlocked" : heavy === true ? "heavyHit" : "enemyHit"
     }
 
-    // This node's knight struck the enemy; heavy for its charged swing
-    function takeDamage(amount, attackerX, attackerY, heavy) {
-        if (!remote) {
-            _takeBlow(amount, attackerX, attackerY, "", heavy)
-            return
-        }
+    // This node's knight struck the enemy; heavy for its charged swing,
+    // parried for a swing into its parry window. This screen judges
+    // whether the blow breaks a lead's stance. Returns the damage it does
+    function takeDamage(amount, attackerX, attackerY, heavy, parried) {
+        let opens = _opens(heavy, parried)
+        if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
         // Remote: the hit looks and counts here, the host applies it
-        let b = _blow(amount, attackerX, attackerY, heavy)
+        let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
         let hdy = attackerY !== undefined ? yWu - attackerY : 0
         if (gameWorld) {
             gameWorld.countFight("dealt", b.damage)
             gameWorld.impact(_hitKind(b.blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
             gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY,
-                                          heavy: heavy === true})
+                                          heavy: heavy === true, opens: opens})
         }
         hitFlashAnimation.restart()
         if (_fx) hitSquash.restart()
+        return b.damage
     }
 
     // Host: the knight of node byId struck the enemy; that node drew the
-    // hit and counted it
-    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy) {
-        _takeBlow(amount, attackerX, attackerY, byId, heavy)
+    // hit and counted it, and judged whether it opens a lead (opens)
+    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+        _takeBlow(amount, attackerX, attackerY, byId, heavy, opens || "")
     }
 
-    // A blow from this node's knight (byId "") or another node's
-    function _takeBlow(amount, attackerX, attackerY, byId, heavy) {
-        let b = _blow(amount, attackerX, attackerY, heavy)
+    // A blow from this node's knight (byId "") or another node's; opens
+    // the cause it breaks a lead's stance with, or ""
+    function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+        if (opens && (!lead || opening)) opens = ""
+        let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let finalDamage = b.damage
         let blocked = b.blocked
         let own = byId === ""
@@ -1295,7 +1665,8 @@ PhysicsItem {
                                 * (heavy === true ? Balance.knight.heavyKnockback : 1))
 
         // Guardian counter-attacks after blocking
-        if (blocked && aiState !== "telegraph" && aiState !== "crush" && aiState !== "lunge") {
+        if (blocked && aiState !== "telegraph" && aiState !== "crush" && aiState !== "lunge"
+                && _beat < 0) {
             if (target) {
                 let dx = target.xWu - xWu
                 let dy = target.yWu - yWu
@@ -1317,7 +1688,14 @@ PhysicsItem {
             _recalcChasePath()
         }
 
-        if (hp <= 0) die(byId)
+        if (hp <= 0) {
+            die(byId)
+            return finalDamage
+        }
+        // A lead: the blow breaks its stance, or wears it
+        if (opens) open(opens)
+        else if (lead && !opening) _wearStance(heavy)
+        return finalDamage
     }
 
     // byId: the node whose knight killed it, "" for this node's

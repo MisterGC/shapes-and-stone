@@ -53,7 +53,9 @@ Item {
     signal enemySpawned(string objectId, var props)
     signal enemyDespawned(string objectId)
     // Host: another player's knight struck an enemy; blow.kind is "damage"
-    // (amount, x, y), "stagger" (seconds) or "push" (dx, dy, speed)
+    // (amount, x, y, heavy, opens: the cause it breaks a lead's stance
+    // with, or ""), "stagger" (seconds), "open" (cause) or "push" (dx, dy,
+    // speed)
     signal enemyBlowReceived(string fromId, var blow)
     // An enemy of the host's lunged at this node's knight (atk, x, y, size)
     signal knightBlowReceived(var blow)

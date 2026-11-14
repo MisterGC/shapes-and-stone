@@ -548,17 +548,24 @@ PhysicsItem {
         let hitCount = 0
         for (let enemy of _swingCandidates()) {
             if (!_hitThisSwing.has(enemy) && isInAttackArc(enemy)) {
+                // A lead is parried only by a swing begun in its window
+                // (Balance.lead.parryStart), not by one it ran into
                 let parried = enemy.parryWindow
+                    && (!enemy.lead || _steps - _swingStep <= Balance.lead.parryStart)
                 let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
                         : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
                 if (parried) dmg = atk * Balance.knight.parrySwing
                 if (isHeavy) {
                     dmg = Math.max(dmg, Math.floor(atk * Balance.knight.heavySwing))
                     // It breaks a guardian's guard: staggered, its shield
-                    // takes nothing off and it does not counter
+                    // takes nothing off and it does not counter. A room's
+                    // lead does not flinch (Enemy.stagger)
                     if (enemy.enemyType === "guardian" && !parried) enemy.stagger()
                 }
-                enemy.takeDamage(dmg, xWu, yWu, isHeavy)
+                // A lead's stance takes a share of it, or breaks: the
+                // number shows what it did
+                let dealt = enemy.takeDamage(dmg, xWu, yWu, isHeavy, parried)
+                if (dealt !== undefined) dmg = dealt
                 if (isHeavy) _heavyLanded = true
                 _hitThisSwing.add(enemy)
                 hitCount++
@@ -965,6 +972,8 @@ PhysicsItem {
     // after a normal swing's start shoves back what stands in the swing's
     // arc. Once a swing; returns how many it shoved
     property int _swungAt: -1000000
+    // The physics step the swing under way began on, a heavy one's too
+    property int _swingStep: -1000000
     property bool _bashed: true
     // The bash's lunge: seconds left and its start velocity, wu/s (y up)
     property real _lungeT: 0
@@ -1124,6 +1133,7 @@ PhysicsItem {
             _swingEarned = 0
             attackCooldown = attackCooldownTime
             _swungAt = _steps
+            _swingStep = _steps
             _bashed = false
             view.swing()
             acted("attack")
@@ -1146,6 +1156,7 @@ PhysicsItem {
         _glancedThisSwing = new Set()
         _swingEarned = 0
         attackCooldown = _swingTimer + Balance.knight.heavyRecovery
+        _swingStep = _steps
         view.swing(true)
         acted("heavy")
         if (gameWorld) gameWorld.playHeavySwing()

@@ -91,10 +91,14 @@ Item {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind") bench.whirlsStarted++
         })
-        for (let e of game.enemies.filter(alive))
-            _foes.push({ ref: e, type: e.enemyType, tier: e.tier, hp: e.maxHp, lastHp: e.hp,
-                         lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
-                         hits: 0, openings: 0 })
+        for (let e of game.enemies.filter(alive)) {
+            let f = { ref: e, type: e.enemyType, tier: e.tier, lead: e.lead, hp: e.maxHp, lastHp: e.hp,
+                      lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
+                      hits: 0, openings: 0, opened: {} }
+            // A lead's openings by what broke its stance (Enemy.open)
+            e.opened.connect(cause => f.opened[cause] = (f.opened[cause] || 0) + 1)
+            _foes.push(f)
+        }
         return game.player !== null
     }
     // The sword level a knight usually has at depth d: the highest the
@@ -118,9 +122,9 @@ Item {
         let r = record
         let p = game.player
         let foes = _foes.map(f => ({
-            type: f.type, tier: f.tier, hp: f.hp,
+            type: f.type, tier: f.tier, lead: f.lead, hp: f.hp,
             engagedAt: f.engagedAt, firstHitAt: f.firstHitAt, diedAt: f.diedAt,
-            hits: f.hits, openings: f.openings,
+            hits: f.hits, openings: f.openings, opened: f.opened,
             // From the first blow that landed to its death
             ttk: f.diedAt !== null && f.firstHitAt !== null ? round3(f.diedAt - f.firstHitAt) : null,
             // From the moment it went for the knight to its death
@@ -172,7 +176,8 @@ Item {
 
     // ---- what the bench sees of each enemy, every step ----
     // A blow that landed is HP lost; an opening is a stagger it went into
-    // (a parry, a perfect block, a broken guard); it engaged on the first
+    // (a parry, a perfect block, a broken guard), and a lead's are counted
+    // by what broke its stance too (opened); it engaged on the first
     // step it was neither patrolling nor idle - chasing, circling, winding
     // up, striking, recovering, staggered; it died on the step it was
     // gone, the blow that killed it one more hit. Time engaged is the
@@ -225,14 +230,17 @@ Item {
     }
     // Holds the left button until the charge is full, counting the physics
     // steps, then lets go at the guardian, which stands in front of the
-    // knight and faces it. The enemies stand still meanwhile. Returns the
-    // steps, whether the guardian staggered and the HP it lost, as JSON
+    // knight and faces it. The enemies stand still meanwhile. The fight
+    // room's tough guardian is its lead (Balance.lead), which a charge
+    // does not stagger: here it is none. Returns the steps, whether the
+    // guardian staggered and the HP it lost, as JSON
     function tryCharge() {
         Clayground.paused = true
         let p = game.player
         let foes = game.enemies.filter(alive)
         for (let e of foes) e.halt()
         let gd = foes.find(e => e.enemyType === "guardian")
+        gd.lead = false
         p.isBlocking = false
         p.moveX = 0
         p.moveY = 0
@@ -302,6 +310,36 @@ Item {
         }
         return JSON.stringify({attacks: wound, crushes: crushes, steps: n, tier: gd.tier,
                                guardianChance: gd.crushChance, crushChance: Balance.enemy.crushChance})
+    }
+
+    // ---- a lead's stance, tried as in the dojo (run_reload.py) ----
+    // The duel room stands: the knight and a lead
+    function duelReady() {
+        return game.player !== null && game.fightRoomActive === true
+            && game.enemies.some(e => alive(e) && e.lead)
+    }
+    // Opens the lead as a parry would and strikes it with a swing of the
+    // knight's atk in the opening. Returns whether its stance bar showed,
+    // whether it opened, the seconds the opening lasts, the HP the swing
+    // took and the HP the table says it takes, as JSON
+    function tryOpening() {
+        Clayground.paused = true
+        let p = game.player
+        let lead = game.enemies.find(e => alive(e) && e.lead)
+        for (let e of game.enemies.filter(alive)) e.halt()
+        let bar = false
+        for (let i = 0; i < lead.children.length; i++)
+            if (lead.children[i].objectName === "stanceBar") bar = lead.children[i].visible
+        lead.halted = false
+        lead.open("parry")
+        let opened = lead.opening && lead.aiState === "stagger"
+        let seconds = round3(lead._attackTimer)
+        let hp0 = lead.hp
+        lead.takeDamage(p.atk, p.xWu, p.yWu, false)
+        return JSON.stringify({bar: bar, opened: opened, seconds: seconds, lost: hp0 - lead.hp,
+                               want: Math.floor(Math.max(Balance.minDamage, p.atk - lead.def)
+                                                * Balance.lead.openingDamage),
+                               openingTime: Balance.lead.openingTime})
     }
 
     // ---- the scripted knight ----

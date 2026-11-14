@@ -127,13 +127,16 @@ Item {
     // id, kind, what it was on this screen when it arrived]
     // (Session.enemyBlowReceived); a push's carries its direction (dx, dy),
     // the enemy's position and the sender's knight's as this screen shows
-    // them, a stagger's its length in seconds
+    // them, a stagger's its length in seconds, a damage's and an open's the
+    // cause it opens a lead with (issue #271)
     property var received: []
     Connections {
         target: bench.session
         function onEnemyBlowReceived(fromId, blow) {
             let e = bench._byId()[blow.id], k = bench.session.remotePlayers[fromId]
             let at = blow.kind === "stagger" ? {seconds: blow.seconds === undefined ? null : blow.seconds}
+                   : blow.kind === "damage" ? {opens: blow.opens || ""}
+                   : blow.kind === "open" ? {opens: blow.cause || ""}
                    : blow.kind !== "push" ? null
                    : {dx: bench.r3(blow.dx), dy: bench.r3(blow.dy),
                       enemy: e ? [bench.r3(e.xWu), bench.r3(e.yWu)] : null,
@@ -203,15 +206,51 @@ Item {
         let e = _byId()[id], k = own ? game.player : null
         if (!own) for (let n in session.remotePlayers) k = session.remotePlayers[n]
         if (!e || !k) return ""
-        let dx = k.xWu - e.xWu, dy = k.yWu - e.yWu
-        let len = Math.max(0.01, Math.hypot(dx, dy))
-        e._dirToTargetX = dx / len
-        e._dirToTargetY = dy / len
+        e.aimShot(k)
         e.fireProjectile()
         return "shot" + game._shotCount
     }
     // How often each enemy entered "stagger" since record(true)
     property var staggers: ({})
+    // How often each lead opened since record(true) (Enemy.opening)
+    property var openings: ({})
+    // Host: enemy id is a room's lead (on) or none, on every screen: the
+    // lead is replicated. A lead it makes winds up no crushing blow, so the
+    // parry the bench tries finds a window
+    function makeLead(id, on) {
+        let e = _byId()[id]
+        if (!e) return false
+        e.lead = on
+        if (on) e.crushChance = 0
+        return true
+    }
+    // Host: lead id strikes the string of its type whose feint comes
+    // first (Balance.lead.strings, issue #272) at this node's knight,
+    // which stands beside it with its shield up. The string's name and the
+    // feint's hold, {} without either
+    function strikeString(id) {
+        let e = _byId()[id], p = game.player
+        if (!e || !p || !e.lead) return {}
+        let list = Balance.lead.strings[e.enemyType] || []
+        let i = -1
+        for (let k = 0; k < list.length; k++) {
+            let f = list[k].beats.indexOf(2)
+            if (f >= 0 && (i < 0 || f < list[i].beats.indexOf(2))) i = k
+        }
+        if (i < 0 || !placeBeside(id)) return {}
+        p.isBlocking = true
+        e.target = p
+        e.beginString(i, false)
+        return {name: list[i].name, hold: Balance.lead.feintHold}
+    }
+    // Enemy id's string as this screen shows it: {name, hold}
+    function stringOf(id) {
+        let e = _byId()[id]
+        return e ? {name: e.stringName, hold: e.feintHold} : {}
+    }
+    // Whether enemy id is a room's lead on this screen, and open now
+    function leadOf(id) { let e = _byId()[id]; return e ? e.lead : null }
+    function openingOf(id) { let e = _byId()[id]; return e ? e.opening : null }
 
     // The knight a step beside enemy id, facing it; the knights cannot fall
     function placeBeside(id) {
@@ -470,7 +509,12 @@ Item {
     // ---- the record: every enemy on this screen, every frame ----
     property bool recording: false
     property var _samples: []
-    function record(on) { recording = on; _samples = []; _passed = {}; if (on) staggers = {} }
+    function record(on) {
+        recording = on
+        _samples = []
+        _passed = {}
+        if (on) { staggers = {}; openings = {} }
+    }
     // The AI states and HPs each enemy took since the last frame: one can
     // last less than a frame (a lunge lands and a blow staggers it at once)
     // and still be sent, and so be shown by the other screen
@@ -490,6 +534,9 @@ Item {
                 if (en.aiState === "stagger") bench.staggers[id] = (bench.staggers[id] || 0) + 1
             })
             en.hpChanged.connect(() => bench._note(id, "h", en.hp))
+            en.openingChanged.connect(() => {
+                if (en.opening) bench.openings[id] = (bench.openings[id] || 0) + 1
+            })
         }
     }
     // One record: enemies() plus, per enemy, the states and HPs it took

@@ -246,6 +246,9 @@ Window {
             // The bash: a right-click soon after a swing shoves the enemy in
             // front back and costs Balance.bash.mana; a late one does not
             let foe = game.enemies.find(x => !x.destroyed && x.enemyType === "grunt")
+            // A room's lead takes no shove (Balance.lead): this one has no
+            // stance
+            foe.lead = false
             // The others hold still, so only the bash moves the two
             for (let x of game.enemies) if (x !== foe && !x.destroyed) x.halted = true
             // In the middle of the largest room, facing a way with open

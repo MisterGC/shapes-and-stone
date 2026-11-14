@@ -916,8 +916,10 @@ ClayWorld2d {
         onEnemyBlowReceived: (fromId, blow) => {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
-            if (blow.kind === "damage") e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true)
+            if (blow.kind === "damage")
+                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "")
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
+            else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
@@ -1085,11 +1087,13 @@ ClayWorld2d {
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
-        // a crushing blow's for the full stagger
+        // a crushing blow's for the full stagger, and opens a lead
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
-        if (result === "perfect" && e && !e.destroyed)
-            e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
+        if (result === "perfect" && e && !e.destroyed) {
+            if (e.lead) e.open("perfect")
+            else e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
+        }
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -1474,6 +1478,7 @@ ClayWorld2d {
         let foes = rollEnemies(rms, spawnRolls(d + pos, a.knights), rand)
         let band = dangerBand(pos)
         let out = { enemies: rms.length > 1 ? foes.length / (rms.length - 1) : 0,
+                    leads: spawnRolls(d + pos, a.knights).leadShare,
                     rooms: rms.length, depth: depthOf(a.index), position: a.pos }
         for (let row of Balance.dungeonMaster.settings)
             if (row.kinds)
@@ -3842,17 +3847,23 @@ ClayWorld2d {
     // What a dungeon at position is built from, with the master's
     // overrides m (null for the game's own): its band, its rooms' count
     // range, the feature kinds' table and its spawn rolls at a danger for
-    // knights (spawnRolls, with the enemies per room m sets). position
-    // left out is the middle of the range
+    // knights (spawnRolls, with the enemies per room and the share of
+    // rooms with a lead m sets). position left out is the middle of the
+    // range
     function dungeonSpec(position, m) {
         let sb = Balance.spawn
         let spec = { band: position === undefined ? 1 : dangerBand(position),
                      roomsMin: sb.roomsMin, roomsMax: sb.roomsMax, kinds: Balance.dungeon.kinds,
-                     enemiesPerRoom: undefined }
-        spec.rolls = (d, knights) => Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+                     enemiesPerRoom: undefined, leadShare: undefined }
+        spec.rolls = (d, knights) => {
+            let rolls = Object.assign(spawnRolls(d, knights), { perRoom: spec.enemiesPerRoom })
+            if (spec.leadShare !== undefined) rolls.leadShare = spec.leadShare
+            return rolls
+        }
         if (!m) return spec
         if (m.rooms !== undefined) spec.roomsMin = spec.roomsMax = m.rooms
         if (m.enemies !== undefined) spec.enemiesPerRoom = m.enemies
+        if (m.leads !== undefined) spec.leadShare = m.leads
         // A feature row's per room, split between its kinds, at every band
         let kinds = {}
         for (let k in Balance.dungeon.kinds) kinds[k] = Object.assign({}, Balance.dungeon.kinds[k])
@@ -4002,8 +4013,10 @@ ClayWorld2d {
 
     // The enemies of a dungeon with these rooms and spawn rolls (spawnRolls,
     // or a dungeonSpec's rolls),
-    // drawn from rand: [{x, y, tier, type}] in wu, across the rooms but the
-    // first, the knights' start, with the table's tier mix
+    // drawn from rand: [{x, y, tier, type, room}] in wu, across the rooms
+    // but the first, the knights' start (room counts from 0 there), dealt
+    // in turn; the rooms dealLeads picks get their lead first, a tough
+    // enemy, the rest is fodder in the table's mix (dealTiers)
     function rollEnemies(rms, sb, rand) {
         let out = []
         if (rms.length < 2) return out
@@ -4013,18 +4026,21 @@ ClayWorld2d {
         let roll = rand()
         let numEnemies = sb.perRoom !== undefined ? Math.round(sb.perRoom * spawnRooms.length)
                                                   : sb.enemiesMin + Math.floor(roll * (sb.enemiesMax - sb.enemiesMin + 1))
-        let tiers = dealTiers(numEnemies, sb, rand)
+        let leads = dealLeads(spawnRooms.length, Math.min(numEnemies, spawnRooms.length), sb.leadShare, rand)
+        let tiers = dealTiers(numEnemies - leads.length, numEnemies, sb, rand)
+        let fodder = 0
         for (let i = 0; i < numEnemies; i++) {
-            let room = spawnRooms[i % spawnRooms.length]
+            let r = i % spawnRooms.length
+            let room = spawnRooms[r]
             let ex = (room.x + 1 + rand() * (room.w - 2)) * cellSize
             let ey = (room.y + 1 + rand() * (room.h - 2)) * cellSize
-            let tier = tiers[i]
+            let tier = i < spawnRooms.length && leads.indexOf(r) >= 0 ? 2 : tiers[fodder++]
             // Enemy type: guardian, spitter, else grunt
             let typeRoll = rand()
             let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
             let type = typeRoll < guardianChance ? "guardian"
                 : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
-            out.push({x: ex, y: ey, tier: tier, type: type})
+            out.push({x: ex, y: ey, tier: tier, type: type, room: r})
         }
         return out
     }
@@ -5660,32 +5676,44 @@ ClayWorld2d {
     // (1 when left out) beyond the first
     function spawnRolls(d, knights) {
         let sb = Balance.spawn, bd = Balance.depth
-        let tough = Math.min(bd.toughCap, 1 - sb.normalChance + d * bd.toughChance)
         let more = Math.floor(d * bd.enemies) + _extraKnights(knights) * Balance.party.enemiesPerKnight
         return {
             enemiesMin: Math.min(bd.enemiesCap, sb.enemiesMin + more),
             enemiesMax: Math.min(bd.enemiesCap, sb.enemiesMax + more),
             weakChance: Math.max(0, sb.weakChance + d * bd.weakChance),
-            normalChance: 1 - tough,
+            leadShare: Math.max(0, Math.min(bd.leadCap, sb.leadShare + d * bd.leadShare)),
             guardianChance: Math.min(bd.typeCap, sb.guardianChance + d * bd.guardianChance),
             guardianChanceTough: Math.min(bd.typeCap, sb.guardianChanceTough + d * bd.guardianChance),
             spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance)
         }
     }
 
-    // The tiers of n enemies (0=weak, 1=normal, 2=tough) in the table's
-    // mix, shuffled: the mix of a dungeon is the table's, not a roll's luck
-    function dealTiers(n, sb, rand) {
-        let weak = Math.round(n * sb.weakChance)
-        let tough = Math.min(n - weak, Math.round(n * (1 - sb.normalChance)))
+    // The rooms with a lead (issue #269), of rooms counted from 0, the
+    // first occupied of them holding an enemy: share of rooms (rounded),
+    // no more than are occupied, picked from those by rand. Dealt, not
+    // rolled: how many rooms have a lead is the table's on every seed
+    function dealLeads(rooms, occupied, share, rand) {
+        let picks = []
+        for (let i = 0; i < occupied; i++) picks.push(i)
+        shuffle(picks, rand)
+        return picks.slice(0, Math.min(occupied, Math.round(rooms * (share || 0))))
+    }
+    // The tiers of n fodder enemies (0=weak, 1=normal) of a dungeon of
+    // total enemies in the table's mix, shuffled: weakChance of total
+    // (rounded) are weak, no more than n, the rest normal. The mix of a
+    // dungeon is the table's, not a roll's luck
+    function dealTiers(n, total, sb, rand) {
+        let weak = Math.min(n, Math.round(total * sb.weakChance))
         let tiers = []
-        for (let i = 0; i < n; i++)
-            tiers.push(i < weak ? 0 : i < n - tough ? 1 : 2)
-        for (let i = n - 1; i > 0; i--) {
+        for (let i = 0; i < n; i++) tiers.push(i < weak ? 0 : 1)
+        return shuffle(tiers, rand)
+    }
+    function shuffle(a, rand) {
+        for (let i = a.length - 1; i > 0; i--) {
             let j = Math.floor(rand() * (i + 1))
-            let t = tiers[i]; tiers[i] = tiers[j]; tiers[j] = t
+            let t = a[i]; a[i] = a[j]; a[j] = t
         }
-        return tiers
+        return a
     }
 
     // An enemy's attack at a danger
@@ -7658,16 +7686,17 @@ ClayWorld2d {
         spawnShards(h.mouthXWu, h.mouthYWu + 0.25, 0, -1, count, Balance.deep.hole.dustColor, 0.09)
     }
     // A creature of the depth crawls out of hole h, in wave w: its kind
-    // and tier from the hole's stream, as the dungeon's enemies are
-    // rolled, standing in its mouth
+    // and tier from the hole's stream, standing in its mouth. It is fodder,
+    // weak at weakChance, else normal: a room's lead comes with the
+    // dungeon, never out of a hole (issue #269)
     function _holeCreature(h, w, rand) {
         if (w > h.wave) {
             if (h.stage === "eyes") _holeTo(h, "waves")
             _holeWave(h, w)
         }
         let sb = spawnRolls(danger, partyKnights)
-        let r = rand(), tier = r < sb.weakChance ? 0 : r < sb.normalChance ? 1 : 2
-        let g = tier === 2 ? sb.guardianChanceTough : sb.guardianChance, k = rand()
+        let tier = rand() < sb.weakChance ? 0 : 1
+        let g = sb.guardianChance, k = rand()
         let type = k < g ? "guardian" : k < g + sb.spitterChance ? "spitter" : "grunt"
         spawnEnemy(h.mouthXWu - 0.4 + (rand() - 0.5) * 0.4, h.mouthYWu - 0.1, tier, type, partyKnights, h.cell)
         _holeDust(h, 5)
