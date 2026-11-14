@@ -230,11 +230,11 @@ Window {
             check(same(shop.levelDepth, [0, 2, 4]) && same(shop.upgradePrice, [30, 45, 60])
                   && same(shop.swordAtk, [5, 9, 12]) && same(shop.shieldBlockedShare, [0.15, 0.1, 0.05])
                   && same(shop.shieldBlockMana, [4, 3, 2]) && same(shop.harnessDashMana, [6, 4, 3])
-                  && same(shop.bladeWhirlMana, [15, 12, 9]),
+                  && same(shop.bladeShare, [0.75, 0.6, 0.45]),
                   "the shop's levelDepth " + shop.levelDepth + ", upgradePrice " + shop.upgradePrice
                   + ", swordAtk " + shop.swordAtk + ", shieldBlockedShare " + shop.shieldBlockedShare
                   + ", shieldBlockMana " + shop.shieldBlockMana + ", harnessDashMana " + shop.harnessDashMana
-                  + ", bladeWhirlMana " + shop.bladeWhirlMana)
+                  + ", bladeShare " + shop.bladeShare)
             let smith = game.room.children.find(c => c.objectName === "npc" && c.npcName === "Blacksmith")
             let wares = smith ? game._offered(smith.wares) : []
             check(wares.map(w => w.id).join(" ") === "sword shield harness blade"
@@ -247,7 +247,8 @@ Window {
                 p.swordLevel = l; p.shieldLevel = l; p.harnessLevel = l; p.bladeLevel = l
                 return p.atk === Balance.knight.atk + shop.swordAtk[i]
                     && near(p.blockedShare, shop.shieldBlockedShare[i]) && near(p.blockMana, shop.shieldBlockMana[i])
-                    && near(p.dashMana, shop.harnessDashMana[i]) && near(p.whirlMana, shop.bladeWhirlMana[i])
+                    && near(p.dashMana, shop.harnessDashMana[i]) && near(p.whirlMana, [15, 12, 9][i])
+                    && near(p.whirlMana, Math.round(Balance.knight.whirlMana * shop.bladeShare[i]))
                     && near(p.blockDrain, Balance.knight.blockDrain)
             })
             p.swordLevel = 0; p.shieldLevel = 0; p.harnessLevel = 0; p.bladeLevel = 0
@@ -255,7 +256,8 @@ Window {
                   && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana)
                   && near(p.dashMana, Balance.knight.dashMana) && near(p.whirlMana, Balance.knight.whirlMana),
                   "levels I to III of the sword add swordAtk, of the shield take shieldBlockedShare and "
-                  + "shieldBlockMana, of the harness harnessDashMana and of the blade bladeWhirlMana; "
+                  + "shieldBlockMana, of the harness harnessDashMana and of the blade bladeShare of the "
+                  + "whirlwind's mana, 15, 12 and 9; "
                   + "level 0 the knight's own")
             // Hurt and dry, away from the fire
             game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4

@@ -243,6 +243,28 @@ QtObject {
         color: "#FFC85A"
     })
 
+    // The knight's special (issue #317): one of order, picked for each
+    // dungeon before its descent intro counts, let loose with the
+    // special's button (Q, R2) for its mana; the smith's balanced blade
+    // lowers it (shop.bladeShare). Each has a name, a line of what it
+    // does and its mana; momentum: it also needs full momentum, as the
+    // whirlwind does. Only the ones ready are in the game and offered;
+    // with one the choice does not show and the knight has that one. A
+    // choice holds for its dungeon and the camp after it, and the next
+    // choice starts on it. The choice's cards are cardWidth px wide; the
+    // one under the keys or the stick is drawn in pickColor
+    readonly property var specials: ({
+        order: ["whirlwind", "stun", "bolt"],
+        whirlwind: { name: "Whirlwind", line: "Spin forward through every enemy in reach. Needs full momentum.",
+                     mana: knight.whirlMana, momentum: true, ready: true },
+        stun: { name: "Stun", line: "Bash with the shield: small enemies around you freeze.",
+                mana: 15, momentum: false, ready: false },
+        bolt: { name: "Bolt", line: "A blast along your aim hurts the first enemy it meets.",
+                mana: 15, momentum: false, ready: false },
+        cardWidth: 220,
+        pickColor: "#E8C35A"
+    })
+
     // The kill chain (issue #270): a kill within window seconds of the
     // knight's last one, on the physics clock, is the next link of its
     // chain; a kill later than that starts a new one, and a hit the knight
@@ -1236,9 +1258,10 @@ QtObject {
         // Lighter harness: a dash costs this much mana instead of
         // knight.dashMana, the whirlwind's dash too
         harnessDashMana: [6, 4, 3],
-        // Balanced blade: a whirlwind costs this much mana, its dash
-        // included, instead of knight.whirlMana
-        bladeWhirlMana: [15, 12, 9]
+        // Balanced blade: the chosen special (specials) costs this share
+        // of its mana, rounded; a whirlwind, its dash included, 20 -> 15,
+        // 12, 9
+        bladeShare: [0.75, 0.6, 0.45]
     })
 
     // The dungeon master's panel (issue #142): with Dungeon Master ticked

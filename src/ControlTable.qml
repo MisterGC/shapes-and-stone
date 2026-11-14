@@ -18,6 +18,10 @@ QtObject {
 
     // Where the player's table is kept: a KeyValueStore
     property var store: null
+    // The special the knight picked (issue #317), as the hint names the
+    // special's button; "" names it as the table does. The action keeps
+    // its id "whirlwind", under which a rebound key is kept
+    property string specialName: ""
     readonly property string storeKey: "controls"
 
     // The actions in the order the hints name them. name: what the hint
@@ -32,7 +36,7 @@ QtObject {
         { id: "strike", name: "strike, hold to charge, at a vein dig", title: "Strike", hold: true },
         { id: "shield", name: "shield", title: "Shield", hold: true },
         { id: "dash", name: "dash", title: "Dash" },
-        { id: "whirlwind", name: "whirlwind", title: "Whirlwind" },
+        { id: "whirlwind", name: "special", title: "Special" },
         { id: "talk", name: "talk", title: "Talk, open a door" },
         { id: "potion", name: "potion", title: "Potion" },
         { id: "draught", name: "draught", title: "Draught" },
@@ -350,6 +354,11 @@ QtObject {
         return onPad ? padOrKeysName(action, padLabel) : keysName(action)
     }
 
+    // What the hint calls action a: its name, the special's button the
+    // special picked
+    function hintName(a) {
+        return a.id === "whirlwind" && specialName !== "" ? specialName : a.name
+    }
     // The controls hint: every action with what it is bound to on the
     // device in use, the four moves as one, each item whole on its line
     function hint(onPad, padLabel) {
@@ -358,7 +367,7 @@ QtObject {
             if (a.move && a.id !== "moveUp") continue
             const id = a.move ? "move" : a.id
             const bound = name(id, onPad, padLabel)
-            if (bound !== "") items.push(bound + " " + a.name)
+            if (bound !== "") items.push(bound + " " + hintName(a))
         }
         return items.map(t => t.replace(/ /g, " ")).join("  •  ")
     }

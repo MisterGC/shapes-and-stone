@@ -96,12 +96,21 @@ PhysicsItem {
                                                 Balance.knight.blockedShare)
     readonly property real blockMana: _level(Balance.shop.shieldBlockMana, shieldLevel,
                                              Balance.knight.blockMana)
-    // The mana a dash costs, and a whirlwind with its dash: a lighter
-    // harness's and a balanced blade's are lower
+    // The mana a dash costs: a lighter harness's is lower
     readonly property real dashMana: _level(Balance.shop.harnessDashMana, harnessLevel,
                                             Balance.knight.dashMana)
-    readonly property real whirlMana: _level(Balance.shop.bladeWhirlMana, bladeLevel,
-                                             Balance.knight.whirlMana)
+    // The special (Balance.specials) the knight picked for this dungeon:
+    // the special's button lets it loose (unleash)
+    property string special: Balance.specials.order[0]
+    // The mana a special costs, a whirlwind's with its dash: a balanced
+    // blade's share of it (Balance.shop.bladeShare), rounded
+    function specialManaOf(id) {
+        let s = Balance.specials[id]
+        if (!s) return 0
+        return bladeLevel > 0 ? Math.round(s.mana * _level(Balance.shop.bladeShare, bladeLevel, 1)) : s.mana
+    }
+    readonly property real specialMana: specialManaOf(special)
+    readonly property real whirlMana: specialManaOf("whirlwind")
     readonly property real blockDrain: Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
@@ -1107,11 +1116,17 @@ PhysicsItem {
         _startDash()
     }
 
-    // Q: the whirlwind, with full momentum and whirlMana. Short of the
+    // The special's button (Q, R2): the special picked and nothing else.
+    // The whirlwind, with full momentum and whirlMana: short of the
     // momentum the pips flash, short of the mana the bar does; either way
-    // nothing else happens. Returns whether it whirled
+    // nothing else happens. A special not in the game yet does nothing.
+    // Returns whether it went off
     function unleash() {
         if (fallen || held || isDashing || openLeft > 0) return false
+        if (special !== "whirlwind") {
+            console.log("[Player] The special", special, "is not in the game yet")
+            return false
+        }
         if (momentum < Balance.momentum.max) {
             momentumShort()
             return false
