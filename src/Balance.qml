@@ -528,6 +528,12 @@ QtObject {
         guardianDuel: [
             { dx: 0, dy: 4, tier: 2, type: "guardian" }
         ],
+        // spitterDuel the same with a spitter lead, the third kind a
+        // room's lead can be (spawn.spitterChance); no band of this table
+        // checks it (issue #315)
+        spitterDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "spitter" }
+        ],
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
         // one charged swing, two or three swings, parries among them for
