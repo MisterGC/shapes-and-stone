@@ -121,6 +121,9 @@ PhysicsItem {
         } else if (name === "whirlwind") {
             view.whirl(Balance.knight.whirlDuration * 1000)
             if (gameWorld && gain > 0) gameWorld.playWhirlwind(gain)
+        } else if (name === "stun") {
+            view.block()
+            if (gameWorld && gain > 0) gameWorld.playStun(gain)
         } else if (name === "dash") {
             view.dash(150)
             if (gameWorld && gain > 0) gameWorld.playDash(gain)

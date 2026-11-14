@@ -344,6 +344,17 @@ ClayWorld2d {
         logSound("sfx/sword_swing", "whirlwind", Balance.whirl.swingPitch, _gainDist(gain), gain)
         logSound("voice/knight/whirl_shout", "whirlShout", Balance.whirl.shoutPitch, _gainDist(gain), gain)
     }
+    // The stun (Balance.stun, issue #318): the shield's bash, a cue of its
+    // own
+    SfxPlayer {
+        id: stunSound
+        source: "../sound/sfx/stun_bash.sfx.json"
+        volume: muted ? 0 : Balance.stun.volume * soundVolume
+    }
+    function playStun(gain) {
+        stunSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/stun_bash", "stun", 0, _gainDist(gain), gain)
+    }
     // The charge is full: a high tick
     SfxPlayer {
         id: chargeTickSound
@@ -727,8 +738,9 @@ ClayWorld2d {
     // one place. With fx off it falls back to the original shake only.
     //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, chainKill (a death
     //         that chains, killLanded), playerHit, playerBlocked,
-    //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
-    //         projectileDeflected, projectileBurst
+    //         perfectBlock, crushBlow, parry, whirlwind, stun (the
+    //         knight's shield bash, Balance.stun, at its centre),
+    //         projectileHit, projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
@@ -798,6 +810,15 @@ ClayWorld2d {
             spawnSparks(x, y, nx, ny, Balance.whirl.sparks, Balance.whirl.glow)
             spawnRing(x, y, Balance.whirl.glow)
             break
+        case "stun":
+            // The shield's bash (Balance.stun): from the knight's centre a
+            // ring out to the stun's reach and sparks all round
+            for (let k = 0; k < 4; k++)
+                spawnSparks(x, y, Math.cos(k * Math.PI / 2), Math.sin(k * Math.PI / 2),
+                            Math.ceil(Balance.stun.sparks / 4), Balance.stun.rimColor)
+            spawnRing(x, y, Balance.stun.color, Balance.stun.reach)
+            spawnRing(x, y, Balance.stun.rimColor)
+            break
         case "projectileHit":
         case "projectileBurst":
             spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
@@ -811,7 +832,7 @@ ClayWorld2d {
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
             let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5,
+                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5, stun: 1,
                                projectileHit: 1, projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
@@ -868,6 +889,9 @@ ClayWorld2d {
         case "whirlwind":
             _trauma(Balance.whirl.trauma)
             _kick(nx * Balance.whirl.kick, ny * Balance.whirl.kick)
+            break
+        case "stun":
+            _trauma(Balance.stun.trauma)
             break
         case "projectileDeflected":
             _trauma(0.12)
@@ -932,6 +956,8 @@ ClayWorld2d {
             property real xWu: 0
             property real yWu: 0
             property real rWu: 0.2
+            // The radius it grows to
+            property real toWu: 1.6
             width: rWu * 2 * pixelPerUnit
             height: width
             radius: width / 2
@@ -942,15 +968,16 @@ ClayWorld2d {
             z: 5
             ParallelAnimation {
                 running: true
-                NumberAnimation { target: _ring; property: "rWu"; to: 1.6; duration: 280; easing.type: Easing.OutCubic }
+                NumberAnimation { target: _ring; property: "rWu"; to: _ring.toWu; duration: 280; easing.type: Easing.OutCubic }
                 NumberAnimation { target: _ring; property: "opacity"; from: 0.9; to: 0; duration: 280 }
                 onFinished: _ring.destroy()
             }
         }
     }
-    function spawnRing(x, y, color) {
+    // A ring growing from (x, y) to toWu wu, 1.6 without it
+    function spawnRing(x, y, color, toWu) {
         let r = ringComp.createObject(glowParent(), {
-            xWu: x, yWu: y, pixelPerUnit: world.pixelPerUnit
+            xWu: x, yWu: y, pixelPerUnit: world.pixelPerUnit, toWu: toWu === undefined ? 1.6 : toWu
         })
         if (r) r.border.color = color
     }
@@ -1025,6 +1052,7 @@ ClayWorld2d {
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
+            else if (blow.kind === "stun") e.stun(blow.seconds)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
         onPartyChanged: _checkPartyDown()
@@ -3315,6 +3343,11 @@ ClayWorld2d {
         // Whirlwinds that hit an enemy, and the enemies they hit
         property int whirlwinds: 0
         property int whirlHits: 0
+        // Stuns (Balance.stun), the enemies they froze and the wind-ups of
+        // a lead or the Warden they ended
+        property int stuns: 0
+        property int stunFrozen: 0
+        property int stunInterrupted: 0
         // Shots this knight's perfect block sent back, and the ones of them
         // that hit an enemy (Balance.projectile)
         property int shotsBack: 0
@@ -3336,6 +3369,7 @@ ClayWorld2d {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
+        r.stuns = 0; r.stunFrozen = 0; r.stunInterrupted = 0
         r.shotsBack = 0; r.shotBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
@@ -3345,7 +3379,9 @@ ClayWorld2d {
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
-    // enemy it hit), shotBack (a perfect block sent a shot back),
+    // enemy it hit), stun (a stun went off), stunFrozen and
+    // stunInterrupted (with the enemies it froze and the wind-ups it
+    // ended), shotBack (a perfect block sent a shot back),
     // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
@@ -3394,6 +3430,9 @@ ClayWorld2d {
         case "crushed": r.crushed++; break
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
+        case "stun": r.stuns++; break
+        case "stunFrozen": r.stunFrozen += amount; break
+        case "stunInterrupted": r.stunInterrupted += amount; break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break

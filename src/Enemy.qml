@@ -235,7 +235,7 @@ PhysicsItem {
     property int _lungeSteps: 0     // physics steps until the lunge lands
 
     // AI state: patrol, chase, telegraph, crush, lunge, stagger, recovery,
-    // kite, shoot
+    // kite, shoot, frozen (a knight's stun, Balance.stun)
     property string aiState: "patrol"
     // The state before the last change, for the lead's growl
     property string _wasState: "patrol"
@@ -351,6 +351,21 @@ PhysicsItem {
         opacity: 0.6
     }
 
+    // Frozen by a knight's stun (Balance.stun): a rim of ice round it, on
+    // every screen, from the replicated aiState
+    Rectangle {
+        objectName: "frostRim"
+        visible: enemy.aiState === "frozen"
+        anchors.centerIn: parent
+        width: parent.width * 1.25
+        height: parent.height * 1.25
+        radius: width * 0.5
+        color: "transparent"
+        border.color: Balance.stun.rimColor
+        border.width: 2
+        opacity: 0.85
+    }
+
     // Life: breathing at rest, a bob while moving (visual only)
     property real _lifeT: Math.random() * 10
     NumberAnimation on _lifeT {
@@ -361,7 +376,8 @@ PhysicsItem {
     readonly property real _speed: enemy.linearVelocity
         ? Math.min(1, Math.sqrt(enemy.linearVelocity.x * enemy.linearVelocity.x
                                 + enemy.linearVelocity.y * enemy.linearVelocity.y) / 3) : 0
-    readonly property real _breath: Math.sin(_lifeT * 2.1) * (1 - _speed)
+    // Frozen by a stun it holds its breath
+    readonly property real _breath: aiState === "frozen" ? 0 : Math.sin(_lifeT * 2.1) * (1 - _speed)
     readonly property real _bob: Math.abs(Math.sin(_lifeT * 12)) * _speed
 
     // Visual
@@ -396,6 +412,8 @@ PhysicsItem {
             case "crush": return Balance.crush.glow
             case "lunge": base = "#FF4444"; break
             case "stagger": base = "#666666"; break
+            // Frozen by a knight's stun: ice
+            case "frozen": base = Balance.stun.color; break
             default: base = isSpitter ? "#6B8E4A" : "#8B3A3A"
             }
             return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
@@ -1026,8 +1044,9 @@ PhysicsItem {
     property real _knockVy: 0
     readonly property real knockDuration: Balance.enemy.knockbackDuration
     function knockback(dx, dy, speed) {
-        // A room's lead stands its ground: no blow, shove or shield moves it
-        if (lead) return
+        // A room's lead stands its ground: no blow, shove or shield moves
+        // it; nor one frozen by a stun
+        if (lead || aiState === "frozen") return
         let len = Math.sqrt(dx * dx + dy * dy)
         if (len < 0.001) return
         _knockVx = dx / len * speed
@@ -1105,6 +1124,15 @@ PhysicsItem {
             break
         case "lunge":
             _stepLunge()
+            break
+        case "frozen":
+            // Thawed on the step its freeze is over: it goes for the knight
+            if (_attackTimer <= 0) {
+                aiState = "chase"
+                _recalcChasePath()
+            } else {
+                body.linearVelocity = Qt.point(0, 0)
+            }
             break
         case "bash":
             // Opened meanwhile, or wound up: through it, on the chase
@@ -1525,6 +1553,11 @@ PhysicsItem {
                 _dirToTargetY * windUpSpeed)
             break
 
+        case "frozen":
+            // A knight's stun (stun): it stands; _stepAttack thaws it
+            body.linearVelocity = Qt.point(0, 0)
+            break
+
         case "stagger":
             body.linearVelocity = Qt.point(0, 0)
             if (_attackTimer <= 0) {
@@ -1704,7 +1737,8 @@ PhysicsItem {
     }
 
     // Staggered for seconds, for the table's enemy.stagger without them.
-    // A room's lead does not flinch: only an opening (open) staggers it
+    // A room's lead does not flinch: only an opening (open) staggers it.
+    // One frozen by a stun stays frozen until it thaws
     function stagger(seconds) {
         if (lead) return
         let t = seconds === undefined ? Balance.enemy.stagger : seconds
@@ -1712,10 +1746,68 @@ PhysicsItem {
             if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stagger", seconds: t})
             return
         }
+        if (aiState === "frozen") return
         parryWindow = false
         _attackTimer = t
         aiState = "stagger"
         staggerWobble.restart()
+    }
+
+    // A knight's stun (Balance.stun, issue #318) reached it: a weak or
+    // normal enemy freezes for seconds, stun.freeze without them - it
+    // neither moves nor strikes, an attack under way is over, and a
+    // stun on a frozen one freezes it anew -; a room's lead or the Warden
+    // loses the wind-up it is in (interrupt). Where it is remote the host
+    // applies it, judging a lead's wind-up by its own state, and every
+    // screen shows it. Returns what it does: "frozen", "interrupted", or
+    // "" for nothing - where it is remote, as the state shown here tells
+    signal stunned(string what)
+    function stun(seconds) {
+        if (destroyed || dormant || halted || _held()) return ""
+        let t = seconds === undefined ? Balance.stun.freeze : seconds
+        let what = !lead ? "frozen" : _windingUp() ? "interrupted" : ""
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "stun", seconds: t})
+            return what
+        }
+        if (what === "interrupted") _interrupt()
+        else if (what === "frozen") _freeze(t)
+        if (what !== "") stunned(what)
+        return what
+    }
+    // A wind-up at the knight is under way: a strike's, a crushing
+    // blow's or a shot's
+    function _windingUp() {
+        return aiState === "telegraph" || aiState === "crush" || aiState === "shoot"
+    }
+    function _freeze(t) {
+        parryWindow = false
+        crushing = false
+        _knockT = 0
+        _bashCell = ""
+        _clearString()
+        body.linearVelocity = Qt.point(0, 0)
+        _attackTimer = Math.max(aiState === "frozen" ? _attackTimer : 0, t)
+        if (aiState === "stagger") {
+            staggerWobble.stop()
+            rotation = 0
+        }
+        aiState = "frozen"
+        console.log("[Enemy] Frozen for", t, "s")
+    }
+    // The lead's wind-up is over before its blow: no blow comes of it, its
+    // string ends, and it goes for the knight again at once - no recovery,
+    // so a charged swing finds no opening, and no stagger: its stance
+    // stays as it was
+    function _interrupt() {
+        parryWindow = false
+        crushing = false
+        _clearString()
+        _attackTimer = 0
+        body.linearVelocity = Qt.point(0, 0)
+        aiState = "chase"
+        _recalcChasePath()
+        console.log("[Enemy] Lead's wind-up interrupted")
     }
 
     // A lead's stance breaks (issue #271): cause is what broke it,
@@ -1795,7 +1887,7 @@ PhysicsItem {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
-        if (enemyType === "guardian" && aiState !== "stagger" && heavy !== true
+        if (enemyType === "guardian" && aiState !== "stagger" && aiState !== "frozen" && heavy !== true
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
