@@ -351,6 +351,8 @@ QtObject {
         grunt: { hpBonus: 2, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 0, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -2, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // The Hollow Warden (Balance.boss): its HP is the boss table's
+        warden: { hpBonus: 0, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -527,7 +529,18 @@ QtObject {
         // duelCancelled of "charge"'s charges
         duelSlow: 20,
         duelSkilled: [6, 15],
-        duelCancelled: 1
+        duelCancelled: 1,
+        // Boss (issue #274): the Hollow Warden alone (Balance.boss), its
+        // adds coming in its phase 2, at the boss depths' first
+        // appearance. At bossDepth "skilled" kills it within bossSkilled
+        // seconds of its engagement and does not fall; "masher" falls or
+        // takes at least bossSlow times as long
+        boss: [
+            { dx: 0, dy: 4, tier: 2, type: "warden" }
+        ],
+        bossDepth: 2,
+        bossSkilled: [60, 90],
+        bossSlow: 2
     })
 
     // A room's lead has a stance (issue #271): it takes no knockback, no
@@ -595,8 +608,90 @@ QtObject {
             spitter: [
                 { name: "volley", beats: [1, 1, 1] },
                 { name: "stutter", beats: [1, 0, 1, 2] }
+            ],
+            // The Hollow Warden's three (Balance.boss), on its own beat
+            warden: [
+                { name: "toll", beats: [1, 0, 1, 0, 1] },
+                { name: "false-toll", beats: [1, 2, 0, 1] },
+                { name: "landslide", beats: [1, 1, 1, 0, 2] }
             ]
         }
+    })
+
+    // A duel sounds and looks like one (issue #273). While a room's lead
+    // within music.reach of the knight is after it - not patrolling, not
+    // halted - the dungeon song plays its duel part, and its flow part
+    // again once the lead has fallen, given up or is out of reach; the
+    // song moves on the next bar. The lead growls as it spots the knight,
+    // at growlVolume, fading with the distance as the scream does. The
+    // song's sting plays on its next beat for every parry and perfect block
+    // of the knight in a duel and every opening of a lead within reach,
+    // one in stingGap seconds of the physics clock. A target lock on a
+    // lead closes the view in to zoom times its size over zoomTime
+    // seconds. An opening plays a slow motion: the physics at slowScale
+    // for slowTime seconds of the physics clock (slowTime / slowScale of
+    // the wall clock); in a session the picture's, as the hit stop's
+    readonly property var duel: ({
+        growlVolume: 0.8,
+        stingGap: 0.25,
+        zoom: 1.15,
+        zoomTime: 0.5,
+        slowScale: 0.3,
+        slowTime: 0.2
+    })
+
+    // The Hollow Warden (issue #274): every every-th dungeon - depth
+    // every - 1, 2 * every - 1, ... - ends in a boss room, the room the
+    // exit stairs' shaft leaves from, and it holds the Warden alone: no
+    // other enemy, feature, trap or wooden door. Its n-th appearance (0
+    // at the first boss depth) has hp * (1 + hpGrow * n) HP, with depth.hp
+    // and party.hpPerKnight on that as any enemy, and plays at tempo 1 +
+    // tempoGrow * n; its attack and defence are enemy.warden's. An iron
+    // gate stands in every way into the room and in the exit shaft. The
+    // ways in stand open until every knight still
+    // standing is in the room - until then the Warden sleeps and a blow
+    // glances off it -: they shut, the Warden wakes, its name shows
+    // as a banner for banner seconds and its HP as a bar while it stands.
+    // The shaft's gate opens only when it falls, and the ways in with it.
+    // It is a room's lead (Balance.lead): its stance, its openings, its
+    // three strings (lead.strings.warden) on beat seconds, divided by its
+    // tempo. At phaseAt of its max HP its phase 2 begins: adds weak grunts
+    // come out of the floor round it, adds more at waveAt, it plays
+    // phase2Tempo times faster - beats, feint holds and count-ins - and
+    // every zone.every seconds a zone opens under each knight standing in
+    // the room: a ring of the slits' colour closes on it over zone.warn
+    // seconds, then the floor there hurts zone.damage (zone.grow more per
+    // appearance) to a knight within zone.radius wu of its centre, judged
+    // on that knight's own screen; a shield does not stop it. Phase 2
+    // turns the room's light to light.ambient and light.temperature, shows
+    // its core and moves the boss song (music/boss) from its part one to
+    // two. Beaten, it drops gold gold (goldGrow more per appearance) in
+    // piles drops round where it fell, a victory banner shows for victory
+    // seconds, and every knight is healed to full HP and mana, a fallen
+    // one rises
+    readonly property var boss: ({
+        every: 3,
+        name: "The Hollow Warden",
+        hp: 2500,
+        hpGrow: 0.35,
+        tempoGrow: 0.1,
+        // Its size a side, wu; its reach and its blow's reach grow with it
+        size: 1.8,
+        beat: 1.0,
+        phaseAt: 0.5,
+        phase2Tempo: 1.25,
+        adds: 3,
+        waveAt: 0.25,
+        zone: { every: 3.5, warn: 1.2, radius: 1.3, damage: 18, grow: 4, linger: 0.4 },
+        gold: 120,
+        goldGrow: 60,
+        drops: 8,
+        banner: 3.0,
+        victory: 3.5,
+        light: { ambient: "#1C0606", temperature: 0.35 },
+        hexColor: "#4A4E57",
+        coreColor: "#FF5A2A",
+        gateColor: "#2F3640"
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that

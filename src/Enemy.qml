@@ -44,13 +44,14 @@ PhysicsItem {
         objectId: enemy.objectId
         properties: ["xWu", "yWu", "aiState", "facingAngle", "hp", "parryWindow", "targetId",
                      "windUpLength", "lead", "stance", "opening", "stringName", "feintHold",
-                     "windUps"]
+                     "windUps", "phase", "dormant"]
         interpolate: true
         interpolator.autoDelay: true
         // HP switches with its state, never blended between two of the
         // host's (clayground#368); so do a wind-up's length, a lead's
-        // stance, a feint's hold and the count of wind-ups
-        steppedProperties: ["hp", "windUpLength", "stance", "feintHold", "windUps"]
+        // stance, a feint's hold and the count of wind-ups, and the
+        // Warden's phase
+        steppedProperties: ["hp", "windUpLength", "stance", "feintHold", "windUps", "phase"]
         interpolator.angleKeys: ["facingAngle"]
     }
 
@@ -170,7 +171,28 @@ PhysicsItem {
     // A blow of a string landed: a lunge ("strike" or "feint") or a shot
     // ("shot"), on beat
     signal struck(int beat, string kind)
-    property string enemyType: "grunt"  // "grunt", "guardian", or "spitter"
+    property string enemyType: "grunt"  // "grunt", "guardian", "spitter" or "warden"
+    // The Hollow Warden (Balance.boss, issue #274): a lead of its own type,
+    // boss.size a side. tempo is its appearance's, set on spawn; phase 2
+    // begins at boss.phaseAt of its max HP and plays boss.phase2Tempo
+    // times faster. Dormant it stands and does not think until the boss
+    // room shuts (Game's BossFight wakes it). phase and dormant show on
+    // every screen
+    readonly property bool boss: enemyType === "warden"
+    property int phase: 1
+    property real tempo: 1
+    property bool dormant: false
+    property bool _waved: false
+    // A bigger enemy reaches as far past its own outline as a common one:
+    // its distances are taken from aimXWu, aimYWu, the corner a common
+    // enemy (0.8 wu) at its centre would have, and its reaches grow by
+    // bulk. Both are its corner and 0 for a common enemy
+    readonly property real bulk: Math.max(0, (widthWu - 0.8) / 2)
+    readonly property real aimXWu: xWu + bulk
+    readonly property real aimYWu: yWu - bulk
+    // How much faster than its table it plays, and a beat of its strings
+    readonly property real speedUp: tempo * (phase === 2 ? Balance.boss.phase2Tempo : 1)
+    readonly property real beatLen: (boss ? Balance.boss.beat : Balance.lead.beat) / speedUp
     // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
     // was built with (issue #157)
     property string fromHole: ""
@@ -215,12 +237,15 @@ PhysicsItem {
     // AI state: patrol, chase, telegraph, crush, lunge, stagger, recovery,
     // kite, shoot
     property string aiState: "patrol"
+    // The state before the last change, for the lead's growl
+    property string _wasState: "patrol"
 
     // The crushing blow (issue #80): a tough grunt or guardian winds one up
     // instead of a lunge at this share of its attacks - aiState "crush",
     // a longer telegraph - and lunges as usual, with no parry window. Its
     // own chance, so a bench can set it; 0 for every other enemy
-    property real crushChance: tier === 2 && enemyType !== "spitter" ? Balance.enemy.crushChance : 0
+    property real crushChance: tier === 2 && enemyType !== "spitter" && enemyType !== "warden"
+                               ? Balance.enemy.crushChance : 0
     // The attack under way is a crushing blow, from its wind-up to its
     // landing; on every screen, from the replicated aiState
     property bool crushing: false
@@ -315,7 +340,7 @@ PhysicsItem {
 
     // Tough enemy glow ring
     Rectangle {
-        visible: tier === 2
+        visible: tier === 2 && !enemy.boss
         anchors.centerIn: parent
         width: parent.width * 1.4
         height: parent.height * 1.4
@@ -342,6 +367,7 @@ PhysicsItem {
     // Visual
     Rectangle {
         id: visual
+        visible: !enemy.boss
         transform: [
             Scale {
                 origin.x: visual.width / 2; origin.y: visual.height
@@ -453,6 +479,162 @@ PhysicsItem {
         }
     }
 
+
+    // The Hollow Warden's look (Balance.boss): a hexagon of stone, hollow,
+    // a frame turning slowly inside the hollow; its rim takes the
+    // telegraph's colours as an enemy's body does. In phase 2 its core
+    // glows in the hollow, above the darkness as the eyes are, and the
+    // frame turns faster. Dormant it is darker
+    readonly property color _wardenRim: {
+        switch (aiState) {
+        case "telegraph": return "#FF8C00"
+        case "lunge": return "#FF4444"
+        case "stagger": return "#666666"
+        default: return dormant ? Qt.darker(Balance.boss.hexColor, 1.6) : Qt.lighter(Balance.boss.hexColor, 1.5)
+        }
+    }
+    Item {
+        id: wardenLook
+        objectName: "wardenLook"
+        visible: enemy.boss
+        anchors.fill: parent
+        scale: visual.scale
+        // The stone: a hexagon with a hexagonal hollow, lit from the top
+        Canvas {
+            id: wardenStone
+            anchors.fill: parent
+            onPaint: {
+                let ctx = getContext("2d")
+                ctx.reset()
+                let w = width, h = height, cx = w / 2, cy = h / 2
+                let hex = (r) => {
+                    ctx.beginPath()
+                    for (let i = 0; i < 6; i++) {
+                        let a = Math.PI / 6 + i * Math.PI / 3
+                        let x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r
+                        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+                    }
+                    ctx.closePath()
+                }
+                let stone = enemy.dormant ? Qt.darker(Balance.boss.hexColor, 1.4) : Balance.boss.hexColor
+                let r = w * 0.5
+                // The hexagon, the hollow cut out of it
+                hex(r * 0.98)
+                ctx.fillStyle = stone
+                ctx.fill()
+                hex(r * 0.5)
+                ctx.fillStyle = "#08080B"
+                ctx.fill()
+                // Its faces: the upper ones lit, the lower ones in shade
+                for (let i = 0; i < 6; i++) {
+                    let a0 = Math.PI / 6 + i * Math.PI / 3, a1 = a0 + Math.PI / 3
+                    ctx.beginPath()
+                    ctx.moveTo(cx + Math.cos(a0) * r * 0.98, cy + Math.sin(a0) * r * 0.98)
+                    ctx.lineTo(cx + Math.cos(a1) * r * 0.98, cy + Math.sin(a1) * r * 0.98)
+                    ctx.lineTo(cx + Math.cos(a1) * r * 0.5, cy + Math.sin(a1) * r * 0.5)
+                    ctx.lineTo(cx + Math.cos(a0) * r * 0.5, cy + Math.sin(a0) * r * 0.5)
+                    ctx.closePath()
+                    let up = -Math.sin(a0 + Math.PI / 6)
+                    ctx.fillStyle = up > 0.3 ? Qt.lighter(stone, 1.25) : up < -0.3 ? Qt.darker(stone, 1.35) : stone
+                    ctx.fill()
+                }
+                // The cracks of an old stone
+                ctx.strokeStyle = Qt.darker(stone, 1.9)
+                ctx.lineWidth = Math.max(1, w * 0.02)
+                ctx.beginPath()
+                ctx.moveTo(cx + r * 0.62, cy - r * 0.2)
+                ctx.lineTo(cx + r * 0.78, cy - r * 0.05)
+                ctx.lineTo(cx + r * 0.86, cy + r * 0.12)
+                ctx.moveTo(cx - r * 0.55, cy + r * 0.5)
+                ctx.lineTo(cx - r * 0.66, cy + r * 0.62)
+                ctx.stroke()
+                // The rim, in the telegraph's colours
+                hex(r * 0.98)
+                ctx.strokeStyle = enemy._wardenRim
+                ctx.lineWidth = Math.max(1.5, w * 0.05)
+                ctx.stroke()
+                hex(r * 0.5)
+                ctx.strokeStyle = Qt.darker(stone, 2.2)
+                ctx.lineWidth = Math.max(1, w * 0.025)
+                ctx.stroke()
+            }
+            Connections {
+                target: enemy
+                function on_WardenRimChanged() { wardenStone.requestPaint() }
+                function onDormantChanged() { wardenStone.requestPaint() }
+                function onWidthChanged() { wardenStone.requestPaint() }
+            }
+        }
+        // The frame inside the hollow, turning
+        Canvas {
+            id: wardenFrame
+            anchors.centerIn: parent
+            width: parent.width * 0.4
+            height: width
+            property real turn: 0
+            rotation: turn
+            NumberAnimation on turn {
+                running: enemy.boss && enemy._fx && !enemy.dormant
+                from: 0; to: 360
+                duration: enemy.phase === 2 ? 2600 : 7000
+                loops: Animation.Infinite
+            }
+            onPaint: {
+                let ctx = getContext("2d")
+                ctx.reset()
+                let w = width, cx = w / 2, r = w * 0.42
+                ctx.beginPath()
+                for (let i = 0; i < 6; i++) {
+                    let a = i * Math.PI / 3
+                    let x = cx + Math.cos(a) * r, y = cx + Math.sin(a) * r
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+                }
+                ctx.closePath()
+                ctx.strokeStyle = Qt.lighter(Balance.boss.hexColor, 1.15)
+                ctx.lineWidth = Math.max(1, w * 0.09)
+                ctx.stroke()
+            }
+            Component.onCompleted: requestPaint()
+            onWidthChanged: requestPaint()
+        }
+    }
+    // Its core, in phase 2: in the hollow, pulsing, above the darkness
+    Item {
+        objectName: "wardenCore"
+        parent: enemy._fx && gameWorld && gameWorld.glowParent ? gameWorld.glowParent() : enemy
+        visible: enemy.boss && enemy.phase === 2 && !enemy.destroyed
+        readonly property real size: enemy.width * 0.34 * visual.scale
+        x: (parent === enemy ? 0 : enemy.x) + (enemy.width - size) / 2
+        y: (parent === enemy ? 0 : enemy.y) + (enemy.height - size) / 2
+        width: size
+        height: size
+        property real pulse: 0
+        SequentialAnimation on pulse {
+            running: enemy.boss && enemy.phase === 2 && enemy._fx
+            loops: Animation.Infinite
+            NumberAnimation { to: 1; duration: 420; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 0; duration: 420; easing.type: Easing.InOutSine }
+        }
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * (1.9 + 0.4 * parent.pulse)
+            height: width
+            radius: width / 2
+            color: Balance.boss.coreColor
+            opacity: 0.22
+        }
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width
+            height: width
+            radius: width / 2
+            color: Balance.boss.coreColor
+            border.color: "#FFD2A0"
+            border.width: Math.max(1, width * 0.12)
+            opacity: 0.75 + 0.25 * parent.pulse
+        }
+    }
+
     // Squash on a hit, crouch while winding up, stretch into the lunge
     property real _poseScale: !_fx ? 1
         : aiState === "telegraph" || aiState === "crush" || aiState === "shoot" || aiState === "bash" ? 0.8
@@ -472,7 +654,7 @@ PhysicsItem {
     Item {
         id: glowEyes
         objectName: "enemyEyes"
-        visible: enemy._fx && enemy.aiState !== "stagger"
+        visible: enemy._fx && enemy.aiState !== "stagger" && !enemy.boss
         width: enemy.width
         height: enemy.height
         scale: visual.scale
@@ -690,6 +872,9 @@ PhysicsItem {
         openFlashAnimation.restart()
         if (gameWorld && gameWorld.spawnWord)
             gameWorld.spawnWord(xWu, yWu + 0.5, Balance.lead.word, Balance.lead.flashColor)
+        // The song's sting and the slow motion, on every screen near it
+        // (Balance.duel)
+        if (gameWorld && gameWorld.leadOpened) gameWorld.leadOpened(enemy)
     }
 
     // Guardian shield arc
@@ -765,6 +950,12 @@ PhysicsItem {
         } else if (aiState !== "lunge") {
             crushing = false
         }
+        // A room's lead growls as it spots the knight: from its patrol into
+        // the hunt, on every screen (Balance.duel)
+        if (lead && _wasState === "patrol" && aiState !== "patrol" && aiState !== "idle"
+                && gameWorld && gameWorld.playLeadGrowl)
+            gameWorld.playLeadGrowl(xWu, yWu)
+        _wasState = aiState
         // A wind-up starts the parry ring: its length where the AI runs, a
         // count of steps where it is shown
         if (aiState === "telegraph" || aiState === "crush" || aiState === "shoot" || aiState === "bash") {
@@ -950,8 +1141,8 @@ PhysicsItem {
             return
         }
         // Lunge speed to reach the knight where it stands now
-        let lungeDx = target.xWu - xWu
-        let lungeDy = target.yWu - yWu
+        let lungeDx = target.xWu - aimXWu
+        let lungeDy = target.yWu - aimYWu
         let lungeDist = Math.sqrt(lungeDx * lungeDx + lungeDy * lungeDy)
         let len = Math.max(0.01, lungeDist)
         _dirToTargetX = lungeDx / len
@@ -1030,15 +1221,15 @@ PhysicsItem {
         let l = Balance.lead
         if (b === 0) {
             feintHold = 0
-            _attackTimer = l.beat
+            _attackTimer = beatLen
             body.linearVelocity = Qt.point(0, 0)
             aiState = "recovery"
             return
         }
         let shot = enemyType === "spitter"
-        let dx = target ? target.xWu - xWu : 0, dy = target ? target.yWu - yWu : 0
+        let dx = target ? target.xWu - aimXWu : 0, dy = target ? target.yWu - aimYWu : 0
         let dist = Math.sqrt(dx * dx + dy * dy)
-        if (!target || dist > (shot ? shootRange : l.reach) || (shot && !_sees(target))) {
+        if (!target || dist > (shot ? shootRange : l.reach + bulk) || (shot && !_sees(target))) {
             _endString()
             return
         }
@@ -1050,10 +1241,10 @@ PhysicsItem {
             _dirToTargetY = dy / len
         }
         // A punishing blow comes at once: no feint
-        let hold = b === 2 && first !== "punish" ? l.feintHold : 0
+        let hold = b === 2 && first !== "punish" ? l.feintHold / speedUp : 0
         let w = first === "punish" ? Balance.enemy.minTelegraph
-            : first === "first" ? (shot ? Balance.enemy.shootWindUp : windUpDuration)
-            : l.beat - (shot ? 0 : lungeDuration)
+            : first === "first" ? (shot ? Balance.enemy.shootWindUp : windUpDuration) / speedUp
+            : beatLen - (shot ? 0 : lungeDuration)
         if (shot) {
             body.linearVelocity = Qt.point(0, 0)
             feintHold = hold
@@ -1090,7 +1281,7 @@ PhysicsItem {
     // lead.reach, holding a charge, as soon as it may attack - in a rest
     // of a string too, not in its recovery after one
     function _punishes(dist, canSee) {
-        return lead && canSee && attackCooldown <= 0 && dist <= Balance.lead.reach
+        return lead && canSee && attackCooldown <= 0 && dist <= Balance.lead.reach + bulk
             && _holdsCharge(target)
     }
     // An attack at the knight: a lead's string, any other enemy's lunge
@@ -1134,6 +1325,11 @@ PhysicsItem {
     function updateAI(dt) {
         if (halted) return
         if (_knockT > 0) return
+        // The Warden asleep: it stands until its room shuts
+        if (dormant) {
+            body.linearVelocity = Qt.point(0, 0)
+            return
+        }
         // In a session it goes for the nearest knight still standing; an
         // attack under way stays on the knight it wound up against
         if (gameWorld && gameWorld.enemiesChooseTarget
@@ -1152,8 +1348,8 @@ PhysicsItem {
         _pathRecalcTimer -= dt
         if (lead && !opening) _restStance(dt)
 
-        let dx = target.xWu - xWu
-        let dy = target.yWu - yWu
+        let dx = target.xWu - aimXWu
+        let dy = target.yWu - aimYWu
         let dist = Math.sqrt(dx * dx + dy * dy)
         let canSee = _sees(target)
         if (canSee) {
@@ -1212,7 +1408,7 @@ PhysicsItem {
                     aiState = "circle"
                     break
                 }
-                if (dist < lungeRange && canSee) {
+                if (dist < lungeRange + bulk && canSee) {
                     _committed = false
                     // Capture direction to target for wind-up/lunge
                     let len = Math.max(0.01, dist)
@@ -1442,10 +1638,10 @@ PhysicsItem {
             return
         }
         if (target && target.takeDamage) {
-            let dx = target.xWu - xWu
-            let dy = target.yWu - yWu
+            let dx = target.xWu - aimXWu
+            let dy = target.yWu - aimYWu
             let dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < Balance.enemy.lungeHitRange) {
+            if (dist < Balance.enemy.lungeHitRange + bulk) {
                 let result = target.takeDamage(atk, xWu, yWu, widthWu, crushing,
                                                _dirToTargetX, _dirToTargetY)
                 // A blocked blow throws it back, a perfect block staggers
@@ -1614,6 +1810,7 @@ PhysicsItem {
     // parried for a swing into its parry window. This screen judges
     // whether the blow breaks a lead's stance. Returns the damage it does
     function takeDamage(amount, attackerX, attackerY, heavy, parried) {
+        if (dormant) return _glance(attackerX, attackerY)
         let opens = _opens(heavy, parried)
         if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
         // Remote: the hit looks and counts here, the host applies it
@@ -1631,6 +1828,15 @@ PhysicsItem {
         return b.damage
     }
 
+    // A blow off the sleeping Warden's stone: a blocked hit's sparks on
+    // this screen, no damage
+    function _glance(attackerX, attackerY) {
+        if (gameWorld && gameWorld.impact)
+            gameWorld.impact("enemyBlocked", xWu, yWu, attackerX !== undefined ? xWu - attackerX : 0,
+                             attackerY !== undefined ? yWu - attackerY : 0, Balance.boss.hexColor)
+        return 0
+    }
+
     // Host: the knight of node byId struck the enemy; that node drew the
     // hit and counted it, and judged whether it opens a lead (opens)
     function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens) {
@@ -1640,6 +1846,10 @@ PhysicsItem {
     // A blow from this node's knight (byId "") or another node's; opens
     // the cause it breaks a lead's stance with, or ""
     function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+        // Asleep, the Warden's stone takes nothing: its fight begins when
+        // its room shuts, not with a blow from a knight its room let in
+        // while another waits outside
+        if (dormant) return 0
         if (opens && (!lead || opening)) opens = ""
         let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let finalDamage = b.damage
@@ -1692,10 +1902,27 @@ PhysicsItem {
             die(byId)
             return finalDamage
         }
+        if (boss) _bossMarks()
         // A lead: the blow breaks its stance, or wears it
         if (opens) open(opens)
         else if (lead && !opening) _wearStance(heavy)
         return finalDamage
+    }
+
+    // The Warden's HP passed a mark of Balance.boss: phaseAt begins its
+    // phase 2, waveAt calls its second wave; Game's BossFight brings the
+    // adds and the zones
+    function _bossMarks() {
+        let b = Balance.boss
+        if (phase === 1 && hp <= maxHp * b.phaseAt) {
+            phase = 2
+            console.log("[Enemy] The Warden's phase 2")
+            if (gameWorld && gameWorld.bossMark) gameWorld.bossMark(enemy, "phase")
+        }
+        if (phase === 2 && !_waved && hp <= maxHp * b.waveAt) {
+            _waved = true
+            if (gameWorld && gameWorld.bossMark) gameWorld.bossMark(enemy, "wave")
+        }
     }
 
     // byId: the node whose knight killed it, "" for this node's
@@ -1704,7 +1931,9 @@ PhysicsItem {
         let own = !byId
         destroyed = true
         // Gold where it fell; in a session only the host's enemies die here
-        if (gameWorld && gameWorld.dropGold && !remote) gameWorld.dropGold(xWu, yWu, tier)
+        if (gameWorld && gameWorld.dropGold && !remote && !boss) gameWorld.dropGold(xWu, yWu, tier)
+        // The Warden fell: its room opens, its gold and the victory
+        if (gameWorld && gameWorld.bossFell && !remote && boss) gameWorld.bossFell(enemy)
         if (gameWorld) {
             // The killer's node draws the death, sounds it, counts the kill
             // and its chain

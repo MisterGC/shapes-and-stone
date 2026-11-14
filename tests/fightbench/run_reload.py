@@ -22,8 +22,12 @@ opening lasts the new time. Then in the flow scenario the knight strikes
 two enemies down CHAIN_GAP seconds apart (Sandbox.tryChain): within
 Balance.chain.window they chain, the second death sound a step higher;
 with chain.window set below the gap in the loaded copy and the sandbox
-reloaded, they no longer do. Prints one PASS or FAIL line per check and
-exits with the number of failures.
+reloaded, they no longer do. Then the bossroom scenario (issue #274) puts
+the knight at the Hollow Warden's door: the room's way in and the Warden
+are on screen, the Warden asleep, its HP and tempo the table's; with
+boss.hp changed in the loaded copy and the sandbox reloaded, the Warden
+has the new HP. Prints one PASS or FAIL line per check and exits with the
+number of failures.
 
 Usage:
   run_reload.py [--loader <clayliveloader>]
@@ -50,6 +54,8 @@ CRUSH_MAX_STEPS = 60 * 60
 NEW_OPENING_TIME = 2.5
 CHAIN_GAP = 2.0
 NEW_CHAIN_WINDOW = 1.5
+BOSS_DEPTH = 2
+NEW_BOSS_HP = 4000
 
 
 def wait(predicate, timeout=30.0):
@@ -87,6 +93,13 @@ def try_chain(bench):
     if not wait(lambda: bench.eval1("fightReady()") is True):
         return None
     return json.loads(bench.eval1(f"tryChain({round(CHAIN_GAP / STEP)})") or "{}")
+
+
+def try_boss_room(bench):
+    bench.eval1(f"applyScenario('bossroom', {BOSS_DEPTH})")
+    if not wait(lambda: bench.eval1("bossRoomReady()") is True):
+        return None
+    return json.loads(bench.eval1("tryBossRoom()") or "{}")
 
 
 def reload(bench, balance, pattern, repl):
@@ -204,6 +217,23 @@ def main():
               f"after the reload the same two kills do not chain (chain.window "
               f"{chain and chain['window']} s, links {chain and chain['links']}, death sound at "
               f"{chain and chain['pitches']})")
+        boss = try_boss_room(bench)
+        check(boss is not None and boss["stage"] == "waiting" and boss["dormant"]
+              and boss["gateOnScreen"] and boss["wardenOnScreen"]
+              and boss["hp"] == boss["wantHp"] and abs(boss["tempo"] - boss["wantTempo"]) < 1e-9,
+              f"the bossroom scenario lands at the Warden's door at depth {boss and boss['depth']}: its "
+              f"way in on screen ({boss and boss['gateOnScreen']}), the Warden on screen "
+              f"({boss and boss['wardenOnScreen']}) and asleep, {boss and boss['hp']} HP "
+              f"({boss and boss['wantHp']} by the table, boss.hp {boss and boss['tableHp']}), tempo "
+              f"{boss and boss['tempo']} ({boss and boss['wantTempo']} by the table)")
+        reloaded = reload(bench, balance, r"(boss: \(\{\s*every: [0-9]+,\s*name: \"[^\"]*\",\s*hp: )[0-9]+,",
+                          rf"\g<1>{NEW_BOSS_HP},")
+        check(reloaded, f"boss.hp set to {NEW_BOSS_HP} and the sandbox reloaded")
+        boss = try_boss_room(bench) if reloaded else None
+        check(boss is not None and boss["tableHp"] == NEW_BOSS_HP and boss["hp"] == boss["wantHp"]
+              and boss["gateOnScreen"],
+              f"after the reload the Warden has {boss and boss['hp']} HP ({boss and boss['wantHp']} by "
+              f"the table at boss.hp {boss and boss['tableHp']}), its way in on screen")
     except TimeoutError as e:
         print("FAIL", e, "; logs in", tmp, file=sys.stderr)
         failures += 1

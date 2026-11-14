@@ -70,6 +70,7 @@ Item {
         cancelledCharges = 0
         _chargeSeen = ""
         engagedSeconds = 0
+        _phase2At = null
         _foes = []
         // What would be heard, on the physics steps: muted, logged
         game.logSounds = true
@@ -91,15 +92,18 @@ Item {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind") bench.whirlsStarted++
         })
-        for (let e of game.enemies.filter(alive)) {
-            let f = { ref: e, type: e.enemyType, tier: e.tier, lead: e.lead, hp: e.maxHp, lastHp: e.hp,
-                      lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
-                      hits: 0, openings: 0, opened: {} }
-            // A lead's openings by what broke its stance (Enemy.open)
-            e.opened.connect(cause => f.opened[cause] = (f.opened[cause] || 0) + 1)
-            _foes.push(f)
-        }
+        for (let e of game.enemies.filter(alive)) follow(e)
         return game.player !== null
+    }
+    // An enemy the bench follows from now on: from the start, or one that
+    // came later (the Warden's adds)
+    function follow(e) {
+        let f = { ref: e, type: e.enemyType, tier: e.tier, lead: e.lead, hp: e.maxHp, lastHp: e.hp,
+                  lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
+                  hits: 0, openings: 0, opened: {}, cameAt: steps > 0 ? now() : 0 }
+        // A lead's openings by what broke its stance (Enemy.open)
+        e.opened.connect(cause => f.opened[cause] = (f.opened[cause] || 0) + 1)
+        _foes.push(f)
     }
     // The sword level a knight usually has at depth d: the highest the
     // smith of a camp before it sold (the camp after depth c sells level L
@@ -167,6 +171,13 @@ Item {
             cancelledCharges: cancelledCharges,
             engagedSeconds: round3(engagedSeconds),
             killGaps: gaps,
+            // The Hollow Warden's fight (Balance.boss): when its phase 2
+            // began, the adds it called, the zones opened and the ones that
+            // hurt the knight
+            boss: game.bossFight.stage === "" ? null : {
+                stage: game.bossFight.stage, phase2At: _phase2At, adds: game.bossFight.addsCalled,
+                zones: game.bossFight.zonesOpened, zoneHits: game.bossFight.zoneHits
+            },
             enemies: foes,
             sounds: game.soundLog,
             music: game.musicTrace
@@ -184,9 +195,13 @@ Item {
     // seconds in which any enemy was engaged
     property var _foes: []
     property real engagedSeconds: 0
+    property var _phase2At: null
     readonly property var calm: ["patrol", "idle"]
     function track(dt) {
         let t = now(), engaged = false
+        for (let e of game.enemies)
+            if (alive(e) && !_foes.some(f => f.ref === e)) follow(e)
+        if (_phase2At === null && game.bossFight.phase === 2) _phase2At = t
         for (let f of _foes) {
             if (f.diedAt !== null) continue
             let e = f.ref
@@ -312,6 +327,32 @@ Item {
                                guardianChance: gd.crushChance, crushChance: Balance.enemy.crushChance})
     }
 
+    // ---- the Warden's room, tried as in the dojo (run_reload.py) ----
+    // The bossroom scenario stands: the knight at the Warden's door, the
+    // Warden asleep in its room (issue #274)
+    function bossRoomReady() {
+        return game.player !== null && game.bossFight.stage === "waiting"
+            && game.enemies.some(e => alive(e) && e.boss)
+    }
+    // Whether item it is on screen: its centre within the game's view
+    function onScreen(it) {
+        let c = it.mapToItem(game, it.width / 2, it.height / 2)
+        return c.x >= 0 && c.x <= game.width && c.y >= 0 && c.y <= game.height
+    }
+    // What a reload into the Warden's room shows: the room's way in and
+    // the Warden on screen, the Warden's HP and tempo against the table
+    // (Game.wardenHp, wardenTempo) for its appearance, as JSON
+    function tryBossRoom() {
+        let f = game.bossFight
+        let w = game.enemies.find(e => alive(e) && e.boss)
+        let g = f.gates.find(x => !x.exit)
+        let n = game.bossAppearance(game.depth)
+        return JSON.stringify({depth: game.depth, stage: f.stage, dormant: w.dormant,
+                               gateOnScreen: onScreen(g), wardenOnScreen: onScreen(w),
+                               hp: w.maxHp, wantHp: game.wardenHp(n, game.partyKnights, game.danger),
+                               tempo: w.tempo, wantTempo: game.wardenTempo(n), tableHp: Balance.boss.hp})
+    }
+
     // ---- a lead's stance, tried as in the dojo (run_reload.py) ----
     // The duel room stands: the knight and a lead
     function duelReady() {
@@ -425,6 +466,10 @@ Item {
     }
 
     function alive(e) { return e && e.destroyed === false }
+    // Where an enemy is reckoned from: a bigger one (the Warden) from the
+    // corner a common one at its centre would have (Enemy.aimXWu)
+    function ex(e) { return e.aimXWu !== undefined ? e.aimXWu : e.xWu }
+    function ey(e) { return e.aimYWu !== undefined ? e.aimYWu : e.yWu }
     function distTo(p, x, y) {
         let dx = x - p.xWu, dy = y - p.yWu
         return Math.sqrt(dx * dx + dy * dy)
@@ -447,9 +492,9 @@ Item {
     function stand(p) { p.moveX = 0; p.moveY = 0 }
     function winding(e) { return e.aiState === "telegraph" || e.aiState === "crush" || e.aiState === "lunge" }
     function nearest(p, foes) {
-        let target = foes[0], targetDist = distTo(p, target.xWu, target.yWu)
+        let target = foes[0], targetDist = distTo(p, ex(target), ey(target))
         for (let e of foes) {
-            let d = distTo(p, e.xWu, e.yWu)
+            let d = distTo(p, ex(e), ey(e))
             if (d < targetDist) { target = e; targetDist = d }
         }
         return { e: target, d: targetDist }
@@ -475,7 +520,7 @@ Item {
         for (let e of foes) {
             if (e.enemyType === "spitter") continue
             if (!winding(e)) continue
-            let d = distTo(p, e.xWu, e.yWu)
+            let d = distTo(p, ex(e), ey(e))
             if (d < 3.5 && d < threatDist) { threat = e; threatDist = d }
         }
         if (!threat) return null
@@ -519,6 +564,26 @@ Item {
         p.isBlocking = false
         return false
     }
+    // A zone of the Warden's (BossFight) warning under the knight: it
+    // walks straight out of it, away from its centre, the shield and the
+    // button let go. Returns whether it is on its way out
+    function leaveZone(p) {
+        let f = game.bossFight, t = f.now(), z = Balance.boss.zone
+        let cx = p.xWu + p.widthWu / 2, cy = p.yWu - p.heightWu / 2
+        for (let q of f.zones) {
+            if (t >= q.at) continue
+            let dx = cx - q.x, dy = cy - q.y, d = Math.sqrt(dx * dx + dy * dy)
+            if (d > z.radius + 0.6) continue
+            letGo(p)
+            p.isBlocking = false
+            if (d < 0.01) { dx = 1; dy = 0; d = 1 }
+            p.moveX = dx / d
+            p.moveY = -dy / d
+            return true
+        }
+        return false
+    }
+
     // A guardian's shield turns swings: a shield dash breaks its guard.
     // Returns whether the knight dashed
     function shieldDash(p, target, targetDist) {
@@ -630,11 +695,13 @@ Item {
         p.attack()
     }
 
-    // "skilled": every attack answered, swings only into openings
+    // "skilled": every attack answered, swings only into openings; it
+    // steps out of a floor zone of the Warden's while it warns
     function pilotSkilled(dt) {
         let p = game.player
         let foes = foesOrRest(p)
         if (!foes) return
+        if (leaveZone(p)) return
         let threat = answerThreat(p, foes, e => e.aiState === "crush" || e.crushing ? "perfect" : "parry")
         if (threat) {
             threat.answer()

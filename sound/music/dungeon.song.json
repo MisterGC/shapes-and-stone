@@ -20,7 +20,14 @@
     "kick": {"instrument": "kick"},
     "snare": {"instrument": "snare"},
     "horn": {"instrument": "brass"},
-    "brush": {"instrument": "brush"}
+    "brush": {"instrument": "brush"},
+    "heart": {"instrument": "kick"},
+    "drone": {"instrument": "pad"},
+    "low": {"instrument": "bass"},
+    "tick": {"instrument": "harp"},
+    "stab": {"instrument": "brass"},
+    "hit": {"instrument": "kick"},
+    "ring": {"instrument": "harp"}
   },
   "patterns": {
     "Dungeon": {
@@ -424,14 +431,110 @@
         {"t": 62.5, "note": 60, "dur": 0.475, "vel": 0.24},
         {"t": 63.5, "note": 60, "dur": 0.475, "vel": 0.4}
       ]
+    },
+    "Duel": {
+      "heart": [
+        {"t": 0.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 0.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 2.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 2.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 4.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 4.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 6.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 6.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 8.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 8.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 10.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 10.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 12.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 12.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 14.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 14.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 16.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 16.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 18.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 18.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 20.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 20.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 22.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 22.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 24.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 24.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 26.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 26.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 28.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 28.5, "note": 36, "dur": 0.475, "vel": 0.33},
+        {"t": 30.0, "note": 36, "dur": 0.475, "vel": 0.688},
+        {"t": 30.5, "note": 36, "dur": 0.475, "vel": 0.33}
+      ],
+      "drone": [
+        {"t": 0.0, "note": 57, "dur": 3.8, "vel": 0.6},
+        {"t": 0.0, "note": 64, "dur": 3.8, "vel": 0.6},
+        {"t": 4.0, "note": 57, "dur": 3.8, "vel": 0.6},
+        {"t": 4.0, "note": 64, "dur": 3.8, "vel": 0.6},
+        {"t": 8.0, "note": 53, "dur": 3.8, "vel": 0.6},
+        {"t": 8.0, "note": 60, "dur": 3.8, "vel": 0.6},
+        {"t": 12.0, "note": 52, "dur": 3.8, "vel": 0.6},
+        {"t": 12.0, "note": 59, "dur": 3.8, "vel": 0.6},
+        {"t": 16.0, "note": 57, "dur": 3.8, "vel": 0.6},
+        {"t": 16.0, "note": 64, "dur": 3.8, "vel": 0.6},
+        {"t": 20.0, "note": 57, "dur": 3.8, "vel": 0.6},
+        {"t": 20.0, "note": 64, "dur": 3.8, "vel": 0.6},
+        {"t": 24.0, "note": 50, "dur": 3.8, "vel": 0.6},
+        {"t": 24.0, "note": 57, "dur": 3.8, "vel": 0.6},
+        {"t": 28.0, "note": 52, "dur": 3.8, "vel": 0.6},
+        {"t": 28.0, "note": 59, "dur": 3.8, "vel": 0.6}
+      ],
+      "low": [
+        {"t": 0.0, "note": 33, "dur": 3.8, "vel": 0.45},
+        {"t": 4.0, "note": 33, "dur": 3.8, "vel": 0.45},
+        {"t": 8.0, "note": 29, "dur": 3.8, "vel": 0.45},
+        {"t": 12.0, "note": 28, "dur": 3.8, "vel": 0.45},
+        {"t": 16.0, "note": 33, "dur": 3.8, "vel": 0.45},
+        {"t": 20.0, "note": 33, "dur": 3.8, "vel": 0.45},
+        {"t": 24.0, "note": 38, "dur": 3.8, "vel": 0.45},
+        {"t": 28.0, "note": 28, "dur": 3.8, "vel": 0.45}
+      ],
+      "tick": [
+        {"t": 3.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 7.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 11.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 15.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 19.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 23.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 27.0, "note": 64, "dur": 0.475, "vel": 0.65},
+        {"t": 31.0, "note": 64, "dur": 0.475, "vel": 0.65}
+      ]
+    },
+    "Sting": {
+      "stab": [
+        {"t": 0.0, "note": 57, "dur": 0.475, "vel": 0.525},
+        {"t": 0.0, "note": 64, "dur": 0.475, "vel": 0.525},
+        {"t": 0.0, "note": 69, "dur": 0.475, "vel": 0.525}
+      ],
+      "hit": [
+        {"t": 0.0, "note": 36, "dur": 0.475, "vel": 0.375}
+      ],
+      "ring": [
+        {"t": 0.0, "note": 76, "dur": 0.2375, "vel": 0.5},
+        {"t": 0.25, "note": 81, "dur": 0.7125, "vel": 0.5}
+      ]
     }
   },
   "segments": {
-    "explore": {"sections": [{"pattern": "Dungeon"}]}
+    "flow": {"sections": [{"pattern": "Dungeon"}]},
+    "duel": {"sections": [{"pattern": "Duel"}]}
   },
-  "start": "explore",
+  "start": "flow",
   "layers": {
     "pulse": {"tracks": ["kick", "snare"], "intensity": [0.15, 0.5], "fade": 4.0},
     "battle": {"tracks": ["horn", "brush"], "intensity": [0.5, 1.0], "fade": 4.0}
+  },
+  "transitions": [
+    {"from": "flow", "to": "duel", "sync": "bar"},
+    {"from": "duel", "to": "flow", "sync": "bar"}
+  ],
+  "stingers": {
+    "sting": {"pattern": "Sting", "sync": "beat"}
   }
 }
