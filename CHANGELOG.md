@@ -8,6 +8,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [0.6.0] - 2026-11-14
 
+### Added
+
+- **A test pilot that plays like a person:** the fight bench has a pilot that answers an attack no sooner than a quarter of a second after it begins and mistimes one in five of its parries and perfect blocks. It plays a flow room, a duel with each kind of lead - a spitter lead's duel is new for it - and the Hollow Warden at depth 2, 5 and 8, and says whether it won and in how many seconds, so how hard a fight is can be judged before anyone plays it. The other test pilots and what they must pass stay as they were. ([#315](https://github.com/MisterGC/shapes-and-stone/issues/315))
+
 ### Changed
 
 - **A duel's slow motion comes from Clayground:** an opening slows the fight as before, and in co-op only the picture. Under it is now Clayground's own slow motion, which counts the game's clock, not the wall clock. The game no longer sets the physics speed itself, and its fight music bench checks on CI that the dungeon song moves to its duel part where no audio device plays it. ([#314](https://github.com/MisterGC/shapes-and-stone/issues/314))
