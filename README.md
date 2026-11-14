@@ -2072,10 +2072,9 @@ closes the view in to `duel.zoom` times its size round the knight, the HUD
 as it was. An opening plays a slow motion: the physics at
 `duel.slowScale` for `duel.slowTime` seconds of the physics clock, so a
 bench that steps the world sees it last the same steps on every run
-(Clayground's `hitStop()` ends on the wall clock; until clayground#506
-gives a slow motion of its own the game binds the physics' time scale
-itself). In a session the slow motion is the picture's, as the hit stop
-is, so the host's simulation never slows for the others; every screen
+(Clayground's `slowMotion()`, clayground#506). In a session the slow
+motion is the picture's, as the hit stop is, so the host's simulation
+never slows for the others; every screen
 follows its own knight's duel from the replicated `lead` and `aiState`,
 growls and stings for the openings near it.
 A perfect block sends a spitter's shot back too (issue #283, the table's

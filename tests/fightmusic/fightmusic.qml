@@ -18,12 +18,13 @@
 // its duel part, which the song moves to on the next bar where an audio
 // output runs it (with none its playhead stands, clayground#507, and the
 // segment is skipped); a parry in the duel and the lead's opening each
-// sting once, the opening plays the slow motion - the physics at
-// slowScale for slowTime of the physics clock, the same steps every run -
+// sting once, the opening plays ClayWorld2d's slow motion
+// (clayground#506) - the physics at slowScale for slowTime of the physics
+// clock, the same steps every run -
 // a lock on the lead closes the view in to duel.zoom round the knight, which
 // stays where it is on screen, a lock on an enemy that is no lead does not,
-// with hitStopMode "view" (a session's) the opening's slow motion is a hit
-// stop of the picture with the physics at full speed, and the lead's fall
+// with hitStopMode "view" (a session's) the opening's slow motion holds the
+// picture with the physics at full speed, and the lead's fall
 // brings the flow part back.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures.
@@ -272,15 +273,16 @@ Window {
             stings = game.soundLog.slice(from).filter(r => r.what === "sting")
             check(duelLead.opening && stings.length === 1, "the lead's opening stings: " + JSON.stringify(stings))
             let d = Balance.duel
-            check(game.slowing && Math.abs(game.slowLeft - d.slowTime) < 1e-9
+            let slow = game.clayInspect().slowMotion
+            check(game.slowMotionActive && Math.abs(slow.remainingMs - d.slowTime * 1000) < 1e-6
                   && Math.abs(game.physics.timeScale - Clayground.timeScale * d.slowScale) < 1e-6,
-                  "the opening plays the slow motion: the physics at " + game.physics.timeScale.toFixed(2)
-                  + " for " + game.slowLeft.toFixed(3) + " s of the physics clock")
+                  "the opening plays ClayWorld2d's slow motion: the physics at " + game.physics.timeScale.toFixed(2)
+                  + " for " + slow.remainingMs.toFixed(1) + " ms of the physics clock")
             let steps = Math.round(d.slowTime * 60)
             Clayground.physicsStep(steps - 1)
-            let still = game.slowing
+            let still = game.slowMotionActive
             Clayground.physicsStep(1)
-            check(still && !game.slowing && game.physics.timeScale === Clayground.timeScale,
+            check(still && !game.slowMotionActive && game.physics.timeScale === Clayground.timeScale,
                   "it ends on the " + steps + "th physics step (slowTime " + d.slowTime + " s), the time scale "
                   + game.physics.timeScale + " again")
             // A lock on the lead closes the view in round the knight
@@ -319,8 +321,8 @@ Window {
             game.player.lockTarget = null
             other.xWu = game.player.xWu + 40
             other.yWu = game.player.yWu + 40
-            // In a session the opening's slow motion is the picture's: a
-            // view hit stop, the simulation at full speed. The lead's
+            // In a session the opening's slow motion is the picture's: the
+            // picture held, the simulation at full speed. The lead's
             // opening runs out first, so it opens again
             Clayground.physicsStep(Math.ceil(Balance.lead.openingTime * 60) + 6)
             let wasOpen = duelLead.opening
@@ -328,11 +330,13 @@ Window {
             duelLead.xWu = game.player.xWu + 3
             duelLead.yWu = game.player.yWu
             duelLead.open("parry")
-            check(!wasOpen && duelLead.opening && game.hitStopActive && !game.slowing
+            check(!wasOpen && duelLead.opening && game.slowMotionActive && game.picture !== game.canvas
                   && game.physics.timeScale === Clayground.timeScale,
-                  "with hitStopMode view the opening's slow motion is a hit stop of the picture ("
-                  + game.hitStopActive + "), not of the physics: slowing " + game.slowing + ", time scale "
+                  "with hitStopMode view the opening's slow motion holds the picture ("
+                  + (game.picture !== game.canvas) + "), not the physics: time scale "
                   + game.physics.timeScale)
+            // It runs out on the physics clock before the bench goes on
+            Clayground.physicsStep(Math.ceil(Balance.duel.slowTime / Balance.duel.slowScale * 60) + 1)
             game.hitStopMode = "physics"
             // The lead falls: the flow part again
             duelLead.die()
