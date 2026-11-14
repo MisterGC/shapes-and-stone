@@ -5965,11 +5965,11 @@ ClayWorld2d {
     function bossAppearance(d) {
         return Math.max(0, Math.ceil((d + 1) / Balance.boss.every) - 1)
     }
-    // Its HP at appearance n for knights at danger d (0 when left out), and
-    // its tempo
+    // Its HP at appearance n for knights at danger d (0 when left out), the
+    // danger's depth.hp share counted up to boss.depthUpTo, and its tempo
     function wardenHp(n, knights, d) {
         let b = Balance.boss
-        return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + (d || 0) * Balance.depth.hp)
+        return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + Math.min(d || 0, b.depthUpTo) * Balance.depth.hp)
                           * (1 + _extraKnights(knights) * Balance.party.hpPerKnight))
     }
     function wardenTempo(n) { return 1 + n * Balance.boss.tempoGrow }

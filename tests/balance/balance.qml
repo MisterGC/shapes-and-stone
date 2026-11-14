@@ -68,7 +68,7 @@ Window {
     function hpOf(type, tier) {
         if (type === "warden") {
             let b = Balance.boss, n = game.bossAppearance(game.depth)
-            return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + game.danger * Balance.depth.hp))
+            return Math.round(b.hp * (1 + n * b.hpGrow) * (1 + Math.min(game.danger, b.depthUpTo) * Balance.depth.hp))
         }
         let base = Balance.enemy.tierHp[tier] + Balance.enemy[type].hpBonus
         // A lead has its type's leadHp share of it (issue #288)

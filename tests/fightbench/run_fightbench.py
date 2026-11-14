@@ -56,9 +56,11 @@ hit an enemy, what was heard - and, with --check, one PASS
 or FAIL line per band of Balance.pacing, and the chain's lines: in the
 flow fights' sound logs the death sound climbs over a 4-kill chain and
 falls back after a break, and each flow fight's counted chains are the
-ones its death sounds tell; in the boss room at Balance.pacing.bossDepth
-"skilled" kills the Warden within bossSkilled seconds of its engagement
-and does not fall, "masher" falls or takes at least bossSlow times as
+ones its death sounds tell; the boss room plays at
+Balance.pacing.bossDepths instead (2, 5 and 8, the Warden's first three
+appearances) unless --depths is given, and at each of them "skilled"
+kills the Warden within bossSkilled seconds of its engagement and does
+not fall, "masher" and "charge" fall or take at least bossSlow times as
 long. The skilled pilot steps out of a floor zone of the Warden's while
 it warns. --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
@@ -466,36 +468,39 @@ def check(results, bands):
 
 
 def check_boss(results, bands):
-    """The boss room's bands (issue #274): at bossDepth "skilled" kills the
-    Warden within bossSkilled seconds of its engagement and does not fall;
-    "masher" falls, or takes at least bossSlow times as long - or is still
-    at it when the fight was stopped that late"""
-    by = {r["answer"]: r for r in results if r["room"] == "boss" and r["depth"] == bands["bossDepth"]}
-    if not by:
-        return []
+    """The boss room's bands (issues #274, #289): at each of bossDepths
+    played "skilled" kills the Warden within bossSkilled seconds of its
+    engagement and does not fall; "masher" and "charge" fall, or take at
+    least bossSlow times as long - or are still at it when the fight was
+    stopped that late"""
     def warden(r):
         return next((e for e in r["enemies"] if e["type"] == "warden"), None)
-    out, depth, skilled_t = [], bands["bossDepth"], None
-    r = by.get("skilled")
-    if r:
-        w = warden(r)
-        t = w["ttkEngaged"] if w else None
-        lo, hi = bands["bossSkilled"]
-        skilled_t = t
-        ok = r["outcome"] != "fallen" and t is not None and lo <= t <= hi
-        what = "never died" if t is None else f"{t:.2f} s"
-        out.append((ok, f"boss depth {depth} skilled: kills the Warden in {lo}-{hi} s and does not fall "
-                        f"({what}, {r['outcome']})"))
-    r = by.get("masher")
-    if r:
-        w = warden(r)
-        t = w["ttkEngaged"] if w else None
-        least = bands["bossSlow"] * (skilled_t if skilled_t is not None else bands["bossSkilled"][0])
-        ok = r["outcome"] == "fallen" or (t is not None and t >= least) or (t is None and r["seconds"] >= least)
-        what = "fell" if r["outcome"] == "fallen" else f"alive after {r['seconds']:.2f} s" if t is None \
-            else f"{t:.2f} s"
-        out.append((ok, f"boss depth {depth} masher: falls or takes at least {bands['bossSlow']} times as "
-                        f"long as skilled, {least:.2f} s ({what})"))
+    out = []
+    for depth in bands["bossDepths"]:
+        by = {r["answer"]: r for r in results if r["room"] == "boss" and r["depth"] == depth}
+        skilled_t = None
+        r = by.get("skilled")
+        if r:
+            w = warden(r)
+            t = w["ttkEngaged"] if w else None
+            lo, hi = bands["bossSkilled"]
+            skilled_t = t
+            ok = r["outcome"] != "fallen" and t is not None and lo <= t <= hi
+            what = "never died" if t is None else f"{t:.2f} s"
+            out.append((ok, f"boss depth {depth} sword {r['sword']} skilled: kills the Warden in {lo}-{hi} s "
+                            f"and does not fall ({what}, {r['outcome']})"))
+        for pilot in ("masher", "charge"):
+            r = by.get(pilot)
+            if not r:
+                continue
+            w = warden(r)
+            t = w["ttkEngaged"] if w else None
+            least = bands["bossSlow"] * (skilled_t if skilled_t is not None else bands["bossSkilled"][0])
+            ok = r["outcome"] == "fallen" or (t is not None and t >= least) or (t is None and r["seconds"] >= least)
+            what = "fell" if r["outcome"] == "fallen" else f"alive after {r['seconds']:.2f} s" if t is None \
+                else f"{t:.2f} s"
+            out.append((ok, f"boss depth {depth} sword {r['sword']} {pilot}: falls or takes at least "
+                            f"{bands['bossSlow']} times as long as skilled, {least:.2f} s ({what})"))
     return out
 
 
@@ -536,16 +541,18 @@ def pacing(args, loader):
     answers = args.answers or list(PILOTS)
     fights = []
     # The depths are the game's own (Balance.pacing.depths), read as the
-    # bands are, unless given
-    depths = args.depths
+    # bands are, unless given; the boss room plays at its own,
+    # Balance.pacing.bossDepths (issue #289)
+    depths = boss_depths = args.depths
     if not depths:
         try:
-            depths = read_pacing(loader)["depths"]
+            p = read_pacing(loader)
         except FightError as e:
             print(f"FAIL {e}; logs in {e.logs}", file=sys.stderr)
             sys.exit(2)
+        depths, boss_depths = p["depths"], p.get("bossDepths") or p["depths"]
     for room in rooms:
-        for depth in depths:
+        for depth in (boss_depths if room == "boss" else depths):
             for answer in answers:
                 fights.append((room, depth, answer))
     results, errors = {}, []

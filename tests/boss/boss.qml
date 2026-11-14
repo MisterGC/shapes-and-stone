@@ -123,7 +123,7 @@ Window {
             let b = Balance.boss
             check(w.maxHp === hp && w.hp === hp && Math.abs(w.tempo - tempo) < 1e-9
                   && Math.abs(w.beatLen - b.beat / tempo) < 1e-9
-                  && Math.abs(hp - Math.round(b.hp * (1 + n * b.hpGrow) * (1 + game.danger * Balance.depth.hp))) <= 0,
+                  && Math.abs(hp - Math.round(b.hp * (1 + n * b.hpGrow) * (1 + Math.min(game.danger, b.depthUpTo) * Balance.depth.hp))) <= 0,
                   "depth " + d + ": appearance " + n + ", HP " + w.maxHp + " (table " + hp + "), tempo "
                   + r1(w.tempo * 100) / 100 + " (table " + tempo + "), a beat of " + r1(w.beatLen * 100) / 100 + " s")
             rows.push({d: d, hp: w.maxHp, tempo: w.tempo})
