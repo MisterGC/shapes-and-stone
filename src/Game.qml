@@ -4036,9 +4036,12 @@ ClayWorld2d {
     // the cards, 1 to 3 take one, Enter, Space or the talk key take the one
     // under the keys. Returns whether it was the choice's. The move keys
     // are the keyboard's stick, which reaches the choice as a pad's does
-    // (_padMenu), so they are not handled here too
+    // (_padMenu), so they are not handled here too - nor an arrow bound to
+    // the move left or right, which would move the choice twice
     function _specialKey(k) {
         let n = specialOffer.length
+        if (k === controlTable.key("moveLeft") || k === controlTable.key("moveRight"))
+            return false
         if (k === Qt.Key_Left)
             moveSpecial(-1)
         else if (k === Qt.Key_Right)
