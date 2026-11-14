@@ -144,7 +144,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -1900,6 +1900,28 @@ run out after it, and exits with the number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/hitstop/hitstop.qml
+```
+
+Entering a dungeon - a run's first and each one after a camp - opens with a
+descent intro: the depth and the dungeon's name for half a second, then a
+count of 3, 2, 1, half a second a beat, then Go. Until Go the world is held
+as under the solo pause: nothing moves, the knight's swing, shield, dash and
+whirlwind are refused and no blow lands on a knight or an enemy. Each beat
+plays the count's knock (`sfx/descent_count`), Go an octave up. The name is
+an adjective of the dungeon's danger band and a place, drawn from the
+level's seed, so in co-op every screen shows the same. In co-op the count
+starts once every knight has arrived in the dungeon, on the session clock,
+so it ends at the same moment on every screen; a knight not arrived after
+6 s holds the others no longer. The camp, the fight room and the dojo's
+scenarios have no intro. The lengths, the names and the wait are
+`Balance.intro`. The game's window and the dojo show it; a bench that
+builds the game itself goes on without unless it sets `descentIntro`, and
+the party benches turn it off. The descent bench steps through the intro
+alone and in a session of a host and a joiner in one process, checks the
+hold, the beats and its length, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/descent/descent.qml
 ```
 
 A grunt does not run straight in: from `enemy.circleRange` on it circles
