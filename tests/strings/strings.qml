@@ -200,6 +200,12 @@ Window {
         }
         e.halt()
         e.lead = false
+        // A spitter's last shots are still in flight: gone, so none of them
+        // reaches the knight in the next check
+        for (let id in game._shotById) {
+            let shot = game._shotById[id]
+            if (shot && !shot.destroyed) shot.vanish()
+        }
         Clayground.physicsStep(steps(Balance.knight.hurtGrace) + 1)
     }
 
