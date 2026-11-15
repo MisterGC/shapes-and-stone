@@ -1300,6 +1300,36 @@
       },
       "delivered": "2026-11-14T22:09:15.998192+00:00",
       "verdict": null
+    },
+    "sfx/bolt_shot": {
+      "category": "sfx",
+      "brief": "the bolt special: a blast leaves the knight along its aim, a dry crack and a bright zap falling away in pitch with a short whoosh behind it; once per bolt",
+      "mode": "live",
+      "source": "sfx/bolt_shot.sfx.json",
+      "render": "sfx/bolt_shot.wav",
+      "report": "sfx/bolt_shot.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-15T10:01:11.433627+00:00",
+      "verdict": null
+    },
+    "sfx/bolt_hit": {
+      "category": "sfx",
+      "brief": "the bolt special's hit: the blast bursts on the first enemy it meets, a snap and a low thud with a falling glint and a fizz after it; quieter where it ends at a wall; once per bolt that ends",
+      "mode": "live",
+      "source": "sfx/bolt_hit.sfx.json",
+      "render": "sfx/bolt_hit.wav",
+      "report": "sfx/bolt_hit.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-15T10:01:11.538478+00:00",
+      "verdict": null
     }
   }
 }
