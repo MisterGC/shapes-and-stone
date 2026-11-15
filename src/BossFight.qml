@@ -15,6 +15,12 @@ import QtQuick
 // shuts and opens its gates, shows the banners and draws the zones. A
 // zone hurts the knight of the screen that sees it hurt, as a trap does,
 // and the victory heals each screen's own knight.
+//
+// The Warden speaks (Balance.boss.lines, issue #323): its appearance's
+// line as its gates shut and another as it falls, on every screen as the
+// stage reaches it there, so in a session every screen hears the same
+// line; its words show under the banner. The line goes with the stage: it
+// holds up neither the Warden's waking nor the gates.
 Item {
     id: fight
 
@@ -51,6 +57,13 @@ Item {
     property int zonesOpened: 0
     // The zones that hurt this node's knight, and how much
     property int zoneHits: 0
+    // The Warden's line under way: its id and its words, and seconds since
+    // it began on the physics clock, so a pause holds its words; -1 for
+    // none. said: the ids of its lines so far in this room, for a bench
+    property string lineId: ""
+    property string lineText: ""
+    property real lineSeconds: -1
+    property var said: []
 
     signal began()
     signal won()
@@ -121,6 +134,10 @@ Item {
         zonesOpened = 0
         zoneHits = 0
         wonSeconds = -1
+        lineId = ""
+        lineText = ""
+        lineSeconds = -1
+        said = []
     }
 
     // Whether (x, y), wu, lies in the room, margin wu inside its walls
@@ -147,6 +164,7 @@ Item {
         }
         if (stage === "fight") fightSeconds += dt
         if (stage === "beaten") wonSeconds += dt
+        if (lineSeconds >= 0) lineSeconds += dt
         if (_owns()) {
             if (stage === "waiting" && _alive(warden) && _allInside()) _setStage("fight")
             if (stage === "fight" && phase === 2) _openZones()
@@ -169,6 +187,7 @@ Item {
             if (_alive(warden) && !warden.remote) warden.dormant = false
             fightSeconds = 0
             console.log("[BossFight] The Warden's room shuts:", Balance.boss.name)
+            _speak("gates")
             began()
         } else if (s === "beaten") {
             for (let id in _zoneItems) if (_zoneItems[id]) _zoneItems[id].destroy()
@@ -177,8 +196,20 @@ Item {
             wonSeconds = 0
             _heal()
             console.log("[BossFight] The Warden falls")
+            _speak("fall")
             won()
         }
+    }
+    // The Warden says its appearance's line for when, "gates" or "fall"
+    function _speak(when) {
+        let line = game.wardenLine(appearance, when)
+        if (!line) return
+        lineId = line.id
+        lineText = line.text
+        lineSeconds = 0
+        said = said.concat([line.id])
+        game.playWardenLine(line.id)
+        console.log("[BossFight] The Warden says:", line.text)
     }
     // Every knight healed to full HP and mana, a fallen one risen: each
     // screen its own
@@ -390,6 +421,24 @@ Item {
                 opacity: 0.8
             }
         }
+    }
+    // The Warden's words, under either banner
+    Text {
+        id: lineCaption
+        objectName: "bossLine"
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height * 0.2 + 96
+        width: Math.min(640, parent.width * 0.8)
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
+        visible: opacity > 0
+        opacity: fight.lineSeconds >= 0 ? fight._bannerAt(fight.lineSeconds, Balance.boss.lineShow) : 0
+        text: "\u201C" + fight.lineText + "\u201D"
+        color: "#D8CFBD"
+        style: Text.Outline
+        styleColor: "#000000"
+        font.pixelSize: 22
+        font.italic: true
     }
     // The victory banner
     Text {
