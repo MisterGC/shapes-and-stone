@@ -85,6 +85,7 @@ PhysicsItem {
     // glows pale. Fallen it settles, smaller and dull, and fades
     Item {
         id: look
+        objectName: "ballLook"
         anchors.fill: parent
         scale: ball.fallen ? 0.8 : 1
         opacity: 1
@@ -270,6 +271,11 @@ PhysicsItem {
     // its time starts again
     function turn(by, own, damage, x, y, dx, dy) {
         if (destroyed) return
+        // One that fell here before another screen's shield turned it
+        // there gets up again: no fade, no rest, seen whole
+        rest.stop()
+        fadeOut.stop()
+        look.opacity = 1
         fallen = false
         back = true
         ownBack = own
