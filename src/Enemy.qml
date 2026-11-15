@@ -174,6 +174,9 @@ PhysicsItem {
     // ("shot"), on beat
     signal struck(int beat, string kind)
     property string enemyType: "grunt"  // "grunt", "guardian", "spitter" or "warden"
+    // It shoots instead of lunging: it keeps its distance (kite), winds up
+    // a shot (aiState "shoot") and its strings are shots
+    readonly property bool ranged: enemyType === "spitter"
     // The Hollow Warden (Balance.boss, issue #274): a lead of its own type,
     // boss.size a side. tempo is its appearance's, set on spawn; phase 2
     // begins at boss.phaseAt of its max HP and plays boss.phase2Tempo
@@ -246,7 +249,7 @@ PhysicsItem {
     // instead of a lunge at this share of its attacks - aiState "crush",
     // a longer telegraph - and lunges as usual, with no parry window. Its
     // own chance, so a bench can set it; 0 for every other enemy
-    property real crushChance: tier === 2 && enemyType !== "spitter" && enemyType !== "warden"
+    property real crushChance: tier === 2 && !ranged && enemyType !== "warden"
                                ? Balance.enemy.crushChance : 0
     // The attack under way is a crushing blow, from its wind-up to its
     // landing; on every screen, from the replicated aiState
@@ -269,7 +272,7 @@ PhysicsItem {
                                       || aiState === "bash"
     readonly property color ringColor: parryWindow ? Balance.parryRing.flashColor
         : crushing ? Balance.crush.ringColor
-        : enemyType === "spitter" ? "#F2D13A" : "#FF8C00"
+        : ranged ? "#F2D13A" : "#FF8C00"
     // Seconds of a lunge after its first step until the parry window opens
     readonly property real _ringLunge: aiState === "shoot" || aiState === "bash" ? 0
         : Math.max(0, lungeStepCount(_ringStep) - 1 - Balance.enemy.parryFrames) * _ringStep
@@ -966,7 +969,7 @@ PhysicsItem {
             if ((aiState === "telegraph" || aiState === "lunge")
                     && gameWorld && gameWorld.playWardenToll)
                 gameWorld.playWardenToll(xWu, yWu, aiState === "lunge" ? "strike" : "windUp")
-        } else if (aiState === "telegraph" && enemyType !== "spitter"
+        } else if (aiState === "telegraph" && !ranged
                 && gameWorld && gameWorld.playScream)
             gameWorld.playScream(xWu, yWu, tier)
         if (aiState === "crush") {
@@ -1261,7 +1264,7 @@ PhysicsItem {
             aiState = "recovery"
             return
         }
-        let shot = enemyType === "spitter"
+        let shot = ranged
         let dx = target ? target.xWu - aimXWu : 0, dy = target ? target.yWu - aimYWu : 0
         let dist = Math.sqrt(dx * dx + dy * dy)
         if (!target || dist > (shot ? shootRange : l.reach + bulk) || (shot && !_sees(target))) {
@@ -1295,7 +1298,7 @@ PhysicsItem {
     // knight again; a spitter shoots again after its cooldown
     function _endString() {
         _clearString()
-        if (enemyType === "spitter") _shootTimer = shootCooldown
+        if (ranged) _shootTimer = shootCooldown
         body.linearVelocity = Qt.point(0, 0)
         aiState = "recovery"
         attackCooldown = Balance.lead.recovery
@@ -1419,8 +1422,8 @@ PhysicsItem {
                     break
                 }
             }
-            if (enemyType === "spitter") {
-                // Spitter transitions to kite when in range with LOS
+            if (ranged) {
+                // A shooter turns to kiting when in range with LOS
                 if (canSee && dist < shootRange) {
                     aiState = "kite"
                 } else if (_pathRecalcTimer <= 0) {
