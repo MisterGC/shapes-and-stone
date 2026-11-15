@@ -233,6 +233,8 @@ PhysicsItem {
 
     // Combat state
     property real attackCooldown: 0
+    // Thawed from a stun and not yet thought since (updateAI)
+    property bool _thawed: false
     property real _attackTimer: 0
     // Circling the knight (Balance.enemy.circle...): the time left, the way
     // round (1 or -1), and whether it has made up its mind to go in
@@ -1193,6 +1195,7 @@ PhysicsItem {
             if (_attackTimer <= 0) {
                 aiState = "chase"
                 _recalcChasePath()
+                _thawed = true
             } else {
                 body.linearVelocity = Qt.point(0, 0)
             }
@@ -1453,6 +1456,15 @@ PhysicsItem {
             _lastKnownTargetPos = _centreOf(target)
         } else {
             _unseenT += dt
+        }
+
+        // Thawed from a stun (Balance.stun) since its last thought: it
+        // chases, and its next attack waits for the thought after, so a
+        // think that falls on the thaw's own step does not wind up out of
+        // the freeze (issue #325, found with the swift boots)
+        if (_thawed) {
+            _thawed = false
+            if (aiState === "chase") return
         }
 
         switch (aiState) {
