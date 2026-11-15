@@ -8,7 +8,8 @@
 // special's button bashes for the stun's mana: the two freeze, the wind-up
 // is over, the third goes on; they show it - the frost rim, held breath -
 // and stand frozen for stun.freeze seconds to the step, unmoved, through a
-// blow too, never striking, then thaw into the chase. Short of the mana the
+// blow too, never striking, then thaw into the chase, and go on chasing or
+// circling, never into a blow. Short of the mana the
 // button bashes nothing. A frozen guardian's shield takes no blow from its
 // front, which it does unfrozen, and a shield push - the bash's shove and
 // stagger - leaves a frozen grunt frozen, unmoved, its freeze running on.
@@ -162,6 +163,14 @@ Window {
         let ax = a.xWu, ay = a.yWu, bx = b.xWu, by = b.yWu, hp = a.hp
         let n = Math.round(Balance.stun.freeze / stepS), frozenFor = -1, moved = 0, struck = false, into = []
         let hp0 = p.hp
+        // The state each one thaws into, as the thaw sets it: the AI's
+        // next think may follow on the same step, and when it does
+        // depends on how long the game ran before the bench paused it
+        let thawed = { a: "", b: "" }
+        let onA = () => { if (thawed.a === "" && a.aiState !== "frozen") thawed.a = a.aiState }
+        let onB = () => { if (thawed.b === "" && b.aiState !== "frozen") thawed.b = b.aiState }
+        a.aiStateChanged.connect(onA)
+        b.aiStateChanged.connect(onB)
         for (let i = 1; i <= n + 3; i++) {
             if (i === 10) a.takeDamage(1, p.xWu, p.yWu, false)
             if (i === 12) b.takeDamage(1, p.xWu, p.yWu, true)
@@ -171,16 +180,22 @@ Window {
                 if (a.aiState === "lunge" || b.aiState === "lunge" || a.parryWindow || b.parryWindow) struck = true
             } else if (frozenFor < 0) {
                 frozenFor = i
-                into = [a.aiState, b.aiState]
+                into = [thawed.a, thawed.b]
             }
         }
+        a.aiStateChanged.disconnect(onA)
+        b.aiStateChanged.disconnect(onB)
         check(Math.abs(frozenFor - n) <= 1, "they stand frozen for " + Balance.stun.freeze + " s, "
               + n + " steps, to the step (" + frozenFor + " steps)")
         check(moved < 1e-3 && a.hp < hp, "frozen they do not move, a blow and a charged one included ("
               + moved.toFixed(4) + " wu, HP " + hp + " -> " + a.hp + ")")
         check(!struck && p.hp === hp0, "frozen they never strike (the knight's HP " + hp0 + " -> " + p.hp + ")")
-        check(into.join() === "chase,chase", "then they thaw into the chase (" + into.join(", ")
-              + "), their AI going on (" + a.aiState + ", " + b.aiState + " 3 steps later)")
+        // Going on, a grunt within reach circles before it strikes: chase
+        // or circle, never a patrol or a blow straight out of the freeze
+        let onward = [a.aiState, b.aiState]
+        check(into.join() === "chase,chase" && onward.every(x => x === "chase" || x === "circle"),
+              "then they thaw into the chase (" + into.join(", ") + "), their AI going on, chasing or circling ("
+              + onward.join(", ") + " 3 steps later)")
         // Short of the mana: nothing
         p.mana = Balance.stun.mana - 1
         rec = g.fightRecord.stuns
