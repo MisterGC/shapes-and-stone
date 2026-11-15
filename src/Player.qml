@@ -107,6 +107,9 @@ PhysicsItem {
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
     readonly property bool fallen: hp <= 0
+    // The descent intro holds the world (issue #316): the knight neither
+    // swings, raises its shield, dashes nor whirls, and takes no blow
+    readonly property bool held: !!gameWorld && gameWorld.introHeld === true
 
     // In a session: the fallen ally this knight lifts up (its node's id,
     // "" for none) and how far, 0..1 (Game._stepRevive); a hit starts it
@@ -747,7 +750,7 @@ PhysicsItem {
     // throws the knight back along; without it, from the attacker's centre
     // through the knight's.
     function takeDamage(amount, attackerX, attackerY, attackerSize, crush, alongX, alongY) {
-        if (fallen) return "ignored"
+        if (fallen || held) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
@@ -793,7 +796,7 @@ PhysicsItem {
     // lands whole, no defence, shield or grace takes any of it, and a
     // dash under way avoids it all. "hit", "dodged" or "ignored"
     function takeTrapDamage(amount) {
-        if (fallen) return "ignored"
+        if (fallen || held) return "ignored"
         if (isDashing) return "dodged"
         hp = Math.max(0, hp - amount)
         _cancelCharge()
@@ -968,7 +971,7 @@ PhysicsItem {
     // The right button: raises the shield, or, with no mana, answers with
     // a dull click and the mana bar's flash so it is no dead input
     function raiseShield() {
-        if (fallen) return
+        if (fallen || held) return
         _shieldWanted = true
         // Broken by a crushing blow, or open after a charged swing that
         // missed: it rises when that is over
@@ -1098,7 +1101,7 @@ PhysicsItem {
     // A dash costs dashMana; it cancels a charge. Open after a charged
     // swing that missed, the knight does not dash
     function dash() {
-        if (fallen || dashCooldown > 0 || isDashing || openLeft > 0) return
+        if (fallen || held || dashCooldown > 0 || isDashing || openLeft > 0) return
         if (!_aimDash() || !_afford(dashMana)) return
         _spend(dashMana)
         _startDash()
@@ -1108,7 +1111,7 @@ PhysicsItem {
     // momentum the pips flash, short of the mana the bar does; either way
     // nothing else happens. Returns whether it whirled
     function unleash() {
-        if (fallen || isDashing || openLeft > 0) return false
+        if (fallen || held || isDashing || openLeft > 0) return false
         if (momentum < Balance.momentum.max) {
             momentumShort()
             return false
@@ -1144,7 +1147,7 @@ PhysicsItem {
     }
 
     function attack() {
-        if (!fallen && attackCooldown <= 0 && !isAttacking) {
+        if (!fallen && !held && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
             isHeavy = false
             _swingTimer = attackDuration + Balance.knight.swingFade
@@ -1168,7 +1171,7 @@ PhysicsItem {
     // followed by knight.heavyRecovery seconds before the next swing once
     // its arc has faded. Returns whether it swung
     function heavyAttack() {
-        if (fallen || attackCooldown > 0 || isAttacking) return false
+        if (fallen || held || attackCooldown > 0 || isAttacking) return false
         isAttacking = true
         isHeavy = true
         _heavyLanded = false
@@ -1194,7 +1197,7 @@ PhysicsItem {
     // a pause or a hit stop holds the charge. Game.qml hands the mouse
     // button's events to pressSwing() and releaseSwing(); a bench can call
     // them without one.
-    function pressSwing(mouse) { return swingInput.press(mouse) }
+    function pressSwing(mouse) { return held ? false : swingInput.press(mouse) }
     function releaseSwing(mouse) { return swingInput.release(mouse) }
     // The button is let go of without a swing: a menu took the input
     function dropSwing() {

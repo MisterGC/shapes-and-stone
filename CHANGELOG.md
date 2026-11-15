@@ -10,6 +10,7 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A dungeon opens with a descent intro:** entering a dungeon shows its depth and a name for it - *The Cold Galleries*, *The Scorched Crypts* - then counts 3, 2, 1 with a stone-drum knock on each beat and Go an octave up, two seconds in all. Until Go nothing moves and nothing strikes or takes damage, so a fight never starts before you can see the room. In co-op the count starts once every knight has arrived and ends at the same moment on every screen; a knight not there after 6 s holds the others no longer. The camp has no intro. The count's sound waits for a verdict by ear. ([#316](https://github.com/MisterGC/shapes-and-stone/issues/316))
 - **A test pilot that plays like a person:** the fight bench has a pilot that answers an attack no sooner than a quarter of a second after it begins and mistimes one in five of its parries and perfect blocks. It plays a flow room, a duel with each kind of lead - a spitter lead's duel is new for it - and the Hollow Warden at depth 2, 5 and 8, and says whether it won and in how many seconds, so how hard a fight is can be judged before anyone plays it. The other test pilots and what they must pass stay as they were. ([#315](https://github.com/MisterGC/shapes-and-stone/issues/315))
 
 ### Changed

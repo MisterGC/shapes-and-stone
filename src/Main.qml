@@ -16,6 +16,8 @@ Window {
 
     Game {
         anchors.fill: parent
+        // Each dungeon opens with its depth, its name and a count (issue #316)
+        descentIntro: true
         Component.onCompleted: console.log("[Main] Game component loaded")
     }
 }

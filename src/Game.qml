@@ -1009,6 +1009,7 @@ ClayWorld2d {
         onRecordBroken: (banner) => _hostRecordBroken(banner)
         onNameEdited: (name) => world.playerName = name
         onAdvanceRequested: _hostAdvanceLevel()
+        onArrivalReported: (fromId, seed, level) => _introArrival(fromId, seed, level)
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
         onImpactReceived: (kind, x, y, dx, dy, color) => {
@@ -1715,12 +1716,14 @@ ClayWorld2d {
     onOverlayUpChanged: if (!overlayUp) world.forceActiveFocus()
     // Paused by stopping the world: the first step after resuming is one
     // frame long, not the whole pause (clayground#338), so no cooldown or
-    // AI timer runs out on it.
+    // AI timer runs out on it. The descent intro holds the world the same
+    // way, in a session too: there every screen holds until the same
+    // moment
     Binding {
         target: world.physics
         property: "running"
         value: false
-        when: world.gamePaused
+        when: world.gamePaused || world.introHeld
         restoreMode: Binding.RestoreBindingOrValue
     }
     components: []
@@ -1781,6 +1784,7 @@ ClayWorld2d {
         runSecrets = 0
         runStartRecord = ownRecord.depth
         recordPassed = false
+        _recordWaits = false
     }
     function _today() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
     // The knights of this run: alone this one, in a session every node's
@@ -1812,7 +1816,15 @@ ClayWorld2d {
         recordPassed = true
         if (banner && screen === "game") _raiseRecordBanner()
     }
-    function _raiseRecordBanner() {
+    // A record passed while a level is built or its descent intro holds
+    // waits for its Go, or, in a level without an intro, for the level to
+    // stand (_recordAfterIntro). now raises it whatever
+    property bool _recordWaits: false
+    function _raiseRecordBanner(now) {
+        if (!now && (resetting || _building || introHeld)) {
+            _recordWaits = true
+            return
+        }
         recordBannerShow.restart()
         recordChime.step = 0
         recordChime.restart()
@@ -1895,6 +1907,7 @@ ClayWorld2d {
                 dungeonAmbience.start()
                 dungeonMusic.start()
                 generateDungeon()
+                _beginIntro()
             }
             // Alone the dungeon master sets the first dungeon here, in a
             // session the host did before the start
@@ -2876,6 +2889,87 @@ ClayWorld2d {
         PauseAnimation { duration: Math.max(0, Balance.record.banner - 2 * Balance.record.fade) * 1000 }
         NumberAnimation { target: recordBannerText; property: "opacity"; to: 0; duration: Balance.record.fade * 1000 }
     }
+
+    // The descent intro (issue #316): the dungeon's depth and name, under
+    // them the count, then Go
+    Item {
+        id: introPanel
+        objectName: "descentIntro"
+        anchors.fill: parent
+        z: 1000
+        visible: world.introOn && (world.introHeld || introGoText.opacity > 0)
+        Column {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.2
+            spacing: 6
+            opacity: world.introHeld ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Balance.intro.fade * 1000 } }
+            Text {
+                objectName: "introDepth"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Depth " + world.depth
+                color: "#DDDDDD"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 20
+                font.bold: true
+                font.letterSpacing: 4
+            }
+            Text {
+                objectName: "introName"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: world.dungeonName
+                color: "#E8C35A"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 40
+                font.bold: true
+                font.letterSpacing: 2
+            }
+            Text {
+                objectName: "introWait"
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: world.introWaiting
+                         && world.introClock - world.introArrivedAt > Balance.intro.waitNote * 1000
+                text: "Waiting for the party"
+                color: "#AAAAAA"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 16
+            }
+        }
+        Text {
+            objectName: "introCount"
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.36
+            visible: world.introBeat > 0
+            text: String(world.introBeat)
+            color: "#FFFFFF"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 72
+            font.bold: true
+        }
+        Text {
+            id: introGoText
+            objectName: "introGo"
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.36
+            opacity: 0
+            text: "Go"
+            color: "#E8C35A"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 72
+            font.bold: true
+        }
+    }
+    SequentialAnimation {
+        id: introGoShow
+        PropertyAction { target: introGoText; property: "opacity"; value: 1 }
+        PauseAnimation { duration: Balance.intro.go * 500 }
+        NumberAnimation { target: introGoText; property: "opacity"; to: 0; duration: Balance.intro.go * 500 }
+    }
     SfxPlayer {
         id: recordChimeSound
         source: "../sound/sfx/menu_confirm.sfx.json"
@@ -3351,6 +3445,7 @@ ClayWorld2d {
         levelType = "dungeon"
         _startRunRecord()
         generateDungeon()
+        _beginIntro()
         minimap.requestPaint()
     }
 
@@ -3636,7 +3731,10 @@ ClayWorld2d {
     // for, the host's in a session; alone they are settled here, before
     // the knight and its record are gone. d.master is the dungeon's
     // overrides, the dungeon master's
+    // True while _enterLevel builds the next level
+    property bool _building: false
     function _enterLevel(newIndex, d) {
+        _building = true
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
                                  potions: player.potions, draughts: player.draughts, creel: player.creel,
@@ -3669,6 +3767,149 @@ ClayWorld2d {
         }
         // A knight still down when the party reaches the camp rises there
         if (session.connected && levelType === "village") _rise("camp")
+        _building = false
+        _beginIntro()
+    }
+
+    // --- The descent intro (issue #316) ---
+    // Entering a dungeon - a run's first and each after a camp - shows its
+    // depth and its name and counts 3, 2, 1 (Balance.intro) while the
+    // world is held: the physics stops as under the solo pause, the
+    // knight's swing, shield, dash and whirlwind are refused and no blow
+    // lands on a knight or an enemy. The camp, the fight room and the
+    // dojo's scenarios have none. The game's own windows show it - Main.qml
+    // and the dojo; a bench that builds the game itself turns it on to
+    // test it, the others go on without
+    property bool descentIntro: Clayground.runsInSandbox
+    // The level the intro is for, -1 for none
+    property int introLevel: -1
+    // When its lead - the depth and the name alone - began on the intro
+    // clock, ms; -1 while this node waits for the party
+    property real introStartsAt: -1
+    // The intro clock, ms: alone it runs while the game is not paused, in
+    // a session it is the session clock
+    property real introClock: 0
+    // When this node arrived in the dungeon, on the intro clock
+    property real introArrivedAt: 0
+    readonly property real introSeconds: Balance.intro.lead + Balance.intro.beats * Balance.intro.beat
+    readonly property bool introOn: introLevel >= 0 && introLevel === levelIndex && levelType === "dungeon"
+                                    && !fightRoomActive && screen === "game"
+    readonly property bool introWaiting: introOn && introStartsAt < 0
+    readonly property bool introHeld: introOn && (introStartsAt < 0 || introClock < introStartsAt + introSeconds * 1000)
+    // The beat counted now: 3, 2 and 1 in the count, 0 in the lead, while
+    // waiting and once it is over
+    readonly property int introBeat: {
+        if (!introHeld || introStartsAt < 0) return 0
+        let t = (introClock - introStartsAt) / 1000 - Balance.intro.lead
+        return t < 0 ? 0 : Math.max(1, Balance.intro.beats - Math.floor(t / Balance.intro.beat))
+    }
+    // The dungeon's name, the same on every screen of a session
+    readonly property string dungeonName: dungeonNameOf(levelSeedNow(), dangerBand(dangerPosition))
+    function dungeonNameOf(seed, band) {
+        let rand = createRng(seed ^ Balance.intro.salt)
+        let a = Balance.intro.adjectives[band], p = Balance.intro.places
+        let adjective = a[Math.floor(rand() * a.length)]
+        return "The " + adjective + " " + p[Math.floor(rand() * p.length)]
+    }
+    // A dungeon is built: its intro begins, alone at once, in a session
+    // once the host says every knight is there
+    function _beginIntro() {
+        if (!descentIntro || levelType !== "dungeon" || fightRoomActive) {
+            introLevel = -1
+            _recordAfterIntro()
+            return
+        }
+        introStartsAt = -1
+        introClock = session.connected ? session.now() : 0
+        introArrivedAt = introClock
+        introLevel = levelIndex
+        if (!session.connected) {
+            introStartsAt = 0
+            return
+        }
+        _introFromHost()
+        if (introStartsAt >= 0) return
+        if (session.isHost) _introCheck()
+        else session.reportArrival(session.runSeed, levelIndex)
+    }
+    // Host: the knights that arrived in each dungeon ("seed:level" ->
+    // {nodeId: true}), until its count is set
+    property var _introArrivals: ({})
+    function _introArrival(fromId, seed, level) {
+        let key = seed + ":" + level
+        let a = _introArrivals[key] || {}
+        a[fromId] = true
+        _introArrivals[key] = a
+        _introCheck()
+    }
+    // Host: once every knight has arrived, or the wait is over, the count
+    // starts on every screen at the same moment of the session clock
+    function _introCheck() {
+        if (!session.connected || !session.isHost || !introWaiting) return
+        let a = _introArrivals[session.runSeed + ":" + levelIndex] || {}
+        let all = session.nodeIds().every(id => id === session.nodeId || a[id] === true)
+        if (!all && session.now() < introArrivedAt + Balance.intro.waitMax * 1000) return
+        let at = session.now() + Balance.intro.lag * 1000
+        _introArrivals = ({})
+        session.publishIntro({ seed: session.runSeed, level: levelIndex, at: at })
+        introStartsAt = at
+        console.log("[Game] Descent intro of level", levelIndex, all ? "for every knight" : "without a knight not arrived")
+    }
+    // A joiner: the host's count for the dungeon it waits in
+    readonly property var _hostIntro: session.intro
+    on_HostIntroChanged: _introFromHost()
+    function _introFromHost() {
+        let v = session.intro
+        if (!introWaiting || !v || v.seed !== session.runSeed || v.level !== introLevel) return
+        introStartsAt = v.at
+    }
+    function _stepIntro() {
+        if (session.connected) {
+            introClock = session.now()
+            _introCheck()
+            return
+        }
+        let now = Date.now()
+        // A stall of the frames holds the count rather than skip a beat
+        if (!gamePaused) introClock += Math.max(0, Math.min(Balance.intro.maxStep * 1000, now - introTick.last))
+        introTick.last = now
+    }
+    Timer {
+        id: introTick
+        property real last: 0
+        interval: 16
+        repeat: true
+        running: world.introHeld
+        onRunningChanged: last = Date.now()
+        onTriggered: world._stepIntro()
+    }
+    onIntroBeatChanged: if (introBeat > 0) _playIntroBeat(0, "beat" + introBeat)
+    onIntroHeldChanged: {
+        if (introHeld) return
+        // Released: Go, unless the count is long over (a knight that
+        // joins the run in this dungeon)
+        if (introOn && introStartsAt >= 0
+                && introClock <= introStartsAt + (introSeconds + Balance.intro.go) * 1000) {
+            _playIntroBeat(Balance.intro.goPitch, "go")
+            introGoShow.restart()
+        }
+        if (screen === "game") _recordAfterIntro()
+    }
+    // The record's banner that waited, once no intro holds
+    function _recordAfterIntro() {
+        if (!_recordWaits || introHeld) return
+        _recordWaits = false
+        _raiseRecordBanner(true)
+    }
+    // The count's knock: the beats on its own pitch, the release up
+    SfxPlayer {
+        id: introCountSound
+        source: "../sound/sfx/descent_count.sfx.json"
+        volume: muted ? 0 : Balance.intro.volume * soundVolume
+    }
+    function _playIntroBeat(pitch, what) {
+        introCountSound.play(1, pitch)
+        logSound("sfx/descent_count", what, pitch, 0, 1)
     }
 
     // Component factories

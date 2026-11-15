@@ -40,6 +40,9 @@ Item {
     signal levelChanged(int levelIndex, real position, real next, int knights, var dm)
     // Host only: a player reached the exit, the host decides to advance
     signal advanceRequested()
+    // Host: a node's knight arrived in the dungeon level of the run seed,
+    // its descent intro waiting for the party (issue #316)
+    signal arrivalReported(string fromId, int seed, int level)
     // The host pressed start in the lobby; the game picks the seed and
     // calls start()
     signal lobbyStartRequested()
@@ -215,6 +218,11 @@ Item {
     property bool _leaving: false
     // The host's dungeon master panel is up (the session property
     // "mastering"): the joiners wait for the next dungeon and are told so
+    // The descent intro's count of the dungeon the host plays, the session
+    // property "intro" ({seed, level, at}): it starts at at on the session
+    // clock on every screen; null before any (issue #316)
+    readonly property var intro: net.connected && net.sessionProperties.intro
+                                 ? net.sessionProperties.intro : null
     readonly property bool mastering: net.connected && net.sessionProperties.mastering === true
     function setMastering(on) {
         if (net.connected && net.isHost) net.setSessionProperty("mastering", on)
@@ -308,6 +316,8 @@ Item {
                 if (!net.isHost) session.recordBroken(data.banner === true)
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
+            } else if (data.type === "arrived") {
+                if (net.isHost) session.arrivalReported(fromId, data.seed, data.level)
             } else if (data.type === "exitReached") {
                 // Host is level authority: any player reaching the exit
                 // advances the whole session
@@ -504,6 +514,20 @@ Item {
         else
             net.broadcast({type: "exitReached"})
     }
+
+    // This node's knight arrived in the dungeon level of the run seed: the
+    // host starts its descent intro once every knight has (issue #316)
+    function reportArrival(seed, level) {
+        if (!net.connected) return
+        if (net.isHost) arrivalReported(net.nodeId, seed, level)
+        else net.sendTo(net.hostId, {type: "arrived", seed: seed, level: level})
+    }
+    // Host: the count of the descent intro, for every screen
+    function publishIntro(v) {
+        if (net.isHost) net.setSessionProperty("intro", v)
+    }
+    // The nodes of the session, as the network lists them
+    function nodeIds() { return net.connected ? net.nodes : [] }
 
     // Leave the session, e.g. for the title after the knight has fallen
     function leave() {
