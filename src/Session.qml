@@ -70,8 +70,8 @@ Item {
     // A spitter of the host's fired (id, x, y, dx, dy, damage)
     signal shotReceived(var shot)
     // Another node's knight let a bolt loose (Balance.bolt): bolt.id, its
-    // start (x, y) and way (dx, dy); and where one ended on that node,
-    // bolt.id at (x, y)
+    // start (x, y) and way (dx, dy); and where and how one ended on that
+    // node, bolt.id at (x, y), bolt.how "enemy", "wall" or "reach"
     signal boltReceived(string fromId, var bolt)
     signal boltEndReceived(string fromId, var bolt)
     // The host owns every gold drop as a replicated object of type "gold",

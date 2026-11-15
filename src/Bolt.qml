@@ -27,9 +27,9 @@ PhysicsItem {
     property bool destroyed: false
     // How far its centre is from where it began
     property real travelled: 0
-    // It ended on this screen: how - "enemy", "wall", "reach" or "report"
-    // (the firing node said where) - the enemy it met, null for none, and
-    // the damage it dealt there
+    // It ended on this screen: how - "enemy", "wall" or "reach", or as the
+    // firing node said when its report came first (Game._boltEndReported)
+    // - the enemy it met, null for none, and the damage it dealt there
     signal ended(string how, var enemy, int dealt)
 
     widthWu: Balance.bolt.size

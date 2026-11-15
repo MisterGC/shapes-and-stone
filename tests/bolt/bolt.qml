@@ -18,8 +18,10 @@
 // joiner's bolt flies through the host's knight to an enemy the host runs
 // - it flies on the host's screen too, the host's enemy loses the bolt's
 // damage once, and neither knight is hurt - and the host's bolt through
-// the joiner's knight the same way. Muted. Prints one PASS or FAIL line per
-// check and exits with the number of failures.
+// the joiner's knight the same way; and a joiner's bolt with nothing in
+// line fades at its reach on both screens, no hit heard on the host's.
+// Muted. Prints one PASS or FAIL line per check and exits with the number
+// of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/bolt/bolt.qml
 
@@ -359,6 +361,8 @@ Window {
               "it hurts no knight, the one in its line included (HP " + host.player.hp + ", " + joiner.player.hp + ")")
     }
     property int hpT: 0
+    // How far the session's bolt with nothing in line flies on its screen
+    readonly property real fadeAt: 1.5
 
     property var soloSteps: [
         [() => solo.screen === "title", () => solo.applyScenario("flow", 0)],
@@ -415,6 +419,27 @@ Window {
         [1200, () => {
             sampler.stop()
             checkShot("host", hostEnds, joinEnds, seen.joiner, idU, boltDamage(host.player, byId(host)[idU] || {def: 0}), hpT)
+            // A bolt with nothing in line: the joiner's shot up, its reach
+            // cut to fadeAt wu so it fades before any wall; the host's copy,
+            // still flying, ends that way when the report comes
+            hostEnds = []; joinEnds = []
+            host.logSounds = true
+            host.clearSoundLog()
+            let jp = joiner.player
+            jp.mana = jp.maxMana
+            aim(jp, 90)
+            let went = jp.unleash()
+            for (let id in joiner._boltById) if (joiner._boltById[id].own) joiner._boltById[id].reach = fadeAt
+            check(went, "the joiner's knight lets a bolt loose with nothing in line")
+        }],
+        [800, () => {
+            let o = joinEnds.filter(x => x.own), t = hostEnds.filter(x => !x.own)
+            let hits = host.soundLog.filter(x => x.cue === "sfx/bolt_hit")
+            check(o.length === 1 && o[0].how === "reach" && t.length === 1 && t[0].how === "reach" && hits.length === 0,
+                  "a bolt that fades at its reach fades on the other screen too, no hit heard there ("
+                  + o.map(x => x.how).join(", ") + " / " + t.map(x => x.how).join(", ") + ", sfx/bolt_hit "
+                  + hits.length + " times)")
+            host.logSounds = false
             hostNet.leave()
             joinNet.leave()
         }],

@@ -6669,12 +6669,13 @@ ClayWorld2d {
     // the others, which fly it under the firing node's id to be seen. It
     // hurts no knight anywhere. Each screen ends it at the first enemy or
     // wall it meets there, or past its reach; the firing node tells the
-    // others where it ended, and a bolt still flying on another screen
-    // ends there then
+    // others where and how it ended, and a bolt still flying on another
+    // screen ends there that way then
     property int _boltCount: 0
     property var _boltById: ({})
-    // A bolt ended on this screen: its id, how ("enemy", "wall", "reach"
-    // or "report"), the enemy it met or null, the damage it dealt, where
+    // A bolt ended on this screen: its id, how ("enemy", "wall" or
+    // "reach", on another screen as the firing node said when its report
+    // came first), the enemy it met or null, the damage it dealt, where
     // its centre was, how far it had flown, and whether it was this
     // screen's knight's
     signal boltEnded(string boltId, string how, var enemy, int dealt, real x, real y,
@@ -6710,8 +6711,8 @@ ClayWorld2d {
         return b
     }
     // Bolt b ended here: sparks and its hit where it met an enemy or a
-    // wall; the own one counts its hit, shows its damage and tells the
-    // others where it ended
+    // wall, past its reach it fades without either; the own one counts its
+    // hit, shows its damage and tells the others where and how it ended
     function _boltEnd(b, how, enemy, dealt) {
         let id = b.boltId, x = b.centreX, y = b.centreY
         if (_boltById[id] === b) delete _boltById[id]
@@ -6719,7 +6720,7 @@ ClayWorld2d {
         if (fx && how !== "reach")
             spawnSparks(x, y, -b.dirX, -b.dirY, bo.sparks, bo.coreColor)
         if (fx) spawnRing(x, y, bo.color, how === "enemy" ? 1.0 : 0.6)
-        if (how === "enemy" || how === "wall" || how === "report") {
+        if (how === "enemy" || how === "wall") {
             let gain = b.own ? 1 : remoteGain(x, y)
             if (how !== "enemy") gain *= bo.wallGain
             if (gain > 0) playBoltHit(gain, x, y)
@@ -6730,12 +6731,13 @@ ClayWorld2d {
                 spawnDamageNumber(enemy.xWu, enemy.yWu, dealt, bo.coreColor)
                 if (fx) _trauma(bo.trauma)
             }
-            session.endBolt({id: id, x: x, y: y})
+            session.endBolt({id: id, x: x, y: y, how: how})
         }
         console.log("[Game] Bolt", id, "ended:", how, "after", b.travelled.toFixed(2), "wu")
         boltEnded(id, how, enemy, dealt, x, y, b.travelled, b.own)
     }
-    // The firing node's bolt ended at (x, y): here too, if it flies still
+    // The firing node's bolt ended at (x, y), at an enemy, a wall or its
+    // reach (how): here too, that way, if it flies still
     function _boltEndReported(r) {
         let b = _boltById[r.id]
         delete _boltById[r.id]
@@ -6744,7 +6746,7 @@ ClayWorld2d {
         } catch (err) { return }
         b.xWu = r.x - b.widthWu / 2
         b.yWu = r.y + b.heightWu / 2
-        b.end("report", null, 0)
+        b.end(r.how === "enemy" || r.how === "wall" ? r.how : "reach", null, 0)
     }
 
     function spawnSpitParticles(wx, wy) {
