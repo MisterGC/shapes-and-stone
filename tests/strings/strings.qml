@@ -1,6 +1,7 @@
 // Strings bench - a room's lead strikes in strings (issue #272).
 //
-// In the fight room each lead type - grunt, guardian, spitter - strikes
+// In the fight room each lead type - grunt, guardian, spitter, and in the
+// ball duel the slinger (issue #322) - strikes
 // every string of its own (Balance.lead.strings) at the knight, which
 // stands with its shield up, the bench stepping the world one physics
 // step at a time. Every strike or feint beat gets its blow - a lunge or a
@@ -99,6 +100,9 @@ Window {
         e.beginString(i, false)
         while (e.stringName !== "" && n < 1200) {
             hold(p, e, x, y, true)
+            // A metal ball the shield bounced would open the slinger it
+            // meets and end its string: gone at once
+            vanishBalls(true)
             Clayground.physicsStep(1)
             rows.push({state: e.aiState, window: e.parryWindow, ring: e.ringProgress,
                        held: e.feinting, beat: e._beat})
@@ -122,7 +126,7 @@ Window {
     function checkString(type, i) {
         let l = Balance.lead
         let s = l.strings[type][i]
-        let melee = type !== "spitter"
+        let melee = type !== "spitter" && type !== "slinger"
         let e = leadOf(type, melee ? 1.5 : 4)
         let r = play(e, i)
         let tag = type + " string \"" + s.name + "\" [" + s.beats.join(", ") + "]"
@@ -188,15 +192,25 @@ Window {
                   + steps(l.feintHold) + " by lead.feintHold), its ring at " + l.feintRing
                   + " and no window open (" + flat.length + " of " + held.length + ")")
         }
-        // A rest is a recovery a beat long
-        let rests = s.beats.filter(b => b === 0).length
+        // A rest is a recovery a beat long: those before the last blow,
+        // and those after it, which the slinger's strings end on (issue
+        // #322), till the string is over
+        let lastK = strikes.length ? strikes[strikes.length - 1].k : -1
+        let rests = s.beats.filter((b, k) => b === 0 && k < lastK).length
+        let after = s.beats.filter((b, k) => b === 0 && k > lastK).length
+        let lastStep = r.blows.length ? r.blows[r.blows.length - 1].step : 0
         if (rests > 0) {
-            let still = runs(r.rows.slice(0, r.blows.length ? r.blows[r.blows.length - 1].step : 0),
-                             x => x.state === "recovery")
+            let still = runs(r.rows.slice(0, lastStep), x => x.state === "recovery")
             let len = still.reduce((a, h) => a + h[1] - h[0] + 1, 0)
             check(Math.abs(len - rests * steps(l.beat)) <= rests,
                   tag + ": its " + rests + " rests stand " + len + " steps (" + rests * steps(l.beat)
                   + " by lead.beat)")
+        }
+        if (after > 0) {
+            let len = r.rows.slice(lastStep + 1).filter(x => x.state === "recovery" && x.beat >= 0).length
+            check(Math.abs(len - after * steps(l.beat)) <= after,
+                  tag + ": its " + after + " rests after the last blow stand " + len + " steps ("
+                  + after * steps(l.beat) + " by lead.beat)")
         }
         e.halt()
         e.lead = false
@@ -206,7 +220,16 @@ Window {
             let shot = game._shotById[id]
             if (shot && !shot.destroyed) shot.vanish()
         }
+        vanishBalls(false)
         Clayground.physicsStep(steps(Balance.knight.hurtGrace) + 1)
+    }
+    // The slinger's metal balls in flight gone; turned, only the ones a
+    // shield bounced
+    function vanishBalls(turned) {
+        for (let id in game._ballById) {
+            let b = game._ballById[id]
+            if (b && !b.destroyed && (!turned || b.back)) b.vanish()
+        }
     }
 
     // A knight within reach of the grunt with a full charge ("full"), one
@@ -393,12 +416,34 @@ Window {
                         || !["grunt", "guardian", "spitter"].every(t => game.enemies.some(
                             e => e.enemyType === t && !e.destroyed)))
                     return
-                stop()
                 run()
+                // The slinger, alone in the ball duel (issue #322)
+                game.applyScenario("ballduel", Balance.spawn.slingerDepth)
+                stage = 2
+                return
+            }
+            if (stage === 2) {
+                if (!game.player || !game.fightRoomActive
+                        || !game.enemies.some(e => e.enemyType === "slinger" && !e.destroyed))
+                    return
+                stop()
+                runSlinger()
                 game.destroy()
                 Qt.exit(failures)
             }
         }
+    }
+
+    // The slinger's strings, as every other lead's
+    function runSlinger() {
+        Clayground.paused = true
+        let list = Balance.lead.strings.slinger || []
+        check(list.length > 0 && list.every(s => s.beats.length > 0 && s.beats[0] !== 0
+                                            && s.beats.every(b => b === 0 || b === 1 || b === 2)),
+              "the slinger has its strings in Balance.lead: "
+              + list.map(s => s.name + " [" + s.beats.join(",") + "]").join(" "))
+        for (let i = 0; i < list.length; i++) checkString("slinger", i)
+        Clayground.paused = false
     }
 
     function run() {

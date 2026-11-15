@@ -391,6 +391,7 @@ PhysicsItem {
     // Visual
     Rectangle {
         id: visual
+        objectName: "enemyBody"
         visible: !enemy.boss
         transform: [
             Scale {
