@@ -64,6 +64,7 @@ QUICK = [
     ("hitstop", "hitstop/hitstop.qml", []),
     ("descent", "descent/descent.qml", []),
     ("specials", "specials/specials.qml", []),
+    ("stun", "stun/stun.qml", []),
     ("answer", "answer/answer.qml", []),
     ("cues", "cues/cues.qml", []),
     ("lipsync", "lipsync/lipsync.qml", []),
