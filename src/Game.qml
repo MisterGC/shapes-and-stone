@@ -8864,11 +8864,11 @@ ClayWorld2d {
     // "flow" and "duel" are the fight room with the pacing bench's rooms
     // (Balance.pacing): fodder only, and a room's lead alone, a grunt;
     // "guardianduel" the same with a guardian lead (Balance.pacing
-    // .guardianDuel)
+    // .guardianDuel), "spitterduel" with a spitter lead (.spitterDuel)
     // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
     // .boss), "bossroom" the dungeon at the boss depth's danger with the
     // knight at the Warden's door (Balance.boss)
-    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "boss", "bossroom", "features", "deep"] }
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "spitterduel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8907,6 +8907,8 @@ ClayWorld2d {
             enterFightRoom(Balance.pacing[name])
         else if (name === "guardianduel")
             enterFightRoom(Balance.pacing.guardianDuel)
+        else if (name === "spitterduel")
+            enterFightRoom(Balance.pacing.spitterDuel)
         else if (name === "bossroom") {
             generateDungeon()
             toBossDoor()
