@@ -222,7 +222,7 @@ Window {
                   + p.wares.map(x => x.label + " " + x.price).join("; ") + ")")
             let harness = p.wares[2]
             check(harness.label.indexOf("a dash costs " + Balance.shop.harnessDashMana[0] + " mana") >= 0
-                  && p.wares[3].label.indexOf("a whirlwind costs " + Balance.shop.bladeWhirlMana[0] + " mana") >= 0,
+                  && p.wares[3].label.indexOf("a whirlwind costs " + Math.round(Balance.knight.whirlMana * Balance.shop.bladeShare[0]) + " mana") >= 0,
                   "the harness and the blade say what they make cheaper (\"" + harness.label + "\", \""
                   + p.wares[3].label + "\")")
             press(Qt.Key_3)
@@ -258,7 +258,7 @@ Window {
             check(!solo.buyWare({ id: "harness" }) && solo.player.harnessLevel === 1,
                   "nor sells it when asked")
             press(Qt.Key_3)
-            check(solo.player.bladeLevel === 1 && solo.player.whirlMana === Balance.shop.bladeWhirlMana[0],
+            check(solo.player.bladeLevel === 1 && solo.player.whirlMana === Math.round(Balance.knight.whirlMana * Balance.shop.bladeShare[0]),
                   "3 buys the balanced blade I (whirlwind " + solo.player.whirlMana + " mana)")
             p.close()
             solo.resetDungeon()

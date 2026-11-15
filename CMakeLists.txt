@@ -126,6 +126,7 @@ clay_app(shapes_and_stone
         src/RemotePlayer.qml
         src/Session.qml
         src/DepthGauge.qml
+        src/SpecialChoice.qml
         src/DungeonMasterPanel.qml
 
     RES_FILES

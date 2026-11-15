@@ -41,8 +41,10 @@ Item {
     // Host only: a player reached the exit, the host decides to advance
     signal advanceRequested()
     // Host: a node's knight arrived in the dungeon level of the run seed,
-    // its descent intro waiting for the party (issue #316)
-    signal arrivalReported(string fromId, int seed, int level)
+    // its descent intro waiting for the party (issue #316) and, before its
+    // count, for each knight to pick its special (issue #317): picked is
+    // false while it still chooses
+    signal arrivalReported(string fromId, int seed, int level, bool picked)
     // The host pressed start in the lobby; the game picks the seed and
     // calls start()
     signal lobbyStartRequested()
@@ -317,7 +319,7 @@ Item {
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
             } else if (data.type === "arrived") {
-                if (net.isHost) session.arrivalReported(fromId, data.seed, data.level)
+                if (net.isHost) session.arrivalReported(fromId, data.seed, data.level, data.picked !== false)
             } else if (data.type === "exitReached") {
                 // Host is level authority: any player reaching the exit
                 // advances the whole session
@@ -516,11 +518,14 @@ Item {
     }
 
     // This node's knight arrived in the dungeon level of the run seed: the
-    // host starts its descent intro once every knight has (issue #316)
-    function reportArrival(seed, level) {
+    // host starts its descent intro once every knight has (issue #316) and
+    // has picked its special (issue #317). picked: false while it still
+    // chooses, and once it has picked it reports again
+    function reportArrival(seed, level, picked) {
         if (!net.connected) return
-        if (net.isHost) arrivalReported(net.nodeId, seed, level)
-        else net.sendTo(net.hostId, {type: "arrived", seed: seed, level: level})
+        let p = picked !== false
+        if (net.isHost) arrivalReported(net.nodeId, seed, level, p)
+        else net.sendTo(net.hostId, {type: "arrived", seed: seed, level: level, picked: p})
     }
     // Host: the count of the descent intro, for every screen
     function publishIntro(v) {

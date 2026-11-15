@@ -98,7 +98,7 @@ Window {
     function swing() { return game.player.data.find(d => d.holdThresholdMs !== undefined) }
     // Every action's name in the hint, the ones missing listed
     function missing(text) {
-        let names = game.controls.actions.map(a => a.name)
+        let names = game.controls.actions.map(a => game.controls.hintName(a))
         return names.filter((n, i) => names.indexOf(n) === i && text.indexOf(n) === -1)
     }
 

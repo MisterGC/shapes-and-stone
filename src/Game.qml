@@ -1009,7 +1009,7 @@ ClayWorld2d {
         onRecordBroken: (banner) => _hostRecordBroken(banner)
         onNameEdited: (name) => world.playerName = name
         onAdvanceRequested: _hostAdvanceLevel()
-        onArrivalReported: (fromId, seed, level) => _introArrival(fromId, seed, level)
+        onArrivalReported: (fromId, seed, level, picked) => _introArrival(fromId, seed, level, picked)
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
         onImpactReceived: (kind, x, y, dx, dy, color) => {
@@ -1770,7 +1770,8 @@ ClayWorld2d {
     // Every control of the knight, kept with the record under "controls"
     // (issue #218): the key handler, the MouseArea, the pad and the hints
     // read it
-    ControlTable { id: controlTable; store: records }
+    // The hint names the chosen special for the special's button
+    ControlTable { id: controlTable; store: records; specialName: world.specialName.toLowerCase() }
     readonly property alias controls: controlTable
     // What action is bound to on the device in use, for a hint: "E", "LMB",
     // or the pad's button while a pad is in use
@@ -2079,6 +2080,11 @@ ClayWorld2d {
     // Input handling: each key does the action it is bound to in the
     // control table; the moves are the controller's (knightPad.keyboardKeys)
     Keys.onPressed: (event) => {
+        // The choice of a special takes its keys first (issue #317)
+        if (specialChoosing && !overlayUp && !event.isAutoRepeat && _specialKey(event.key)) {
+            event.accepted = true
+            return
+        }
         // 1 to 5 buy what the dialogue panel offers (the smith's gems and
         // four upgrades), whatever they are bound to
         if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5
@@ -2308,6 +2314,7 @@ ClayWorld2d {
         if (screen === "lobby") return session.lobby
         if (screen === "game" && fallen) return fallenLoader.item
         if (screen === "game" && menuOpen) return pauseLoader.item
+        if (screen === "game" && specialChoosing) return specialLoader.item
         return null
     }
     MenuPad {
@@ -2538,9 +2545,11 @@ ClayWorld2d {
         }
     }
 
-    // Momentum (Balance.momentum): a pip for each one earned, right of the
-    // mana bar; full, they glow and Q is named. Q short of them flashes
-    // them for momentum.flash seconds
+    // The chosen special (issue #317), right of the mana bar: its name and
+    // its mana, then, for one that needs it, momentum (Balance.momentum):
+    // a pip for each one earned; full, they glow and the special's button
+    // is named. The button short of them flashes them for momentum.flash
+    // seconds
     Row {
         id: momentumHud
         objectName: "momentumHud"
@@ -2552,6 +2561,18 @@ ClayWorld2d {
         visible: player !== null
         readonly property int have: player ? player.momentum : 0
         readonly property bool full: have >= Balance.momentum.max
+        readonly property bool needs: !!player && !!Balance.specials[player.special]
+                                      && Balance.specials[player.special].momentum === true
+        Text {
+            objectName: "specialHud"
+            anchors.verticalCenter: parent.verticalCenter
+            text: player ? world.specialName + " " + player.specialMana : ""
+            color: "#DDDDDD"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 12
+            font.bold: true
+        }
         property bool flashing: false
         Timer {
             id: momentumFlash
@@ -2566,9 +2587,10 @@ ClayWorld2d {
             }
         }
         Repeater {
-            model: Balance.momentum.max
+            model: momentumHud.needs ? Balance.momentum.max : 0
             Rectangle {
                 required property int index
+                anchors.verticalCenter: parent.verticalCenter
                 width: 10; height: 10
                 rotation: 45
                 color: index >= momentumHud.have ? "#2A2A2A"
@@ -2580,8 +2602,10 @@ ClayWorld2d {
             }
         }
         Text {
-            visible: momentumHud.full
-            // The whirlwind's key or pad button, from the control table
+            objectName: "specialKey"
+            anchors.verticalCenter: parent.verticalCenter
+            visible: momentumHud.full || !momentumHud.needs
+            // The special's key or pad button, from the control table
             text: world.controlName("whirlwind")
             color: Balance.momentum.color
             style: Text.Outline
@@ -2929,7 +2953,7 @@ ClayWorld2d {
             Text {
                 objectName: "introWait"
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: world.introWaiting
+                visible: world.introWaiting && !world.specialChoosing
                          && world.introClock - world.introArrivedAt > Balance.intro.waitNote * 1000
                 text: "Waiting for the party"
                 color: "#AAAAAA"
@@ -2962,6 +2986,27 @@ ClayWorld2d {
             styleColor: "#000000"
             font.pixelSize: 72
             font.bold: true
+        }
+    }
+    // The choice of a special, under the depth and the name while the
+    // intro waits for it (issue #317)
+    Loader {
+        id: specialLoader
+        anchors.fill: parent
+        z: 1001
+        active: world.specialChoosing
+        sourceComponent: Component {
+            SpecialChoice {
+                cards: world.specialCards
+                selected: world.specialSelected
+                pad: world.padInUse
+                padLabels: world.padLabels
+                keysMove: controlTable.keyName(controlTable.key("moveLeft")) + "/"
+                          + controlTable.keyName(controlTable.key("moveRight"))
+                onMoved: (by) => world.moveSpecial(by)
+                onPointed: (index) => world.specialSelected = index
+                onTaken: (index) => world.chooseSpecial(world.specialOffer[index])
+            }
         }
     }
     SequentialAnimation {
@@ -3738,9 +3783,10 @@ ClayWorld2d {
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
                                  potions: player.potions, draughts: player.draughts, creel: player.creel,
-                                 momentum: player.momentum, levels: smithLevels(player) }
+                                 momentum: player.momentum, levels: smithLevels(player), special: player.special }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0, pouch: [],
-                                 potions: 0, draughts: 0, creel: [], momentum: 0, levels: smithLevels(null) }
+                                 potions: 0, draughts: 0, creel: [], momentum: 0, levels: smithLevels(null),
+                                 special: Balance.specials.order[0] }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
                     "gold:", carried.gold, "gems:", carried.pouch.length, "potions:", carried.potions, "draughts:", carried.draughts,
                     "smith:", JSON.stringify(carried.levels))
@@ -3764,6 +3810,7 @@ ClayWorld2d {
             player.draughts = carried.draughts
             player.creel = carried.creel
             player.momentum = carried.momentum
+            player.special = carried.special
         }
         // A knight still down when the party reaches the camp rises there
         if (session.connected && levelType === "village") _rise("camp")
@@ -3814,6 +3861,8 @@ ClayWorld2d {
     // A dungeon is built: its intro begins, alone at once, in a session
     // once the host says every knight is there
     function _beginIntro() {
+        specialPending = false
+        _keepOfferedSpecial()
         if (!descentIntro || levelType !== "dungeon" || fightRoomActive) {
             introLevel = -1
             _recordAfterIntro()
@@ -3823,31 +3872,37 @@ ClayWorld2d {
         introClock = session.connected ? session.now() : 0
         introArrivedAt = introClock
         introLevel = levelIndex
+        _offerSpecials()
         if (!session.connected) {
-            introStartsAt = 0
+            if (!specialPending) introStartsAt = 0
             return
         }
         _introFromHost()
         if (introStartsAt >= 0) return
         if (session.isHost) _introCheck()
-        else session.reportArrival(session.runSeed, levelIndex)
+        else session.reportArrival(session.runSeed, levelIndex, !specialPending)
     }
     // Host: the knights that arrived in each dungeon ("seed:level" ->
     // {nodeId: true}), until its count is set
     property var _introArrivals: ({})
-    function _introArrival(fromId, seed, level) {
+    // picked: false while that knight still chooses its special
+    function _introArrival(fromId, seed, level, picked) {
         let key = seed + ":" + level
         let a = _introArrivals[key] || {}
-        a[fromId] = true
+        a[fromId] = picked !== false
         _introArrivals[key] = a
         _introCheck()
     }
-    // Host: once every knight has arrived, or the wait is over, the count
-    // starts on every screen at the same moment of the session clock
+    // Host: once every knight has arrived and picked its special, or the
+    // wait for one not arrived is over, the count starts on every screen
+    // at the same moment of the session clock. A knight that arrived and
+    // still chooses holds the count however long it takes (issue #317)
     function _introCheck() {
-        if (!session.connected || !session.isHost || !introWaiting) return
+        if (!session.connected || !session.isHost || !introWaiting || specialPending) return
         let a = _introArrivals[session.runSeed + ":" + levelIndex] || {}
-        let all = session.nodeIds().every(id => id === session.nodeId || a[id] === true)
+        let others = session.nodeIds().filter(id => id !== session.nodeId)
+        if (others.some(id => a[id] === false)) return
+        let all = others.every(id => a[id] === true)
         if (!all && session.now() < introArrivedAt + Balance.intro.waitMax * 1000) return
         let at = session.now() + Balance.intro.lag * 1000
         _introArrivals = ({})
@@ -3861,6 +3916,9 @@ ClayWorld2d {
     function _introFromHost() {
         let v = session.intro
         if (!introWaiting || !v || v.seed !== session.runSeed || v.level !== introLevel) return
+        // A count that starts without this knight's pick (it arrived after
+        // the host's wait) takes the special under the keys
+        if (specialPending) _pickSpecial(specialOffer[specialSelected] || player.special)
         introStartsAt = v.at
     }
     function _stepIntro() {
@@ -3910,6 +3968,92 @@ ClayWorld2d {
     function _playIntroBeat(pitch, what) {
         introCountSound.play(1, pitch)
         logSound("sfx/descent_count", what, pitch, 0, 1)
+    }
+
+    // --- The knight's special (issue #317) ---
+    // Before a dungeon's descent intro counts, the knight picks one of the
+    // specials (Balance.specials) for that dungeon: the choice shows while
+    // the intro waits, with the depth and the name, and the count starts
+    // once it is made - in a session once every knight has made its own.
+    // Only the specials in the game are offered; with one there is no
+    // choice and the knight has that one. Without an intro (the fight
+    // room, the dojo's scenarios, a bench that turns it off) the knight
+    // keeps the special it has. specialsAll offers the specials not in the
+    // game yet too, for a bench that tests the choice: picked, one does
+    // nothing
+    property bool specialsAll: false
+    readonly property var specialsOffered: Balance.specials.order.filter(
+        id => specialsAll || Balance.specials[id].ready === true)
+    // This node's knight has its choice to make in this dungeon
+    property bool specialPending: false
+    readonly property bool specialChoosing: specialPending && introWaiting && !!player
+    // The specials on the choice's cards, and the one under the keys or
+    // the stick
+    property var specialOffer: []
+    property int specialSelected: 0
+    // The choice's cards: name, line and the mana each costs this knight,
+    // its balanced blade's share taken off
+    readonly property var specialCards: specialOffer.map(id => ({
+        id: id, name: Balance.specials[id].name, line: Balance.specials[id].line,
+        mana: player ? player.specialManaOf(id) : Balance.specials[id].mana }))
+    // The chosen special's name, for the HUD and the controls hint
+    readonly property string specialName: player && Balance.specials[player.special]
+                                          ? Balance.specials[player.special].name : ""
+    // A special no longer offered gives way to the first that is
+    function _keepOfferedSpecial() {
+        if (player && specialsOffered.indexOf(player.special) < 0 && specialsOffered.length > 0)
+            player.special = specialsOffered[0]
+    }
+    // The intro begins: with two or more specials the choice opens on the
+    // knight's last one
+    function _offerSpecials() {
+        specialOffer = specialsOffered.slice()
+        specialPending = !!player && specialOffer.length > 1
+        specialSelected = player ? Math.max(0, specialOffer.indexOf(player.special)) : 0
+        if (specialPending) console.log("[Game] The knight chooses its special:", specialOffer.join(", "))
+    }
+    function _pickSpecial(id) {
+        specialPending = false
+        player.special = id
+        console.log("[Game] The knight picked the special", id, "for level", levelIndex)
+    }
+    // The knight takes the special id: alone the count starts, in a
+    // session the host hears of it. False when no choice is open or id is
+    // not offered
+    function chooseSpecial(id) {
+        if (!specialChoosing || specialOffer.indexOf(id) < 0) return false
+        specialSelected = specialOffer.indexOf(id)
+        _pickSpecial(id)
+        if (!session.connected) introStartsAt = introClock
+        else if (session.isHost) _introCheck()
+        else session.reportArrival(session.runSeed, levelIndex, true)
+        return true
+    }
+    function moveSpecial(by) {
+        specialSelected = Math.max(0, Math.min(specialOffer.length - 1, specialSelected + by))
+    }
+    // A key while the choice is open: the arrows left and right move along
+    // the cards, 1 to 3 take one, Enter, Space or the talk key take the one
+    // under the keys. Returns whether it was the choice's. The move keys
+    // are the keyboard's stick, which reaches the choice as a pad's does
+    // (_padMenu), so they are not handled here too - nor an arrow bound to
+    // the move left or right, which would move the choice twice
+    function _specialKey(k) {
+        let n = specialOffer.length
+        if (k === controlTable.key("moveLeft") || k === controlTable.key("moveRight"))
+            return false
+        if (k === Qt.Key_Left)
+            moveSpecial(-1)
+        else if (k === Qt.Key_Right)
+            moveSpecial(1)
+        else if (k >= Qt.Key_1 && k < Qt.Key_1 + n)
+            chooseSpecial(specialOffer[k - Qt.Key_1])
+        else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space
+                 || k === controlTable.key("talk"))
+            chooseSpecial(specialOffer[specialSelected])
+        else
+            return false
+        return true
     }
 
     // Component factories
@@ -4037,13 +4181,18 @@ ClayWorld2d {
             : line === "harness" ? "Lighter harness" : "Balanced blade"
         return level < 1 ? name : name + " " + (["I", "II", "III", "IV", "V"][level - 1] || String(level))
     }
+    // The mana the chosen special costs with the balanced blade of level
+    function _bladeMana(level) {
+        let s = Balance.specials[player ? player.special : Balance.specials.order[0]]
+        return Math.round(s.mana * Balance.shop.bladeShare[Math.min(level, Balance.shop.bladeShare.length) - 1])
+    }
     function smithGives(line, level) {
         let sh = Balance.shop, i = level - 1
         return line === "sword" ? "+" + sh.swordAtk[i] + " damage"
             : line === "shield" ? "a block lets " + Math.round(sh.shieldBlockedShare[i] * 100)
                                   + " % through, costs " + sh.shieldBlockMana[i] + " mana"
             : line === "harness" ? "a dash costs " + sh.harnessDashMana[i] + " mana"
-            : "a whirlwind costs " + sh.bladeWhirlMana[i] + " mana"
+            : "a " + specialName.toLowerCase() + " costs " + _bladeMana(level) + " mana"
     }
 
     // --- The village's wares (issue #38) ---
