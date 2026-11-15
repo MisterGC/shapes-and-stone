@@ -173,7 +173,13 @@ PhysicsItem {
     // A blow of a string landed: a lunge ("strike" or "feint") or a shot
     // ("shot"), on beat
     signal struck(int beat, string kind)
-    property string enemyType: "grunt"  // "grunt", "guardian", "spitter" or "warden"
+    property string enemyType: "grunt"  // "grunt", "guardian", "spitter", "slinger" or "warden"
+    // It shoots instead of lunging: it keeps its distance (kite), winds up
+    // a shot (aiState "shoot") and its strings are shots
+    readonly property bool ranged: enemyType === "spitter" || enemyType === "slinger"
+    // The slinger (Balance.ball, issue #322): a lead of iron whose shots
+    // are metal balls that bounce off the walls and off a raised shield
+    readonly property bool slinger: enemyType === "slinger"
     // The Hollow Warden (Balance.boss, issue #274): a lead of its own type,
     // boss.size a side. tempo is its appearance's, set on spawn; phase 2
     // begins at boss.phaseAt of its max HP and plays boss.phase2Tempo
@@ -246,7 +252,7 @@ PhysicsItem {
     // instead of a lunge at this share of its attacks - aiState "crush",
     // a longer telegraph - and lunges as usual, with no parry window. Its
     // own chance, so a bench can set it; 0 for every other enemy
-    property real crushChance: tier === 2 && enemyType !== "spitter" && enemyType !== "warden"
+    property real crushChance: tier === 2 && !ranged && enemyType !== "warden"
                                ? Balance.enemy.crushChance : 0
     // The attack under way is a crushing blow, from its wind-up to its
     // landing; on every screen, from the replicated aiState
@@ -269,7 +275,7 @@ PhysicsItem {
                                       || aiState === "bash"
     readonly property color ringColor: parryWindow ? Balance.parryRing.flashColor
         : crushing ? Balance.crush.ringColor
-        : enemyType === "spitter" ? "#F2D13A" : "#FF8C00"
+        : ranged ? "#F2D13A" : "#FF8C00"
     // Seconds of a lunge after its first step until the parry window opens
     readonly property real _ringLunge: aiState === "shoot" || aiState === "bash" ? 0
         : Math.max(0, lungeStepCount(_ringStep) - 1 - Balance.enemy.parryFrames) * _ringStep
@@ -385,6 +391,7 @@ PhysicsItem {
     // Visual
     Rectangle {
         id: visual
+        objectName: "enemyBody"
         visible: !enemy.boss
         transform: [
             Scale {
@@ -396,10 +403,18 @@ PhysicsItem {
         ]
         anchors.centerIn: parent
         anchors.fill: parent
-        radius: width * .5
+        // The slinger is a block of iron with rounded corners, every other
+        // enemy round
+        radius: enemy.slinger ? width * 0.22 : width * .5
         opacity: tier === 0 ? 0.6 : 1.0
         color: {
             let isSpitter = enemyType === "spitter"
+            // The slinger's iron: grey steel, colder as it hunts
+            if (enemy.slinger && ["patrol", "chase", "kite", "recovery", "idle"].indexOf(enemy.aiState) >= 0) {
+                let iron = enemy.aiState === "patrol" || enemy.aiState === "idle" ? "#6E7A86"
+                    : enemy.aiState === "chase" ? "#7F8C99" : "#93A1AE"
+                return tier === 0 ? Qt.darker(iron, 1.4) : tier === 2 ? Qt.lighter(iron, 1.2) : iron
+            }
             let base
             switch (enemy.aiState) {
             case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
@@ -441,7 +456,22 @@ PhysicsItem {
                 ctx.strokeStyle = dark
                 ctx.lineWidth = w * 0.06
 
-                if (enemyType === "spitter") {
+                if (enemy.slinger) {
+                    // A visor's slit across, two rivets above it and a
+                    // round muzzle below, the bore dark
+                    ctx.fillRect(w * 0.16, h * 0.34, w * 0.68, h * 0.11)
+                    ctx.beginPath()
+                    ctx.arc(w * 0.16, h * 0.14, w * 0.055, 0, Math.PI * 2)
+                    ctx.arc(w * 0.84, h * 0.14, w * 0.055, 0, Math.PI * 2)
+                    ctx.fill()
+                    ctx.lineWidth = w * 0.08
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.72, w * 0.16, 0, Math.PI * 2)
+                    ctx.stroke()
+                    ctx.beginPath()
+                    ctx.arc(w * 0.5, h * 0.72, w * 0.07, 0, Math.PI * 2)
+                    ctx.fill()
+                } else if (enemyType === "spitter") {
                     // Big central eye
                     ctx.beginPath()
                     ctx.arc(w * 0.5, h * 0.4, w * 0.22, 0, Math.PI * 2)
@@ -679,7 +709,9 @@ PhysicsItem {
         height: enemy.height
         scale: visual.scale
         readonly property bool spitter: enemy.enemyType === "spitter"
-        readonly property color eyeColor: spitter ? "#D8FF80"
+        // The slinger's one eye is its visor's slit, cold blue
+        readonly property bool slit: enemy.slinger
+        readonly property color eyeColor: slit ? "#BFE6FF" : spitter ? "#D8FF80"
             : enemy.aiState === "telegraph" || enemy.aiState === "crush" || enemy.aiState === "lunge"
             ? "#FFF2C0" : "#FFB040"
         property real open: 1
@@ -690,23 +722,23 @@ PhysicsItem {
             NumberAnimation { to: 1; duration: 90 }
         }
         Repeater {
-            model: glowEyes.spitter ? [0.5] : [0.381, 0.619]
+            model: glowEyes.spitter || glowEyes.slit ? [0.5] : [0.381, 0.619]
             Item {
                 required property var modelData
                 x: enemy.width * modelData
-                y: enemy.height * 0.44
+                y: enemy.height * (glowEyes.slit ? 0.42 : 0.44)
                 // Halo, then the eye itself
                 Rectangle {
-                    width: enemy.width * (glowEyes.spitter ? 0.5 : 0.36)
-                    height: width * (0.4 + 0.6 * glowEyes.open)
-                    radius: width / 2
+                    width: enemy.width * (glowEyes.slit ? 0.6 : glowEyes.spitter ? 0.5 : 0.36)
+                    height: width * (glowEyes.slit ? 0.3 : 1) * (0.4 + 0.6 * glowEyes.open)
+                    radius: height / 2
                     x: -width / 2; y: -height / 2
                     color: glowEyes.eyeColor
                     opacity: 0.18
                 }
                 Rectangle {
-                    width: enemy.width * (glowEyes.spitter ? 0.18 : 0.13)
-                    height: width * glowEyes.open
+                    width: enemy.width * (glowEyes.slit ? 0.44 : glowEyes.spitter ? 0.18 : 0.13)
+                    height: width * (glowEyes.slit ? 0.14 : 1) * glowEyes.open
                     radius: width / 2
                     x: -width / 2; y: -height / 2
                     color: glowEyes.eyeColor
@@ -933,8 +965,10 @@ PhysicsItem {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.top
         anchors.bottomMargin: hp < maxHp ? 14 : 6
-        text: enemyType === "guardian" ? "Flank/Push" : (enemyType === "spitter" ? "Close/Shield" : "Block/Counter")
-        color: enemyType === "guardian" ? "#CC6644" : (enemyType === "spitter" ? "#6B8E4A" : "#AAAAAA")
+        text: enemyType === "guardian" ? "Flank/Push" : enemy.slinger ? "Shield it back"
+            : (enemyType === "spitter" ? "Close/Shield" : "Block/Counter")
+        color: enemyType === "guardian" ? "#CC6644" : enemy.slinger ? "#93A1AE"
+            : (enemyType === "spitter" ? "#6B8E4A" : "#AAAAAA")
         font.pixelSize: 9
         font.bold: true
         style: Text.Outline
@@ -966,7 +1000,7 @@ PhysicsItem {
             if ((aiState === "telegraph" || aiState === "lunge")
                     && gameWorld && gameWorld.playWardenToll)
                 gameWorld.playWardenToll(xWu, yWu, aiState === "lunge" ? "strike" : "windUp")
-        } else if (aiState === "telegraph" && enemyType !== "spitter"
+        } else if (aiState === "telegraph" && !ranged
                 && gameWorld && gameWorld.playScream)
             gameWorld.playScream(xWu, yWu, tier)
         if (aiState === "crush") {
@@ -1261,7 +1295,7 @@ PhysicsItem {
             aiState = "recovery"
             return
         }
-        let shot = enemyType === "spitter"
+        let shot = ranged
         let dx = target ? target.xWu - aimXWu : 0, dy = target ? target.yWu - aimYWu : 0
         let dist = Math.sqrt(dx * dx + dy * dy)
         if (!target || dist > (shot ? shootRange : l.reach + bulk) || (shot && !_sees(target))) {
@@ -1295,7 +1329,7 @@ PhysicsItem {
     // knight again; a spitter shoots again after its cooldown
     function _endString() {
         _clearString()
-        if (enemyType === "spitter") _shootTimer = shootCooldown
+        if (ranged) _shootTimer = shootCooldown
         body.linearVelocity = Qt.point(0, 0)
         aiState = "recovery"
         attackCooldown = Balance.lead.recovery
@@ -1419,8 +1453,8 @@ PhysicsItem {
                     break
                 }
             }
-            if (enemyType === "spitter") {
-                // Spitter transitions to kite when in range with LOS
+            if (ranged) {
+                // A shooter turns to kiting when in range with LOS
                 if (canSee && dist < shootRange) {
                     aiState = "kite"
                 } else if (_pathRecalcTimer <= 0) {
@@ -1730,6 +1764,12 @@ PhysicsItem {
         _dirToTargetY = dy / len
     }
     function fireProjectile() {
+        // A slinger's shot is a metal ball, from its centre (Balance.ball)
+        if (slinger) {
+            if (gameWorld && gameWorld.spawnBall)
+                gameWorld.spawnBall(centreXWu, centreYWu, _dirToTargetX, _dirToTargetY, atk)
+            return
+        }
         if (gameWorld && gameWorld.spawnProjectile) {
             let half = Balance.projectile.size / 2
             gameWorld.spawnProjectile(centreXWu - half, centreYWu + half, _dirToTargetX, _dirToTargetY, atk)
@@ -1813,8 +1853,9 @@ PhysicsItem {
     }
 
     // A lead's stance breaks (issue #271): cause is what broke it,
-    // "parry", "perfect", "heavy", "worn" or "shot" (a shot sent back,
-    // Balance.projectile). It staggers for Balance.lead.openingTime, every
+    // "parry", "perfect", "heavy", "worn", "shot" (a shot sent back,
+    // Balance.projectile) or "ball" (a metal ball a shield bounced,
+    // Balance.ball). It staggers for Balance.lead.openingTime, every
     // blow then doing openingDamage times its damage, and its attack under
     // way is over. Where it is remote the
     // host breaks it, and every screen shows the opening. An enemy that is
@@ -1918,11 +1959,12 @@ PhysicsItem {
         return _struck(amount, attackerX, attackerY, heavy, _opens(heavy, parried))
     }
     // A shot this node's knight sent back with a perfect block hit it
-    // (Balance.projectile, issue #283), coming from (attackerX,
+    // (Balance.projectile, issue #283), or a metal ball its shield bounced
+    // (Balance.ball, issue #322, cause "ball"), coming from (attackerX,
     // attackerY): a blow of amount that opens a lead, as a parry does,
     // landing whole. Returns the damage it does
-    function takeShot(amount, attackerX, attackerY) {
-        return _struck(amount, attackerX, attackerY, false, lead && !opening ? "shot" : "")
+    function takeShot(amount, attackerX, attackerY, cause) {
+        return _struck(amount, attackerX, attackerY, false, lead && !opening ? (cause || "shot") : "")
     }
     // This node's knight's bolt hit it (Balance.bolt, issue #319), coming
     // from (attackerX, attackerY): a blow of amount as any other, but on a

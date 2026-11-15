@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -790,8 +790,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 
 At the camp the witch reads the next dungeon: where it sits in its depth's
 range - high, in the middle or low - and what lives there, how many
-enemies, how many of them tough and weak, how many guardians and
-spitters, and when it hides a secret room that a hidden chamber lies
+enemies, how many of them tough and weak, how many guardians,
+spitters and slingers, and when it hides a secret room that a hidden chamber lies
 below and how to find it. She reads it off the run's seed, the next
 dungeon's position and the knights the party has, the way the dungeon is
 built (`Game.foretell`, `Game.secretsOf`), so the dungeon the knights
@@ -1144,14 +1144,20 @@ enemies are fodder, weak and normal, so the rooms without a lead fight
 in larger groups as the count grows; a creature out of a hole is fodder
 too. The mix is dealt, not rolled: the share of rooms with a lead, rounded,
 picked among the rooms that hold an enemy, and `spawn.weakChance` of its
-enemies weak, so it follows the depth on every seed. In the dojo,
+enemies weak, so it follows the depth on every seed. From depth
+`spawn.slingerDepth` (1) on, `spawn.slingerChance` (a quarter) of the
+leads are slingers, the lead that slings metal balls (issue #322, below);
+the other leads keep the mix of types they had, and a slinger is never
+fodder nor comes out of a hole. In the dojo,
 `applyScenario("dungeon", 4)` through `eval` lands in the dungeon at
 depth 4 (the village and the fight room take a depth the same way), and
 the balance bench checks depth 0, 2 and 4 against the table. The leads
-bench plans 50 seeds at each of depths 0, 2, 4 and 8, checks that no room
+bench plans 50 seeds at each of depths 0, 1, 2, 4 and 8, checks that no room
 holds two tough enemies, that each has the table's count of rooms with a
-lead and that a seed planned twice is the same dungeon, then builds the
-dungeon at each depth and checks it is the planned one:
+lead, that a seed planned twice is the same dungeon and that the slingers
+are leads only, none before depth 1 and about a quarter of the leads
+after, then builds the dungeon at each depth and checks it is the planned
+one:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/leads/leads.qml
@@ -2265,8 +2271,46 @@ in steps and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
 ```
 
+The slinger (issue #322, the table's `ball` group and `enemy.slinger`) is
+the fourth kind of lead, from depth 1 on: a block of grey iron with rounded
+corners, a visor's slit for its one cold eye and a muzzle below it, where
+every other enemy is round. It keeps its distance as the spitter does and
+slings a metal ball instead of a shot: a dark iron ball, `ball.size` wu
+across, at `ball.speed`, in strings of its own (`lead.strings.slinger`,
+one ball and then two beats of rest while it bounces about), its stance
+and openings a lead's. A ball bounces off the walls and a shut door,
+mirrored off the grid's cells, so its path is the same at any frame rate;
+after `ball.bounces` (4) bounces it falls at the next wall it meets, lies
+`ball.restTime` seconds and is gone, and `ball.lifetime` seconds after it
+left it falls where it is. A ball no shield has touched passes the
+enemies and hurts the knight it meets for the slinger's `atk`, and falls
+there; a dash goes through it. Any raised shield facing it bounces it,
+for the shield's mana as a blocked shot: a plain block off the shield like
+a mirror, at least `ball.glance` (35) degrees off the line it came along,
+so it never goes straight back; a perfect block along the way the knight
+faces at `ball.backSpeed`, which is how a knight aims it. A shield's ball
+glows pale, hurts no knight, and the first enemy it meets takes
+`ball.backDamage` times the swing of the knight whose shield sent it, and
+it falls there; a lead it hits opens (cause `ball`), the blow landing
+whole. So a room with a slinger plays a little like Pong: the shield is
+the paddle. The ball's shot, its bounce and, lower, its fall are the cues
+`sfx/ball_shot` and `sfx/ball_bounce`. In a session the host's slinger
+slings on every screen and every screen bounces the ball off the walls
+itself; the knight's own screen judges a hit or a shield's bounce and
+tells the others where the ball fell, or where it was turned and which
+way, and the screen whose knight turned it judges the enemy it hits. The
+fight record counts `ballsBack`, `ballsAimed` and `ballBackHits`. The
+ball bench checks its look beside the spitter's, its bounces against the
+mirror path, its fall, the knight it hurts, the dash, both shields and the
+lead a shield's ball opens, and in a session the same bounces and the
+same turn on both screens and the host's lead opened once:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/ball/ball.qml
+```
+
 A lead attacks in strings (issue #272), in the arrow slits' beat notation:
-`lead.strings` holds each lead type's, 1 a strike, 2 a feint, 0 a rest,
+`lead.strings` holds each lead type's - the slinger's among them -, 1 a strike, 2 a feint, 0 a rest,
 `lead.beat` seconds a beat, and the parry ring closes once per beat. A
 feint's wind-up holds `lead.feintHold` longer, its ring standing at
 `lead.feintRing`, then strikes; a rest is a recovery a charged swing
@@ -2382,7 +2426,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -2422,18 +2466,23 @@ kill - or is a duel that a button-masher loses and a reader of its rhythm
 wins. `--room flow` fills the fight room with fodder only, `--room duel`
 with a room's lead alone, a tough grunt, `--room guardianduel` with a
 guardian lead alone (issue #288, `Balance.pacing`), `--room spitterduel`
-with a spitter lead alone, the third kind of lead (issue #315), and in each the
+with a spitter lead alone, the third kind of lead (issue #315), `--room
+ballduel` with a slinger lead alone, the fourth (issue #322), and in each the
 knight has the sword level it usually has at that depth (`--sword` sets
 another). Four more answers are the pacing pilots: `charge` holds a full
 charge and lets go at the nearest enemy, `masher` clicks, `skilled`
 parries, perfect-blocks - crushing blows and shots, which it sends back -
-and strikes in openings, and `person` plays like a person (below).
+and strikes in openings, and `person` plays like a person (below). Both
+meet a metal ball as a shot, facing it so the perfect block aims it at
+the lead, as near the lead's way as the shield's arc still meets the
+ball; each fight reports the balls slung, their wall bounces, the ones the
+shield bounced and aimed and the ones that hit.
 `--pacing` plays the
 rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all four
 pilots, four loaders at a time:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,
@@ -2528,8 +2577,15 @@ knight. The skilled pilot steps out of a zone while it warns. At each of
 `charge` fall or take at least `bossSlow` times as long. In every boss
 fight the Warden's wind-ups and strikes play its toll and nothing screams
 before its adds come, and in no flow or duel fight is its toll heard
-(issue #287). No band checks the spitter duel. The five rooms are the dojo's
-scenarios `flow`, `duel`, `guardianduel`, `spitterduel` and `boss` too: a reload lands in them, and an
+(issue #287). No band checks the spitter duel or the ball duel; `--check`
+tests the slinger's balls instead (issue #322): in every ball duel each
+ball that fell at a wall bounced `ball.bounces` times first and none
+more, every bounce at the room's walls, and at each depth a ball the
+skilled pilot's shield bounced hits the lead and opens it; and one ball
+slung by hand across the room (`Sandbox.tryBall`) bounces off its walls
+`ball.bounces` times, each where the mirror path off the walls puts it,
+and falls at the next wall. The six rooms are the dojo's
+scenarios `flow`, `duel`, `guardianduel`, `spitterduel`, `ballduel` and `boss` too: a reload lands in them, and an
 edit of `Balance.pacing` changes who stands there.
 
 **The person pilot** (issue #315). The other pilots play frame-perfectly or mash, so a fight can pass the

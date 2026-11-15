@@ -420,6 +420,21 @@ and tells the others (`struck`, broadcast):
   `Game.shotEnded` says what became of each shot on this screen.
   A known trade-off: no host decides who a shot hits, so one shot that
   meets two knights on their two screens within the network delay hits both.
+- a slinger's metal ball (issue #322): the host gives it an id (`ball1`,
+  `ball2`, ...) and sends it with its start and way (`ball`). Every node
+  flies it under that id and bounces it off the walls itself: the walls are
+  the grid's cells and a shut door, and each bounce mirrors the ball at the
+  cell's side, so the path is the same on every screen whatever its frame
+  rate (the ball bench measured the host's and the joiner's bounces at most
+  0.005 wu apart). The node whose knight it meets judges it and sends
+  `{source: "ball", id, result, x, y}`: `hit` where it fell, or `blocked`
+  or `perfect` where the shield turned it, with the way it went (`dx`,
+  `dy`). Every other node puts its ball of that id there, fallen or turned
+  that way. The node whose knight's shield turned it judges the enemy it
+  hits, sends the blow to the host as a shot sent back does, and reports
+  `enemy` where it fell. A ball that falls at a wall or at the end of its
+  time falls on each screen alone. A report that comes before the host's
+  ball flies it from the report, and the host's ball is not flown again.
 
 The parry window of a held blow is counted in physics steps (the blow's
 arrival step minus `enemy.parryFrames`), as the enemy's attack runs, not in

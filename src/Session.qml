@@ -70,6 +70,9 @@ Item {
     signal enemyKillReceived(var kill)
     // A spitter of the host's fired (id, x, y, dx, dy, damage)
     signal shotReceived(var shot)
+    // A slinger of the host's slung a metal ball (Balance.ball): ball.id,
+    // its centre (x, y), its way (dx, dy) and damage
+    signal ballReceived(var ball)
     // Another node's knight let a bolt loose (Balance.bolt): bolt.id, its
     // start (x, y) and way (dx, dy); and where and how one ended on that
     // node, bolt.id at (x, y), bolt.how "enemy", "wall" or "reach"
@@ -124,8 +127,8 @@ Item {
     // it is on another level (issue #169)
     signal pouchDropAnswered(bool ok)
     // Another node judged an attack on its own knight: report.source is
-    // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
-    // what became of it (Game.knightStruck)
+    // "lunge" (id: the enemy's), "shot" (id: the shot's) or "ball" (id: the
+    // metal ball's), report.result what became of it (Game.knightStruck)
     signal struckReported(string fromId, var report)
     // Another knight's HP changed or its node left: the party may be down
     // now
@@ -315,6 +318,8 @@ Item {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
                 session.shotReceived(data)
+            } else if (data.type === "ball") {
+                session.ballReceived(data)
             } else if (data.type === "bolt") {
                 session.boltReceived(fromId, data)
             } else if (data.type === "boltEnd") {
@@ -718,6 +723,10 @@ Item {
     // Host: a spitter fired, every node flies the shot
     function sendShot(shot) {
         net.broadcast(Object.assign({type: "shot"}, shot))
+    }
+    // Host: a slinger slung a metal ball, every node flies it
+    function sendBall(ball) {
+        net.broadcast(Object.assign({type: "ball"}, ball))
     }
     // This node's knight let a bolt loose, every node flies it; and where
     // it ended here

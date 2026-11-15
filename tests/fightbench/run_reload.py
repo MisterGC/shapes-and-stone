@@ -20,8 +20,9 @@ a swing in the opening does lead.openingDamage times its damage; with
 lead.openingTime changed in the loaded copy and the sandbox reloaded, the
 opening lasts the new time. The guardianduel scenario (issue #288) stands
 a guardian lead with the table's HP, its type's leadHp share of the tough
-tier's, and the spitterduel scenario (issue #315) one spitter lead of tier
-2 alone; with guardian.leadHp changed in the loaded copy and the sandbox
+tier's, the spitterduel scenario (issue #315) one spitter lead of tier
+2 alone, and the ballduel scenario (issue #322) one slinger lead of tier 2
+alone; with guardian.leadHp changed in the loaded copy and the sandbox
 reloaded, the guardian lead has the new HP. Then in the flow scenario the knight strikes
 two enemies down CHAIN_GAP seconds apart (Sandbox.tryChain): within
 Balance.chain.window they chain, the second death sound a step higher;
@@ -248,6 +249,14 @@ def main():
               f"{spitter and spitter['tier']}, {spitter and spitter['hp']} HP ({spitter and spitter['want']} "
               f"by the table), alone ({spitter and spitter['standing']} standing, "
               f"{spitter and spitter['leads']} leads)")
+        # The slinger's duel (issue #322): one slinger lead, tough, alone
+        slinger = try_duel_lead(bench, "ballduel")
+        check(slinger is not None and slinger["type"] == "slinger" and slinger["tier"] == 2
+              and slinger["leads"] == 1 and slinger["standing"] == 1 and slinger["hp"] == slinger["want"],
+              f"the ballduel scenario stands one {slinger and slinger['type']} lead of tier "
+              f"{slinger and slinger['tier']}, {slinger and slinger['hp']} HP ({slinger and slinger['want']} "
+              f"by the table), alone ({slinger and slinger['standing']} standing, "
+              f"{slinger and slinger['leads']} leads)")
         reloaded = reload(bench, balance, r"(guardian: \{ hpBonus: -?[0-9]+, leadHp: )[0-9.]+,",
                           rf"\g<1>{NEW_GUARDIAN_LEAD_HP},")
         check(reloaded, f"guardian.leadHp set to {NEW_GUARDIAN_LEAD_HP} and the sandbox reloaded")
