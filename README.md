@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2081,6 +2081,37 @@ checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/killchain/killchain.qml
+```
+
+Spiders, mice and rats scurry over the dungeon's floor (`Balance.critters`,
+issue #324), there to make it feel alive and nothing more. A room holds
+`critters.perRoom` of them on average and the corridors one per
+`critters.perCorridorCells` of their cells, none within
+`critters.clearOfSpawn` wu of where the knights come in; each kind has its
+size, speed and the distance at which it notices a knight. A knight coming
+near startles one, and after `critters.startle` seconds it runs from the
+nearest knight, sliding along the walls, until none is within
+`critters.forget` wu; resting, it scurries a little now and then. A knight
+walking over one squashes it: the squash (`sfx/critter_squash`, a live cue,
+a rat's lower and a spider's higher) and a mark in its kind's colour on
+the floor for the rest of the level. A critter is drawn only - no body, no
+enemy - so it never hurts, never blocks the way, counts for no kill and no
+chain link and is no target for the lock-on. In co-op every screen lays
+out the same critters from the level's seed and runs them itself: they
+flee from and are squashed by the knights that screen shows, and nothing
+about them is sent over the network, as nothing in the game depends on
+them. Only critters within `critters.awake` wu of a knight move. The
+critter bench surveys 8 dungeons' critters, checks another screen lays out
+the same, that one out of reach scurries and one near a standing knight
+runs, walks the knight at one and checks its squash, sound and mark, the
+knight's HP, kills, chain and lock-on, and exits with the number of failed
+checks; `-- fps`, with a window, counts the frames drawn with no
+critters, the game's and a dungeon full of them while the knight walks
+from room to room:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/critters/critters.qml
+qml -I build/bin/qml tests/critters/critters.qml -- fps
 ```
 
 A grunt does not run straight in: from `enemy.circleRange` on it circles
