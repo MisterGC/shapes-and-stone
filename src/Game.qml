@@ -376,6 +376,17 @@ ClayWorld2d {
         boltHitSound.play(gain === undefined ? 1 : gain)
         logSound("sfx/bolt_hit", "boltHit", 0, _distTo(xWu, yWu), gain)
     }
+    // A special's stronger version (Balance.combo, issue #320): a swell
+    // over the special's own sound
+    SfxPlayer {
+        id: surgeSound
+        source: "../sound/sfx/special_surge.sfx.json"
+        volume: muted ? 0 : Balance.combo.volume * soundVolume
+    }
+    function playSurge(gain) {
+        surgeSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/special_surge", "surge", 0, _gainDist(gain), gain)
+    }
     // The charge is full: a high tick
     SfxPlayer {
         id: chargeTickSound
@@ -840,6 +851,24 @@ ClayWorld2d {
             spawnRing(x, y, Balance.stun.color, Balance.stun.reach)
             spawnRing(x, y, Balance.stun.rimColor)
             break
+        case "stunStrong":
+            // The stronger stun (Balance.combo.stun): out to its reach, in
+            // the combo's colour, with a ring of the stun's own inside it
+            for (let k = 0; k < 8; k++)
+                spawnSparks(x, y, Math.cos(k * Math.PI / 4), Math.sin(k * Math.PI / 4),
+                            Math.ceil(Balance.stun.sparks / 4), Balance.stun.rimColor)
+            spawnRing(x, y, Balance.combo.color, Balance.combo.stun.reach)
+            spawnRing(x, y, Balance.stun.color, Balance.stun.reach)
+            spawnRing(x, y, Balance.stun.rimColor)
+            break
+        case "surge":
+            // A special's stronger version went off (Balance.combo): a ring
+            // and sparks all round the knight
+            for (let k = 0; k < 6; k++)
+                spawnSparks(x, y, Math.cos(k * Math.PI / 3), Math.sin(k * Math.PI / 3),
+                            Math.ceil(Balance.combo.sparks / 6), Balance.combo.color)
+            spawnRing(x, y, Balance.combo.color, Balance.combo.ring)
+            break
         case "projectileHit":
         case "projectileBurst":
             spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
@@ -854,6 +883,7 @@ ClayWorld2d {
         if (!fx) {
             let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
                                playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5, stun: 1,
+                               stunStrong: 1.5, surge: 0.5,
                                projectileHit: 1, projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
@@ -913,6 +943,9 @@ ClayWorld2d {
             break
         case "stun":
             _trauma(Balance.stun.trauma)
+            break
+        case "stunStrong":
+            _trauma(Balance.combo.trauma)
             break
         case "projectileDeflected":
             _trauma(0.12)
@@ -1110,7 +1143,7 @@ ClayWorld2d {
         onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
         onBoltReceived: (fromId, bolt) => {
-            if (screen === "game") _flyBolt(bolt.id, bolt.x, bolt.y, bolt.dx, bolt.dy, 0, false)
+            if (screen === "game") _flyBolt(bolt.id, bolt.x, bolt.y, bolt.dx, bolt.dy, 0, false, bolt.strong === true)
         }
         onBoltEndReceived: (fromId, bolt) => _boltEndReported(bolt)
         onShotReceived: (shot) => {
@@ -3057,6 +3090,7 @@ ClayWorld2d {
                 padLabels: world.padLabels
                 keysMove: controlTable.keyName(controlTable.key("moveLeft")) + "/"
                           + controlTable.keyName(controlTable.key("moveRight"))
+                combo: world.comboHint
                 onMoved: (by) => world.moveSpecial(by)
                 onPointed: (index) => world.specialSelected = index
                 onTaken: (index) => world.chooseSpecial(world.specialOffer[index])
@@ -3377,6 +3411,9 @@ ClayWorld2d {
         // Bolts (Balance.bolt) let loose, and the ones that hit an enemy
         property int bolts: 0
         property int boltHits: 0
+        // Specials let loose as their stronger version, by the combo
+        // (Balance.combo)
+        property int strongSpecials: 0
         // Shots this knight's perfect block sent back, and the ones of them
         // that hit an enemy (Balance.projectile)
         property int shotsBack: 0
@@ -3399,7 +3436,7 @@ ClayWorld2d {
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
         r.stuns = 0; r.stunFrozen = 0; r.stunInterrupted = 0
-        r.bolts = 0; r.boltHits = 0
+        r.bolts = 0; r.boltHits = 0; r.strongSpecials = 0
         r.shotsBack = 0; r.shotBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
@@ -3465,6 +3502,7 @@ ClayWorld2d {
         case "stunInterrupted": r.stunInterrupted += amount; break
         case "bolt": r.bolts++; break
         case "boltHit": r.boltHits++; break
+        case "strong": r.strongSpecials++; break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break
@@ -4066,7 +4104,21 @@ ClayWorld2d {
     // its balanced blade's share taken off
     readonly property var specialCards: specialOffer.map(id => ({
         id: id, name: Balance.specials[id].name, line: Balance.specials[id].line,
-        mana: player ? player.specialManaOf(id) : Balance.specials[id].mana }))
+        mana: player ? player.specialManaOf(id) : Balance.specials[id].mana,
+        strongName: Balance.combo[id] ? Balance.combo[id].name : "",
+        strongLine: Balance.combo[id] ? Balance.combo[id].line : "" }))
+    // The combo for a special's stronger version (Balance.combo, issue
+    // #320), as the choice shows it: away from the aim, then towards it,
+    // then the special's button, in the moves and the button as they are
+    // bound on the device in use; on the keys also the two move keys that
+    // make it while the knight aims up or is locked on an enemy
+    readonly property string comboHint: {
+        let button = controlName("whirlwind")
+        if (padInUse || touchControls) return "Combo: the stick away from your aim, then towards it, then " + button
+        let k = n => controlTable.keyName(controlTable.key(n))
+        return "Combo: away from your aim, then towards it, then " + button
+            + "  (aiming up: " + k("moveDown") + " " + k("moveUp") + " " + button + ")"
+    }
     // The chosen special's name, for the HUD and the controls hint
     readonly property string specialName: player && Balance.specials[player.special]
                                           ? Balance.specials[player.special].name : ""
@@ -6681,17 +6733,19 @@ ClayWorld2d {
     signal boltEnded(string boltId, string how, var enemy, int dealt, real x, real y,
                      real travelled, bool own)
     // This node's knight lets a bolt loose from (x, y), its centre, along
-    // (dx, dy), dealing damage to the first enemy it meets
-    function fireBolt(x, y, dx, dy, damage) {
+    // (dx, dy), dealing damage to the first enemy it meets; strong, the
+    // stronger version (Balance.combo.bolt), bigger and faster, on every
+    // screen
+    function fireBolt(x, y, dx, dy, damage, strong) {
         let id = (session.connected ? session.nodeId : "solo") + "-bolt" + (++_boltCount)
         playBoltShot()
-        session.sendBolt({id: id, x: x, y: y, dx: dx, dy: dy})
-        return _flyBolt(id, x, y, dx, dy, damage, true)
+        session.sendBolt({id: id, x: x, y: y, dx: dx, dy: dy, strong: strong === true})
+        return _flyBolt(id, x, y, dx, dy, damage, true, strong === true)
     }
-    function _flyBolt(id, x, y, dx, dy, damage, own) {
-        let size = Balance.bolt.size
+    function _flyBolt(id, x, y, dx, dy, damage, own, strong) {
+        let size = strong ? Balance.combo.bolt.size : Balance.bolt.size
         let b = boltComponent.createObject(world.room, {
-            boltId: id, own: own, damage: damage,
+            boltId: id, own: own, damage: damage, strong: strong === true,
             fromX: x, fromY: y, dirX: dx, dirY: dy,
             xWu: x - size / 2, yWu: y + size / 2,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
@@ -6719,7 +6773,7 @@ ClayWorld2d {
         let bo = Balance.bolt
         if (fx && how !== "reach")
             spawnSparks(x, y, -b.dirX, -b.dirY, bo.sparks, bo.coreColor)
-        if (fx) spawnRing(x, y, bo.color, how === "enemy" ? 1.0 : 0.6)
+        if (fx) spawnRing(x, y, b.strong ? Balance.combo.color : bo.color, how === "enemy" ? 1.0 : 0.6)
         if (how === "enemy" || how === "wall") {
             let gain = b.own ? 1 : remoteGain(x, y)
             if (how !== "enemy") gain *= bo.wallGain

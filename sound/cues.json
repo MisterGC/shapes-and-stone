@@ -1330,6 +1330,21 @@
       },
       "delivered": "2026-11-15T10:01:11.538478+00:00",
       "verdict": null
+    },
+    "sfx/special_surge": {
+      "category": "sfx",
+      "brief": "a special's stronger version, fired by its direction combo: a bright swell rising an octave and a half with a high chime ringing after it and a shimmer over it, layered over the special's own sound; once per stronger special",
+      "mode": "live",
+      "source": "sfx/special_surge.sfx.json",
+      "render": "sfx/special_surge.wav",
+      "report": "sfx/special_surge.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-15T10:54:10.652933+00:00",
+      "verdict": null
     }
   }
 }

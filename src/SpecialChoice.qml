@@ -8,12 +8,15 @@ import QtQuick
 // right, as the keyboard's stick, and a gamepad's stick or D-pad and A
 // come through MenuPad (padMove, padConfirm); the mouse picks a card by a
 // click. The card under the keys or the stick is drawn in
-// Balance.specials.pickColor
+// Balance.specials.pickColor. Each card names the special's stronger
+// version and what is stronger about it, and a line under the cards the
+// combo that fires it (Balance.combo, issue #320)
 Item {
     id: choice
     objectName: "specialChoice"
 
-    // The cards, [{id, name, line, mana}], in Balance.specials.order
+    // The cards, [{id, name, line, mana, strongName, strongLine}], in
+    // Balance.specials.order
     property var cards: []
     // The card under the keys or the stick (Game.specialSelected)
     property int selected: 0
@@ -23,6 +26,9 @@ Item {
     property var padLabels: ({ A: "A" })
     // What the keys that move and take are bound to, for the hint
     property string keysMove: "A/D"
+    // The combo for the stronger version, in the controls as bound
+    // (Game.comboHint)
+    property string combo: ""
 
     // A move along the cards, a card under the mouse, a card taken
     signal moved(int by)
@@ -88,6 +94,15 @@ Item {
                             font.pixelSize: 13
                         }
                         Text {
+                            objectName: "specialStrong"
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            visible: card.modelData.strongName !== ""
+                            text: "Combo: " + card.modelData.strongName + ", " + card.modelData.strongLine
+                            color: Balance.combo.color
+                            font.pixelSize: 12
+                        }
+                        Text {
                             objectName: "specialMana"
                             width: parent.width
                             text: card.modelData.mana + " mana"
@@ -105,6 +120,16 @@ Item {
                     }
                 }
             }
+        }
+        Text {
+            objectName: "specialCombo"
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: choice.combo !== ""
+            text: choice.combo
+            color: Balance.combo.color
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 13
         }
         Text {
             objectName: "specialHint"

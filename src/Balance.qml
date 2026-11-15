@@ -320,6 +320,61 @@ QtObject {
         wallGain: 0.5
     })
 
+    // The combo (issue #320): a short combo of directions entered with the
+    // moves - keys, stick or touch pad, as they are bound - just before the
+    // special's button fires the special's stronger version for the same
+    // mana. The combo is away from the knight's aim, then towards it: the
+    // moves point within cone degrees of the way away from its facing on a
+    // physics step, then within cone degrees of its facing no later than
+    // gap seconds after the last step they pointed away, the combo entered
+    // on that step; moves under deadZone of a full push point nowhere. The
+    // button within window seconds of it fires the stronger version, later
+    // the normal one; a combo entered the other way round, or away again
+    // after it, is none, and so is one the knight was aimed elsewhere in.
+    // Away is judged against the facing from before the moves turned it,
+    // for at most awayMax seconds of pushing away, so a pad's left stick
+    // that aims as the knight walks turns the knight round at once and
+    // still enters the combo; pushed away longer, the knight has turned
+    // round. The knight walks on through it all. Each
+    // special's stronger version has a name, a line of what is stronger
+    // and its numbers:
+    // - whirlwind: spins duration seconds instead of knight.whirlDuration,
+    //   hits every standing enemy within reach instead of
+    //   knight.whirlReach for swing times atk instead of knight.whirlSwing;
+    //   it still needs full momentum
+    // - stun: freezes for freeze seconds instead of stun.freeze, every
+    //   weak and normal enemy within reach instead of stun.reach; a lead
+    //   or the Warden in it still only loses its wind-up, never opened
+    // - bolt: damage times atk instead of bolt.damage, size wu across
+    //   instead of bolt.size, at speed instead of bolt.speed; on a lead or
+    //   the Warden still a chip that never breaks the stance
+    // As it fires the knight shows the stronger version's name in
+    // wordColor over it, a ring of color out to ring wu and sparks sparks
+    // round it, and plays sound/sfx/special_surge at volume over the
+    // special's own sound; a stronger whirlwind's blade glows color, a
+    // stronger stun's ring and a stronger bolt are drawn in color, and a
+    // stronger stun shakes the screen by trauma. In a session every screen
+    // sees and hears it
+    readonly property var combo: ({
+        window: 0.35,
+        gap: 0.25,
+        cone: 50,
+        deadZone: 0.5,
+        awayMax: 0.5,
+        whirlwind: { name: "Tempest", line: "spins longer and wider, hits harder",
+                     duration: 0.5, reach: 2.2, swing: 3 },
+        stun: { name: "Quake", line: "freezes further and longer",
+                freeze: 2.5, reach: 3.5 },
+        bolt: { name: "Lance", line: "a bigger, faster blast, twice the damage",
+                damage: 2.0, size: 0.6, speed: 22.0 },
+        color: "#FFD45A",
+        wordColor: "#FFE89A",
+        ring: 1.4,
+        sparks: 18,
+        trauma: 0.45,
+        volume: 0.8
+    })
+
     // The kill chain (issue #270): a kill within window seconds of the
     // knight's last one, on the physics clock, is the next link of its
     // chain; a kill later than that starts a new one, and a hit the knight

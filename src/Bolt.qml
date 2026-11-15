@@ -8,7 +8,9 @@ import Clayground.World
 // ends at the first enemy it meets, at a wall or past its reach. Only the
 // bolt of this screen's knight (own) deals the enemy its blow; another
 // knight's flies here to be seen and bursts on the enemy it meets alone.
-// It hurts no knight: its sensor does not meet one
+// It hurts no knight: its sensor does not meet one. A strong one is the
+// stronger version (Balance.combo.bolt, issue #320): bigger, faster and
+// drawn in Balance.combo.color, on every screen
 PhysicsItem {
     id: bolt
     objectName: "bolt"
@@ -20,7 +22,9 @@ PhysicsItem {
     property real dirY: 0
     property real fromX: 0
     property real fromY: 0
-    property real speed: Balance.bolt.speed
+    property bool strong: false
+    readonly property color _color: strong ? Balance.combo.color : Balance.bolt.color
+    property real speed: strong ? Balance.combo.bolt.speed : Balance.bolt.speed
     property real reach: Balance.bolt.reach
     property int damage: 0
     property bool own: false
@@ -32,8 +36,8 @@ PhysicsItem {
     // - the enemy it met, null for none, and the damage it dealt there
     signal ended(string how, var enemy, int dealt)
 
-    widthWu: Balance.bolt.size
-    heightWu: Balance.bolt.size
+    widthWu: strong ? Balance.combo.bolt.size : Balance.bolt.size
+    heightWu: widthWu
     bodyType: Body.Dynamic
     bullet: true
     fixedRotation: true
@@ -51,7 +55,7 @@ PhysicsItem {
         offsetXWu: bolt.widthWu / 2
         offsetYWu: -bolt.heightWu / 2
         radius: Balance.bolt.light
-        color: Balance.bolt.color
+        color: bolt._color
         intensity: 1.0
         castsShadows: false
     }
@@ -63,7 +67,7 @@ PhysicsItem {
         width: parent.width * 2.2
         height: parent.height * 0.6
         radius: height / 2
-        color: Balance.bolt.color
+        color: bolt._color
         opacity: 0.45
         transformOrigin: Item.Right
         rotation: -Math.atan2(bolt.dirY, bolt.dirX) * 180 / Math.PI
@@ -73,7 +77,7 @@ PhysicsItem {
         width: parent.width * 1.7
         height: width
         radius: width / 2
-        color: Balance.bolt.color
+        color: bolt._color
         opacity: 0.4
     }
     Rectangle {

@@ -139,6 +139,11 @@ Window {
             game.playBoltHit()
             check(shot && hit && shot.lastSeed !== shotSeed && hit.lastSeed !== hitSeed,
                   "the game's own calls play the bolt's shot and hit from their recipes")
+            // A special's stronger version's swell (issue #320)
+            let surge = p["sfx/special_surge.sfx.json"], surgeSeed = surge ? surge.lastSeed : null
+            game.playSurge()
+            check(surge && surge.lastSeed !== surgeSeed,
+                  "the game's own call plays a stronger special's swell from its recipe")
             let n = game.veinSoundCount
             game.playChink(-1)
             game.playTink(4)

@@ -101,7 +101,15 @@ chip of it on a lead's stance, a guardian's shield's share from its front
 bolt that ended at a wall ended at the room's wall and none outside the
 room; and in the spitter duel the masher with the bolt takes at least
 Balance.pacing.duelSlow seconds to kill the lead, or falls, as the masher
-must in a duel.
+must in a duel. It also enters the combo by hand in the flow room
+(Sandbox.tryCombo, issue #320): for each special the knight's moves away
+from its aim, then towards it, as a pilot walks, and the special's button
+at once, then the same with the button later than Balance.combo.window;
+--check tests that the combo fires each stronger version - the stun
+freezes an enemy past the stun's reach, the bolt deals
+Balance.combo.bolt.damage times atk, the whirlwind hits enemies past its
+reach for Balance.combo.whirlwind.swing times atk and spins longer - the
+late button the normal one, and that the knight walks on through it.
 --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
@@ -305,6 +313,60 @@ def check_bolt_shots(s, step=1 / 60):
          f"bolt by hand: shot at the room's wall {wall['toWall']} wu off it stops there ({wall.get('how')} after "
          f"{wall.get('travelled')} wu, {wall.get('edge')} wu from the centre, the wall at {s['roomHalf']})"),
     ]
+
+
+def enter_combos(loader, seed):
+    """The combo entered by hand in the flow room for each special, and
+    late (Sandbox.tryCombo, issue #320), or raises FightError"""
+    tmp, bench, proc, log = start_loader(loader)
+    try:
+        if not bench.wait_phase("ready"):
+            raise FightError("the sandbox did not load", tmp)
+        if bench.eval1(f"begin({seed}, 'mix', 0, 'flow', 0)") is not True:
+            raise FightError("the fight room did not start", tmp)
+        time.sleep(1.0)
+        combos = json.loads(bench.eval1("tryCombo()") or "null")
+    except (TimeoutError, json.JSONDecodeError, TypeError) as e:
+        raise FightError(f"the combos could not be entered: {e}", tmp)
+    finally:
+        stop_loader(proc, log)
+    if not isinstance(combos, dict):
+        raise FightError(f"the combos gave nothing: {combos!r}", tmp)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return combos
+
+
+def check_combos(c):
+    """(ok, line) for the combos entered by hand: each special's stronger
+    version right after the combo, the knight walking on through it, and
+    the normal one with the button late"""
+    lines = []
+    when = f"away {c['away']} steps, towards {c['towards']}"
+    late = f"later than the window of {c['window']} s"
+    s, sl = c["stun"], c["stunLate"]
+    lines.append((s["ready"] and s["strong"] and s["frozen"],
+                  f"combo by hand: {when}, then the button, fires the stronger stun: an enemy {s['gap']} wu off, "
+                  f"past the stun's reach, freezes (combo {'entered' if s['ready'] else 'not entered'}, "
+                  f"{'stronger' if s['strong'] else 'normal'}, {'frozen' if s['frozen'] else 'not frozen'})"))
+    lines.append((sl["went"] and not sl["strong"] and not sl["frozen"],
+                  f"combo by hand: the button {late} fires the normal stun, the enemy {sl['gap']} wu off not "
+                  f"frozen ({'stronger' if sl['strong'] else 'normal'}, {'frozen' if sl['frozen'] else 'not frozen'})"))
+    b, bl = c["bolt"], c["boltLate"]
+    lines.append((b["strong"] and b["lost"] == b["want"] and bl["went"] and not bl["strong"] and bl["lost"] == bl["want"]
+                  and bl["size"] < b["size"],
+                  f"combo by hand: the stronger bolt deals {b['want']} (lost {b['lost']}, {b['size']} wu across), "
+                  f"the late one the normal {bl['want']} (lost {bl['lost']}, {bl['size']} wu across)"))
+    w, wl = c["whirl"], c["whirlLate"]
+    lines.append((w["strong"] and all(x == w["want"] for x in w["lost"]) and wl["went"] and not wl["strong"]
+                  and wl["lost"] == [0, 0] and w["seconds"] > wl["seconds"],
+                  f"combo by hand: the stronger whirlwind hits both enemies {round(w['side'], 2)} wu either side for "
+                  f"{w['want']} (lost {w['lost']}) over {w['seconds']} s, the late one neither (lost {wl['lost']}) "
+                  f"over {wl['seconds']} s"))
+    slowest = min(x["slowest"] for x in (s, b, w))
+    lines.append((slowest >= c["moveSpeed"] * 0.5,
+                  f"combo by hand: the knight walks on through every combo (slowest {slowest:.2f} wu/s, "
+                  f"its speed {c['moveSpeed']})"))
+    return lines
 
 
 def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
@@ -880,17 +942,26 @@ def pacing(args, loader):
             fights += [("spitterduel", d, BOLT) for d in depths]
     results, errors = {}, []
     shots = None
+    combos = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(play_fight, loader, args.seed, a, d, room, -1, args.max_seconds,
                                args.batch): (room, d, a) for room, d, a in fights}
         # The bolts shot by hand (issue #319)
         shooting = pool.submit(shoot_bolts, loader, args.seed) \
             if not args.answers and "flow" in rooms else None
+        # The combos entered by hand (issue #320)
+        entering = pool.submit(enter_combos, loader, args.seed) \
+            if not args.answers and "flow" in rooms else None
         if shooting:
             try:
                 shots = shooting.result()
             except FightError as e:
                 errors.append(f"FAIL the bolts by hand: {e}; logs in {e.logs}")
+        if entering:
+            try:
+                combos = entering.result()
+            except FightError as e:
+                errors.append(f"FAIL the combos by hand: {e}; logs in {e.logs}")
         for fut in concurrent.futures.as_completed(futures):
             key = futures[fut]
             try:
@@ -931,6 +1002,8 @@ def pacing(args, loader):
         lines += check_stun(ordered) + check_bolt(ordered)
         if shots:
             lines += check_bolt_shots(shots)
+        if combos:
+            lines += check_combos(combos)
     if lines:
         print()
         for ok, line in lines:
