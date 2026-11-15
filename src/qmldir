@@ -36,6 +36,7 @@ CampTalk 1.0 CampTalk.qml
 CampSounds 1.0 CampSounds.qml
 Projectile 1.0 Projectile.qml
 Bolt 1.0 Bolt.qml
+MetalBall 1.0 MetalBall.qml
 Npc 1.0 Npc.qml
 DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml

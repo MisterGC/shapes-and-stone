@@ -1167,8 +1167,13 @@ ClayWorld2d {
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
             playSpitShot(shot.x, shot.y)
         }
+        onBallReceived: (b) => {
+            if (screen !== "game" || _ballsDone[b.id] || _ballById[b.id]) return
+            _flyBall(b.id, b.x, b.y, b.dx, b.dy, b.damage)
+        }
         onStruckReported: (fromId, report) => {
             if (report.source === "shot") _shotReported(report)
+            else if (report.source === "ball") _ballReported(report)
             else if (report.source === "arrow") _arrowReported(report)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
@@ -1534,7 +1539,7 @@ ClayWorld2d {
         let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand,
                                   isBossDepth(depthOf(index)))
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
-                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0, warden: 0,
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0, slinger: 0, warden: 0,
                     secrets: secretsOf(index, position) }
         for (let e of enemies) {
             out[["weak", "normal", "tough"][e.tier]]++
@@ -1588,7 +1593,9 @@ ClayWorld2d {
                    + (tiers.length > 0 ? ", " + tiers.join(", ") : "") + ".")
         let kinds = [f.guardian > 0 ? f.guardian + " behind shields" : "",
                      f.spitter > 0 ? f.spitter + (f.spitter === 1 ? " that spits" : " that spit")
-                                     + " from afar" : ""].filter(t => t !== "")
+                                     + " from afar" : "",
+                     f.slinger > 0 ? f.slinger + (f.slinger === 1 ? " of iron that slings" : " of iron that sling")
+                                     + " balls off the walls" : ""].filter(t => t !== "")
         lines.push(kinds.length > 0 ? "Among them " + kinds.join(" and ") + "."
                                     : "No shields, nothing that spits - only teeth.")
         if (f.secrets > 0)
@@ -3447,6 +3454,11 @@ ClayWorld2d {
         // that hit an enemy (Balance.projectile)
         property int shotsBack: 0
         property int shotBackHits: 0
+        // Metal balls this knight's shield bounced, the ones of them a
+        // perfect block aimed, and the ones that hit an enemy (Balance.ball)
+        property int ballsBack: 0
+        property int ballsAimed: 0
+        property int ballBackHits: 0
         property int kills: 0
         // Kill chains of two links or more (Balance.chain), and the
         // longest one's links
@@ -3472,6 +3484,7 @@ ClayWorld2d {
         r.stuns = 0; r.stunFrozen = 0; r.stunInterrupted = 0
         r.bolts = 0; r.boltHits = 0; r.strongSpecials = 0
         r.shotsBack = 0; r.shotBackHits = 0
+        r.ballsBack = 0; r.ballsAimed = 0; r.ballBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
         r.chainBlows = 0; r.chainExtra = 0; r.chainPeak = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
@@ -3484,7 +3497,9 @@ ClayWorld2d {
     // enemy it hit), stun (a stun went off), stunFrozen and
     // stunInterrupted (with the enemies it froze and the wind-ups it
     // ended), bolt (a bolt let loose), boltHit (one hit an enemy), shotBack (a perfect block sent a shot back),
-    // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
+    // shotBackHit (a shot it sent back hit an enemy), ballBack (its shield
+    // bounced a metal ball, amount 1 for a perfect block's), ballBackHit (a
+    // ball it bounced hit an enemy), kill, chain (a kill made a chain amount links long),
     // chainBlow (the chain's bonus added amount points to a blow),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
@@ -3557,6 +3572,11 @@ ClayWorld2d {
             break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
+        case "ballBack":
+            r.ballsBack++
+            if (amount === 1) r.ballsAimed++
+            break
+        case "ballBackHit": r.ballBackHits++; break
         case "fall": r.deaths++; break
         case "lift": r.lifts++; break
         case "lifted": r.lifted++; break
@@ -4279,6 +4299,7 @@ ClayWorld2d {
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
+    Component { id: ballComponent; MetalBall {} }
     Component { id: boltComponent; Bolt {} }
     Component { id: npcComponent; Npc {} }
     Component { id: goldDropComponent; GoldDrop {} }
@@ -4789,8 +4810,16 @@ ClayWorld2d {
             let ex = (room.x + 1 + rand() * (room.w - 2)) * cellSize
             let ey = (room.y + 1 + rand() * (room.h - 2)) * cellSize
             let tier = i < spawnRooms.length && leads.indexOf(r) >= 0 ? 2 : tiers[fodder++]
-            // Enemy type: guardian, spitter, else grunt
+            // Enemy type: guardian, spitter, else grunt; a lead may be a
+            // slinger (issue #322), and the others share the rest of the
+            // roll out as before
             let typeRoll = rand()
+            let sc = tier === 2 ? (sb.slingerChance || 0) : 0
+            if (sc > 0 && typeRoll < sc) {
+                out.push({x: ex, y: ey, tier: tier, type: "slinger", room: r})
+                continue
+            }
+            if (sc > 0) typeRoll = (typeRoll - sc) / (1 - sc)
             let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
             let type = typeRoll < guardianChance ? "guardian"
                 : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
@@ -6448,7 +6477,9 @@ ClayWorld2d {
             leadShare: Math.max(0, Math.min(bd.leadCap, sb.leadShare + d * bd.leadShare)),
             guardianChance: Math.min(bd.typeCap, sb.guardianChance + d * bd.guardianChance),
             guardianChanceTough: Math.min(bd.typeCap, sb.guardianChanceTough + d * bd.guardianChance),
-            spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance)
+            spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance),
+            // From its depth on, a share of the leads are slingers (issue #322)
+            slingerChance: Math.floor(d) >= sb.slingerDepth ? sb.slingerChance : 0
         }
     }
 
@@ -6766,6 +6797,98 @@ ClayWorld2d {
             proj.gone.connect(() => { if (world._shotById[id] === proj) delete world._shotById[id] })
             console.log("[Game] Projectile", id, "spawned at", px.toFixed(1), py.toFixed(1))
         }
+    }
+
+    // --- The slinger's metal balls (Balance.ball, issue #322) ---
+    // In a session the host's slinger slings on every node: each node
+    // flies the ball under the host's id for it and bounces it off the
+    // walls itself - mirrored off the grid's cells, so its path is the
+    // same on every screen. It hurts only that node's knight: that node
+    // judges it by its knight's own state and reports it - "hit" where
+    // the ball fell, or "blocked" or "perfect" where the shield met it and
+    // the way it went -, and every other node puts its ball of that id
+    // there, falling or turned. The node whose knight's shield turned it
+    // judges the enemy it hits and reports where it fell ("enemy"). A
+    // ball that falls at a wall or at the end of its time falls on each
+    // screen alone.
+    property int _ballCount: 0
+    property var _ballById: ({})
+    // Balls a report reached before the host's ball did, by id: it flies
+    // no more when it comes
+    property var _ballsDone: ({})
+    // Ball id bounced off a wall here, its n-th, its centre at (x, y)
+    signal ballBounced(string ballId, int n, real x, real y)
+    // A shield turned ball id: by "blocked" or "perfect", this node's
+    // knight's (local) or another's, which reported it; (dx, dy) the way
+    // it went
+    signal ballTurned(string ballId, string by, bool local, real dx, real dy)
+    // Ball id fell here: how (MetalBall.fell), its wall bounces, by what a
+    // shield turned it ("" none), and where its centre was
+    signal ballFell(string ballId, string how, int bounces, string turnedBy, real x, real y)
+    // Whether cell (gx, gy) stops a ball: a wall, a shut door, or past the
+    // grid's edge
+    function ballSolid(gx, gy) {
+        if (gy < 0 || gy >= grid.length || !grid[gy] || gx < 0 || gx >= grid[gy].length) return true
+        if (grid[gy][gx] === cellWall) return true
+        return doors.length > 0 && doorShut(gx + "," + gy)
+    }
+    // A slinger slings a ball from its centre (x, y) along (dx, dy),
+    // damage the blow it deals a knight: the host's on every node
+    function spawnBall(x, y, dx, dy, damage) {
+        let id = "ball" + (++_ballCount)
+        if (session.connected && session.isHost)
+            session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage})
+        return _flyBall(id, x, y, dx, dy, damage)
+    }
+    // This node's knight met ball id: "hit" where it fell at (x, y), or
+    // "blocked" or "perfect" where its shield turned it there, along
+    // (dx, dy)
+    function ballLanded(id, result, x, y, dx, dy) {
+        let report = {source: "ball", id: id, result: result, x: x, y: y}
+        if (result === "blocked" || result === "perfect") {
+            report.dx = dx
+            report.dy = dy
+            countFight("ballBack", result === "perfect" ? 1 : 0)
+            ballTurned(id, result, true, dx, dy)
+        }
+        if (session.connected) session.reportStruck(report)
+    }
+    // Another node's knight met ball id, or its shield's ball an enemy:
+    // here it falls there, or is turned from there the way it went
+    function _ballReported(r) {
+        let b = _ballById[r.id]
+        if (r.result === "blocked" || r.result === "perfect") {
+            if (!b || b.destroyed) b = _flyBall(r.id, r.x, r.y, r.dx, r.dy, 0)
+            _ballsDone[r.id] = true
+            if (b) b.turn(r.result, false, 0, r.x, r.y, r.dx, r.dy)
+            ballTurned(r.id, r.result, false, r.dx, r.dy)
+            return
+        }
+        _ballsDone[r.id] = true
+        if (b && !b.destroyed) b.fallAt(r.x, r.y, "report")
+    }
+    function _flyBall(id, x, y, dx, dy, damage) {
+        let size = Balance.ball.size
+        let b = ballComponent.createObject(world.room, {
+            ballId: id,
+            xWu: x - size / 2, yWu: y + size / 2,
+            dirX: dx, dirY: dy,
+            damage: damage,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world,
+            // Its sensor: the knight, and the enemy a shield's ball hits;
+            // the walls are the grid's (ballSolid)
+            sensorCategories: catProjectile,
+            sensorCollidesWith: catPlayer | catEnemy
+        })
+        if (!b) return null
+        _ballById[id] = b
+        b.bounced.connect((n, bx, by) => world.ballBounced(id, n, bx, by))
+        b.fell.connect(how => world.ballFell(id, how, b.bounces, b.turnedBy, b.centreX, b.centreY))
+        b.gone.connect(() => { if (world._ballById[id] === b) delete world._ballById[id] })
+        console.log("[Game] Ball", id, "from", x.toFixed(1), y.toFixed(1))
+        return b
     }
 
     // --- The bolt (Balance.bolt, issue #319) ---
@@ -7095,6 +7218,11 @@ ClayWorld2d {
         }
         _shotById = {}
         _shotsBack = {}
+        for (let id in _ballById) {
+            try { if (_ballById[id] && !_ballById[id].destroyed) _ballById[id].vanish() } catch(err) {}
+        }
+        _ballById = {}
+        _ballsDone = {}
 
         grid = []
         rooms = []
@@ -9519,11 +9647,12 @@ ClayWorld2d {
     // "flow" and "duel" are the fight room with the pacing bench's rooms
     // (Balance.pacing): fodder only, and a room's lead alone, a grunt;
     // "guardianduel" the same with a guardian lead (Balance.pacing
-    // .guardianDuel), "spitterduel" with a spitter lead (.spitterDuel)
+    // .guardianDuel), "spitterduel" with a spitter lead (.spitterDuel),
+    // "ballduel" with a slinger lead (.ballDuel, issue #322)
     // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
     // .boss), "bossroom" the dungeon at the boss depth's danger with the
     // knight at the Warden's door (Balance.boss)
-    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "spitterduel", "boss", "bossroom", "features", "deep"] }
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "spitterduel", "ballduel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -9564,6 +9693,8 @@ ClayWorld2d {
             enterFightRoom(Balance.pacing.guardianDuel)
         else if (name === "spitterduel")
             enterFightRoom(Balance.pacing.spitterDuel)
+        else if (name === "ballduel")
+            enterFightRoom(Balance.pacing.ballDuel)
         else if (name === "bossroom") {
             generateDungeon()
             toBossDoor()

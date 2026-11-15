@@ -110,6 +110,7 @@ clay_app(shapes_and_stone
         src/CampSounds.qml
         src/Projectile.qml
         src/Bolt.qml
+        src/MetalBall.qml
         src/Npc.qml
         src/DialoguePanel.qml
         src/TitleScreen.qml

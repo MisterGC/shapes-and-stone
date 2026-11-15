@@ -500,6 +500,10 @@ QtObject {
         grunt: { hpBonus: 2, leadHp: 0.67, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 0, leadHp: 0.67, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -2, leadHp: 1, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // The slinger (issue #322): a lead of iron that slings metal balls
+        // (Balance.ball), only ever a room's lead (spawn.slingerChance);
+        // it keeps its distance as the spitter does
+        slinger: { hpBonus: -2, leadHp: 1, atk: 14, def: 1, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // The Hollow Warden (Balance.boss): its HP is the boss table's
         warden: { hpBonus: 0, leadHp: 1, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
         // How often an enemy decides, and how often a chase re-plans its path
@@ -558,7 +562,7 @@ QtObject {
         crushMana: 15,
         crushLockout: 0.5,
         crushShare: 0.6,
-        // Spitter: keeps its distance and shoots
+        // A spitter or a slinger: keeps its distance and shoots
         preferredDist: 5.0,
         // Backs off below this share of preferredDist, closes in above the other
         tooClose: 0.7,
@@ -584,6 +588,38 @@ QtObject {
         backDamage: 1.0
     })
 
+    // A slinger's metal ball (issue #322): size wu across, flying from the
+    // slinger's centre at the knight's at speed. It bounces off the walls
+    // and a shut door bounces times, mirrored; the next wall it meets it
+    // falls at, lies restTime seconds and is gone. lifetime seconds after
+    // it left, or after a shield sent it, it falls where it is. A knight it
+    // meets takes the slinger's atk; a dash goes through it. Any raised
+    // shield facing it bounces it, at the shield's mana as a blocked shot:
+    // a plain block off the shield like a mirror, at least glance degrees
+    // off the line it came along, at the speed it had; a perfect block
+    // along the way the knight faces at backSpeed. A ball a shield bounced
+    // hurts no knight; the first enemy it meets takes backDamage times the
+    // swing (atk) of the knight whose shield sent it, and it falls; a lead
+    // it hits opens (cause "ball"), the blow landing whole. A shield's
+    // bounce is no wall's: it does not count. It is color, a shield's
+    // turnedColor; its shot plays at shotVolume, a bounce at bounceVolume,
+    // its fall the bounce fallPitch semitones down
+    readonly property var ball: ({
+        size: 0.36,
+        speed: 8.0,
+        backSpeed: 12.0,
+        bounces: 4,
+        glance: 35,
+        lifetime: 10.0,
+        restTime: 0.6,
+        backDamage: 1.0,
+        color: "#8A949E",
+        turnedColor: "#DDF4FF",
+        shotVolume: 0.7,
+        bounceVolume: 0.6,
+        fallPitch: -5
+    })
+
     readonly property var spawn: ({
         // Rooms per dungeon, rolled evenly from roomsMin to roomsMax, each
         // roomSizeMin to roomSizeMax cells a side; the build and the witch's
@@ -606,6 +642,11 @@ QtObject {
         guardianChance: 0.15,
         guardianChanceTough: 0.4,
         spitterChance: 0.2,
+        // The slinger (issue #322), a kind of lead: from depth slingerDepth
+        // on, slingerChance of the rooms' leads are slingers; the type
+        // rolls above share the rest out as before
+        slingerDepth: 1,
+        slingerChance: 0.25,
         // The village fight room: who stands where, offset in wu from its
         // centre, and how long after it is cleared it fills up again
         fightRoom: [
@@ -679,6 +720,11 @@ QtObject {
         // checks it, the person below plays it (issue #315)
         spitterDuel: [
             { dx: 0, dy: 4, tier: 2, type: "spitter" }
+        ],
+        // ballDuel the same with a slinger lead, the fourth kind (issue
+        // #322); no band of this table checks it either
+        ballDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "slinger" }
         ],
         // The person (issue #315): a fourth pilot, "person", plays as
         // "skilled" does with a person's reaction and misses. It answers
@@ -794,6 +840,12 @@ QtObject {
             spitter: [
                 { name: "volley", beats: [1, 1, 1] },
                 { name: "stutter", beats: [1, 0, 1, 2] }
+            ],
+            // The slinger's (issue #322): one ball, then rests while it
+            // bounces about
+            slinger: [
+                { name: "serve", beats: [1, 0, 0] },
+                { name: "feint-serve", beats: [2, 0, 0, 1, 0, 0] }
             ],
             // The Hollow Warden's three (Balance.boss), on its own beat
             warden: [
