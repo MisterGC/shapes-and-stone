@@ -90,7 +90,7 @@ gamepad, whichever was used last. By default:
 | Effects on and off | V | - |
 | Menu | Esc | Start |
 
-In a dialogue 1 to 5 buy what is offered; on a pad the stick picks a ware,
+In a dialogue 1 to 6 buy what is offered; on a pad the stick picks a ware,
 the potion's button buys it and the dash's closes the dialogue.
 
 *Control Input*, in the menu under *Sound* and on the title, shows the
@@ -1631,7 +1631,7 @@ up to `value[1]` with all of them clean (`Balance.deep.shapes`); the HUD
 shows a gem of each shape the pouch holds and how many, beside the gold.
 The pouch goes with the knight from level to level, and the smith buys
 it: talking to him, his first ware is the gems, 1 sells them all for
-their worth (the keys 1 to 5 pick his wares now). A knight that falls
+their worth (the keys 1 to 6 pick his wares now). A knight that falls
 drops its pouch where it fell: another knight whose centre comes within
 `pouchReach` of it, or who lifts the fallen one up, takes it; one left on
 the floor is lost with the level. In a session each screen judges its
