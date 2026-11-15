@@ -255,6 +255,11 @@ Item {
             // Kill chains of two links or more, and the longest's links
             chains: r.chains,
             longestChain: r.longestChain,
+            // The blows the chain's bonus made stronger, the points it
+            // added and its peak (Balance.chain.bonusShare, issue #321)
+            chainBlows: r.chainBlows,
+            chainExtra: r.chainExtra,
+            chainPeak: round3(r.chainPeak),
             deaths: r.deaths,
             clearSeconds: r.clearSeconds >= 0 ? round3(r.clearSeconds) : null,
             knightHp: p ? p.hp : 0,

@@ -585,7 +585,10 @@ PhysicsItem {
     // whirlwind's hits, whole points; without a bonus it is dmg
     function chained(dmg) {
         let bonus = gameWorld && gameWorld.chainBonus ? gameWorld.chainBonus : 0
-        return bonus > 0 ? Math.floor(dmg * (1 + bonus) + 1e-6) : dmg
+        if (bonus <= 0) return dmg
+        let more = Math.floor(dmg * (1 + bonus) + 1e-6)
+        if (gameWorld.countFight) gameWorld.countFight("chainBlow", more - dmg)
+        return more
     }
 
     // Check if an enemy is within the attack arc: a heavy swing's when one

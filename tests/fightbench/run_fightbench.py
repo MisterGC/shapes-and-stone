@@ -462,6 +462,9 @@ def describe(r):
     if pitches:
         lines.append(f"  chains {r['chains']}, longest {r['longestChain']}; the death sound at "
                      + ", ".join(f"{p:+d}" for p in pitches) + " semitones")
+    if r.get("chainBlows"):
+        lines.append(f"  chain bonus: {r['chainBlows']} blows stronger, +{r['chainExtra']} points, "
+                     f"peak +{round(r['chainPeak'] * 100)}%")
     cues = Counter(s["cue"] + ("" if not s["pitch"] else f"{s['pitch']:+d}") for s in r["sounds"])
     lines.append(f"  heard: {len(r['sounds'])} sounds - "
                  + ", ".join(f"{c} {n}" for c, n in sorted(cues.items(), key=lambda kv: -kv[1])))

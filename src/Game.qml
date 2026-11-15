@@ -3452,6 +3452,11 @@ ClayWorld2d {
         // longest one's links
         property int chains: 0
         property int longestChain: 0
+        // Blows the chain's bonus made stronger (Balance.chain.bonusShare),
+        // the points it added before defense and the highest it went
+        property int chainBlows: 0
+        property int chainExtra: 0
+        property real chainPeak: 0
         property int deaths: 0
         // Fallen allies this knight lifted up, and the times an ally lifted
         // it up (a rise at camp is neither)
@@ -3468,6 +3473,7 @@ ClayWorld2d {
         r.bolts = 0; r.boltHits = 0; r.strongSpecials = 0
         r.shotsBack = 0; r.shotBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
+        r.chainBlows = 0; r.chainExtra = 0; r.chainPeak = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
         r.seconds = 0; r.clearSeconds = -1
         breakChain()
@@ -3479,6 +3485,7 @@ ClayWorld2d {
     // stunInterrupted (with the enemies it froze and the wind-ups it
     // ended), bolt (a bolt let loose), boltHit (one hit an enemy), shotBack (a perfect block sent a shot back),
     // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
+    // chainBlow (the chain's bonus added amount points to a blow),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
     // --- The kill chain (Balance.chain, issue #270) ---
@@ -3543,6 +3550,11 @@ ClayWorld2d {
         case "bolt": r.bolts++; break
         case "boltHit": r.boltHits++; break
         case "strong": r.strongSpecials++; break
+        case "chainBlow":
+            r.chainBlows++
+            r.chainExtra += amount
+            r.chainPeak = Math.max(r.chainPeak, chainBonus)
+            break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break
