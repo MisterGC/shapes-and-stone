@@ -80,6 +80,7 @@ gamepad, whichever was used last. By default:
 | Shield | right button | L1 |
 | Dash | Space | B |
 | Special (the one picked for the dungeon) | Q | R2 |
+| Its stronger version: move away from your aim, then towards it, then | Q | R2 |
 | Talk, open a door | E | A |
 | Potion | 1 | X |
 | Draught | 2 | Y |
@@ -144,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2000,6 +2001,45 @@ exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/bolt/bolt.qml
 ```
 
+A combo of two directions just before the special's button fires the
+special's stronger version for the same mana (`Balance.combo`, issue
+#320): the moves away from the knight's aim, then towards it - with the
+keys, the stick or the touch pad, as they are bound - and the button
+within `combo.window` seconds. On a physics step the moves point away
+when they are within `combo.cone` degrees of the way opposite the
+knight's facing, towards when within it of the facing, and nowhere under
+`combo.deadZone` of a full push; towards no later than `combo.gap` seconds
+after the last step away enters the combo. Locked on an enemy, or aiming
+up, it is S then W. The knight walks on through it, and someone who
+never learns it loses nothing: the button later than the window, the
+combo the other way round or the moves away again after it fire the
+normal special. The stronger versions: the whirlwind spins
+`combo.whirlwind.duration` seconds, hits within `combo.whirlwind.reach`
+for `combo.whirlwind.swing` times atk and still needs full momentum; the
+stun freezes for `combo.stun.freeze` seconds within `combo.stun.reach`, a
+lead or the Warden in it still only losing its wind-up; the bolt deals
+`combo.bolt.damage` times atk, `combo.bolt.size` wu across at
+`combo.bolt.speed`, still a chip on a lead's stance that never breaks it.
+Each has a name - *Tempest*, *Quake*, *Lance* - that shows over the
+knight as it fires, with a gold ring and sparks round it and the swell
+`sfx/special_surge` over the special's own sound; the stronger whirlwind's
+blade glows gold, the stronger stun's ring and the stronger bolt are gold.
+A whirlwind out of a full charge and a dash stays the normal one. The
+choice of specials names each one's stronger version on its card and
+the combo under the cards, in the keys as bound ("aiming up: S W Q") or
+for the stick. In co-op the other screens see the name, the ring and the
+stronger whirlwind, hear the swell, fly the stronger bolt big, and the
+host freezes its enemies for the stronger stun's freeze. The fight
+record counts the stronger specials (`strongSpecials`). The combo bench
+enters the combo with the keys, the pad's stick and rebound keys, late,
+the wrong way round and away again, checks each special's stronger
+version, the choice's combo line, and a joiner's stronger stun and bolt
+on the host, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/combo/combo.qml
+```
+
 A grunt does not run straight in: from `enemy.circleRange` on it circles
 the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
 `enemy.circleTime` seconds, then commits, goes in and lunges; a knight
@@ -2418,6 +2458,17 @@ spitter duel, the one place a knight could stand back and shoot, the
 masher with the bolt takes at least `Balance.pacing.duelSlow` seconds to
 kill the lead, or falls, as the masher must in a duel; the report shows
 the masher's own time beside it.
+
+It also enters the combo by hand in the flow room (issue #320): for each
+special the knight's moves away from its aim, then towards it, as a pilot
+walks, and the special's button at once, then the same with the button
+later than `Balance.combo.window`. `--check` tests that the combo fires
+each stronger version - the stun freezes an enemy past the stun's reach,
+the bolt deals `Balance.combo.bolt.damage` times atk less its defense, the
+whirlwind hits an enemy either side past its reach for
+`Balance.combo.whirlwind.swing` times atk and spins longer -, that the late
+button fires the normal one, and that the knight walks on through every
+combo. No pilot enters the combo in its fights.
 
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
