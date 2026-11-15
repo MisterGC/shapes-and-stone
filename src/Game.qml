@@ -755,6 +755,71 @@ ClayWorld2d {
         dialoguePanel.lipSync(Qt.resolvedUrl("../sound/" + cue + ".visemes.json"))
     }
 
+    // The Hollow Warden's words (Balance.boss.lines, issue #323): voiced
+    // lines of the sound factory (sound/voice/warden.voice.json), each a
+    // cue "voice/warden/<id>" of sound/cues.json. It has no mouth, so
+    // nothing reads their viseme cues
+    Sound {
+        id: wardenGates1
+        source: "../sound/voice/warden/gates_1.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFall1
+        source: "../sound/voice/warden/fall_1.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenGates2
+        source: "../sound/voice/warden/gates_2.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFall2
+        source: "../sound/voice/warden/fall_2.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenGates3
+        source: "../sound/voice/warden/gates_3.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFall3
+        source: "../sound/voice/warden/fall_3.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenGatesLater
+        source: "../sound/voice/warden/gates_later.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFallLater
+        source: "../sound/voice/warden/fall_later.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    readonly property var _wardenLines: ({
+        "gates_1": wardenGates1, "fall_1": wardenFall1,
+        "gates_2": wardenGates2, "fall_2": wardenFall2,
+        "gates_3": wardenGates3, "fall_3": wardenFall3,
+        "gates_later": wardenGatesLater, "fall_later": wardenFallLater
+    })
+    // The line of the Warden's appearance n (0 at the first boss depth)
+    // for when, "gates" or "fall": {id, text}; past the table's last pair
+    // the last one
+    function wardenLine(n, when) {
+        let lines = Balance.boss.lines
+        return lines[Math.max(0, Math.min(lines.length - 1, n))][when]
+    }
+    // The Warden says its line id: every screen plays its own
+    function playWardenLine(id) {
+        let line = _wardenLines[id]
+        if (!line) return
+        line.play()
+        logSound("voice/warden/" + id, "wardenLine", 0, 0, 1)
+    }
+
     // Apply screen shake via transform on room
     transform: Translate { x: _shakeOffsetX; y: _shakeOffsetY }
 
