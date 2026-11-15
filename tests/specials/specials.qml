@@ -158,6 +158,7 @@ Window {
         g._enterLevel(g.levelIndex + 1)
     }
 
+    property real pickedFrom: 0
     property real pickedAt: 0
     property var spent: null
 
@@ -248,6 +249,11 @@ Window {
             check(bound && right === 1 && left === -1, "with the moves bound to the arrows Right moves "
                   + right + " card and Left " + left + " (1 and -1)")
             beatsOf(solo).length = 0
+            // The pick is taken on the press, inside keyClick, which then
+            // runs the timers due: the intro's clock may tick once more
+            // before it returns. The pick lies between the clock before the
+            // click and after it, at most one of its steps apart
+            pickedFrom = solo.introClock
             key(solo, Qt.Key_2)
             pickedAt = solo.introClock
             check(solo.player.special === "stun" && !solo.specialChoosing,
@@ -255,8 +261,11 @@ Window {
             check(solo.introStartsAt >= 0 && solo.introHeld, "the count starts on the pick")
         }],
         [() => !solo.introHeld, () => {
-            check(beatsOf(solo).join(",") === "3,2,1" && solo.introStartsAt === pickedAt,
-                  "it counts 3, 2, 1 from the pick (" + beatsOf(solo).join(",") + ") and lets go")
+            let at = solo.introStartsAt
+            check(beatsOf(solo).join(",") === "3,2,1" && at >= pickedFrom && at <= pickedAt
+                  && pickedAt - pickedFrom <= Balance.intro.maxStep * 1000,
+                  "it counts 3, 2, 1 from the pick (" + beatsOf(solo).join(",") + ", from " + at
+                  + " ms on the intro's clock, the click from " + pickedFrom + " to " + pickedAt + ") and lets go")
             let p = solo.player
             check(text(solo, "specialHud") === "Stun " + blade("stun", 1) && p.specialMana === blade("stun", 1),
                   "the HUD shows the stun and its mana with the blade (" + text(solo, "specialHud") + ")")
