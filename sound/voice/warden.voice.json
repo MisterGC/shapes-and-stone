@@ -1,0 +1,1095 @@
+{
+  "format": 1,
+  "game": "shapes-and-stone",
+  "language": "en",
+  "lines": [
+    {
+      "id": "gates_1",
+      "text": "None who come this deep go home.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden, a knight turned to stone long ago, as its gates shut on the knight the first time they meet: slow, deep and grave, a warning more than a threat; over in about three seconds, read under its name banner",
+      "params": {
+        "exaggeration": 0.45,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/gates_1.take01.wav",
+          "seed": 1106992573,
+          "text": "None who come this deep go home.",
+          "rendered": "2026-11-15T13:48:16+00:00",
+          "duration_s": 3.12,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "None who come this deep go home.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/gates_1.take02.wav",
+          "seed": 202575952,
+          "text": "None who come this deep go home.",
+          "rendered": "2026-11-15T13:48:18+00:00",
+          "duration_s": 2.88,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "None who come this deep go home.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/gates_1.take03.wav",
+          "seed": 1448819653,
+          "text": "None who come this deep go home.",
+          "rendered": "2026-11-15T13:48:19+00:00",
+          "duration_s": 2.6,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "None who come this deep go home.",
+            "matches": true
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/gates_1.wav",
+      "visemes": "warden/gates_1.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:49.107271+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -20.29,
+        "lufs": -18.04,
+        "true_peak_dbtp": -1.05,
+        "gain_db": 2.54,
+        "limiter_max_reduction_db": 2.15,
+        "deess_max_reduction_db": 5.77,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "fall_1",
+      "text": "This stone... remembers a sword.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as it falls the first time, its stone cracking: slow and puzzled, half to itself, the pause where the memory surfaces; over in about three seconds, read under the victory banner",
+      "params": {
+        "exaggeration": 0.45,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/fall_1.take01.wav",
+          "seed": 1939753635,
+          "text": "This stone... remembers a sword.",
+          "rendered": "2026-11-15T13:48:20+00:00",
+          "duration_s": 3.12,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "This stone remembers a sword.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/fall_1.take02.wav",
+          "seed": 1187757789,
+          "text": "This stone... remembers a sword.",
+          "rendered": "2026-11-15T13:48:21+00:00",
+          "duration_s": 3.2,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "This stone remembers a sword.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/fall_1.take03.wav",
+          "seed": 1494823578,
+          "text": "This stone... remembers a sword.",
+          "rendered": "2026-11-15T13:48:23+00:00",
+          "duration_s": 2.64,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "This stone remembers a sword.",
+            "matches": true
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/fall_1.wav",
+      "visemes": "warden/fall_1.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:50.103732+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -20.52,
+        "lufs": -18.0,
+        "true_peak_dbtp": -2.64,
+        "gain_db": 2.52,
+        "limiter_max_reduction_db": 0.0,
+        "deess_max_reduction_db": 5.54,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "gates_2",
+      "text": "I came down too, once. Like you.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as its gates shut the second time, the knight met before: slow and low, recognising the knight, weary rather than hostile; over in about three seconds",
+      "params": {
+        "exaggeration": 0.45,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/gates_2.take01.wav",
+          "seed": 306758887,
+          "text": "I came down too, once. Like you.",
+          "rendered": "2026-11-15T13:48:24+00:00",
+          "duration_s": 3.0,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I came down too once, like you.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/gates_2.take02.wav",
+          "seed": 201677031,
+          "text": "I came down too, once. Like you.",
+          "rendered": "2026-11-15T13:48:25+00:00",
+          "duration_s": 3.68,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I came down too, once, like you.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/gates_2.take03.wav",
+          "seed": 724396636,
+          "text": "I came down too, once. Like you.",
+          "rendered": "2026-11-15T13:48:27+00:00",
+          "duration_s": 3.48,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I came down too once, like you.",
+            "matches": true
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/gates_2.wav",
+      "visemes": "warden/gates_2.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:51.339979+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -21.58,
+        "lufs": -18.01,
+        "true_peak_dbtp": -1.05,
+        "gain_db": 3.73,
+        "limiter_max_reduction_db": 2.47,
+        "deess_max_reduction_db": 5.69,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "fall_2",
+      "text": "The stone took me, as it took them.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as it falls the second time, its stone cracking further: slow and sorrowful, 'them' the travellers turned to stone in the deep; over in about three seconds",
+      "params": {
+        "exaggeration": 0.45,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/fall_2.take01.wav",
+          "seed": 137926599,
+          "text": "The stone took me, as it took them.",
+          "rendered": "2026-11-15T13:48:28+00:00",
+          "duration_s": 2.72,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "The stone took me as it took them.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/fall_2.take02.wav",
+          "seed": 495345603,
+          "text": "The stone took me, as it took them.",
+          "rendered": "2026-11-15T13:48:29+00:00",
+          "duration_s": 3.04,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "The stone took me as it took them.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/fall_2.take03.wav",
+          "seed": 938576744,
+          "text": "The stone took me, as it took them.",
+          "rendered": "2026-11-15T13:48:30+00:00",
+          "duration_s": 3.32,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "A stone took me, as it took them.",
+            "matches": false
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/fall_2.wav",
+      "visemes": "warden/fall_2.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:52.454556+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -22.46,
+        "lufs": -18.08,
+        "true_peak_dbtp": -1.05,
+        "gain_db": 4.83,
+        "limiter_max_reduction_db": 2.44,
+        "deess_max_reduction_db": 5.76,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "gates_3",
+      "text": "I was sworn to bring them home.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as its gates shut the third time: slow and solemn, an oath remembered, a little pride in it; over in about three seconds",
+      "params": {
+        "exaggeration": 0.5,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/gates_3.take01.wav",
+          "seed": 1711726885,
+          "text": "I was sworn to bring them home.",
+          "rendered": "2026-11-15T13:48:31+00:00",
+          "duration_s": 2.64,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.5,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I was sworn to bring them home.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/gates_3.take02.wav",
+          "seed": 1726875312,
+          "text": "I was sworn to bring them home.",
+          "rendered": "2026-11-15T13:48:33+00:00",
+          "duration_s": 2.32,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.5,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I was sworn to bring them home.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/gates_3.take03.wav",
+          "seed": 1377130776,
+          "text": "I was sworn to bring them home.",
+          "rendered": "2026-11-15T13:48:34+00:00",
+          "duration_s": 2.36,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.5,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I was sworn to bring them home.",
+            "matches": true
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/gates_3.wav",
+      "visemes": "warden/gates_3.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:53.440569+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -21.73,
+        "lufs": -18.0,
+        "true_peak_dbtp": -1.75,
+        "gain_db": 3.73,
+        "limiter_max_reduction_db": 0.0,
+        "deess_max_reduction_db": 5.66,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "fall_3",
+      "text": "I was a knight... once. Free them.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as it falls the third time, the stone nearly broken: slow, quiet and clear, the confession at last, then a plea to the knight; over in about three seconds",
+      "params": {
+        "exaggeration": 0.5,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/fall_3.take01.wav",
+          "seed": 1075776002,
+          "text": "I was a knight... once. Free them.",
+          "rendered": "2026-11-15T13:48:35+00:00",
+          "duration_s": 3.72,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.5,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I was a knight once. Free them.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/fall_3.take02.wav",
+          "seed": 1053105580,
+          "text": "I was a knight... once. Free them.",
+          "rendered": "2026-11-15T13:48:36+00:00",
+          "duration_s": 3.16,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.5,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I was a knight, once. Free them.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/fall_3.take03.wav",
+          "seed": 844820024,
+          "text": "I was a knight... once. Free them.",
+          "rendered": "2026-11-15T13:48:38+00:00",
+          "duration_s": 2.68,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.5,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "I was a knight, once, freedom.",
+            "matches": false
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/fall_3.wav",
+      "visemes": "warden/fall_3.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:54.625799+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -18.89,
+        "lufs": -18.05,
+        "true_peak_dbtp": -1.05,
+        "gain_db": 0.89,
+        "limiter_max_reduction_db": 0.91,
+        "deess_max_reduction_db": 5.76,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "gates_later",
+      "text": "Still the stone holds me. Strike true.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as its gates shut at its fourth appearance and every one after: slow and steady, resigned, asking the knight for a clean end; over in about three seconds",
+      "params": {
+        "exaggeration": 0.45,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/gates_later.take01.wav",
+          "seed": 2056653413,
+          "text": "Still the stone holds me. Strike true.",
+          "rendered": "2026-11-15T13:48:39+00:00",
+          "duration_s": 4.24,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "Still, the stone holds me. Strike true.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/gates_later.take02.wav",
+          "seed": 1517572485,
+          "text": "Still the stone holds me. Strike true.",
+          "rendered": "2026-11-15T13:48:41+00:00",
+          "duration_s": 3.72,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "Still the stone holds me, strike true.",
+            "matches": true
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/gates_later.take03.wav",
+          "seed": 1709428905,
+          "text": "Still the stone holds me. Strike true.",
+          "rendered": "2026-11-15T13:48:42+00:00",
+          "duration_s": 3.64,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "Still the stone holds me. Strike. True.",
+            "matches": true
+          }
+        }
+      ],
+      "chosen": 2,
+      "render": "warden/gates_later.wav",
+      "visemes": "warden/gates_later.visemes.json",
+      "processed": {
+        "take": 2,
+        "at": "2026-11-15T13:49:19.800283+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -21.91,
+        "lufs": -18.0,
+        "true_peak_dbtp": -1.73,
+        "gain_db": 3.91,
+        "limiter_max_reduction_db": 0.0,
+        "deess_max_reduction_db": 5.78,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    },
+    {
+      "id": "fall_later",
+      "text": "Climb, knight. Climb for us both.",
+      "voice": "warden_hollow",
+      "direction": "the Hollow Warden as it falls at its fourth appearance and every one after: slow and warm for the first time, sending the knight on; over in about three seconds",
+      "params": {
+        "exaggeration": 0.45,
+        "cfg_weight": 0.3
+      },
+      "takes": [
+        {
+          "take": 1,
+          "file": "warden/takes/fall_later.take01.wav",
+          "seed": 1502159460,
+          "text": "Climb, knight. Climb for us both.",
+          "rendered": "2026-11-15T13:48:44+00:00",
+          "duration_s": 3.32,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "Climb Knight, climb for us both.",
+            "matches": true
+          }
+        },
+        {
+          "take": 2,
+          "file": "warden/takes/fall_later.take02.wav",
+          "seed": 2062846270,
+          "text": "Climb, knight. Climb for us both.",
+          "rendered": "2026-11-15T13:48:45+00:00",
+          "duration_s": 3.28,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "Climb night, climb for us both.",
+            "matches": false
+          }
+        },
+        {
+          "take": 3,
+          "file": "warden/takes/fall_later.take03.wav",
+          "seed": 1391122903,
+          "text": "Climb, knight. Climb for us both.",
+          "rendered": "2026-11-15T13:48:46+00:00",
+          "duration_s": 3.6,
+          "provenance": {
+            "engine": "vocli",
+            "version": "0.1.0",
+            "model": "chatterbox",
+            "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+            "mlx_audio": "0.4.8",
+            "voice": "warden_hollow",
+            "language": "en",
+            "license": "MIT",
+            "design": {
+              "engine": "qwen",
+              "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+              "license": "Apache-2.0",
+              "seed": 11
+            }
+          },
+          "params": {
+            "exaggeration": 0.45,
+            "cfg_weight": 0.3
+          },
+          "heard": {
+            "text": "Climb, knights. Climb for us both.",
+            "matches": false
+          }
+        }
+      ],
+      "chosen": 1,
+      "render": "warden/fall_later.wav",
+      "visemes": "warden/fall_later.visemes.json",
+      "processed": {
+        "take": 1,
+        "at": "2026-11-15T13:48:56.799192+00:00",
+        "settings": {
+          "highpass_hz": 80.0,
+          "deess_from_hz": 5000.0,
+          "deess_threshold_db": -12.0,
+          "deess_ratio": 2.0,
+          "deess_max_db": 6.0,
+          "target_lufs": -18.0,
+          "max_true_peak_dbtp": -1.0
+        },
+        "lufs_before": -18.72,
+        "lufs": -18.0,
+        "true_peak_dbtp": -2.93,
+        "gain_db": 0.72,
+        "limiter_max_reduction_db": 0.0,
+        "deess_max_reduction_db": 5.71,
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      }
+    }
+  ]
+}

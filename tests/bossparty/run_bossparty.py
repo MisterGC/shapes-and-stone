@@ -11,16 +11,21 @@ other enemy stands. Then:
 
 - both screens build the boss room on the same cells with the same gates,
   the exit's shut and the ways in open, and show the same Warden asleep,
-  its HP the table's for two knights
+  its HP the table's for two knights and its stone cracked alike, one
+  crack per defeat before (issue #323)
 - the host's knight steps into the room, the joiner's stays outside: the
   room stays open on both screens; the joiner's steps in too: it shuts on
-  both, the Warden wakes, and both show its banner and its HP bar
+  both, the Warden wakes, and both show its banner and its HP bar, and
+  both screens hear and show the same line of the Warden's (issue #323)
 - the host strikes it down to Balance.boss.phaseAt of its HP: both screens
   show its phase 2, the same adds by id and the room's light turned; the
   host's zones under the knights show on the joiner's screen, by id
 - the host's knight kills it: both screens open every gate, the exit's too,
-  show the victory banner, and each heals its own knight to full HP and
-  mana
+  show the victory banner, hear and show the same last line, and each
+  heals its own knight to full HP and mana
+
+--depth takes the session to another boss dungeon than the first, at 2:
+5 and 8 are the Warden's second and third appearance.
 
 The loader is --loader, else $CLAYLIVELOADER, else build/bin/clayliveloader
 of this repository (configure with -DCLAYGROUND_WITH_TOOLS=ON), else the
@@ -28,7 +33,7 @@ first clayliveloader on PATH. It should be built from the Clayground commit
 the game's clayground/ submodule pins.
 
 Usage:
-  run_bossparty.py [--loader <clayliveloader>] [--mode local|cloud] [--seed 424242]
+  run_bossparty.py [--loader <clayliveloader>] [--mode local|cloud] [--seed 424242] [--depth 2]
 
 Prints one PASS or FAIL line per check and exits with the number of failed
 checks (100: the bench could not get to its end). The temp dir with both
@@ -56,6 +61,7 @@ def main():
     ap.add_argument("--mode", choices=("local", "cloud"), default="local",
                     help="signaling: Local (LAN) or Cloud (PeerJS)")
     ap.add_argument("--seed", type=int, default=424242, help="the run's seed")
+    ap.add_argument("--depth", type=int, default=DEPTH, help="the boss dungeon's depth: 2, 5, 8, ...")
     args = ap.parse_args()
 
     failures = 0
@@ -135,10 +141,10 @@ def run(args, loader, tmp, procs, check):
         H.eval([f"startGame({args.seed})"])
         if not wait_for(lambda: H.eval1("inRun()") is True and J.eval1("inRun()") is True, 30):
             return abort("the session did not reach the dungeon")
-        index = H.eval1(f"goToDepth({DEPTH})")
+        index = H.eval1(f"goToDepth({args.depth})")
         if not wait_for(lambda: J.eval1("level()") == index and H.json("boss()")["warden"] is not None
                         and J.json("boss()")["warden"] is not None and J.eval1("inRun()") is True, 30):
-            return abort(f"the session did not reach the boss dungeon at depth {DEPTH} (level {index})")
+            return abort(f"the session did not reach the boss dungeon at depth {args.depth} (level {index})")
         H.eval1("halt()")
         for i in (H, J):
             i.eval(["standUp()"])
@@ -163,6 +169,10 @@ def fight(H, J, check):
           and hw["dormant"] and jw["dormant"] and jw["remote"] and not hw["remote"],
           f"both show the same Warden {hw['id']} asleep, {hw['hp']} HP (joiner {jw['hp']}; "
           f"{want} by the table for two knights)")
+    n = H.eval1("game.bossAppearance(game.depth)")
+    check(hb["appearance"] == jb["appearance"] == n and hw["cracks"] == jw["cracks"] == n,
+          f"both show it at its appearance {n}, its stone with {hw['cracks']} cracks (joiner {jw['cracks']}), "
+          f"one per defeat before")
 
     # One knight in: the room stays open; both in: it shuts
     H.eval1("enterRoom(-1.5)")
@@ -182,6 +192,9 @@ def fight(H, J, check):
           f"(host {hb['stage']}, joiner {jb['stage']})")
     check(jb["bar"] and hb["bar"] and wait_for(lambda: H.json("boss()")["banner"] > 0.2, 3),
           "both show its name banner and its HP bar")
+    gates_id = H.eval1(f"game.wardenLine({n}, 'gates').id")
+    check(hb["said"] == jb["said"] == [gates_id] and hb["line"] == jb["line"] != "",
+          f"both screens hear and show its line \"{hb['line']}\" ({hb['said']}, joiner {jb['said']})")
 
     # Phase 2 with its adds and zones
     H.eval1(f"strikeWarden(Balance.boss.phaseAt)")
@@ -214,6 +227,9 @@ def fight(H, J, check):
           f"(host {hb['stage']}, joiner {jb['stage']})")
     check(jb["victory"] > 0.2 and wait_for(lambda: H.json("boss()")["victory"] > 0.2, 3),
           "both show the victory banner")
+    fall_id = H.eval1(f"game.wardenLine({n}, 'fall').id")
+    check(hb["said"] == jb["said"] == [gates_id, fall_id] and hb["line"] == jb["line"] != "",
+          f"both screens hear and show its last line \"{hb['line']}\" (joiner {jb['said']})")
     check(hb["hp"] == hb["maxHp"] and jb["hp"] == jb["maxHp"] and hb["mana"] == hb["maxMana"]
           and jb["mana"] == jb["maxMana"],
           f"each heals its own knight to full HP and mana (host {hb['hp']}/{hb['maxHp']}, "

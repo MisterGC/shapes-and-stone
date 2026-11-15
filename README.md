@@ -337,12 +337,16 @@ it, where it came from, and a person's verdict once it has been heard.
   too: its part `one`, a low choir, the bass tolling the root and a brass
   call, and from the Warden's phase 2 on its part `two`, the bass running
   in eighths under kick, snare and hat, moving on the next bar.
-- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
-  the knight's whirlwind shout are lines of the voice scripts
-  `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
-  to -18 LUFS and lip-synced by Rhubarb. A greeting plays its render, and the
-  dialogue panel moves the speaker's mouth from the line's viseme cues,
-  `<line>.visemes.json` beside the render.
+- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings,
+  the knight's whirlwind shout and the Hollow Warden's eight lines are
+  lines of the voice scripts `sound/voice/<name>.voice.json`, spoken by
+  vocli through `sp say`, cleaned to -18 LUFS and lip-synced by Rhubarb. A
+  greeting plays its render, and the dialogue panel moves the speaker's
+  mouth from the line's viseme cues, `<line>.visemes.json` beside the
+  render. The Warden has no mouth, so nothing reads its lines' cues; its
+  voice, `warden_hollow`, was designed by vocli's `create` (a big, weary
+  man near sixty, hoarse and unhurried), and each take records that
+  design's model and seed.
 
 The build ships what the sheet names: a live cue's recipe or song, a
 rendered cue's render, and a voiced line's viseme cues. A changed recipe is
@@ -2363,14 +2367,36 @@ adds and opens the zones and the gates - and keeps it as the session
 property `boss`, so every screen shuts and opens its gates, shows the
 banners and draws the zones; each screen judges the zones under its own
 knight and heals its own knight. The Warden's `phase` and `dormant` are
-replicated with the rest of an enemy. The boss bench builds the dungeons of
+replicated with the rest of an enemy.
+
+It was a knight once, and it tells it (issue #323): at its n-th appearance
+it says `boss.lines[n].gates` as its gates shut and `boss.lines[n].fall`
+as it falls - the last pair at its fourth appearance and every one after -,
+each a voiced line, the cue `voice/warden/<id>`, at `boss.lineVolume`, its
+words shown as a subtitle above the HP bar for `boss.lineShow` seconds.
+Read in order the lines tell its story: *None who come this deep go home.*
+/ *This stone... remembers a sword.* / *I came down too, once. Like you.* /
+*The stone took me, as it took them.* / *I was sworn to bring them home.* /
+*I was a knight... once. Free them.*, and after that *Still the stone holds
+me. Strike true.* / *Climb, knight. Climb for us both.* A line goes with
+its stage on every screen - the gates' on the step they shut, the Warden
+awake on that same step -, so it holds nothing up, and in co-op every
+screen hears the same line. Its stone shows a crack for every defeat
+before, n of them up to `boss.cracks`, the core's ember in each; the host
+spawns the Warden with its `cracks`, so every screen draws the same. The boss bench builds the dungeons of
 depths 0 to 8 and checks the boss rooms at exactly 2, 5 and 8, each the
 room of the exit's shaft, and the Warden's HP and tempo per appearance;
+and its cracks per appearance;
 then in the one at depth 2 it steps the knight into the room and checks
-the gates, the wake, the banner, the bar, the song's parts, phase 2 with
+the gates, the wake, the Warden's line played and shown on the step the
+room shuts with the Warden awake on it, the banner, the bar, the song's
+parts, phase 2 with
 its adds, tempo, light and core, a zone that hurts through a shield and one
-stepped out of, the second wave, and the fall with its gold, its open
-gates, its victory banner and the heal:
+stepped out of, the second wave, and the fall with its line, its gold, its
+open gates, its victory banner and the heal. Last it checks the lines:
+every appearance's own up to the third, the last pair after, their words
+the voice script's, each a voice cue with an open verdict, none over eight
+words or `boss.lineShow` seconds, and it prints the story in order:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/boss/boss.qml
@@ -2382,24 +2408,28 @@ depth at or past the danger given, the knight in the corridor at the
 Warden's door; an edit of the table's `boss` group changes the next fight
 after a reload. The boss capture renders one frame of the fight with
 Clayground's `clayrender` - `shot` `"banner"`, `"phase1"`, `"phase2"` or
-`"victory"` - with the copied shaders:
+`"victory"`, at the boss depth `depth` (2 when left out; 5, 8 and 11 show
+the Warden cracked by one, two and three defeats) - with the copied
+shaders; it logs what the frame shows as `[Capture] {...}`:
 
 ```
-clayrender tests/boss/Capture.qml --out boss.png --size 1100x700 --set 'shot="phase2"' --wait-for 'ready' --settle
+clayrender tests/boss/Capture.qml --out boss.png --size 1100x700 --set 'shot="phase2"' --set 'depth=5' --wait-for 'ready' --settle
 ```
 
 The boss party bench checks it over the network: a host and a joiner go
-down to depth 2; both build the boss room with the same gates and show the
-same Warden asleep, its HP the table's for two knights; with one knight in
+down to depth 2 (`--depth` another boss depth); both build the boss room
+with the same gates and show the same Warden asleep, its HP the table's
+for two knights and its cracks alike; with one knight in
 the room it stays open on both screens, with both in it shuts on both and
-the Warden wakes; struck to its phase 2 it shows on both with the same
+the Warden wakes, and both hear and show its same line; struck to its
+phase 2 it shows on both with the same
 adds by id, the light turned and the host's zones; when it falls every
-gate opens on both, both show the victory banner and each heals its
-knight. It needs the live loader and exits with the number of failed
-checks:
+gate opens on both, both show the victory banner and its same last line,
+and each heals its knight. It needs the live loader and exits with the
+number of failed checks:
 
 ```
-python3 tests/bossparty/run_bossparty.py --mode local
+python3 tests/bossparty/run_bossparty.py --mode local [--depth 5]
 ```
 
 The ring bench steps a grunt's wind-up in the paused fight room and saves

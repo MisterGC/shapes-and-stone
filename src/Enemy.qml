@@ -185,8 +185,10 @@ PhysicsItem {
     // begins at boss.phaseAt of its max HP and plays boss.phase2Tempo
     // times faster. Dormant it stands and does not think until the boss
     // room shuts (Game's BossFight wakes it). phase and dormant show on
-    // every screen
+    // every screen. cracks: the defeats before this appearance, each a
+    // crack across its stone (issue #323), set on spawn
     readonly property bool boss: enemyType === "warden"
+    property int cracks: 0
     property int phase: 1
     property real tempo: 1
     property bool dormant: false
@@ -598,6 +600,30 @@ PhysicsItem {
                 ctx.moveTo(cx - r * 0.55, cy + r * 0.5)
                 ctx.lineTo(cx - r * 0.66, cy + r * 0.62)
                 ctx.stroke()
+                // A crack for every defeat before (Balance.boss.cracks): from
+                // the rim into the hollow, a jag and a fork, each at its own
+                // angle, the golden angle on from the one before; the
+                // core's ember shows in it
+                let jag = [[0.97, 0], [0.83, 0.17], [0.7, -0.1], [0.6, 0.15], [0.5, 0]]
+                for (let k = 0; k < Math.min(enemy.cracks, Balance.boss.cracks); k++) {
+                    let a0 = -Math.PI / 2 + k * 2.39996, side = k % 2 === 0 ? 1 : -1
+                    let pts = jag.map(q => [cx + Math.cos(a0 + side * q[1]) * r * q[0],
+                                            cy + Math.sin(a0 + side * q[1]) * r * q[0]])
+                    let f = a0 - side * 0.3
+                    for (let pass = 0; pass < 2; pass++) {
+                        ctx.strokeStyle = pass === 0 ? "#050507" : Balance.boss.coreColor
+                        ctx.globalAlpha = pass === 0 ? 1 : 0.75
+                        ctx.lineWidth = pass === 0 ? Math.max(2, w * 0.06) : Math.max(1, w * 0.02)
+                        ctx.lineJoin = "miter"
+                        ctx.beginPath()
+                        ctx.moveTo(pts[0][0], pts[0][1])
+                        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
+                        ctx.moveTo(pts[1][0], pts[1][1])
+                        ctx.lineTo(cx + Math.cos(f) * r * 0.74, cy + Math.sin(f) * r * 0.74)
+                        ctx.stroke()
+                    }
+                    ctx.globalAlpha = 1
+                }
                 // The rim, in the telegraph's colours
                 hex(r * 0.98)
                 ctx.strokeStyle = enemy._wardenRim
@@ -612,6 +638,7 @@ PhysicsItem {
                 target: enemy
                 function on_WardenRimChanged() { wardenStone.requestPaint() }
                 function onDormantChanged() { wardenStone.requestPaint() }
+                function onCracksChanged() { wardenStone.requestPaint() }
                 function onWidthChanged() { wardenStone.requestPaint() }
             }
         }

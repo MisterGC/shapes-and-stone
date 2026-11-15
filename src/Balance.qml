@@ -914,7 +914,15 @@ QtObject {
     // wind-up and its strike, the lunge setting off, play its own toll
     // (sfx/warden_toll, a hollow stone toll on A1) at toll.volume, fading
     // with the distance as the scream does, the wind-up toll.windUp
-    // semitones off the cue's own, the strike toll.strike
+    // semitones off the cue's own, the strike toll.strike.
+    // It speaks (issue #323): it was a knight once. At its n-th appearance
+    // it says lines[n].gates as its gates shut and lines[n].fall as it
+    // falls - the last pair at every appearance past them -, on every
+    // screen, at lineVolume; each a voiced line of the sound factory
+    // (sound/voice/warden.voice.json, the cue voice/warden/<id>), its words
+    // shown under the banner for lineShow seconds. Read in order they tell
+    // its story. Its stone shows a crack for every defeat before, n of
+    // them, up to cracks
     readonly property var boss: ({
         every: 3,
         name: "The Hollow Warden",
@@ -939,7 +947,20 @@ QtObject {
         hexColor: "#4A4E57",
         coreColor: "#FF5A2A",
         gateColor: "#2F3640",
-        toll: { windUp: 7, strike: 0, volume: 0.9 }
+        toll: { windUp: 7, strike: 0, volume: 0.9 },
+        lines: [
+            { gates: { id: "gates_1", text: "None who come this deep go home." },
+              fall: { id: "fall_1", text: "This stone... remembers a sword." } },
+            { gates: { id: "gates_2", text: "I came down too, once. Like you." },
+              fall: { id: "fall_2", text: "The stone took me, as it took them." } },
+            { gates: { id: "gates_3", text: "I was sworn to bring them home." },
+              fall: { id: "fall_3", text: "I was a knight... once. Free them." } },
+            { gates: { id: "gates_later", text: "Still the stone holds me. Strike true." },
+              fall: { id: "fall_later", text: "Climb, knight. Climb for us both." } }
+        ],
+        lineVolume: 0.9,
+        lineShow: 4.0,
+        cracks: 6
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that

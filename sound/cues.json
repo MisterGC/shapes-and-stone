@@ -1375,6 +1375,262 @@
       },
       "delivered": "2026-11-15T12:40:10.541647+00:00",
       "verdict": null
+    },
+    "voice/warden/gates_1": {
+      "category": "voice",
+      "brief": "the Hollow Warden, a knight turned to stone long ago, as its gates shut on the knight the first time they meet: slow, deep and grave, a warning more than a threat; over in about three seconds, read under its name banner",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/gates_1.wav",
+      "report": "voice/warden/gates_1.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:49:45.210686+00:00",
+      "verdict": null
+    },
+    "voice/warden/fall_1": {
+      "category": "voice",
+      "brief": "the Hollow Warden as it falls the first time, its stone cracking: slow and puzzled, half to itself, the pause where the memory surfaces; over in about three seconds, read under the victory banner",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/fall_1.wav",
+      "report": "voice/warden/fall_1.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:49:49.202863+00:00",
+      "verdict": null
+    },
+    "voice/warden/gates_2": {
+      "category": "voice",
+      "brief": "the Hollow Warden as its gates shut the second time, the knight met before: slow and low, recognising the knight, weary rather than hostile; over in about three seconds",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/gates_2.wav",
+      "report": "voice/warden/gates_2.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:49:53.538123+00:00",
+      "verdict": null
+    },
+    "voice/warden/fall_2": {
+      "category": "voice",
+      "brief": "the Hollow Warden as it falls the second time, its stone cracking further: slow and sorrowful, 'them' the travellers turned to stone in the deep; over in about three seconds",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/fall_2.wav",
+      "report": "voice/warden/fall_2.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:49:57.343156+00:00",
+      "verdict": null
+    },
+    "voice/warden/gates_3": {
+      "category": "voice",
+      "brief": "the Hollow Warden as its gates shut the third time: slow and solemn, an oath remembered, a little pride in it; over in about three seconds",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/gates_3.wav",
+      "report": "voice/warden/gates_3.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:50:01.125043+00:00",
+      "verdict": null
+    },
+    "voice/warden/fall_3": {
+      "category": "voice",
+      "brief": "the Hollow Warden as it falls the third time, the stone nearly broken: slow, quiet and clear, the confession at last, then a plea to the knight; over in about three seconds",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/fall_3.wav",
+      "report": "voice/warden/fall_3.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:50:05.852256+00:00",
+      "verdict": null
+    },
+    "voice/warden/gates_later": {
+      "category": "voice",
+      "brief": "the Hollow Warden as its gates shut at its fourth appearance and every one after: slow and steady, resigned, asking the knight for a clean end; over in about three seconds",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/gates_later.wav",
+      "report": "voice/warden/gates_later.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:50:10.601788+00:00",
+      "verdict": null
+    },
+    "voice/warden/fall_later": {
+      "category": "voice",
+      "brief": "the Hollow Warden as it falls at its fourth appearance and every one after: slow and warm for the first time, sending the knight on; over in about three seconds",
+      "mode": "rendered",
+      "source": "voice/warden.voice.json",
+      "render": "voice/warden/fall_later.wav",
+      "report": "voice/warden/fall_later.report.json",
+      "provenance": {
+        "engine": "vocli",
+        "version": "0.1.0",
+        "model": "chatterbox",
+        "checkpoint": "mlx-community/chatterbox-multilingual-v3",
+        "mlx_audio": "0.4.8",
+        "voice": "warden_hollow",
+        "language": "en",
+        "license": "MIT",
+        "design": {
+          "engine": "qwen",
+          "checkpoint": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+          "license": "Apache-2.0",
+          "seed": 11
+        },
+        "lipsync": {
+          "engine": "rhubarb",
+          "version": "1.14.0",
+          "recognizer": "pocketSphinx",
+          "license": "MIT"
+        }
+      },
+      "delivered": "2026-11-15T13:50:15.192786+00:00",
+      "verdict": null
     }
   }
 }

@@ -1,0 +1,102 @@
+{
+  "line": "fall_3",
+  "text": "I was a knight... once. Free them.",
+  "audio": "warden/fall_3.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-323/sound/voice/warden/fall_3.wav",
+    "duration": 3.72
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.03,
+      "value": "X"
+    },
+    {
+      "start": 0.03,
+      "end": 0.14,
+      "value": "C"
+    },
+    {
+      "start": 0.14,
+      "end": 0.21,
+      "value": "B"
+    },
+    {
+      "start": 0.21,
+      "end": 0.35,
+      "value": "F"
+    },
+    {
+      "start": 0.35,
+      "end": 0.63,
+      "value": "D"
+    },
+    {
+      "start": 0.63,
+      "end": 0.77,
+      "value": "B"
+    },
+    {
+      "start": 0.77,
+      "end": 1.05,
+      "value": "C"
+    },
+    {
+      "start": 1.05,
+      "end": 1.49,
+      "value": "B"
+    },
+    {
+      "start": 1.49,
+      "end": 1.53,
+      "value": "F"
+    },
+    {
+      "start": 1.53,
+      "end": 1.71,
+      "value": "C"
+    },
+    {
+      "start": 1.71,
+      "end": 1.99,
+      "value": "B"
+    },
+    {
+      "start": 1.99,
+      "end": 2.48,
+      "value": "X"
+    },
+    {
+      "start": 2.48,
+      "end": 2.56,
+      "value": "G"
+    },
+    {
+      "start": 2.56,
+      "end": 2.84,
+      "value": "B"
+    },
+    {
+      "start": 2.84,
+      "end": 2.98,
+      "value": "C"
+    },
+    {
+      "start": 2.98,
+      "end": 3.18,
+      "value": "A"
+    },
+    {
+      "start": 3.18,
+      "end": 3.72,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}
