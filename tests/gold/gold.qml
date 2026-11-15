@@ -194,7 +194,7 @@ Window {
         [() => npc(solo, "Blacksmith").nearbyPlayer !== null, () => press(Qt.Key_E)],
         [() => panel(solo).visible, () => {
             let p = panel(solo)
-            check(p.speakerName === "Blacksmith" && p.wares.length === 4
+            check(p.speakerName === "Blacksmith" && p.wares.length === 5
                   && p.wares[0].id === "sword" && p.wares[1].id === "shield"
                   && p.wares[0].label.indexOf("+" + Balance.shop.swordAtk[0] + " damage") >= 0
                   && p.wares[1].label.indexOf(Math.round(Balance.shop.shieldBlockedShare[0] * 100) + " %") >= 0
