@@ -922,7 +922,10 @@ QtObject {
     // (sound/voice/warden.voice.json, the cue voice/warden/<id>), its words
     // shown under the banner for lineShow seconds. Read in order they tell
     // its story. Its stone shows a crack for every defeat before, n of
-    // them, up to cracks
+    // them, up to cracks.
+    // Each of its strings begins with a wind-up of countIn seconds,
+    // divided by its tempo, where a room's other leads wind up for
+    // enemy.windUp
     readonly property var boss: ({
         every: 3,
         name: "The Hollow Warden",
@@ -933,6 +936,7 @@ QtObject {
         // Its size a side, wu; its reach and its blow's reach grow with it
         size: 1.8,
         beat: 1.0,
+        countIn: 0.5,
         phaseAt: 0.5,
         phase2Tempo: 1.25,
         adds: 3,

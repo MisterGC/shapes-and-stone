@@ -217,6 +217,8 @@ PhysicsItem {
     property real _lungeSpeed: 0  // Calculated per attack
     readonly property real windUpSpeed: Balance.enemy.windUpSpeed
     readonly property real windUpDuration: Balance.enemy.windUp
+    // A lead's string's first wind-up: the Warden's its own (boss.countIn)
+    readonly property real countIn: boss ? Balance.boss.countIn : windUpDuration
     readonly property real lungeDuration: Balance.enemy.lungeDuration
     readonly property real lungeRange: Balance.enemy.lungeRange
     property int hp: Balance.enemy.tierHp[1]
@@ -1342,7 +1344,7 @@ PhysicsItem {
         // A punishing blow comes at once: no feint
         let hold = b === 2 && first !== "punish" ? l.feintHold / speedUp : 0
         let w = first === "punish" ? Balance.enemy.minTelegraph
-            : first === "first" ? (shot ? Balance.enemy.shootWindUp : windUpDuration) / speedUp
+            : first === "first" ? (shot ? Balance.enemy.shootWindUp : countIn) / speedUp
             : beatLen - (shot ? 0 : lungeDuration)
         if (shot) {
             body.linearVelocity = Qt.point(0, 0)
