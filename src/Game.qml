@@ -6655,14 +6655,15 @@ ClayWorld2d {
     }
     function wardenTempo(n) { return 1 + n * Balance.boss.tempoGrow }
     // The Warden at appearance n, its corner at (ex, ey), for knights;
-    // dormant until its room shuts. In a session only the host spawns
+    // dormant until its room shuts, its stone cracked by the n defeats
+    // before. In a session only the host spawns
     function spawnWarden(ex, ey, n, knights, dormant) {
         let ehp = wardenHp(n, knights, danger)
         let props = {
             xWu: ex, yWu: ey, widthWu: Balance.boss.size, heightWu: Balance.boss.size,
             hp: ehp, maxHp: ehp, atk: enemyAtk("warden", danger), def: Balance.enemy.warden.def,
             tier: 2, enemyType: "warden", tempo: wardenTempo(n), dormant: dormant === true,
-            fromHole: ""
+            cracks: Math.min(n, Balance.boss.cracks), fromHole: ""
         }
         if (!session.connected) _makeEnemy(props)
         else if (session.isHost) session.spawnEnemy(props)
