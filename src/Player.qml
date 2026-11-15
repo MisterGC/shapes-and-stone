@@ -121,21 +121,23 @@ PhysicsItem {
     // combo.gap after the last step away, against the facing kept from
     // before the first step away, for at most combo.awayMax of pushing
     // away: longer, the knight has turned round, and the moves are judged
-    // against its facing again. The facing of the step before, the steps
-    // the moves first and last pointed away (-1 none) and the facing
-    // kept, the way they point now (-1 away, 1 towards, 0 neither) and the
-    // step the combo was entered (-1 none)
+    // against its facing again. It all counts the simulated seconds of
+    // each physics step (_comboClock), so a frame longer than another does
+    // not stretch it. The facing of the step before, when the moves first
+    // and last pointed away (-1 none) and the facing kept, the way they
+    // point now (-1 away, 1 towards, 0 neither) and when the combo was
+    // entered (-1 none), on that clock
+    property real _comboClock: 0
     property real _comboFacing: NaN
-    property int _comboAwayFrom: -1
-    property int _comboAwayAt: -1
+    property real _comboAwayFrom: -1
+    property real _comboAwayAt: -1
     property real _comboAwayFacing: 0
     property int _comboWay: 0
-    property int comboAt: -1
+    property real comboAt: -1
     // The special's button now fires the stronger version: the combo was
     // entered at most combo.window seconds ago
     function comboReady() {
-        return comboAt >= 0 && !!world
-            && (_steps - comboAt) * world.timeStep <= Balance.combo.window + 1e-6
+        return comboAt >= 0 && _comboClock - comboAt <= Balance.combo.window + 1e-6
     }
     // Whether the last special let loose was the stronger version
     property bool lastStrong: false
@@ -158,12 +160,12 @@ PhysicsItem {
         let d = Math.abs(((facingAngle - angle) % 360 + 540) % 360 - 180)
         return d <= Balance.combo.cone + 1e-9
     }
-    function _readCombo() {
+    function _readCombo(dt) {
+        _comboClock += dt
+        let now = _comboClock
         if (isNaN(_comboFacing)) _comboFacing = facingAngle
-        let awaying = _comboAwayAt >= 0
-            && (_steps - _comboAwayAt) * world.timeStep <= Balance.combo.gap + 1e-6
-        if (awaying && _comboWay === -1
-                && (_steps - _comboAwayFrom) * world.timeStep > Balance.combo.awayMax + 1e-6) {
+        let awaying = _comboAwayAt >= 0 && now - _comboAwayAt <= Balance.combo.gap + 1e-6
+        if (awaying && _comboWay === -1 && now - _comboAwayFrom > Balance.combo.awayMax + 1e-6) {
             // Pushed away that long the knight has turned round
             _comboAwayAt = -1
             awaying = false
@@ -173,12 +175,12 @@ PhysicsItem {
             // Away again: a combo entered before is gone
             if (!awaying) {
                 _comboAwayFacing = _comboFacing
-                _comboAwayFrom = _steps
+                _comboAwayFrom = now
             }
-            _comboAwayAt = _steps
+            _comboAwayAt = now
             comboAt = -1
         } else if (way === 1 && _comboWay !== 1 && awaying && _facesStill(_comboAwayFacing)) {
-            comboAt = _steps
+            comboAt = now
             console.log("[Player] Combo entered")
         }
         _comboWay = way
@@ -337,7 +339,7 @@ PhysicsItem {
         function onStepped() {
             let dt = player.world.timeStep
             _steps++
-            _readCombo()
+            _readCombo(dt)
             _countSteps(dt)
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
