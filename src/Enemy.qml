@@ -123,7 +123,9 @@ PhysicsItem {
         return gameWorld.hasLineOfSight(centreXWu, centreYWu, c.x, c.y)
     }
 
-    bodyType: remote ? Body.Kinematic : Body.Dynamic
+    // Frozen by a stun, nothing pushes it either: a knight walking into it
+    // stops
+    bodyType: remote || aiState === "frozen" ? Body.Kinematic : Body.Dynamic
     fixedRotation: true
     gravityScale: 0
 
