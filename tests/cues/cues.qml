@@ -132,6 +132,13 @@ Window {
             let bash = p["sfx/stun_bash.sfx.json"], bashSeed = bash ? bash.lastSeed : null
             game.playStun()
             check(bash && bash.lastSeed !== bashSeed, "the game's own call plays the stun's bash from its recipe")
+            // The bolt's shot and hit (issue #319)
+            let shot = p["sfx/bolt_shot.sfx.json"], hit = p["sfx/bolt_hit.sfx.json"]
+            let shotSeed = shot ? shot.lastSeed : null, hitSeed = hit ? hit.lastSeed : null
+            game.playBoltShot()
+            game.playBoltHit()
+            check(shot && hit && shot.lastSeed !== shotSeed && hit.lastSeed !== hitSeed,
+                  "the game's own calls play the bolt's shot and hit from their recipes")
             let n = game.veinSoundCount
             game.playChink(-1)
             game.playTink(4)
