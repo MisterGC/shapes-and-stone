@@ -14,7 +14,7 @@ intensity).
 
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
-                    [--answer mix|block|parry|perfect|heavy|whirlwind|charge|masher|skilled|person]
+                    [--answer mix|block|parry|perfect|heavy|whirlwind|stun|charge|masher|skilled|person]
                     [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--sword N]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
   run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel boss]
@@ -31,7 +31,11 @@ heavy swing at a guardian instead of shield-dashing it, "whirlwind"
 fights as "mix" does
 and, once its momentum is full, whirls (Q) at the nearest enemy within
 reach. The report counts the whirlwinds that landed (hit an enemy), their
-hits and the ones begun. The pacing pilots: "charge" holds a full charge
+hits and the ones begun. "stun" fights as "mix" does with the stun for its
+special (issue #318): it stuns when a weak or normal enemy not frozen
+stands in the stun's reach, and when a lead winds up in it 3 s or more
+after its last stun; the report has each enemy's stuns and frozen spans.
+The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
 perfect-blocks - crushing blows and shots, which it sends back - and
 strikes in openings, "person" plays as "skilled" with a person's reaction
@@ -72,7 +76,15 @@ person's fights get no band either: a section of their own says of each
 whether the person won - cleared the room without falling - and in how
 many seconds, or how it lost, with its answers and misses (issue #315);
 --check tests its own rule instead: its misses over all its fights lie
-within Balance.pacing.person.missSlack of its share.
+within Balance.pacing.person.missSlack of its share. Unless --answers is
+given, the run also plays "stun" in the flow and the duel room at its
+first depth, banded by no table; --check tests the stun on them (issue
+#318): in the flow fight it froze enemies, each frozen span lasted
+Balance.stun.freeze from the stun that froze it last, within two steps,
+the enemy did not move in it and thawed into the chase, never into a
+blow; in the duel it ended the lead's wind-ups, each time from a wind-up
+into the chase, the lead not opened, its stance as it was, and never
+froze it.
 --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
@@ -96,11 +108,15 @@ import uuid
 from collections import Counter
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANSWERS = ("mix", "block", "parry", "perfect", "heavy", "whirlwind", "charge", "masher", "skilled",
-           "person")
+ANSWERS = ("mix", "block", "parry", "perfect", "heavy", "whirlwind", "stun", "charge", "masher",
+           "skilled", "person")
 PILOTS = ("charge", "masher", "skilled", "person")
 # The pilot that plays like a person (issue #315): reported, not banded
 PERSON = "person"
+# The stun's pilot (issue #318): its fights are judged by check_stun, never
+# banded, in these rooms at the first depth of a pacing run
+STUN = "stun"
+STUN_ROOMS = ("flow", "duel")
 
 
 class Inspect:
@@ -285,11 +301,15 @@ def fmt_s(v):
 
 def describe(r):
     """The report of one fight as lines of text"""
+    stun = ""
+    if r["answer"] == STUN:
+        stun = (f", stuns {r.get('stuns', 0)}, froze {r.get('stunFrozen', 0)}, "
+                f"ended {r.get('stunInterrupted', 0)} wind-ups")
     lines = [f"{r['room']} depth {r['depth']} sword {r['sword']} {r['answer']}: "
              f"{r['outcome']} after {r['seconds']:.2f} s, damage taken {r['damageTaken']}, "
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s, shots sent back {r.get('shotsBack', 0)} "
-             f"({r.get('shotBackHits', 0)} hit)"]
+             f"({r.get('shotBackHits', 0)} hit){stun}"]
     for e in r["enemies"]:
         # A lead's openings by what broke its stance (Balance.lead)
         opened = e.get("opened") or {}
@@ -381,6 +401,69 @@ def check_person_misses(results, person):
     return [(abs(missed / answers - share) <= slack + 1e-9,
              f"the person misses {share} of its answers, give or take {slack} "
              f"({missed} of {answers}, {missed / answers:.2f}, in {len(rs)} fights)")]
+
+
+def check_stun(results, step=1 / 60):
+    """(ok, line) for the stun's fights (issue #318): in a flow fight the
+    knight stunned and froze enemies, every frozen span ended lasted
+    Balance.stun.freeze from the stun that froze it last, within two
+    steps, its enemy did not move and thawed into the chase; no weak or
+    normal enemy was anything but frozen by a stun. In a duel the stun
+    ended the lead's wind-ups: each from a wind-up into the chase, not
+    opened, its stance as it was; the lead never froze and no opening
+    came on a stun's step"""
+    out = []
+    for r in results:
+        if r["answer"] != STUN:
+            continue
+        tag = f"stun {r['room']} depth {r['depth']}"
+        freeze = r.get("stunFreeze")
+        small = [e for e in r["enemies"] if not e.get("lead") and e["type"] != "warden"]
+        leads = [e for e in r["enemies"] if e.get("lead") or e["type"] == "warden"]
+        if r["room"] == "flow":
+            out.append((r.get("stuns", 0) > 0 and r.get("stunFrozen", 0) > 0,
+                        f"{tag}: the knight stuns and freezes small enemies ({r.get('stuns', 0)} stuns, "
+                        f"{r.get('stunFrozen', 0)} frozen)"))
+            spans = [sp for e in small for sp in e.get("frozenSpans", []) if sp["thawAt"] is not None]
+            lasted = [sp["lasted"] for sp in spans if sp["lasted"] is not None]
+            off = [x for x in lasted if abs(x - freeze) > 2 * step + 1e-6]
+            out.append((bool(lasted) and not off and len(lasted) == len(spans),
+                        f"{tag}: each frozen span lasts {freeze} s from its stun, within two steps "
+                        f"({len(lasted)} spans, " + (f"{min(lasted):.3f}-{max(lasted):.3f} s" if lasted else "none")
+                        + (f", off: {off}" if off else "") + ")"))
+            moved = max([sp["moved"] for e in small for sp in e.get("frozenSpans", [])], default=0)
+            out.append((moved <= 0.01, f"{tag}: a frozen enemy does not move (at most {moved:.3f} wu)"))
+            into = Counter(sp["into"] for sp in spans)
+            out.append((bool(spans) and set(into) == {"chase"},
+                        f"{tag}: a frozen enemy thaws into the chase, never into a blow ("
+                        + ", ".join(f"{k} {n}" for k, n in sorted(into.items())) + ")"))
+            whats = Counter(s["what"] for e in small for s in e.get("stuns", []))
+            cut = sum(1 for e in small for s in e.get("stuns", []) if s["before"] in ("telegraph", "crush", "lunge"))
+            out.append((set(whats) <= {"frozen"},
+                        f"{tag}: a stun freezes a weak or normal enemy, nothing else ("
+                        + ", ".join(f"{k} {n}" for k, n in sorted(whats.items())) + f"; {cut} of them "
+                        "cut an attack short)"))
+        else:
+            stuns = [s for e in leads for s in e.get("stuns", [])]
+            ended = [s for s in stuns if s["what"] == "interrupted"]
+            out.append((len(ended) > 0 and r.get("stunInterrupted", 0) == len(ended),
+                        f"{tag}: the stun ends the lead's wind-ups ({len(ended)} ended, "
+                        f"the record {r.get('stunInterrupted', 0)})"))
+            bad = [s for s in stuns if s["what"] != "interrupted"
+                   or s["before"] not in ("telegraph", "crush", "shoot") or s["after"] != "chase"]
+            out.append((not bad, f"{tag}: each from a wind-up into the chase ("
+                                 + ", ".join(sorted({f"{s['before']}->{s['after']}" for s in stuns})) + ")"))
+            opened = [s for s in stuns if s["opening"] or abs(s["stance"] - s["stanceBefore"]) > 1e-6]
+            on_stun = [o for e in leads for o in e.get("openedAt", [])
+                       if any(abs(o["t"] - s["t"]) <= step + 1e-6 for s in stuns)]
+            out.append((not opened and not on_stun,
+                        f"{tag}: the lead is not opened and keeps its stance ({len(opened)} stuns opened it "
+                        f"or wore its stance, {len(on_stun)} openings on a stun's step; its openings "
+                        + (", ".join(f"{c} {n}" for e in leads for c, n in sorted((e.get('opened') or {}).items()))
+                           or "none") + ")"))
+            froze = sum(len(e.get("frozenSpans", [])) for e in leads)
+            out.append((froze == 0, f"{tag}: the lead never freezes ({froze} frozen spans)"))
+    return out
 
 
 def death_pitches(r):
@@ -656,6 +739,9 @@ def pacing(args, loader):
         for depth in (boss_depths if room == "boss" else depths):
             for answer in answers:
                 fights.append((room, depth, answer))
+    # The stun's fights (issue #318), at the first depth
+    if not args.answers:
+        fights += [(room, depths[0], STUN) for room in STUN_ROOMS if room in rooms]
     results, errors = {}, []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(play_fight, loader, args.seed, a, d, room, -1, args.max_seconds,
@@ -679,8 +765,9 @@ def pacing(args, loader):
             json.dump(ordered, f, indent=2)
             f.write("\n")
     failed = 0
-    # The person's fights are reported, never banded (issue #315)
-    banded = [r for r in ordered if r["answer"] != PERSON]
+    # The person's fights are reported, never banded (issue #315), nor are
+    # the stun's (check_stun, issue #318)
+    banded = [r for r in ordered if r["answer"] not in (PERSON, STUN)]
     person = person_lines(ordered)
     if person:
         p = ordered[0]["pacing"].get("person", {})
@@ -694,6 +781,8 @@ def pacing(args, loader):
         lines = check(banded, banded[0]["pacing"])
     if args.check and person:
         lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
+    if args.check:
+        lines += check_stun(ordered)
     if lines:
         print()
         for ok, line in lines:
