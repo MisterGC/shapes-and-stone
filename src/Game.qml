@@ -3461,6 +3461,12 @@ ClayWorld2d {
     property real _chainAt: 0
     // The chain hit stops this screen made, for a bench
     property int chainStops: 0
+    // The pips this chain added, one every pipEvery-th link, and the share
+    // of their damage the knight's blows deal on top while it holds
+    // (Balance.chain.bonusShare, bonusCap; issue #321): 0 once it breaks
+    readonly property int chainPips: Math.floor(chainLinks / Balance.chain.pipEvery)
+    readonly property real chainBonus: Math.round(Math.min(Balance.chain.bonusCap,
+                                                           chainPips * Balance.chain.bonusShare) * 1000) / 1000
     function killLanded(x, y, dx, dy, color) {
         let c = Balance.chain
         chainLinks = chainLinks > 0 && physicsSeconds - _chainAt <= c.window ? chainLinks + 1 : 1

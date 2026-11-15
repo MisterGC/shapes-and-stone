@@ -384,7 +384,11 @@ QtObject {
     // screen alone: freeze seconds, plus freezeStep for each link past the
     // second, at most freezeMax, the world at freezeScale, and trauma for
     // the shake. Every pipEvery-th link adds a momentum pip. A chain is
-    // counted (fightRecord.chains) once it reaches two links
+    // counted (fightRecord.chains) once it reaches two links.
+    // While the chain holds - its window not run out, no hit taken - each
+    // pip it added makes the knight's blows (every swing, the whirlwind's
+    // hits) deal bonusShare more of their damage, at most bonusCap more
+    // (issue #321)
     readonly property var chain: ({
         window: 2.5,
         pitches: [0, 1, 3, 5, 7, 8, 10, 12],
@@ -393,7 +397,9 @@ QtObject {
         freezeMax: 0.17,
         freezeScale: 0,
         trauma: 0.45,
-        pipEvery: 3
+        pipEvery: 3,
+        bonusShare: 0.15,
+        bonusCap: 0.45
     })
 
     // The sword-and-shield combo: the right button within window seconds of
