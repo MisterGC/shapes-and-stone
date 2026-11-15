@@ -388,7 +388,10 @@ QtObject {
     // While the chain holds - its window not run out, no hit taken - each
     // pip it added makes the knight's blows (every swing, the whirlwind's
     // hits) deal bonusShare more of their damage, at most bonusCap more
-    // (issue #321); the HUD shows it in bonusColor beside the special
+    // (issue #321); the HUD shows it in bonusColor beside the special.
+    // A chain's kill bursts more the longer the chain, on every screen:
+    // each link past the first, up to burstLinks, adds burstShards shards
+    // and burstSparks sparks and widens its ring by burstRing wu
     readonly property var chain: ({
         window: 2.5,
         pitches: [0, 1, 3, 5, 7, 8, 10, 12],
@@ -400,7 +403,11 @@ QtObject {
         pipEvery: 3,
         bonusShare: 0.15,
         bonusCap: 0.45,
-        bonusColor: "#FF9A4A"
+        bonusColor: "#FF9A4A",
+        burstLinks: 8,
+        burstShards: 3,
+        burstSparks: 3,
+        burstRing: 0.3
     })
 
     // The sword-and-shield combo: the right button within window seconds of

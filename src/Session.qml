@@ -50,8 +50,9 @@ Item {
     signal lobbyStartRequested()
     // The lobby was left without starting
     signal lobbyLeft()
-    // Another player hit or was hit; this screen draws the hit, no more
-    signal impactReceived(string kind, real x, real y, real dx, real dy, var color)
+    // Another player hit or was hit; this screen draws the hit, no more.
+    // links: a chained kill's links (Game.impact), else 0
+    signal impactReceived(string kind, real x, real y, real dx, real dy, var color, int links)
     // The host runs every enemy as a replicated object of type "enemy"; it
     // came to life or went on this node - a joiner's too, also one that
     // joins late (issue #13)
@@ -274,7 +275,8 @@ Item {
                 let rp = remotePlayers[fromId]
                 if (rp) rp.triggerAction(data.action)
             } else if (data.type === "impact") {
-                session.impactReceived(data.kind, data.x, data.y, data.dx, data.dy, data.color)
+                session.impactReceived(data.kind, data.x, data.y, data.dx, data.dy, data.color,
+                                       data.links || 0)
             } else if (data.type === "enemyBlow") {
                 if (net.isHost) session.enemyBlowReceived(fromId, data)
             } else if (data.type === "knightBlow") {
@@ -511,10 +513,11 @@ Item {
     }
 
     // A hit the local player landed or took, for the others to draw
-    function sendImpact(kind, x, y, dx, dy, color) {
+    function sendImpact(kind, x, y, dx, dy, color, links) {
         if (net.connected && inGame)
             net.broadcast({type: "impact", kind: kind, x: x, y: y, dx: dx, dy: dy,
-                           color: color === undefined ? undefined : String(color)})
+                           color: color === undefined ? undefined : String(color),
+                           links: links || 0})
     }
 
     // The local player reached the exit: the host advances, a joiner asks

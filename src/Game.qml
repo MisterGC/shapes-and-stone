@@ -776,23 +776,36 @@ ClayWorld2d {
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
+    //   links: a chainKill's links, its burst's size (Balance.chain)
     // Its world part (sparks, shards, rings, stains) belongs to the place
     // of the hit and shows on every screen; its screen part (shake, kick,
     // hit-stop, flash) only on the screen of whoever hit or was hit. A local
     // hit goes out to the others, who draw its world part only.
-    function impact(kind, x, y, dx, dy, color, local) {
+    function impact(kind, x, y, dx, dy, color, local, links) {
         let len = Math.sqrt(dx * dx + dy * dy)
         let nx = len > 0.001 ? dx / len : 0
         let ny = len > 0.001 ? dy / len : 0
-        _impactWorld(kind, x, y, nx, ny, color)
+        _impactWorld(kind, x, y, nx, ny, color, links)
         if (local === false) return
         _impactScreen(kind, nx, ny)
-        session.sendImpact(kind, x, y, dx, dy, color)
+        session.sendImpact(kind, x, y, dx, dy, color, links)
     }
 
-    function _impactWorld(kind, x, y, nx, ny, color) {
+    // The particles of a kill's burst, its chain's links-th: one link (or
+    // none given) is a kill's own, each link past it adds to it
+    // (Balance.chain.burstLinks, burstShards, burstSparks, burstRing)
+    // The last kill's burst this screen drew, for a bench
+    property var lastDeathBurst: null
+    function deathBurst(links) {
+        let c = Balance.chain
+        let past = Math.max(0, Math.min(links || 1, c.burstLinks) - 1)
+        return { shards: 12 + past * c.burstShards, sparks: 10 + past * c.burstSparks,
+                 ring: 1.6 + past * c.burstRing }
+    }
+
+    function _impactWorld(kind, x, y, nx, ny, color, links) {
         if (!fx) {
-            if (kind === "enemyDeath") spawnDeathParticles(x, y)
+            if (kind === "enemyDeath" || kind === "chainKill") spawnDeathParticles(x, y)
             else if (kind === "parry") spawnParryEffect(x, y)
             else if (kind === "projectileDeflected") spawnDeflectParticles(x, y)
             else if (kind === "projectileBurst") spawnSpitParticles(x, y)
@@ -812,12 +825,15 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
         case "enemyDeath":
-        case "chainKill":
-            spawnShards(x, y, nx, ny, 12, color, 0.3)
-            spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
-            spawnRing(x, y, Qt.lighter(color, 1.4))
+        case "chainKill": {
+            let burst = deathBurst(kind === "chainKill" ? links : 1)
+            lastDeathBurst = burst
+            spawnShards(x, y, nx, ny, burst.shards, color, 0.3)
+            spawnSparks(x, y, nx, ny, burst.sparks, Qt.lighter(color, 1.6))
+            spawnRing(x, y, Qt.lighter(color, 1.4), burst.ring)
             spawnStain(x, y, color)
             break
+        }
         case "playerHit":
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
             break
@@ -1093,8 +1109,8 @@ ClayWorld2d {
         onArrivalReported: (fromId, seed, level, picked) => _introArrival(fromId, seed, level, picked)
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
-        onImpactReceived: (kind, x, y, dx, dy, color) => {
-            if (screen === "game") impact(kind, x, y, dx, dy, color, false)
+        onImpactReceived: (kind, x, y, dx, dy, color, links) => {
+            if (screen === "game") impact(kind, x, y, dx, dy, color, false, links)
         }
         onEnemySpawned: (objectId, props) => _makeEnemy(props, objectId)
         onEnemyDespawned: (objectId) => _dropEnemy(objectId)
@@ -3484,7 +3500,7 @@ ClayWorld2d {
         let c = Balance.chain
         chainLinks = chainLinks > 0 && physicsSeconds - _chainAt <= c.window ? chainLinks + 1 : 1
         _chainAt = physicsSeconds
-        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color)
+        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color, true, chainLinks)
         playDeathBurst(x, y, c.pitches[Math.min(chainLinks, c.pitches.length) - 1])
         countFight("kill")
         if (chainLinks >= 2) countFight("chain", chainLinks)
