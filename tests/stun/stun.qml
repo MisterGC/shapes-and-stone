@@ -9,7 +9,10 @@
 // is over, the third goes on; they show it - the frost rim, held breath -
 // and stand frozen for stun.freeze seconds to the step, unmoved, through a
 // blow too, never striking, then thaw into the chase. Short of the mana the
-// button bashes nothing. In the duel scenario the lead, its stance worn,
+// button bashes nothing. A frozen guardian's shield takes no blow from its
+// front, which it does unfrozen, and a shield push - the bash's shove and
+// stagger - leaves a frozen grunt frozen, unmoved, its freeze running on.
+// In the duel scenario the lead, its stance worn,
 // winds up: the stun ends its wind-up and its string, it goes for the
 // knight again at once, not frozen, not opened, its stance as it was, and
 // a charged swing right after finds no opening; out of a wind-up a stun
@@ -184,7 +187,50 @@ Window {
         let refused = !p.unleash()
         check(refused && p.mana === Balance.stun.mana - 1 && g.fightRecord.stuns === rec && a.aiState !== "frozen",
               "short of the mana the button bashes nothing and spends nothing")
+        soloFrozenRules()
         Clayground.paused = false
+    }
+
+    // Two rules of the freeze: a frozen guardian's shield takes no blow,
+    // and a shield push - the bash's shove and stagger - leaves a frozen
+    // enemy frozen, unmoved, its freeze running on
+    function soloFrozenRules() {
+        let g = solo, p = g.player
+        readyStun(p)
+        let small = g.enemies.filter(e => alive(e) && !e.lead)
+        let gd = small.find(e => e.enemyType === "guardian")
+        let gr = small.find(e => e.enemyType === "grunt")
+        check(!!gd && !!gr, "the flow room stands a guardian and a grunt")
+        if (!gd || !gr) return
+        for (let e of small) if (e !== gd && e !== gr) place(e, p, 12, 0)
+        // The guardian to the knight's right, its shield facing the knight
+        place(gd, p, 1.5, 0)
+        place(gr, p, -1.5, 0)
+        steps(1)
+        gd.hp = 1000
+        gd.facingAngle = 180
+        let amount = 20, full = Math.max(Balance.minDamage, amount - gd.def)
+        let blocked = gd.takeDamage(amount, p.xWu, p.yWu, false)
+        check(blocked === Math.floor(full * Balance.enemy.blockedShare),
+              "not frozen, the guardian's shield takes a blow from its front (" + blocked + " of " + full + ")")
+        p.unleash()
+        check(gd.aiState === "frozen" && gr.aiState === "frozen", "the stun freezes the guardian and the grunt")
+        gd.facingAngle = 180
+        let hp = gd.hp
+        let dealt = gd.takeDamage(amount, p.xWu, p.yWu, false)
+        check(dealt === full && hp - gd.hp === full,
+              "frozen, the guardian's shield takes no blow: a blow from its front does all its damage ("
+              + dealt + " of " + full + ")")
+        // The bash's shield push on the frozen grunt: its shove, then its
+        // stagger (Player._tryBash)
+        let x = gr.xWu, y = gr.yWu, left = gr._attackTimer
+        gr.shove(gr.xWu - p.xWu, gr.yWu - p.yWu, Balance.bash.speed)
+        gr.stagger(Balance.bash.stagger)
+        steps(10)
+        let moved = Math.hypot(gr.xWu - x, gr.yWu - y)
+        check(gr.aiState === "frozen" && moved < 1e-3 && Math.abs(left - gr._attackTimer - 10 * stepS) < 1e-6,
+              "a shield push leaves a frozen enemy frozen, unmoved, its freeze running on (" + gr.aiState + ", "
+              + moved.toFixed(4) + " wu, " + left.toFixed(3) + " -> " + gr._attackTimer.toFixed(3) + " s left)")
     }
 
     // A lead, or the Warden, winding up: the stun ends the wind-up
