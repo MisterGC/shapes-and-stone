@@ -149,6 +149,10 @@ Window {
             game.playBallBounce(undefined, undefined, "fall")
             check(bs && bb && bs.lastSeed !== bsSeed && bbBounce !== bbSeed && bb.lastSeed !== bbBounce,
                   "the game's own calls play the ball's shot, its bounce and its fall from their recipes")
+            // A critter squashed under a knight's foot (issue #324)
+            let sq = p["sfx/critter_squash.sfx.json"], sqSeed = sq ? sq.lastSeed : null
+            game.playCritterSquash(undefined, undefined, "rat")
+            check(sq && sq.lastSeed !== sqSeed, "the game's own call plays a critter's squash from its recipe")
             // A special's stronger version's swell (issue #320)
             let surge = p["sfx/special_surge.sfx.json"], surgeSeed = surge ? surge.lastSeed : null
             game.playSurge()
