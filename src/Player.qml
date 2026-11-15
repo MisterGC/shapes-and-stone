@@ -111,6 +111,49 @@ PhysicsItem {
     }
     readonly property real specialMana: specialManaOf(special)
     readonly property real whirlMana: specialManaOf("whirlwind")
+
+    // The combo (Balance.combo, issue #320): the moves away from the aim,
+    // then towards it, read off moveX and moveY on every physics step -
+    // whatever the keys, the stick or the touch pad they come from are
+    // bound to - against the facing of that step. The step the moves
+    // last pointed away (-1 none), the way they point now (-1 away, 1
+    // towards, 0 neither) and the step the combo was entered (-1 none)
+    property int _comboAwayAt: -1
+    property int _comboWay: 0
+    property int comboAt: -1
+    // The special's button now fires the stronger version: the combo was
+    // entered at most combo.window seconds ago
+    function comboReady() {
+        return comboAt >= 0 && !!world
+            && (_steps - comboAt) * world.timeStep <= Balance.combo.window + 1e-6
+    }
+    // Whether the last special let loose was the stronger version
+    property bool lastStrong: false
+    // The way the moves point against the facing: -1 away, 1 towards, 0
+    // neither or under combo.deadZone
+    function comboWay() {
+        let c = Balance.combo
+        let len = Math.sqrt(moveX * moveX + moveY * moveY)
+        if (len < c.deadZone) return 0
+        let rad = facingAngle * Math.PI / 180
+        // moveY is screen down, the facing's y is up
+        let along = (moveX * Math.cos(rad) - moveY * Math.sin(rad)) / len
+        let cone = Math.cos(c.cone * Math.PI / 180)
+        return along >= cone - 1e-9 ? 1 : along <= -cone + 1e-9 ? -1 : 0
+    }
+    function _readCombo() {
+        let way = comboWay()
+        if (way === -1) {
+            // Away again: a combo entered before is gone
+            _comboAwayAt = _steps
+            comboAt = -1
+        } else if (way === 1 && _comboWay !== 1 && _comboAwayAt >= 0
+                   && (_steps - _comboAwayAt) * world.timeStep <= Balance.combo.gap + 1e-6) {
+            comboAt = _steps
+            console.log("[Player] Combo entered")
+        }
+        _comboWay = way
+    }
     readonly property real blockDrain: Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
@@ -196,6 +239,8 @@ PhysicsItem {
     // The dash under way is a whirlwind (Balance.knight.whirl...), let
     // loose with Q (unleash)
     property bool isWhirling: false
+    // The whirlwind under way is the stronger version (Balance.combo)
+    property bool whirlStrong: false
     // Momentum (Balance.momentum): pips earned by blows that land, all of
     // them spent by a whirlwind. _swingEarned is what the swing under way
     // has earned so far: it earns its best blow once, not per enemy
@@ -262,6 +307,7 @@ PhysicsItem {
         function onStepped() {
             let dt = player.world.timeStep
             _steps++
+            _readCombo()
             _countSteps(dt)
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
@@ -346,6 +392,7 @@ PhysicsItem {
     }
 
     // A moment others should see: "attack", "heavy", "whirlwind", "stun", "bolt",
+    // a special's stronger version as "whirlwind+", "stun+" or "bolt+",
     // "dash", "parry", "block", "perfectBlock", "hurt", "shieldBreak",
     // "sit" or "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
@@ -692,15 +739,17 @@ PhysicsItem {
     function whirlEnemies() {
         if (!gameWorld || !gameWorld.enemies) return 0
         let k = Balance.knight
-        _breakBones(k.whirlReach, false)
-        _breakThings(k.whirlReach, false)
+        let reach = whirlStrong ? Balance.combo.whirlwind.reach : k.whirlReach
+        let swing = whirlStrong ? Balance.combo.whirlwind.swing : k.whirlSwing
+        _breakBones(reach, false)
+        _breakThings(reach, false)
         let hitCount = 0
         for (let e of gameWorld.enemies) {
             if (!e || e.destroyed !== false || _hitThisWhirl.has(e)) continue
             let dx = e.xWu + e.widthWu / 2 - (xWu + widthWu / 2)
             let dy = e.yWu - e.heightWu / 2 - (yWu - heightWu / 2)
-            if (dx * dx + dy * dy > k.whirlReach * k.whirlReach) continue
-            let dmg = Math.floor(atk * k.whirlSwing)
+            if (dx * dx + dy * dy > reach * reach) continue
+            let dmg = Math.floor(atk * swing)
             _hitThisWhirl.add(e)
             e.takeDamage(dmg, xWu, yWu, true)
             hitCount++
@@ -1120,26 +1169,50 @@ PhysicsItem {
     // The whirlwind, with full momentum and whirlMana: short of the
     // momentum the pips flash, short of the mana the bar does; either way
     // nothing else happens. The stun (_stun) and the bolt (_bolt) for
-    // their mana alone. A special not in the game yet does nothing.
+    // their mana alone. A special not in the game yet does nothing. With
+    // the combo just entered (comboReady) it is the stronger version for
+    // the same mana (Balance.combo), and the combo is spent.
     // Returns whether it went off
     function unleash() {
         if (fallen || held || isDashing || openLeft > 0) return false
-        if (special === "stun") return _stun()
-        if (special === "bolt") return _bolt()
-        if (special !== "whirlwind") {
+        let strong = comboReady()
+        let went = false
+        if (special === "stun") went = _stun(strong)
+        else if (special === "bolt") went = _bolt(strong)
+        else if (special !== "whirlwind") {
             console.log("[Player] The special", special, "is not in the game yet")
             return false
-        }
-        if (momentum < Balance.momentum.max) {
+        } else if (momentum < Balance.momentum.max) {
             momentumShort()
             return false
+        } else if (_aimDash() && _afford(whirlMana)) {
+            _spend(whirlMana)
+            momentum = 0
+            _startDash()
+            _whirl(strong)
+            went = true
         }
-        if (!_aimDash() || !_afford(whirlMana)) return false
-        _spend(whirlMana)
-        momentum = 0
-        _startDash()
-        _whirl()
-        return true
+        if (went) {
+            lastStrong = strong
+            comboAt = -1
+            if (strong) _surge()
+        }
+        return went
+    }
+
+    // A stronger special went off (Balance.combo): its name over the
+    // knight, a ring and sparks round it and the swell over its sound, on
+    // this screen; the others see and hear it by its action (special+)
+    function _surge() {
+        let c = Balance.combo
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        if (gameWorld) {
+            gameWorld.playSurge()
+            gameWorld.spawnWord(xWu, yWu + 0.4, c[special].name.toUpperCase(), c.wordColor)
+            if (gameWorld.impact) gameWorld.impact("surge", cx, cy, 0, 0, c.color)
+            gameWorld.countFight("strong")
+        }
+        console.log("[Player] The stronger", special, "-", c[special].name)
     }
 
     // The stun (Balance.stun, issue #318): for specialMana - short of it
@@ -1150,11 +1223,11 @@ PhysicsItem {
     // lead or the Warden loses its wind-up. Its ring shows on every
     // screen; the record counts the bash, the enemies it froze and the
     // wind-ups it ended. Returns whether it bashed
-    function _stun() {
+    function _stun(strong) {
         if (!_afford(specialMana)) return false
         _spend(specialMana)
         _cancelCharge()
-        let s = Balance.stun
+        let s = strong ? Balance.combo.stun : Balance.stun
         let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
         let froze = 0, ended = 0
         for (let e of (gameWorld && gameWorld.enemies) || []) {
@@ -1168,15 +1241,16 @@ PhysicsItem {
             else if (what === "interrupted") ended++
         }
         view.block()
-        acted("stun")
+        acted(strong ? "stun+" : "stun")
         if (gameWorld) {
             gameWorld.playStun()
-            if (gameWorld.impact) gameWorld.impact("stun", cx, cy, 0, 0, s.color)
+            if (gameWorld.impact) gameWorld.impact(strong ? "stunStrong" : "stun", cx, cy, 0, 0,
+                                                   strong ? Balance.combo.color : Balance.stun.color)
             gameWorld.countFight("stun")
             gameWorld.countFight("stunFrozen", froze)
             gameWorld.countFight("stunInterrupted", ended)
         }
-        console.log("[Player] Stun! Froze", froze, "and ended", ended, "wind-ups")
+        console.log("[Player]", strong ? "Strong stun!" : "Stun!", "Froze", froze, "and ended", ended, "wind-ups")
         return true
     }
 
@@ -1186,44 +1260,48 @@ PhysicsItem {
     // holds let go of; it hurts the first enemy it meets for bolt.damage
     // times atk (Game.fireBolt). The record counts it. Returns whether it
     // went off
-    function _bolt() {
+    function _bolt(strong) {
         if (!_afford(specialMana)) return false
         _spend(specialMana)
         _cancelCharge()
         let rad = facingAngle * Math.PI / 180
         let dx = Math.cos(rad), dy = Math.sin(rad)
         let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
-        let damage = Math.round(atk * Balance.bolt.damage)
+        let damage = Math.round(atk * (strong ? Balance.combo.bolt.damage : Balance.bolt.damage))
         view.parry()
-        acted("bolt")
+        acted(strong ? "bolt+" : "bolt")
         if (gameWorld) {
-            gameWorld.fireBolt(cx, cy, dx, dy, damage)
+            gameWorld.fireBolt(cx, cy, dx, dy, damage, strong)
             gameWorld.countFight("bolt")
         }
-        console.log("[Player] Bolt! Facing:", facingAngle.toFixed(0), "degrees, damage", damage)
+        console.log("[Player]", strong ? "Strong bolt!" : "Bolt!", "Facing:", facingAngle.toFixed(0),
+                    "degrees, damage", damage)
         return true
     }
 
     // The whirlwind: the dash under way goes on as one, whirlDuration
-    // seconds at whirlSpeed from now
-    function _whirl() {
+    // seconds at whirlSpeed from now; strong, the stronger version's
+    // (Balance.combo.whirlwind)
+    function _whirl(strong) {
         let k = Balance.knight
+        let duration = strong ? Balance.combo.whirlwind.duration : k.whirlDuration
         isAttacking = false
         isHeavy = false
         isWhirling = true
+        whirlStrong = strong === true
         _hitThisWhirl = new Set()
         _whirlLanded = false
-        _dashTimer = k.whirlDuration
-        dashCooldown = k.whirlDuration + dashCooldownTime
-        attackCooldown = k.whirlDuration
-        view.whirl(k.whirlDuration * 1000)
-        acted("whirlwind")
+        _dashTimer = duration
+        dashCooldown = duration + dashCooldownTime
+        attackCooldown = duration
+        view.whirl(duration * 1000, whirlStrong)
+        acted(whirlStrong ? "whirlwind+" : "whirlwind")
         if (gameWorld) {
             gameWorld.playWhirlwind()
             if (gameWorld.impact)
                 gameWorld.impact("whirlwind", xWu, yWu, _dashDirX, -_dashDirY)
         }
-        console.log("[Player] Whirlwind!")
+        console.log("[Player]", whirlStrong ? "Strong whirlwind!" : "Whirlwind!")
     }
 
     function attack() {

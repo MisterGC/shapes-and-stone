@@ -344,11 +344,12 @@ QtObject {
     //   instead of bolt.size, at speed instead of bolt.speed; on a lead or
     //   the Warden still a chip that never breaks the stance
     // As it fires the knight shows the stronger version's name in
-    // wordColor over it, a ring of color and sparks sparks round it, and
-    // plays sound/sfx/special_surge at volume over the special's own sound;
-    // a stronger whirlwind's blade glows color, a stronger stun's ring and
-    // a stronger bolt are drawn in color. In a session every screen sees
-    // and hears it
+    // wordColor over it, a ring of color out to ring wu and sparks sparks
+    // round it, and plays sound/sfx/special_surge at volume over the
+    // special's own sound; a stronger whirlwind's blade glows color, a
+    // stronger stun's ring and a stronger bolt are drawn in color, and a
+    // stronger stun shakes the screen by trauma. In a session every screen
+    // sees and hears it
     readonly property var combo: ({
         window: 0.35,
         gap: 0.25,
@@ -362,7 +363,9 @@ QtObject {
                 damage: 2.0, size: 0.6, speed: 22.0 },
         color: "#FFD45A",
         wordColor: "#FFE89A",
+        ring: 1.4,
         sparks: 18,
+        trauma: 0.45,
         volume: 0.8
     })
 
