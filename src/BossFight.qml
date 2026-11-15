@@ -422,12 +422,14 @@ Item {
             }
         }
     }
-    // The Warden's words, under either banner
+    // The Warden's words, low on the screen as a subtitle, just above
+    // its HP bar, so they never hide it in the room
     Text {
         id: lineCaption
         objectName: "bossLine"
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height * 0.2 + 96
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 54 + 34 + 12
         width: Math.min(640, parent.width * 0.8)
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
