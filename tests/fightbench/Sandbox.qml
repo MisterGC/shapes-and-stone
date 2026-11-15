@@ -52,7 +52,7 @@ Item {
     // danger is the danger the fight room is at: its depth and, after the
     // point, the position in the depth's range (Game.applyScenario);
     // room who stands in it: "mixed" (Balance.spawn.fightRoom), "flow",
-    // "duel", "guardianduel", "spitterduel" or "boss" (Balance.pacing); sword the knight's sword level, -1 for the
+    // "duel", "guardianduel", "spitterduel", "ballduel" or "boss" (Balance.pacing); sword the knight's sword level, -1 for the
     // one it usually has at that depth (usualSword), 0 when left out
     function begin(s, a, d, r, sw) {
         Clayground.paused = true
@@ -74,6 +74,7 @@ Item {
         _stunAt = -1000
         _boltAt = -1000
         boltEnds = []
+        balls = ({})
         cancelledCharges = 0
         _chargeSeen = ""
         engagedSeconds = 0
@@ -93,7 +94,7 @@ Item {
         game.logSounds = true
         game.followFightOnSteps = true
         // The dojo's scenarios: "fight" for the mixed room, "flow", "duel",
-        // "guardianduel", "spitterduel", "boss"
+        // "guardianduel", "spitterduel", "ballduel", "boss"
         game.applyScenario(room === "mixed" ? "fight" : room, danger)
         // The log's clock from 0, in steps of exactly 1/60 s: the same
         // fight logs the same times
@@ -119,6 +120,9 @@ Item {
         if (!_boltsFollowed) {
             _boltsFollowed = true
             game.boltEnded.connect(bench.boltEnded)
+            game.ballBounced.connect(bench.ballBounced)
+            game.ballTurned.connect(bench.ballTurned)
+            game.ballFell.connect(bench.ballFell)
         }
         return game.player !== null
     }
@@ -144,6 +148,28 @@ Item {
             Object.assign(b, { type: enemy.enemyType, lead: enemy.lead, dealt: dealt, allowed: allowed })
         }
         boltEnds.push(b)
+    }
+    // Every metal ball of a slinger's (issue #322), by its id: when it was
+    // slung, its wall bounces - when, where its centre touched the wall
+    // and how far from the room's centre along either axis -, the shield
+    // that turned it ("blocked" or "perfect") and when, and how it fell,
+    // when and after how many bounces
+    property var balls: ({})
+    function _ball(id) {
+        if (!balls[id]) balls[id] = { at: now(), bounces: [], turned: null, turnedAt: null, fell: null }
+        return balls[id]
+    }
+    function ballBounced(id, n, x, y) {
+        _ball(id).bounces.push({ t: now(), n: n, x: round3(x), y: round3(y),
+                                 edge: round3(Math.max(Math.abs(x - game._fightRoomCx), Math.abs(y - game._fightRoomCy))) })
+    }
+    function ballTurned(id, by, local, dx, dy) {
+        let b = _ball(id)
+        b.turned = by
+        b.turnedAt = now()
+    }
+    function ballFell(id, how, bounces, by, x, y) {
+        _ball(id).fell = { t: now(), how: how, bounces: bounces, x: round3(x), y: round3(y) }
     }
     // An enemy the bench follows from now on: from the start, or one that
     // came later (the Warden's adds)
@@ -228,6 +254,17 @@ Item {
             // enemy (Balance.projectile)
             shotsBack: r.shotsBack,
             shotBackHits: r.shotBackHits,
+            // The slinger's metal balls (Balance.ball, issue #322): the
+            // ones the knight's shield bounced, a perfect block aimed and
+            // that hit an enemy, as the record counts them; each ball
+            // slung; the wall bounces the table allows and the ball's half
+            // size
+            ballsBack: r.ballsBack,
+            ballsAimed: r.ballsAimed,
+            ballBackHits: r.ballBackHits,
+            balls: Object.keys(balls).map(id => Object.assign({ id: id }, balls[id])),
+            ballBounces: Balance.ball.bounces,
+            ballRadius: Balance.ball.size / 2,
             crushBlows: crushBlows,
             crushed: r.crushed,
             heavySwings: heavySwings,
@@ -595,6 +632,37 @@ Item {
                                 roomHalf: half, atk: p.atk })
     }
 
+    // ---- a metal ball, slung by hand (issue #322) ----
+    // In the ball duel after begin(): the pilot rests, the slinger halted,
+    // the knight at the room's centre in a long grace, so the ball passes
+    // it. One ball from 6 wu left of and 3 below the centre, at 0.8, 0.6,
+    // fast enough to meet five walls in its time: its bounces and its
+    // fall as the bench saw them (balls), with what to hold them to, as
+    // JSON
+    function tryBall() {
+        Clayground.paused = true
+        _rng = null
+        let p = game.player, cx = game._fightRoomCx, cy = game._fightRoomCy
+        let half = 15 * game.cellSize / 2
+        for (let e of game.enemies.filter(alive)) e.halt()
+        p.maxHp = 100000
+        p.hp = 100000
+        p.graceLeft = 1e6
+        let from = { x: cx - 6, y: cy - 3 }, dir = { x: 0.8, y: 0.6 }
+        let b = game.spawnBall(from.x, from.y, dir.x, dir.y, 10)
+        let id = b.ballId
+        b.speed = 16
+        let k = 0
+        while (!(balls[id] && balls[id].fell) && k < 1200) {
+            Clayground.physicsStep(1)
+            k++
+        }
+        p.graceLeft = 0
+        return JSON.stringify({ from: from, dir: dir, speed: 16, centre: { x: cx, y: cy }, roomHalf: half,
+                                radius: Balance.ball.size / 2, bounces: Balance.ball.bounces,
+                                ball: balls[id] || null, steps: k })
+    }
+
     // ---- the combo, entered by hand (issue #320) ----
     // In the flow room after begin(): the pilot rests, every enemy halted
     // in a corner, the knight at the room's centre. For each special the
@@ -930,16 +998,40 @@ Item {
     // next. A shot sent back is none to answer. Returns whether the knight
     // is answering one
     readonly property real perfectFrom: 0.9
-    function answerShot(p, dt, towards, perfect) {
+    // A slinger's metal ball (issue #322) is a shot too while it comes at
+    // the knight: not fallen, none a shield turned, flying towards it
+    function incoming(p, o) {
+        if (o.destroyed !== false || o.back) return false
+        if (o.objectName === "projectile") return true
+        if (o.objectName !== "ball" || o.fallen) return false
+        let c = { x: p.xWu + p.widthWu / 2, y: p.yWu - p.heightWu / 2 }
+        return o.dirX * (c.x - o.centreX) + o.dirY * (c.y - o.centreY) > 0
+    }
+    // Facing a ball with the shield so a perfect block sends it at aim
+    // (Balance.ball): as near aim's way as the shield's arc still meets
+    // the ball, a margin inside it; facing the ball itself without aim
+    readonly property real aimMargin: 15
+    function faceShot(p, o, aim) {
+        face(p, o)
+        if (!aim || o.objectName !== "ball") return
+        let toBall = p.facingAngle
+        let px = p.xWu + p.widthWu / 2, py = p.yWu - p.heightWu / 2
+        let toAim = Math.atan2(ey(aim) - aim.heightWu / 2 + (aim.bulk || 0) - py,
+                               ex(aim) + aim.widthWu / 2 - (aim.bulk || 0) - px) * 180 / Math.PI
+        let d = ((toAim - toBall) % 360 + 540) % 360 - 180
+        let most = Balance.knight.shieldArc - aimMargin
+        p.facingAngle = toBall + Math.max(-most, Math.min(most, d))
+    }
+    function answerShot(p, dt, towards, perfect, aim) {
         let shot = null, shotDist = 1e9
         for (let o of game.room.children) {
-            if (o.objectName !== "projectile" || o.destroyed !== false || o.back) continue
+            if (!(o.objectName === "projectile" || o.objectName === "ball") || !incoming(p, o)) continue
             let d = distTo(p, o.xWu, o.yWu)
             if (d < 3 && d < shotDist) { shot = o; shotDist = d }
         }
         if (shot) {
             letGo(p)
-            face(p, shot)
+            faceShot(p, shot, perfect === true ? aim : null)
             let cd = Math.hypot(shot.xWu + shot.widthWu / 2 - p.xWu - p.widthWu / 2,
                                 shot.yWu - shot.heightWu / 2 - p.yWu + p.heightWu / 2)
             if (perfect === true && !p.isBlocking && cd > perfectFrom) {
@@ -1021,7 +1113,7 @@ Item {
 
         // 2. A spitter's shot on its way: shield up towards it a moment,
         // "perfect" just before it meets the knight
-        if (answerShot(p, dt, null, answer === "perfect")) return
+        if (answerShot(p, dt, null, answer === "perfect", nearest(p, foes).e)) return
 
         // 3. Go for the nearest enemy
         let near = nearest(p, foes), target = near.e, targetDist = near.d
@@ -1110,7 +1202,7 @@ Item {
             return
         }
         let near = nearest(p, foes), target = near.e
-        if (answerShot(p, dt, near.d > 1.3 ? target : null, true)) return
+        if (answerShot(p, dt, near.d > 1.3 ? target : null, true, target)) return
         letGo(p)
         face(p, target)
         if (shieldDash(p, target, near.d)) return
@@ -1161,7 +1253,7 @@ Item {
     // seed's, the room's and the danger's own, so every fight of a pacing
     // run, all on one seed, has its misses on answers of its own
     function missPhaseOf(s, r, d) {
-        let rooms = ["mixed", "flow", "duel", "guardianduel", "spitterduel", "boss"]
+        let rooms = ["mixed", "flow", "duel", "guardianduel", "spitterduel", "boss", "ballduel"]
         return game.createRng(game.deriveSeed(s, rooms.indexOf(r) * 1000 + Math.round(d * 100)))()
     }
     // Whether the next answer is a miss, and if so whether early
@@ -1189,7 +1281,8 @@ Item {
             a.last = s
         }
         for (let o of game.room.children)
-            if (o.objectName === "projectile" && o.destroyed === false && !o.back && !_shotsSeen.has(o))
+            if ((o.objectName === "projectile" || o.objectName === "ball") && o.destroyed === false
+                    && !o.back && !_shotsSeen.has(o))
                 _shotsSeen.set(o, shotBegan(o, t))
         for (let [o] of Array.from(_shotsSeen))
             if (o.destroyed !== false) _shotsSeen.delete(o)
@@ -1197,12 +1290,13 @@ Item {
             for (let q of game.bossFight.zones)
                 if (!_zonesSeen.has(q.id)) _zonesSeen.set(q.id, t)
     }
-    // When shot o, first seen at t, began: the wind-up of the spitter it
-    // left, the nearest one whose wind-up began within a second, else t
+    // When shot o, first seen at t, began: the wind-up of the spitter (or
+    // the slinger, a ball) it left, the nearest one whose wind-up began
+    // within a second, else t
     function shotBegan(o, t) {
         let at = t, best = 1e9
         for (let e of game.enemies) {
-            if (!alive(e) || e.enemyType !== "spitter") continue
+            if (!alive(e) || !e.ranged) continue
             let a = _attacks.get(e)
             if (!a || a.shotAt < 0 || t - a.shotAt > 1) continue
             let d = Math.hypot(ex(e) - o.xWu, ey(e) - o.yWu)
@@ -1278,10 +1372,10 @@ Item {
     // farther off: an ordinary block) or none (it lets the shot hit).
     // Returns whether the knight is answering one
     property var _shotPlans: new Map()
-    function personShot(p, dt, towards) {
+    function personShot(p, dt, towards, aim) {
         let shot = null, shotDist = 1e9
         for (let o of game.room.children) {
-            if (o.objectName !== "projectile" || o.destroyed !== false || o.back) continue
+            if (!(o.objectName === "projectile" || o.objectName === "ball") || !incoming(p, o)) continue
             let at = _shotsSeen.has(o) ? _shotsSeen.get(o) : -1
             if (!seenSince(at)) continue
             let d = distTo(p, o.xWu, o.yWu)
@@ -1299,7 +1393,7 @@ Item {
             if (plan.miss && !plan.early) shot = null
             else {
                 letGo(p)
-                face(p, shot)
+                faceShot(p, shot, aim)
                 let cd = Math.hypot(shot.xWu + shot.widthWu / 2 - p.xWu - p.widthWu / 2,
                                     shot.yWu - shot.heightWu / 2 - p.yWu + p.heightWu / 2)
                 let from = perfectFrom + (plan.miss ? shot.speed * Balance.knight.perfectBlockFrames / 60 : 0)
@@ -1340,7 +1434,7 @@ Item {
             return
         }
         let near = nearest(p, foes), target = near.e
-        if (personShot(p, dt, near.d > 1.3 ? target : null)) return
+        if (personShot(p, dt, near.d > 1.3 ? target : null, target)) return
         letGo(p)
         face(p, target)
         if (shieldDash(p, target, near.d)) return

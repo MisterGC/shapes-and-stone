@@ -15,9 +15,9 @@ intensity).
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
                     [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person]
-                    [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--sword N]
+                    [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--sword N]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
-  run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel boss]
+  run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss]
                     [--depths 0 2 4] [--answers charge masher skilled person] [--jobs N]
                     [--json out.json]
 
@@ -45,8 +45,9 @@ perfect-blocks - crushing blows and shots, which it sends back - and
 strikes in openings, "person" plays as "skilled" with a person's reaction
 time and misses (Balance.pacing.person, issue #315). --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
 only, "duel" a room's lead alone, a grunt, "guardianduel" a guardian lead
-alone (issue #288), "spitterduel" a spitter lead alone (issue #315) and
-"boss" the Hollow Warden alone, its
+alone (issue #288), "spitterduel" a spitter lead alone (issue #315),
+"ballduel" a slinger lead alone, the lead whose metal balls bounce off the
+walls and the shields (issue #322), and "boss" the Hollow Warden alone, its
 adds coming in its phase 2 (Balance.pacing, Balance.boss). --sword is the
 knight's sword level: by default 0 in the mixed room and in flow and duel
 the one a knight usually has at that depth. --danger is the danger the
@@ -56,8 +57,8 @@ at that danger. --depth d is --danger d, the bottom of the depth's range.
 The same seed and danger give the same numbers.
 
 --pacing plays every room of --rooms at every depth of --depths with every
-pilot of --answers (by default flow, duel, guardianduel, spitterduel and
-boss, Balance.pacing.depths, and
+pilot of --answers (by default flow, duel, guardianduel, spitterduel,
+ballduel and boss, Balance.pacing.depths, and
 charge, masher, skilled and person), --jobs loaders at a time, prints a report of
 each fight - per enemy its time to kill and hits to kill, the gaps between
 kills, the kill chains and the longest one's links (Balance.chain), the
@@ -75,7 +76,16 @@ not fall, "masher" and "charge" fall or take at least bossSlow times as
 long. The skilled pilot steps out of a floor zone of the Warden's while
 it warns. In every boss fight the Warden's wind-ups and strikes play its
 toll and nothing screams before its adds come; in no flow or duel fight
-is its toll heard (issue #287). No band checks the spitter duel. The
+is its toll heard (issue #287). No band checks the spitter duel or the
+ball duel; --check tests the slinger's balls there instead (issue #322):
+in each ball duel every ball that fell at a wall bounced
+Balance.ball.bounces times first and none bounced more, each bounce at
+the room's walls, and at each depth a ball the skilled pilot's shield
+bounced hit the lead and opened it (its record's hits, the lead's
+openings by "ball"); and one ball slung by hand across the ball duel's
+room (Sandbox.tryBall) bounces off its walls Balance.ball.bounces times,
+each where the mirror path off the walls puts it, and falls at the next
+wall. The
 person's fights get no band either: a section of their own says of each
 whether the person won - cleared the room without falling - and in how
 many seconds, or how it lost, with its answers and misses (issue #315);
@@ -315,6 +325,80 @@ def check_bolt_shots(s, step=1 / 60):
     ]
 
 
+def sling_ball(loader, seed):
+    """The metal ball slung by hand in the ball duel (Sandbox.tryBall,
+    issue #322), or raises FightError"""
+    tmp, bench, proc, log = start_loader(loader)
+    try:
+        if not bench.wait_phase("ready"):
+            raise FightError("the sandbox did not load", tmp)
+        if bench.eval1(f"begin({seed}, 'skilled', 1, 'ballduel', 0)") is not True:
+            raise FightError("the ball duel did not start", tmp)
+        time.sleep(1.0)
+        ball = json.loads(bench.eval1("tryBall()") or "null")
+    except (TimeoutError, json.JSONDecodeError, TypeError) as e:
+        raise FightError(f"the ball could not be slung: {e}", tmp)
+    finally:
+        stop_loader(proc, log)
+    if not isinstance(ball, dict) or not ball.get("ball"):
+        raise FightError(f"the ball slung nothing: {ball!r}", tmp)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return ball
+
+
+def mirror_path(x, y, dx, dy, lo, hi, n):
+    """Where a ball from (x, y) along (dx, dy) touches the walls of a box
+    [lo, hi] on both axes, its centre: its first n contacts, each with
+    the axis it meets"""
+    out = []
+    for _ in range(n):
+        tx = (hi[0] - x) / dx if dx > 0 else (x - lo[0]) / -dx if dx < 0 else float("inf")
+        ty = (hi[1] - y) / dy if dy > 0 else (y - lo[1]) / -dy if dy < 0 else float("inf")
+        t = min(tx, ty)
+        x, y = x + dx * t, y + dy * t
+        axis = "x" if tx <= ty else "y"
+        if axis == "x":
+            dx = -dx
+        else:
+            dy = -dy
+        out.append((x, y, axis))
+    return out
+
+
+def check_ball_by_hand(s, step=1 / 60):
+    """(ok, line) for the ball slung by hand: it bounces off the room's
+    walls ballBounces times, each where the mirror path off the walls puts
+    it, and falls at the next wall"""
+    c, half, rad, most = s["centre"], s["roomHalf"], s["radius"], s["bounces"]
+    lo = (c["x"] - half + rad, c["y"] - half + rad)
+    hi = (c["x"] + half - rad, c["y"] + half - rad)
+    path = mirror_path(s["from"]["x"], s["from"]["y"], s["dir"]["x"], s["dir"]["y"], lo, hi, most + 1)
+    ball = s["ball"]
+    got = ball["bounces"]
+    across = s["speed"] * step + 2e-3
+    off = []
+    for i, h in enumerate(got):
+        if i >= len(path):
+            off.append(i + 1)
+            continue
+        x, y, axis = path[i]
+        on, other = (abs(h["x"] - x), abs(h["y"] - y)) if axis == "x" else (abs(h["y"] - y), abs(h["x"] - x))
+        if on > 2e-3 or other > across:
+            off.append(i + 1)
+    fell = ball.get("fell") or {}
+    x, y, axis = path[most]
+    fell_off = abs(fell.get("x", 1e9) - x) if axis == "x" else abs(fell.get("y", 1e9) - y)
+    return [
+        (len(got) == most and not off,
+         f"ball by hand: slung across the ball duel's room it bounces {len(got)} times off its walls ({most} by "
+         f"the table), each where the mirror path puts it (" + ", ".join(f"({h['x']:.2f}, {h['y']:.2f})" for h in got)
+         + (f"; off at {off}" if off else "") + ")"),
+        (fell.get("how") == "wall" and fell.get("bounces") == most and fell_off <= 2e-3,
+         f"ball by hand: after them it falls at the next wall ({fell.get('how')} after {fell.get('bounces')} bounces "
+         f"at ({fell.get('x', 0):.2f}, {fell.get('y', 0):.2f}), the wall at ({x:.2f}, {y:.2f}))"),
+    ]
+
+
 def enter_combos(loader, seed):
     """The combo entered by hand in the flow room for each special, and
     late (Sandbox.tryCombo, issue #320), or raises FightError"""
@@ -418,7 +502,8 @@ TIERS = ("weak", "normal", "tough")
 # The pacing rooms, and among them the duel rooms with bands: a grunt lead
 # alone and a guardian lead alone (Balance.pacing.duel, .guardianDuel); the
 # spitter lead's duel (.spitterDuel, issue #315) has none
-ROOMS = ("flow", "duel", "guardianduel", "spitterduel", "boss")
+# the slinger's (.ballDuel, issue #322) has none either: check_ball tests it
+ROOMS = ("flow", "duel", "guardianduel", "spitterduel", "ballduel", "boss")
 DUELS = ("duel", "guardianduel")
 
 
@@ -441,6 +526,13 @@ def describe(r):
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s, shots sent back {r.get('shotsBack', 0)} "
              f"({r.get('shotBackHits', 0)} hit){stun}"]
+    balls = r.get("balls") or []
+    if balls:
+        fell = Counter(b["fell"]["how"] for b in balls if b.get("fell"))
+        lines.append(f"  balls: {len(balls)} slung, {sum(len(b['bounces']) for b in balls)} wall bounces, "
+                     f"{r.get('ballsBack', 0)} bounced by the shield ({r.get('ballsAimed', 0)} aimed by a perfect "
+                     f"block), {r.get('ballBackHits', 0)} hit an enemy; fell "
+                     + (", ".join(f"{k} {n}" for k, n in sorted(fell.items())) or "none"))
     for e in r["enemies"]:
         # A lead's openings by what broke its stance (Balance.lead)
         opened = e.get("opened") or {}
@@ -659,6 +751,40 @@ def check_bolt(results, step=1 / 60):
             out.append((ok, f"{tag}: the masher with the bolt takes at least {bands['duelSlow']} s to kill "
                             f"the spitter lead, or falls ({what}, {len(hits)} bolt hits; the masher without "
                             f"it {mt or 'not played'})"))
+    return out
+
+
+def check_ball(results):
+    """(ok, line) for the slinger's balls in the ball duels (issue #322):
+    in each fight every ball that fell at a wall bounced ballBounces times
+    first, none bounced more, and each bounce touched the room's walls;
+    over the ball duels balls bounced off the walls; at each depth a ball
+    the skilled pilot's shield bounced hit the lead and opened it"""
+    out = []
+    rs = [r for r in results if r["room"] == "ballduel"]
+    for r in rs:
+        tag = f"ballduel depth {r['depth']} {r['answer']}"
+        balls, most = r.get("balls") or [], r["ballBounces"]
+        wall = [b for b in balls if b.get("fell") and b["fell"]["how"] == "wall"]
+        short = [b["id"] for b in wall if len(b["bounces"]) != most]
+        over = [b["id"] for b in balls if len(b["bounces"]) > most]
+        half, rad = r["roomHalf"], r["ballRadius"]
+        astray = [h["edge"] for b in balls for h in b["bounces"] if abs(h["edge"] - (half - rad)) > 1e-3]
+        out.append((not short and not over and not astray,
+                    f"{tag}: every ball that fell at a wall bounced {most} times first, none more, each bounce "
+                    f"at the room's walls ({len(balls)} balls, {len(wall)} fell at a wall, "
+                    f"{sum(len(b['bounces']) for b in balls)} bounces"
+                    + (f"; short {short}" if short else "") + (f"; over {over}" if over else "")
+                    + (f"; astray {astray[:5]}" if astray else "") + ")"))
+    for r in rs:
+        if r["answer"] != "skilled":
+            continue
+        leads = [e for e in r["enemies"] if e.get("lead")]
+        opened = sum((e.get("opened") or {}).get("ball", 0) for e in leads)
+        out.append((r.get("ballBackHits", 0) > 0 and opened > 0,
+                    f"ballduel depth {r['depth']} skilled: a ball its shield bounced hits the lead and opens it "
+                    f"({r.get('ballsBack', 0)} bounced, {r.get('ballsAimed', 0)} aimed, {r.get('ballBackHits', 0)} hit, "
+                    f"the lead opened by a ball {opened} times)"))
     return out
 
 
@@ -946,6 +1072,7 @@ def pacing(args, loader):
     results, errors = {}, []
     shots = None
     combos = None
+    slung = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(play_fight, loader, args.seed, a, d, room, -1, args.max_seconds,
                                args.batch): (room, d, a) for room, d, a in fights}
@@ -955,11 +1082,19 @@ def pacing(args, loader):
         # The combos entered by hand (issue #320)
         entering = pool.submit(enter_combos, loader, args.seed) \
             if not args.answers and "flow" in rooms else None
+        # The metal ball slung by hand (issue #322)
+        slinging = pool.submit(sling_ball, loader, args.seed) \
+            if not args.answers and "ballduel" in rooms else None
         if shooting:
             try:
                 shots = shooting.result()
             except FightError as e:
                 errors.append(f"FAIL the bolts by hand: {e}; logs in {e.logs}")
+        if slinging:
+            try:
+                slung = slinging.result()
+            except FightError as e:
+                errors.append(f"FAIL the ball by hand: {e}; logs in {e.logs}")
         if entering:
             try:
                 combos = entering.result()
@@ -1002,11 +1137,13 @@ def pacing(args, loader):
     if args.check and person:
         lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
     if args.check:
-        lines += check_stun(ordered) + check_bolt(ordered)
+        lines += check_stun(ordered) + check_bolt(ordered) + check_ball(ordered)
         if shots:
             lines += check_bolt_shots(shots)
         if combos:
             lines += check_combos(combos)
+        if slung:
+            lines += check_ball_by_hand(slung)
     if lines:
         print()
         for ok, line in lines:
