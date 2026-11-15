@@ -345,9 +345,9 @@ PhysicsItem {
         }
     }
 
-    // A moment others should see: "attack", "heavy", "whirlwind", "dash",
-    // "parry", "block", "perfectBlock", "hurt", "shieldBreak", "sit" or
-    // "stand".
+    // A moment others should see: "attack", "heavy", "whirlwind", "stun",
+    // "dash", "parry", "block", "perfectBlock", "hurt", "shieldBreak",
+    // "sit" or "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -1119,10 +1119,11 @@ PhysicsItem {
     // The special's button (Q, R2): the special picked and nothing else.
     // The whirlwind, with full momentum and whirlMana: short of the
     // momentum the pips flash, short of the mana the bar does; either way
-    // nothing else happens. A special not in the game yet does nothing.
-    // Returns whether it went off
+    // nothing else happens. The stun (_stun) for its mana alone. A special
+    // not in the game yet does nothing. Returns whether it went off
     function unleash() {
         if (fallen || held || isDashing || openLeft > 0) return false
+        if (special === "stun") return _stun()
         if (special !== "whirlwind") {
             console.log("[Player] The special", special, "is not in the game yet")
             return false
@@ -1136,6 +1137,44 @@ PhysicsItem {
         momentum = 0
         _startDash()
         _whirl()
+        return true
+    }
+
+    // The stun (Balance.stun, issue #318): for specialMana - short of it
+    // the mana bar flashes and nothing else happens - the knight bashes
+    // with its shield where it stands, a charge it holds let go of, and
+    // every enemy whose centre is within stun.reach of the knight's, all
+    // round it, is stunned (Enemy.stun): a weak or normal one freezes, a
+    // lead or the Warden loses its wind-up. Its ring shows on every
+    // screen; the record counts the bash, the enemies it froze and the
+    // wind-ups it ended. Returns whether it bashed
+    function _stun() {
+        if (!_afford(specialMana)) return false
+        _spend(specialMana)
+        _cancelCharge()
+        let s = Balance.stun
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let froze = 0, ended = 0
+        for (let e of (gameWorld && gameWorld.enemies) || []) {
+            if (!e || e.destroyed !== false) continue
+            let dx = e.xWu + e.widthWu / 2 - cx
+            let dy = e.yWu - e.heightWu / 2 - cy
+            let r = s.reach + (e.bulk || 0)
+            if (dx * dx + dy * dy > r * r) continue
+            let what = e.stun(s.freeze)
+            if (what === "frozen") froze++
+            else if (what === "interrupted") ended++
+        }
+        view.block()
+        acted("stun")
+        if (gameWorld) {
+            gameWorld.playStun()
+            if (gameWorld.impact) gameWorld.impact("stun", cx, cy, 0, 0, s.color)
+            gameWorld.countFight("stun")
+            gameWorld.countFight("stunFrozen", froze)
+            gameWorld.countFight("stunInterrupted", ended)
+        }
+        console.log("[Player] Stun! Froze", froze, "and ended", ended, "wind-ups")
         return true
     }
 

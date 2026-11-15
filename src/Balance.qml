@@ -258,11 +258,35 @@ QtObject {
         whirlwind: { name: "Whirlwind", line: "Spin forward through every enemy in reach. Needs full momentum.",
                      mana: knight.whirlMana, momentum: true, ready: true },
         stun: { name: "Stun", line: "Bash with the shield: small enemies around you freeze.",
-                mana: 15, momentum: false, ready: false },
+                mana: stun.mana, momentum: false, ready: true },
         bolt: { name: "Bolt", line: "A blast along your aim hurts the first enemy it meets.",
                 mana: 15, momentum: false, ready: false },
         cardWidth: 220,
         pickColor: "#E8C35A"
+    })
+
+    // The stun (issue #318), a special: the knight bashes with its shield
+    // for mana, and every weak and normal enemy whose centre is within
+    // reach wu of the knight's, all round it, freezes for freeze seconds of
+    // the physics clock: it neither moves nor strikes, an attack it had
+    // under way is over, a blow does not knock it back and a guardian's
+    // shield takes none. A room's lead or the Warden in reach (reach
+    // grows by its bulk) loses the wind-up it is in - a strike's, a
+    // crushing blow's or a shot's - and goes for the knight again at once,
+    // its stance as it was: it is never frozen and never opened. A frozen
+    // enemy is drawn in color with a rim of rimColor and stops breathing;
+    // the bash rings out to reach in color with sparks sparks round the
+    // knight, shakes the screen by trauma and sounds sound/sfx/stun_bash
+    // at volume
+    readonly property var stun: ({
+        mana: 15,
+        reach: 2.5,
+        freeze: 1.5,
+        color: "#9CCFE8",
+        rimColor: "#E8F7FF",
+        sparks: 16,
+        trauma: 0.3,
+        volume: 0.8
     })
 
     // The kill chain (issue #270): a kill within window seconds of the
@@ -322,16 +346,16 @@ QtObject {
 
     // The dungeon music (sound/music/dungeon.song.json) follows the fight:
     // its intensity is how many enemies within reach world units of the
-    // knight are after it - chasing, winding up or striking - out of
-    // fullAt, eased up at rise and down at fall per second, so the pulse
-    // layer (0.15..0.5) comes in with the first enemy and the battle layer
-    // (0.5..1) with the second and third
+    // knight are after it - chasing, winding up, striking or frozen by a
+    // stun (stun) - out of fullAt, eased up at rise and down at fall per
+    // second, so the pulse layer (0.15..0.5) comes in with the first enemy
+    // and the battle layer (0.5..1) with the second and third
     readonly property var music: ({
         fullAt: 3,
         reach: 14,
         rise: 1.5,
         fall: 0.2,
-        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash"]
+        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash", "frozen"]
     })
 
     // A grunt or a guardian winding up its lunge screams like a goblin,

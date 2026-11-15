@@ -1,11 +1,11 @@
 // Specials bench - the knight picks one of three specials at the start of
 // a dungeon (issue #317).
 //
-// Alone, with the whirlwind the one special in the game: the first
-// dungeon shows no choice, the knight has the whirlwind, the descent
-// intro counts at once, the HUD shows "Whirlwind 20" and the controls hint
-// "Q whirlwind", and Q whirls. Then the bench offers the specials not in
-// the game yet too (Game.specialsAll) and the knight buys the balanced
+// Alone, with the whirlwind and the stun in the game (issue #318): the
+// first dungeon's intro shows a card for each, the whirlwind's under the
+// keys, and Enter takes it; the count starts, the HUD shows "Whirlwind 20"
+// and the controls hint "Q whirlwind", and Q whirls. Then the bench offers
+// the special not in the game yet too (Game.specialsAll) and the knight buys the balanced
 // blade I at the camp. The next dungeon's intro shows the choice with the
 // depth and the name: three cards with a name, a line and the mana each
 // costs with the blade (Balance.shop.bladeShare), the whirlwind's card
@@ -13,9 +13,9 @@
 // party", the world held. The arrows and the move keys move along the
 // cards, one card a press also with the moves bound to the arrows, and 2
 // takes the stun: the choice goes, the count starts and lets go.
-// The HUD shows the stun and its mana, the hint "Q stun"; neither Q nor
-// the pad's R2 whirls, nothing is spent, and the smith says what the
-// blade gives the stun. In the dungeon after the camp the choice opens on
+// The HUD shows the stun and its mana, the hint "Q stun"; Q and the pad's
+// R2 each bash for the stun's mana with the blade, neither whirls nor
+// spends the momentum, and the smith says what the blade gives the stun. In the dungeon after the camp the choice opens on
 // the stun; the synthetic pad's stick moves along the cards and A takes
 // the whirlwind, which Q lets loose as today for the blade's mana. In the
 // next one a click takes the bolt, which holds through its dungeon and
@@ -169,12 +169,15 @@ Window {
         }],
         [() => solo.player && solo.introOn, () => {
             check(Balance.specials.order.join(",") === "whirlwind,stun,bolt"
-                  && solo.specialsOffered.join(",") === "whirlwind",
-                  "the specials are the whirlwind, the stun and the bolt, the whirlwind the one in the game ("
+                  && solo.specialsOffered.join(",") === "whirlwind,stun",
+                  "the specials are the whirlwind, the stun and the bolt, the whirlwind and the stun in the game ("
                   + solo.specialsOffered.join(",") + ")")
-            check(!solo.specialChoosing && shown(solo, "specialChoice") === null && solo.introStartsAt === 0,
-                  "with one special no choice shows and the count starts at once")
-            check(solo.player.special === "whirlwind", "the knight has the whirlwind")
+            check(solo.specialChoosing && card(solo, "whirlwind") !== null && card(solo, "stun") !== null
+                  && card(solo, "bolt") === null && solo.specialSelected === 0,
+                  "the first dungeon's intro shows their two cards, the whirlwind's under the keys")
+            key(solo, Qt.Key_Return)
+            check(!solo.specialChoosing && solo.introStartsAt >= 0 && solo.player.special === "whirlwind",
+                  "Enter takes the whirlwind and the count starts")
         }],
         [() => !solo.introHeld, () => {
             let p = solo.player
@@ -262,15 +265,20 @@ Window {
             check(hint(solo).indexOf("Q stun") >= 0 && hint(solo).indexOf("whirlwind") < 0,
                   "the controls hint says Q stun")
             ready(p)
+            let stuns = solo.fightRecord.stuns
             key(solo, Qt.Key_Q)
-            check(!p.isWhirling && !p.isDashing && p.mana === p.maxMana && p.momentum === Balance.momentum.max,
-                  "with the stun chosen Q fires no whirlwind and spends nothing")
+            check(!p.isWhirling && !p.isDashing && Math.abs(p.maxMana - p.mana - blade("stun", 1)) < 1e-6
+                  && p.momentum === Balance.momentum.max && solo.fightRecord.stuns === stuns + 1,
+                  "with the stun chosen Q bashes for the stun's " + (p.maxMana - p.mana)
+                  + " mana, no whirlwind, the momentum kept")
+            ready(p)
             pad({triggerR2: 1})
         }],
         [100, () => {
             let p = solo.player
-            check(!p.isWhirling && !p.isDashing && p.mana === p.maxMana && p.momentum === Balance.momentum.max,
-                  "nor does the pad's R2")
+            check(!p.isWhirling && !p.isDashing && Math.abs(p.maxMana - p.mana - blade("stun", 1)) < 1e-6
+                  && p.momentum === Balance.momentum.max,
+                  "so does the pad's R2 (" + (p.maxMana - p.mana) + " mana)")
             pad({})
             check(solo.smithGives("blade", 2) === "a stun costs " + blade("stun", 2) + " mana",
                   "the smith's blade II lowers the stun (" + solo.smithGives("blade", 2) + ")")

@@ -45,7 +45,8 @@ Item {
     // Pauses the world and enters the fight room; the driver steps from here.
     // answer is how the knight fights: "mix", "block", "parry", "perfect",
     // "heavy" (as mix, but it charges at guardians), "whirlwind" (as mix,
-    // but it whirls through every enemy), or one of the pacing pilots
+    // but it whirls through every enemy), "stun" (as mix, but it stuns,
+    // issue #318), or one of the pacing pilots
     // "charge", "masher", "skilled" and "person" (Balance.pacing);
     // danger is the danger the fight room is at: its depth and, after the
     // point, the position in the depth's range (Game.applyScenario);
@@ -69,6 +70,7 @@ Item {
         crushBlows = 0
         _crushing = new Set()
         whirlsStarted = 0
+        _stunAt = -1000
         cancelledCharges = 0
         _chargeSeen = ""
         engagedSeconds = 0
@@ -100,6 +102,9 @@ Item {
             game.player.maxMana = 1000
             game.player.mana = 1000
             game.player.swordLevel = sword
+            // The special's button lets the stun loose for "stun", else the
+            // whirlwind
+            game.player.special = answer === "stun" ? "stun" : "whirlwind"
         }
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
@@ -112,10 +117,23 @@ Item {
     // came later (the Warden's adds)
     function follow(e) {
         let f = { ref: e, type: e.enemyType, tier: e.tier, lead: e.lead, hp: e.maxHp, lastHp: e.hp,
-                  lastState: e.aiState, engagedAt: null, firstHitAt: null, diedAt: null,
-                  hits: 0, openings: 0, opened: {}, cameAt: steps > 0 ? now() : 0 }
-        // A lead's openings by what broke its stance (Enemy.open)
-        e.opened.connect(cause => f.opened[cause] = (f.opened[cause] || 0) + 1)
+                  lastState: e.aiState, lastStance: e.stance, engagedAt: null, firstHitAt: null,
+                  diedAt: null, hits: 0, openings: 0, opened: {}, openedAt: [],
+                  cameAt: steps > 0 ? now() : 0,
+                  stuns: [], lastStunAt: null, frozen: null, frozenSpans: [] }
+        // A lead's openings by what broke its stance (Enemy.open), and when
+        e.opened.connect(cause => {
+            f.opened[cause] = (f.opened[cause] || 0) + 1
+            f.openedAt.push({ t: now(), cause: cause })
+        })
+        // What a knight's stun did to it (Enemy.stun, issue #318): the
+        // state it was in on the step before and the one after, whether
+        // it opened, its stance before and after
+        e.stunned.connect(what => {
+            f.stuns.push({ t: now(), what: what, before: f.lastState, after: e.aiState,
+                           opening: e.opening, stanceBefore: f.lastStance, stance: e.stance })
+            if (what === "frozen") f.lastStunAt = now()
+        })
         _foes.push(f)
     }
     // The sword level a knight usually has at depth d: the highest the
@@ -141,7 +159,14 @@ Item {
         let foes = _foes.map(f => ({
             type: f.type, tier: f.tier, lead: f.lead, hp: f.hp,
             engagedAt: f.engagedAt, firstHitAt: f.firstHitAt, diedAt: f.diedAt,
-            hits: f.hits, openings: f.openings, opened: f.opened,
+            hits: f.hits, openings: f.openings, opened: f.opened, openedAt: f.openedAt,
+            // Its stuns, and each span it stood frozen (issue #318): from
+            // the last stun that froze it to its thaw, how far it moved and
+            // the state it thawed into; open at the end when it died
+            // frozen or the fight stopped
+            stuns: f.stuns,
+            frozenSpans: f.frozenSpans.concat(f.frozen ? [Object.assign({}, f.frozen, {
+                thawAt: null, lasted: null, into: f.diedAt !== null ? "died" : "running" })] : []),
             // The HP it had left, 0 once dead
             hpLeft: f.diedAt !== null ? 0 : f.lastHp,
             // From the first blow that landed to its death
@@ -178,6 +203,12 @@ Item {
             whirlwinds: r.whirlwinds,
             whirlHits: r.whirlHits,
             whirlsStarted: whirlsStarted,
+            // The stuns (Balance.stun), the enemies they froze and the
+            // wind-ups they ended, as the game's record counts them
+            stuns: r.stuns,
+            stunFrozen: r.stunFrozen,
+            stunInterrupted: r.stunInterrupted,
+            stunFreeze: Balance.stun.freeze,
             kills: r.kills,
             // Kill chains of two links or more, and the longest's links
             chains: r.chains,
@@ -248,9 +279,28 @@ Item {
             if (into) engaged = true
             if (into && f.engagedAt === null) f.engagedAt = t
             if (e.aiState === "stagger" && f.lastState !== "stagger") f.openings++
+            trackFrozen(f, e, t)
             f.lastState = e.aiState
+            f.lastStance = e.stance
         }
         if (engaged) engagedSeconds += dt
+    }
+
+    // A frozen span (issue #318): it begins on the step the enemy is seen
+    // frozen, reckoned from the stun that froze it last, and ends on the
+    // step it is seen thawed. How far its centre moved meanwhile
+    function trackFrozen(f, e, t) {
+        if (e.aiState === "frozen") {
+            if (!f.frozen)
+                f.frozen = { stunAt: f.lastStunAt, x: e.xWu, y: e.yWu, moved: 0 }
+            f.frozen.stunAt = f.lastStunAt
+            f.frozen.moved = round3(Math.max(f.frozen.moved, Math.hypot(e.xWu - f.frozen.x, e.yWu - f.frozen.y)))
+        } else if (f.frozen) {
+            f.frozenSpans.push(Object.assign({}, f.frozen, {
+                thawAt: t, lasted: f.frozen.stunAt === null ? null : round3(t - f.frozen.stunAt),
+                into: e.aiState }))
+            f.frozen = null
+        }
     }
 
     // A charge ended without its release: a hit, the shield or a dash
@@ -451,6 +501,11 @@ Item {
     // guardian in the heavy swing's reach. "whirlwind" fights as "mix"
     // does and earns momentum by it; with all of it (Balance.momentum) and
     // an enemy within whirlFrom it whirls at that enemy (Q, unleash).
+    // "stun" fights as "mix" does with the stun for its special (issue
+    // #318): it stuns (Q, unleash) when a weak or normal enemy not frozen
+    // stands within the stun's reach, and when a lead winds up within it
+    // stunRest seconds or more after its last stun - the wind-ups between
+    // it meets as "mix" does, so the duel goes on.
     //
     // The pacing pilots (Balance.pacing): "charge" never raises the shield;
     // it holds a full charge, walks at the nearest enemy and lets go once
@@ -500,6 +555,27 @@ Item {
     function letGo(p) {
         if (_held) p.dropSwing()
         _held = false
+    }
+    // The last stun, on the bench's clock, and the rest before a lead's
+    // wind-up is stunned again
+    property real _stunAt: -1000
+    readonly property real stunRest: 3
+    function stunNow(p, foes) {
+        if (p.isDashing || p.special !== "stun") return false
+        let cx = p.xWu + p.widthWu / 2, cy = p.yWu - p.heightWu / 2
+        let near = e => {
+            let dx = e.xWu + e.widthWu / 2 - cx, dy = e.yWu - e.heightWu / 2 - cy
+            let r = Balance.stun.reach * 0.9 + (e.bulk || 0)
+            return dx * dx + dy * dy <= r * r
+        }
+        let small = foes.some(e => !e.lead && e.aiState !== "frozen" && near(e))
+        let lead = now() - _stunAt >= stunRest && foes.some(e => e.lead && near(e)
+            && (e.aiState === "telegraph" || e.aiState === "crush" || e.aiState === "shoot"))
+        if (!small && !lead) return false
+        letGo(p)
+        if (!p.unleash()) return false
+        _stunAt = now()
+        return true
     }
 
     Connections {
@@ -674,6 +750,7 @@ Item {
         let p = game.player
         let foes = foesOrRest(p)
         if (!foes) return
+        if (answer === "stun" && stunNow(p, foes)) return
 
         // 1. An attack coming at the knight: parry or block it
         let threat = answerThreat(p, foes, () => answer === "perfect" ? "perfect"

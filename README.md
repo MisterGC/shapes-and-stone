@@ -1937,8 +1937,8 @@ and the camp after it, and the next choice opens on it. In co-op every
 knight picks its own; a knight that has arrived and still chooses holds the
 count however long it takes, and a knight that has picked shows "Waiting
 for the party" meanwhile. Only the specials in the game are offered, and with one there is
-no choice: today that is the whirlwind alone, so the game shows none until
-the stun (#318) and the bolt (#319) are in. Without an intro (the fight
+no choice: today they are the whirlwind and the stun, and the bolt (#319)
+joins them once it is in. Without an intro (the fight
 room, the dojo's scenarios, a bench that turns it off) the knight keeps the
 special it has, the whirlwind at the start. The Control Input page calls
 the special's button *Special*; it keeps the action id `whirlwind`, under
@@ -1951,6 +1951,28 @@ own, and exits with the number of failed checks:
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/specials/specials.qml
 ```
+
+The stun (`Balance.stun`, issue #318) is the special for a crowd: for its
+mana (`stun.mana`, 15, the balanced blade's share of it) the knight bashes
+with its shield where it stands, and every weak and normal enemy whose
+centre is within `stun.reach` wu of the knight's, all round it, freezes
+for `stun.freeze` seconds of the physics clock. A frozen enemy neither
+moves nor strikes: an attack it had under way is over, no blow knocks it
+back, nothing pushes it, a guardian's shield takes no blow and a shield
+push or a bash does not stagger it out of the freeze. It is drawn in ice
+blue with a white rim and holds its breath, and thaws into the chase. A
+room's lead or the Warden in reach is never frozen: a stun in its wind-up
+- a strike's, a crushing blow's or a shot's - ends it, no blow comes of
+it and its string is over, and it goes for the knight again at once,
+neither staggered nor in its recovery and its stance as it was, so the
+stun never opens it; out of a wind-up a stun does nothing to it. The bash
+rings out to the stun's reach with sparks all round and plays its own
+cue, `sfx/stun_bash`, a deep thump with a short iron ring and frost over
+it. In co-op the host applies a joiner's stun to the enemies it runs, and
+the frozen state shows on every screen; the other screens see the knight's
+shield flash and hear the bash, fading with the distance. The fight
+record counts the stuns, the enemies they froze and the wind-ups they
+ended.
 
 A grunt does not run straight in: from `enemy.circleRange` on it circles
 the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
@@ -2261,7 +2283,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -2277,7 +2299,12 @@ guardian is in reach (the report counts them as `heavySwings` and
 back from the nearest enemy and, full, lets go and dashes at it, by turns
 just before and just after the dash's start (the report counts the
 whirlwinds that landed as `whirlwinds`, their hits as `whirlHits` and the
-ones begun as `whirlsStarted`). A crushing blow is met by the same plan, so a parry finds
+ones begun as `whirlsStarted`), `stun` meets attacks as `mix` does with the
+stun for its special and stuns whenever a weak or normal enemy not frozen
+stands in its reach, and when a lead winds up in it 3 s or more after its
+last stun (the report counts them as `stuns`, `stunFrozen` and
+`stunInterrupted`, and gives each enemy its stuns and the spans it stood
+frozen). A crushing blow is met by the same plan, so a parry finds
 no window; the report counts the crushing wind-ups as `crushBlows`.
 `--danger` puts the fight room at a
 danger, a depth plus a position in its range (`2.5`), and `--depth d` at
@@ -2335,6 +2362,17 @@ on its next bar of real time, and the bench runs faster than that) and the
 growls and stings heard. Since the lead's stance (#271) every band
 passes, and the CI job `slow-benches` fails on a red one. Its report is
 kept as the run's `pacing` artifact.
+
+Unless `--answers` is given, a pacing run also plays `stun` in the flow
+room and in the duel at its first depth (issue #318); no band of
+`Balance.pacing` judges them, `--check` tests the stun on them. In the flow
+fight the knight stuns and freezes enemies, each span an enemy stands
+frozen lasts `Balance.stun.freeze` from the stun that froze it last, within
+two physics steps, the enemy does not move in it and thaws into the chase,
+never into a blow, and a stun does nothing to a weak or normal enemy but
+freeze it. In the duel the stun ends the lead's wind-ups, each time from a
+wind-up into the chase, the lead is not opened by it, its stance stays as
+it was, no opening comes on a stun's step, and the lead never freezes.
 
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,

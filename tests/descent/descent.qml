@@ -21,8 +21,9 @@
 // same name, hold the same count and let go at the same moment of the
 // session clock. A knight whose intro never reports holds the host no
 // longer than Balance.intro.waitMax, and the host is told it waits.
-// Prints one PASS or FAIL line per check and exits with the number of
-// failures.
+// With two specials or more in the game the knight takes the first at once
+// (the specials bench tries the choice). Prints one PASS or FAIL line per
+// check and exits with the number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/descent/descent.qml
 
@@ -90,6 +91,12 @@ Window {
         let g = gameComp.createObject(bench.contentItem, Object.assign({
             width: 1000, height: 500, muted: true, logSounds: true, descentIntro: true,
             recordStoreName: "ShapesAndStoneDescentBench"}, props))
+        // The intro, not the choice of a special, is this bench's: with two
+        // specials or more in the game (issue #318) the knight takes the
+        // first card as soon as the choice opens, the whirlwind
+        g.specialChoosingChanged.connect(() => Qt.callLater(() => {
+            if (g.specialChoosing) g.chooseSpecial(g.specialOffer[0])
+        }))
         watch(g)
         return g
     }

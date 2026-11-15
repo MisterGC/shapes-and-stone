@@ -128,6 +128,10 @@ Window {
             game.playHoleSound("groan", null)
             check(crumble.lastSeed !== before[0] && rumble.lastSeed !== before[1] && groan.lastSeed !== before[2],
                   "the game's own calls play the crumble, the rumble and the groan from their recipes")
+            // The stun's shield bash (issue #318)
+            let bash = p["sfx/stun_bash.sfx.json"], bashSeed = bash ? bash.lastSeed : null
+            game.playStun()
+            check(bash && bash.lastSeed !== bashSeed, "the game's own call plays the stun's bash from its recipe")
             let n = game.veinSoundCount
             game.playChink(-1)
             game.playTink(4)
