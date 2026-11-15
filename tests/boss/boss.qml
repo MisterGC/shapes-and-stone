@@ -9,6 +9,8 @@
 // dungeon at depth 2, the bench steps the world one physics step at a time:
 // the knight walks into the room, which shuts - the ways in and the shaft -,
 // the Warden wakes, its banner and HP bar show and its song plays part one.
+// A string of its begins with its own count-in, boss.countIn over its
+// speed-up, in either phase (issue #330).
 // At Balance.boss.phaseAt of its HP its phase 2 begins: its adds come, it
 // plays phase2Tempo times faster, the light turns and the song plays part
 // two; a zone opens under the knight, warns, and hurts it through a raised
@@ -219,6 +221,26 @@ Window {
         p.hp = p.maxHp
         p.graceLeft = 0
     }
+    // The Warden begins a string that opens with a strike at a knight 1
+    // wu off: its first wind-up is its count-in (issue #330). It stands
+    // halted, not thinking, again after
+    function countIn(w) {
+        let list = Balance.lead.strings.warden
+        let i = list.findIndex(x => x.beats[0] === 1)
+        w.target = {xWu: w.aimXWu + 1, yWu: w.aimYWu}
+        w.beginString(i, false)
+        let r = {state: w.aiState, wound: w._attackTimer, name: w.stringName,
+                 want: Math.max(Balance.enemy.minTelegraph, Balance.boss.countIn / w.speedUp)}
+        w.halt()
+        w.halted = false
+        return r
+    }
+    function countInLine(c, phase) {
+        return "in its phase " + phase + " a string (" + c.name + ") begins with its own count-in: "
+            + Math.round(c.wound * 1000) / 1000 + " s wound up (boss.countIn " + Balance.boss.countIn
+            + " over its speed-up, " + Math.round(c.want * 1000) / 1000 + " s; enemy.windUp "
+            + Balance.enemy.windUp + ")"
+    }
 
     function checkFight() {
         game.applyScenario("bossroom", 2, seed)
@@ -294,6 +316,9 @@ Window {
         walkTo(g.cxWu, g.cyWu, steps(1.5))
         check(f.inside(p.xWu + 0.5, p.yWu - 0.5, 0), "the shut gate holds the knight in the room")
 
+        let c1 = countIn(w)
+        check(c1.state === "telegraph" && Math.abs(c1.wound - c1.want) < 1e-6, countInLine(c1, 1))
+
         // ---- phase 2 ----
         w.halt()
         w.halted = false
@@ -311,6 +336,9 @@ Window {
               && game.bossSongPlayer().state === "two",
               "it plays " + b.phase2Tempo + " times faster (a beat of " + r1(w.beatLen * 100) / 100
               + " s), the light turns and the song plays part two")
+        let c2 = countIn(w)
+        check(c2.state === "telegraph" && Math.abs(c2.wound - c2.want) < 1e-6
+              && Math.abs(c2.want - Balance.boss.countIn / (w.tempo * b.phase2Tempo)) < 1e-9, countInLine(c2, 2))
         let core = null
         for (let it of [w].concat(game.glowParent().children))
             if (it.objectName === "wardenCore") core = it

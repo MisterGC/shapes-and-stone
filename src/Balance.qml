@@ -504,8 +504,9 @@ QtObject {
         // (Balance.ball), only ever a room's lead (spawn.slingerChance);
         // it keeps its distance as the spitter does
         slinger: { hpBonus: -2, leadHp: 1, atk: 14, def: 1, chaseSpeed: 2.4, patrolSpeed: 0.9 },
-        // The Hollow Warden (Balance.boss): its HP is the boss table's
-        warden: { hpBonus: 0, leadHp: 1, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
+        // The Hollow Warden (Balance.boss): its HP is the boss table's; its
+        // blow is light for a boss, as its strings land many (issue #330)
+        warden: { hpBonus: 0, leadHp: 1, atk: 10, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -922,22 +923,35 @@ QtObject {
     // (sound/voice/warden.voice.json, the cue voice/warden/<id>), its words
     // shown under the banner for lineShow seconds. Read in order they tell
     // its story. Its stone shows a crack for every defeat before, n of
-    // them, up to cracks
+    // them, up to cracks.
+    // Each of its strings begins with a wind-up of countIn seconds,
+    // divided by its tempo, where a room's other leads wind up for
+    // enemy.windUp. A person can beat it at depth 2, 5 and 8 (issue
+    // #330): the fight bench's person pilot (pacing.person) sees a
+    // wind-up a quarter of a second late and may still swing as it
+    // begins, so the count-in is long enough that its parry comes
+    // lead.parryRest after that swing; a slower tempoGrow does the same
+    // for a string's later wind-ups at depth 8. enemy.warden.atk keeps
+    // the blows its missed parries let through under the knight's HP, hp
+    // asks fewer answers of it while "skilled" stays within
+    // pacing.bossSkilled, and zone.every leaves room between a zone and
+    // the Warden's strings
     readonly property var boss: ({
         every: 3,
         name: "The Hollow Warden",
-        hp: 2500,
+        hp: 2000,
         hpGrow: 0.05,
         depthUpTo: 4,
-        tempoGrow: 0.05,
+        tempoGrow: 0.025,
         // Its size a side, wu; its reach and its blow's reach grow with it
         size: 1.8,
         beat: 1.0,
+        countIn: 1.0,
         phaseAt: 0.5,
         phase2Tempo: 1.25,
         adds: 3,
         waveAt: 0.25,
-        zone: { every: 3.5, warn: 1.2, radius: 1.3, damage: 18, grow: 4, linger: 0.4 },
+        zone: { every: 5.0, warn: 1.2, radius: 1.3, damage: 18, grow: 4, linger: 0.4 },
         gold: 120,
         goldGrow: 60,
         drops: 8,

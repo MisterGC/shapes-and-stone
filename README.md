@@ -2390,7 +2390,10 @@ room's lead (`Enemy` type `warden`), counted among the rooms with a lead
 (`spawn.leadShare`), and in the dungeon's plan the witch reads: its
 stance, its openings and three
 strings of its own (`lead.strings.warden`) on a beat of `boss.beat`
-seconds. It sounds like none of the small ones (issue #287): its wind-up
+seconds, each begun with a wind-up of `boss.countIn` seconds where a
+room's other leads wind up for `enemy.windUp` (issue #330): a person who
+sees it a quarter of a second late and swings once more still has the
+rest (`lead.parryRest`) before the parry. It sounds like none of the small ones (issue #287): its wind-up
 and its strike - the lunge setting off, which every screen sees - play
 its own toll, `sfx/warden_toll`, a hollow stone toll on A1, the wind-up a
 fifth up on E (`boss.toll.windUp`), the strike on A (`boss.toll.strike`),
@@ -2399,8 +2402,8 @@ Each appearance is stronger: `boss.hp` times `1 + n *
 boss.hpGrow` HP for its n-th, with `depth.hp` and `party.hpPerKnight` on
 that as any enemy - `depth.hp` counted only up to `boss.depthUpTo`, since
 the smith's sword stops growing at depth 5 (issue #289) -, and a tempo of
-`1 + n * boss.tempoGrow` that its beats are divided by: 3500 HP at tempo 1
-at depth 2, 4725 at 1.05 at depth 5, 4950 at 1.1 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
+`1 + n * boss.tempoGrow` that its beats are divided by: 2800 HP at tempo 1
+at depth 2, 3780 at 1.025 at depth 5, 3960 at 1.05 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
 glows, `boss.adds` weak grunts come out of the floor round it and as many
 more at `boss.waveAt`, it plays `boss.phase2Tempo` times faster - beats,
 feint holds and count-ins -, the room's light turns to `boss.light` and its
@@ -2438,7 +2441,7 @@ and its cracks per appearance;
 then in the one at depth 2 it steps the knight into the room and checks
 the gates, the wake, the Warden's line played and shown on the step the
 room shuts with the Warden awake on it, the banner, the bar, the song's
-parts, phase 2 with
+parts, its own count-in in either phase (issue #330), phase 2 with
 its adds, tempo, light and core, a zone that hurts through a shield and one
 stepped out of, the second wave, and the fall with its line, its gold, its
 open gates, its victory banner and the heal. Last it checks the lines:
@@ -2717,7 +2720,8 @@ A `WIN` counts as "a person can do this": the person cleared the room
 without falling within the bench's 180 s. A `LOSE` (fell, or still
 fighting at 180 s) in a fight meant to be beatable - every flow room,
 every duel, the Warden at depth 2, 5 and 8 - is a finding: a tuning issue
-for that fight, not a reason to change the pilot. A win is not a promise:
+for that fight, not a reason to change the pilot. Since issue #330 it wins
+every one of them on the bench's seed, the Warden in about 76 to 80 s. A win is not a promise:
 the pilot knows every string, never panics and never strays, so it is the
 least a person needs, and the owner's playtest still judges the rest.
 
@@ -3236,7 +3240,7 @@ rhythm. Its numbers are the table's `boss` group.
 |-----------|-------|
 | **Shape** | Large hollow stone hexagon, a frame turning in its hollow |
 | **Color** | Stone grey (#4A4E57), its core glowing orange-red (#FF5A2A) in phase 2 |
-| **Health** | 2500 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
+| **Health** | 2000 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
 | **Phases** | 2 |
 
 **Phase 1 (100%-50% HP):** three strings of strikes, rests and a feint on

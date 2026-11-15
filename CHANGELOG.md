@@ -24,6 +24,7 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The Hollow Warden can be beaten without playing perfectly:** each of its strings now begins with a longer wind-up, a full second instead of half of one, so a parry timed to its ring counts even if you were still swinging as it began. A parry you miss costs 6 to 9 HP instead of 18 to 21, it has a fifth less HP, its floor zones open every 5 s instead of every 3.5 s, and it speeds up less from one appearance to the next. The fight bench's pilot that reacts a quarter of a second late and mistimes one parry in five now beats it at depth 2, 5 and 8 in 76 to 80 s, where it fell within 23 s before; mashing or holding a charge still loses to it. ([#330](https://github.com/MisterGC/shapes-and-stone/issues/330))
 - **A duel's slow motion comes from Clayground:** an opening slows the fight as before, and in co-op only the picture. Under it is now Clayground's own slow motion, which counts the game's clock, not the wall clock. The game no longer sets the physics speed itself, and its fight music bench checks on CI that the dungeon song moves to its duel part where no audio device plays it. ([#314](https://github.com/MisterGC/shapes-and-stone/issues/314))
 
 ## [0.5.0] - 2026-11-14
