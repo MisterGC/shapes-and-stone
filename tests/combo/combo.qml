@@ -2,7 +2,13 @@
 // special's stronger version for the same mana (issue #320).
 //
 // Alone, stepped on the physics clock, the enemies' AI halted, in the flow
-// scenario, the knight aiming up: with the stun, the move keys away from
+// scenario. First the pad's left stick alone, the right stick at rest and
+// the aim the game's own, so the left stick aims as the knight walks, one
+// physics step a turn of the event loop: right a while, then left (away),
+// then right (towards) and R2 fire the stronger bolt, the aim held right
+// through the push away; held left past Balance.combo.aimHold the knight
+// turns round, and right then and R2 fire the normal bolt. Then, the
+// knight aiming up: with the stun, the move keys away from
 // the aim (S) for a few steps, then towards it (W), and Q fires the
 // stronger stun (Balance.combo.stun) for the stun's mana - an enemy past
 // the stun's reach and inside the stronger one's freezes, for the stronger
@@ -169,6 +175,77 @@ Window {
 
     property var ends: []
     property var small: []
+
+    // ---- the pad's left stick alone, the aim the game's (issue #320) ----
+    // One physics step a turn of the event loop, so KnightPad's aim, a
+    // Qt.callLater, follows the stick between steps as in play
+    property var stick: ({})
+    function stickSteps(state, n) {
+        let out = [[20, () => { pad(state); bench.stick = state }]]
+        for (let i = 0; i < n; i++) out.push([20, () => {
+            if (bench.stick.triggerR2 !== 1) Clayground.physicsStep(1)
+        }])
+        return out
+    }
+    property var stickWent: null
+    function stickStart() {
+        let g = solo, p = g.player
+        Clayground.paused = true
+        p.special = "bolt"
+        p.maxHp = 100000
+        p.hp = 100000
+        p.maxMana = 1000
+        p.mana = p.maxMana
+        for (let e of g.enemies.filter(alive)) place(e, p, -10, 10)
+        p.xWu = g._fightRoomCx - p.widthWu / 2
+        p.yWu = g._fightRoomCy + p.heightWu / 2
+    }
+    // R2 pressed: whether the special was the stronger one, the bolt in
+    // flight's size, the facing
+    function stickFire() {
+        let g = solo, p = g.player, bolt = null
+        p.mana = p.maxMana
+        pad({axisX: 1, triggerR2: 1})
+        for (let id in g._boltById) if (g._boltById[id].own) bolt = g._boltById[id]
+        stickWent = {strong: p.lastStrong, size: bolt ? bolt.widthWu : 0,
+                     facing: p.facingAngle, padAim: p.padAim}
+    }
+    function stickCheckStrong() {
+        let r = stickWent
+        check(r.padAim && r.strong && Math.abs(r.size - Balance.combo.bolt.size) < 1e-6,
+              "the pad's left stick alone, right then left then right, the right stick at rest and the aim the "
+              + "game's, and R2 fire the stronger bolt (" + (r.strong ? "stronger" : "normal") + ", "
+              + r.size + " wu across, facing " + r.facing.toFixed(0) + ")")
+        check(Math.abs(r.facing) < 1, "the push away left the aim right, where the bolt flies (facing "
+              + r.facing.toFixed(1) + ")")
+    }
+    function stickCheckTurn() {
+        let r = stickWent
+        check(!r.strong && Math.abs(r.size - Balance.bolt.size) < 1e-6,
+              "held left past the aim's hold, " + Balance.combo.aimHold + " s, the knight turns round: right "
+              + "then and R2 fire the normal bolt (" + (r.strong ? "stronger" : "normal") + ", " + r.size + " wu across)")
+    }
+    function stickTurned() {
+        let p = solo.player
+        check(Math.abs(Math.abs(p.facingAngle) - 180) < 1, "held left that long the knight faces left (facing "
+              + p.facingAngle.toFixed(1) + ")")
+    }
+    readonly property int holdSteps: Math.ceil(Balance.combo.aimHold * 60) + 6
+    readonly property var stickCases: [].concat(
+        [[20, () => stickStart()]],
+        stickSteps({axisX: 1}, 10),
+        stickSteps({axisX: -1}, 4),
+        stickSteps({axisX: 1}, 2),
+        [[20, () => stickFire()], [20, () => { pad({}); bench.stick = {} }], [20, () => stickCheckStrong()]],
+        stickSteps({}, 40),
+        stickSteps({axisX: 1}, 10),
+        stickSteps({axisX: -1}, holdSteps),
+        [[20, () => stickTurned()]],
+        stickSteps({axisX: 1}, 2),
+        [[20, () => stickFire()], [20, () => { pad({}); bench.stick = {} }], [20, () => stickCheckTurn()]],
+        stickSteps({}, 40),
+        [[20, () => { Clayground.paused = false }]]
+    )
 
     // The stun by the keys: the stronger one, then late, the wrong way
     // round and away again after the combo
@@ -438,14 +515,16 @@ Window {
     }
     property real frozenAt: 0
 
-    property var soloSteps: [
+    property var soloSteps: [].concat([
         [() => solo.screen === "title", () => solo.applyScenario("flow", 0)],
-        [() => solo.player && solo.fightRoomActive && solo.enemies.filter(alive).length >= 4, () => soloStun()],
+        [() => solo.player && solo.fightRoomActive && solo.enemies.filter(alive).length >= 4, () => {}]],
+        stickCases, [
+        [100, () => soloStun()],
         [100, () => soloBolt()],
         [100, () => soloRebound()],
         [100, () => { solo.logSounds = false; solo.destroy(); solo = null }],
         [300, () => startSession()]
-    ]
+    ])
     property var sessionSteps: [
         [() => hostNet.networkId !== "", () => joinNet.join(hostNet.networkId)],
         [() => hostNet.connected && joinNet.connected && hostNet.nodeCount >= 2, () => {
