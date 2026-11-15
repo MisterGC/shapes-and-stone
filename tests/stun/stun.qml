@@ -9,7 +9,9 @@
 // is over, the third goes on; they show it - the frost rim, held breath -
 // and stand frozen for stun.freeze seconds to the step, unmoved, through a
 // blow too, never striking, then thaw into the chase, and go on chasing or
-// circling, never into a blow. Short of the mana the
+// circling, never into a blow; a think of the AI's on the thaw's own step
+// leaves a guardian in the knight's reach chasing, the think after winds
+// it up (issue #325). Short of the mana the
 // button bashes nothing. A frozen guardian's shield takes no blow from its
 // front, which it does unfrozen, and a shield push - the bash's shove and
 // stagger - leaves a frozen grunt frozen, unmoved, its freeze running on.
@@ -203,7 +205,41 @@ Window {
         check(refused && p.mana === Balance.stun.mana - 1 && g.fightRecord.stuns === rec && a.aiState !== "frozen",
               "short of the mana the button bashes nothing and spends nothing")
         soloFrozenRules()
+        soloThawThink()
         Clayground.paused = false
+    }
+
+    // A think that falls on the thaw's own step (issue #325): a guardian
+    // frozen with the knight in its lunge reach thaws into the chase, and
+    // the AI's think on that step leaves it chasing; the think after winds
+    // it up. The thaw and the thinks are called by hand, so the AI's own
+    // timer takes neither
+    function soloThawThink() {
+        let g = solo, p = g.player
+        readyStun(p)
+        let small = g.enemies.filter(e => alive(e) && !e.lead)
+        let gd = small.find(e => e.enemyType === "guardian")
+        check(!!gd, "the flow room stands a guardian for the thaw's think")
+        if (!gd) return
+        for (let e of small) if (e !== gd) place(e, p, 12, 0)
+        place(gd, p, 1.0, 0)
+        steps(1)
+        gd.target = p
+        gd.stun()
+        gd.attackCooldown = 0
+        check(gd.aiState === "frozen", "the guardian in the knight's reach freezes (" + gd.aiState + ")")
+        gd._attackTimer = 0
+        gd._stepAttack(stepS)
+        let thawed = gd.aiState
+        gd.updateAI(Balance.enemy.thinkInterval)
+        let first = gd.aiState
+        gd.updateAI(Balance.enemy.thinkInterval)
+        let second = gd.aiState
+        check(thawed === "chase" && first === "chase",
+              "a think on the thaw's own step leaves it chasing, no wind-up out of the freeze (thawed "
+              + thawed + ", after the think " + first + ")")
+        check(second === "telegraph" || second === "crush",
+              "the think after winds it up at the knight in its reach (" + second + ")")
     }
 
     // Two rules of the freeze: a frozen guardian's shield takes no blow,
