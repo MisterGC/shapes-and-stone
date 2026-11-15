@@ -616,6 +616,23 @@ ClayWorld2d {
         logSound("sfx/ball_bounce", what || "bounce", pitch, _distTo(xWu, yWu), gain)
     }
 
+    // A critter squashed under a knight's foot (Balance.critters, issue
+    // #324): a crunch, pitched by its kind, fading with the distance from
+    // this knight
+    SfxPlayer {
+        id: critterSquashSound
+        source: "../sound/sfx/critter_squash.sfx.json"
+        volume: muted ? 0 : Balance.critters.squashVolume * soundVolume
+    }
+    function playCritterSquash(xWu, yWu, kind) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        let k = Balance.critters.kinds[kind]
+        let pitch = k ? k.pitch : 0
+        critterSquashSound.play(gain, pitch)
+        logSound("sfx/critter_squash", kind || "squash", pitch, _distTo(xWu, yWu), gain)
+    }
+
     // A tough enemy winds up a crushing blow: a low growl, the spitter's
     // sample pitched down, fading with the distance from this knight
     Sound {
@@ -3716,6 +3733,8 @@ ClayWorld2d {
             fishing.step(world.physics.timeStep)
             world._stepHoles()
             world._stepDeepTravellers()
+            world._stepCritters(world.physics.timeStep)
+            world._stepFightRoom(world.physics.timeStep)
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -4649,6 +4668,8 @@ ClayWorld2d {
             let py = (startRoom.y + startRoom.h / 2) * cellSize
             console.log("[Game] Spawning player at:", px, py)
             spawnPlayer(px, py)
+            // Step 6b: the critters, clear of where the knights come in
+            if (levelType === "dungeon") placeCritters(planCritters(levelSeed, px, py))
         }
 
         // Step 7: Block the entrance so player can't backtrack
@@ -5259,6 +5280,186 @@ ClayWorld2d {
         impactSound.play(0.35)
         logSound("sfx/punch_hitting", "bones", 0, _distTo(pile.xWu, pile.yWu), 0.35)
         pile.destroy()
+    }
+
+    // The dungeon's critters (Balance.critters, issue #324): spiders, mice
+    // and rats on the floor of its rooms and corridors. They are drawn
+    // only - no body, no enemy - so they never hurt, never block the way,
+    // count for no kill chain and are no target for the lock-on. Every
+    // screen lays out the same ones from the level's seed and runs them
+    // itself: they flee from the knights it shows and are squashed by
+    // them, nothing sent over the network
+    Component { id: critterComponent; Critter {} }
+    property var critters: []
+    // How many were squashed in this level, and the marks they left
+    property int crittersSquashed: 0
+    property var critterMarks: []
+    // A critter of kind was squashed at (x, y) by knight
+    signal critterSquashed(string kind, real x, real y, var knight)
+    // The critters of the level built from levelSeed, none within
+    // clearOfSpawn wu of (spawnX, spawnY): [{kind, x, y, seed}], x and y
+    // its centre in wu. Drawn from their own stream, so the rest of the
+    // level stays as it was without them
+    function planCritters(levelSeed, spawnX, spawnY) {
+        let t = Balance.critters
+        let rand = createRng(levelSeed ^ 0x63726974)
+        let out = []
+        let add = (x, y) => {
+            let kind = _critterKind(rand()), seed = rand()
+            if (Math.hypot(x - spawnX, y - spawnY) < t.clearOfSpawn || !critterFree(x, y)) return
+            if (doors.length > 0 && doorAt(Math.floor(x / cellSize) + "," + Math.floor(y / cellSize))) return
+            out.push({ kind: kind, x: x, y: y, seed: seed })
+        }
+        for (let room of rooms) {
+            // A whole number per room, its fraction a chance of one more
+            let n = Math.floor(t.perRoom + rand())
+            for (let i = 0; i < n; i++)
+                add((room.x + 0.5 + rand() * (room.w - 1)) * cellSize,
+                    (room.y + 0.5 + rand() * (room.h - 1)) * cellSize)
+        }
+        let halls = []
+        for (let gy = 0; gy < gridHeight; gy++)
+            for (let gx = 0; gx < gridWidth; gx++)
+                if (grid[gy][gx] === cellHallway) halls.push([gx, gy])
+        let n = halls.length > 0 ? Math.floor(halls.length / t.perCorridorCells + rand()) : 0
+        for (let i = 0; i < n; i++) {
+            let c = halls[Math.floor(rand() * halls.length)]
+            add((c[0] + 0.3 + 0.4 * rand()) * cellSize, (c[1] + 0.3 + 0.4 * rand()) * cellSize)
+        }
+        return out
+    }
+    // The kind a draw r of 0..1 picks, by the kinds' shares
+    function _critterKind(r) {
+        let kinds = Balance.critters.kinds, total = 0
+        for (let k in kinds) total += kinds[k].share
+        let at = r * total, last = ""
+        for (let k in kinds) {
+            last = k
+            at -= kinds[k].share
+            if (at < 0) return k
+        }
+        return last
+    }
+    function placeCritters(list) {
+        critters = []
+        crittersSquashed = 0
+        critterMarks = []
+        for (let p of list) {
+            let k = Balance.critters.kinds[p.kind]
+            let c = critterComponent.createObject(world.room, {
+                kind: p.kind, xWu: p.x, yWu: p.y, sizeWu: k.size, color: k.color, seed: p.seed,
+                heading: p.seed * 2 * Math.PI,
+                moodLeft: Balance.critters.rest[0] + p.seed * (Balance.critters.rest[1] - Balance.critters.rest[0]),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+            if (!c) continue
+            critters.push(c)
+            dungeonObjects.push(c)
+        }
+    }
+    // Whether a critter may stand at (x, y): on a floor cell, not in a
+    // shut door
+    function critterFree(x, y) {
+        let gx = Math.floor(x / cellSize), gy = Math.floor(y / cellSize)
+        if (gx < 0 || gy < 0 || gx >= gridWidth || gy >= gridHeight || grid[gy][gx] === cellWall) return false
+        return doors.length === 0 || !doorShut(gx + "," + gy)
+    }
+    // c runs dist wu toward angle a, or as near to it as the walls let it:
+    // straight on, else turned ever further to either side. False when
+    // it is cornered and stays
+    function _critterRun(c, a, dist, dt) {
+        let edge = c.sizeWu / 2
+        for (let turn of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, 2.6, -2.6]) {
+            let b = a + (c.seed < 0.5 ? turn : -turn)
+            let cx = Math.cos(b), cy = Math.sin(b)
+            let nx = c.xWu + cx * dist, ny = c.yWu + cy * dist
+            if (!critterFree(nx + cx * edge, ny + cy * edge)) continue
+            c.xWu = nx
+            c.yWu = ny
+            c.gait += dist
+            // It turns fast but not at once
+            let d = Math.atan2(Math.sin(b - c.heading), Math.cos(b - c.heading))
+            c.heading += d * Math.min(1, dt * 18)
+            return true
+        }
+        return false
+    }
+    // Each physics step: a critter a knight stands on is squashed; one a
+    // knight comes near startles and runs from it until none is near; the
+    // rest scurry about now and then. Only those within awake wu of a
+    // knight move
+    function _stepCritters(dt) {
+        if (critters.length === 0) return
+        let t = Balance.critters
+        let knights = knightsHere()
+        for (let c of critters.slice()) {
+            let k = t.kinds[c.kind]
+            let near = null, nd = Infinity
+            for (let n of knights) {
+                let d = Math.hypot(n.x - c.xWu, n.y - c.yWu)
+                if (d < nd) { nd = d; near = n }
+            }
+            if (nd > t.awake) continue
+            if (nd <= t.squash + c.sizeWu / 2) { squashCritter(c, near.knight); continue }
+            let noticed = near && !near.seated && nd < k.notice
+            if (noticed && (c.mood === "rest" || c.mood === "wander")) {
+                c.mood = "startled"
+                c.moodLeft = t.startle
+                c.from = near.knight
+                continue
+            }
+            if (c.mood === "startled") {
+                c.moodLeft -= dt
+                if (c.moodLeft <= 0) c.mood = "flee"
+            } else if (c.mood === "flee") {
+                if (nd > t.forget) {
+                    c.mood = "rest"
+                    c.from = null
+                    c.moodLeft = t.rest[0] + Math.random() * (t.rest[1] - t.rest[0])
+                    continue
+                }
+                c.from = near.knight
+                let away = Math.atan2(c.yWu - near.y, c.xWu - near.x)
+                _critterRun(c, away + 0.35 * Math.sin(c.gait * 2 + c.seed * 6), k.speed * dt, dt)
+            } else if (c.mood === "wander") {
+                let dx = c.toXWu - c.xWu, dy = c.toYWu - c.yWu
+                let step = k.speed * t.wanderSpeed * dt, left = Math.hypot(dx, dy)
+                if (left <= step || !_critterRun(c, Math.atan2(dy, dx), Math.min(step, left), dt)) {
+                    c.mood = "rest"
+                    c.moodLeft = t.rest[0] + Math.random() * (t.rest[1] - t.rest[0])
+                }
+            } else {
+                c.moodLeft -= dt
+                if (c.moodLeft > 0) continue
+                let a = Math.random() * 2 * Math.PI, d = t.wander * (0.4 + 0.6 * Math.random())
+                c.toXWu = c.xWu + Math.cos(a) * d
+                c.toYWu = c.yWu + Math.sin(a) * d
+                c.mood = "wander"
+            }
+        }
+    }
+    // A knight stood on c: gone with a squash, its mark left on the floor
+    function squashCritter(c, knight) {
+        let t = Balance.critters, k = t.kinds[c.kind]
+        let i = critters.indexOf(c)
+        if (i < 0) return
+        critters.splice(i, 1)
+        let j = dungeonObjects.indexOf(c)
+        if (j >= 0) dungeonObjects.splice(j, 1)
+        c.squashed = true
+        crittersSquashed++
+        let m = stainComp.createObject(world.room, {
+            xWu: c.xWu, yWu: c.yWu, color: k.mark, sizeWu: c.sizeWu * t.markSize, seed: c.seed,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        if (m) {
+            critterMarks.push(m)
+            dungeonObjects.push(m)
+        }
+        playCritterSquash(c.xWu, c.yWu, c.kind)
+        critterSquashed(c.kind, c.xWu, c.yWu, knight)
+        c.destroy()
     }
 
     // The dungeon's features (Balance.dungeon): [{kind, gx, gy, xWu, yWu}],
@@ -7274,6 +7475,8 @@ ClayWorld2d {
         holeEvents = []
         holeSounds = []
         deepTravellers = []
+        critters = []
+        critterMarks = []
         _deepRuns = ({})
         deepTravellerEvents = []
         deepTravellerSounds = []
@@ -9704,22 +9907,20 @@ ClayWorld2d {
         gameCamera.target = player
     }
 
-    // Auto-respawn enemies in fight room when all dead
-    Timer {
-        id: fightRoomRespawn
-        interval: Balance.spawn.fightRoomRespawn * 1000
-        repeat: true
-        running: fightRoomActive
-        onTriggered: {
-            if (!player) return
-            let alive = 0
-            for (let e of enemies)
-                if (e && e.destroyed === false) alive++
-            if (alive > 0) return
-            enemies = []
-            _spawnFightRoomEnemies()
-            console.log("[Game] Fight room: respawned enemies")
-        }
+    // The fight room fills again Balance.spawn.fightRoomRespawn seconds
+    // after its last enemy fell, on the physics clock: a pause holds it,
+    // and so does a bench between the steps it runs
+    property real _fightRoomEmptyFor: 0
+    function _stepFightRoom(dt) {
+        if (!fightRoomActive || !player) { _fightRoomEmptyFor = 0; return }
+        for (let e of enemies)
+            if (e && e.destroyed === false) { _fightRoomEmptyFor = 0; return }
+        _fightRoomEmptyFor += dt
+        if (_fightRoomEmptyFor < Balance.spawn.fightRoomRespawn - 1e-6) return
+        _fightRoomEmptyFor = 0
+        enemies = []
+        _spawnFightRoomEnemies()
+        console.log("[Game] Fight room: respawned enemies")
     }
 
     // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo

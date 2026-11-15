@@ -69,6 +69,7 @@ QUICK = [
     ("ball", "ball/ball.qml", []),
     ("combo", "combo/combo.qml", []),
     ("killchain", "killchain/killchain.qml", []),
+    ("critters", "critters/critters.qml", []),
     ("answer", "answer/answer.qml", []),
     ("cues", "cues/cues.qml", []),
     ("lipsync", "lipsync/lipsync.qml", []),

@@ -1378,6 +1378,51 @@ QtObject {
         ]
     })
 
+    // The dungeon's critters (issue #324): spiders, mice and rats on the
+    // floor of its rooms and corridors, there to make it feel alive and
+    // nothing more. Drawn only: no body, so they never hurt and never block
+    // the way; no enemy, so they count for no kill chain and the lock-on
+    // never picks one. Each screen runs its own from the level's seed: the
+    // same critters in the same places, each fleeing and squashed by the
+    // knights that screen shows, nothing sent over the network.
+    // A room holds perRoom of them on average (a whole number, its fraction
+    // a chance of one more), the corridors one per perCorridorCells of
+    // their cells, none within clearOfSpawn wu of where the knights come in.
+    // Each is one of kinds, picked by share: size wu across, running at
+    // speed wu per second (below the knight's moveSpeed, so a knight that
+    // goes for one catches it), noticing a standing knight within notice
+    // wu. A noticed knight startles it for startle seconds, then it runs
+    // from the nearest knight, sliding along the walls, until none is
+    // within forget wu. Resting, every rest[0] to rest[1] seconds it
+    // scurries up to wander wu at wanderSpeed of its speed. A knight's
+    // centre within squash wu of a critter's edge squashes it: the squash
+    // plays pitch semitones from the cue at squashVolume, fading with the
+    // distance, and a mark of its kind's colour, markSize times its size,
+    // stays on the floor for the level. Only critters within awake wu of a
+    // knight move; the rest wait where they are
+    readonly property var critters: ({
+        perRoom: 1.6,
+        perCorridorCells: 14,
+        clearOfSpawn: 4,
+        kinds: {
+            mouse: { share: 0.4, size: 0.36, speed: 5.5, notice: 3.0, pitch: 0,
+                     color: "#8C8279", mark: "#4A1E1A" },
+            rat: { share: 0.25, size: 0.52, speed: 5.0, notice: 3.5, pitch: -4,
+                   color: "#5C4B3F", mark: "#3E1712" },
+            spider: { share: 0.35, size: 0.42, speed: 4.2, notice: 2.2, pitch: 4,
+                      color: "#2B2326", mark: "#2E3A1C" }
+        },
+        startle: 0.18,
+        forget: 6,
+        rest: [2, 7],
+        wander: 1.2,
+        wanderSpeed: 0.35,
+        squash: 0.5,
+        markSize: 1.7,
+        squashVolume: 0.55,
+        awake: 18
+    })
+
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
     readonly property var loot: ({
         // By tier: weak, normal, tough. The fight room drops none

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "name": "critter_squash",
+  "variation": { "seed": 324, "pool": 4 },
+  "layers": [
+    { "name": "crunch", "role": "transient", "source": "noise", "length": 22, "gain": -4,
+      "envelope": { "attack": 0, "decay": 22, "sustain": 0, "release": 0, "decayCurve": 1 },
+      "filter": { "type": "bandpass", "cutoff": 3200, "resonance": 0.3 },
+      "vary": { "filter.cutoff": [-500, 500] } },
+    { "name": "crackle", "role": "transient", "source": "noise", "length": 5, "gain": -16,
+      "envelope": { "attack": 0, "decay": 5, "sustain": 0, "release": 0, "decayCurve": 1 },
+      "filter": { "type": "bandpass", "cutoff": 2200, "resonance": 0.25 },
+      "burst": { "count": 3, "duration": 45, "density": 0.5,
+                 "jitter": { "time": 0.6, "gain": 4, "cutoff": 0.5 } } },
+    { "name": "squelch", "role": "body", "source": "sine", "freq": 260, "length": 90, "gain": -3, "offset": 6,
+      "envelope": { "attack": 1, "decay": 88, "sustain": 0, "release": 0, "decayCurve": 1 },
+      "pitch": { "start": 5, "end": -7, "time": 80 },
+      "vary": { "detune": [-1, 1] } },
+    { "name": "wet", "role": "tail", "source": "noise", "length": 110, "gain": -14, "offset": 15,
+      "noise": { "color": "pink" },
+      "envelope": { "attack": 5, "decay": 100, "sustain": 0, "release": 0 },
+      "filter": { "type": "bandpass", "cutoff": 900, "resonance": 0.3 } }
+  ]
+}

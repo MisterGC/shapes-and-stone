@@ -1631,6 +1631,21 @@
       },
       "delivered": "2026-11-15T13:50:15.192786+00:00",
       "verdict": null
+    },
+    "sfx/critter_squash": {
+      "category": "sfx",
+      "brief": "a critter of the dungeon, a spider, a mouse or a rat, squashed under a knight's foot: a short dry crunch with a crackle and a small wet squelch; once per critter, fading with the distance, a rat's 4 semitones lower and a spider's 4 higher",
+      "mode": "live",
+      "source": "sfx/critter_squash.sfx.json",
+      "render": "sfx/critter_squash.wav",
+      "report": "sfx/critter_squash.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-15T14:31:42.653201+00:00",
+      "verdict": null
     }
   }
 }

@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_s": 0.125011,
+  "time_span_s": 0.25,
+  "loop": false,
+  "loudness": {
+    "lufs_integrated": -19.294905,
+    "lufs_block_s": 0.125011,
+    "true_peak_dbtp": -3.583788,
+    "peak_dbfs": -3.589315,
+    "rms_dbfs": -18.232339,
+    "crest_factor_db": 14.643024
+  },
+  "envelope": {
+    "silence_start_s": 0.0,
+    "silence_end_s": 0.009773,
+    "attack_s": 0.004989,
+    "peak_at_s": 0.009977,
+    "peak_db": -9.120627,
+    "fall_20db_at_s": 0.044898,
+    "fall_60db_at_s": 0.119728
+  },
+  "spectrum": {
+    "centroid_hz": 387.787443,
+    "rolloff_hz": 366.064453,
+    "flatness": 0.002687,
+    "band_shares": {
+      "20_60": 0.000894,
+      "60_250": 0.023414,
+      "250_500": 0.943129,
+      "500_2k": 0.019968,
+      "2k_5k": 0.009634,
+      "5k_10k": 0.002518,
+      "10k_20k": 0.000443
+    }
+  },
+  "pitch": {
+    "voiced_share": 0.545455,
+    "median_hz": 323.164399,
+    "start_hz": 334.421283,
+    "end_hz": 284.481204,
+    "sweep_semitones": -2.8,
+    "track": [
+      [
+        0.0,
+        336.358566
+      ],
+      [
+        0.01161,
+        334.421283
+      ],
+      [
+        0.02322,
+        332.495158
+      ],
+      [
+        0.03483,
+        313.833639
+      ],
+      [
+        0.04644,
+        284.481204
+      ],
+      [
+        0.05805,
+        262.381621
+      ],
+      [
+        0.06966,
+        null
+      ],
+      [
+        0.08127,
+        null
+      ],
+      [
+        0.09288,
+        null
+      ],
+      [
+        0.10449,
+        null
+      ],
+      [
+        0.1161,
+        null
+      ]
+    ]
+  },
+  "psychoacoustics": {
+    "sharpness_acum": 1.438915,
+    "roughness_asper": 0.03304,
+    "roughness_max_asper": 0.03304
+  },
+  "defects": {
+    "clipped_samples": 0,
+    "clipped_share": 0.0,
+    "dc_offset": 0.001028,
+    "loop_seam_jump": 0.001567,
+    "loop_seam_jump_ratio": 0.03168
+  },
+  "provenance": {
+    "tool": "sp analyze",
+    "sp_version": "0.1.0",
+    "libraries": {
+      "librosa": "0.11.0",
+      "pyloudnorm": "0.2.0",
+      "mosqito": "1.2.1",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "soundfile": "0.14.0",
+      "matplotlib": "3.11.2"
+    },
+    "thresholds": "default"
+  },
+  "flags": [],
+  "file": "critter_squash.wav",
+  "pictures": {
+    "spectrogram": "critter_squash.spec.png",
+    "waveform": "critter_squash.wave.png"
+  }
+}
