@@ -36,7 +36,8 @@ PhysicsItem {
     // It fell: it lies where it fell, harmless, until it is gone
     property bool fallen: false
     property bool destroyed: false
-    // It bounced off a wall, its n-th, its centre at (x, y)
+    // It bounced off a wall, its n-th, its centre touching the wall at
+    // (x, y)
     signal bounced(int n, real x, real y)
     // It fell: how - "wall" (past its bounces), "knight" (it hurt one),
     // "enemy" (a shield's ball hit one), "life" (its time was over) or
@@ -134,23 +135,34 @@ PhysicsItem {
             return
         }
         if (gameWorld && gameWorld.ballSolid) _bounce()
+        _lastX = centreX
+        _lastY = centreY
         if (fallen) return
         body.linearVelocity = Qt.point(dirX * speed, -dirY * speed)
     }
 
-    // Each axis on its own: when the edge it flies towards is in a solid
-    // cell, its centre is mirrored at that cell's side and the axis turns;
-    // past its bounces it falls at that side instead
+    // Where its centre was after the step before, for the axes' tests
+    property real _lastX: centreX
+    property real _lastY: centreY
+    Component.onCompleted: { _lastX = centreX; _lastY = centreY }
+
+    // Each axis on its own, x first: when the edge it flies towards is in
+    // a solid cell - along x in the rows it came from, along y in the
+    // columns it is in now -, its centre is mirrored at that cell's side
+    // and the axis turns; past its bounces it falls at that side instead
     function _bounce() {
         let cs = gameWorld.cellSize, r = widthWu / 2
         let cx = centreX, cy = centreY, hit = false
+        // Where its centre was as it touched the wall
+        let tx = cx, ty = cy
         let solidAt = (x, y) => gameWorld.ballSolid(Math.floor(x / cs), Math.floor(y / cs))
         if (dirX !== 0) {
             let sx = dirX > 0 ? 1 : -1, edge = cx + sx * r
-            if (solidAt(edge, cy - r * 0.7) || solidAt(edge, cy + r * 0.7)) {
+            if (solidAt(edge, _lastY - r * 0.7) || solidAt(edge, _lastY + r * 0.7)) {
                 let side = (sx > 0 ? Math.floor(edge / cs) : Math.floor(edge / cs) + 1) * cs
                 if (bounces >= Balance.ball.bounces) return _fallAt(side - sx * r, cy, "wall")
-                cx = 2 * (side - sx * r) - cx
+                tx = side - sx * r
+                cx = 2 * tx - cx
                 dirX = -dirX
                 hit = true
             }
@@ -160,7 +172,8 @@ PhysicsItem {
             if (solidAt(cx - r * 0.7, edge) || solidAt(cx + r * 0.7, edge)) {
                 let side = (sy > 0 ? Math.floor(edge / cs) : Math.floor(edge / cs) + 1) * cs
                 if (bounces >= Balance.ball.bounces) return _fallAt(cx, side - sy * r, "wall")
-                cy = 2 * (side - sy * r) - cy
+                ty = side - sy * r
+                cy = 2 * ty - cy
                 dirY = -dirY
                 hit = true
             }
@@ -168,11 +181,13 @@ PhysicsItem {
         if (!hit) return
         _put(cx, cy)
         bounces++
-        bounced(bounces, cx, cy)
+        bounced(bounces, tx, ty)
     }
     function _put(cx, cy) {
         xWu = cx - widthWu / 2
         yWu = cy + heightWu / 2
+        _lastX = cx
+        _lastY = cy
     }
 
     // Its time is over: it falls where it is. It starts again when a
