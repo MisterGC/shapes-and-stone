@@ -69,6 +69,11 @@ Item {
     signal enemyKillReceived(var kill)
     // A spitter of the host's fired (id, x, y, dx, dy, damage)
     signal shotReceived(var shot)
+    // Another node's knight let a bolt loose (Balance.bolt): bolt.id, its
+    // start (x, y) and way (dx, dy); and where one ended on that node,
+    // bolt.id at (x, y)
+    signal boltReceived(string fromId, var bolt)
+    signal boltEndReceived(string fromId, var bolt)
     // The host owns every gold drop as a replicated object of type "gold",
     // as it owns the enemies; it came to life or went on this node
     signal goldSpawned(string objectId, var props)
@@ -308,6 +313,10 @@ Item {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
                 session.shotReceived(data)
+            } else if (data.type === "bolt") {
+                session.boltReceived(fromId, data)
+            } else if (data.type === "boltEnd") {
+                session.boltEndReceived(fromId, data)
             } else if (data.type === "struck") {
                 session.struckReported(fromId, data)
             } else if (data.type === "lift") {
@@ -706,6 +715,14 @@ Item {
     // Host: a spitter fired, every node flies the shot
     function sendShot(shot) {
         net.broadcast(Object.assign({type: "shot"}, shot))
+    }
+    // This node's knight let a bolt loose, every node flies it; and where
+    // it ended here
+    function sendBolt(bolt) {
+        if (net.connected) net.broadcast(Object.assign({type: "bolt"}, bolt))
+    }
+    function endBolt(bolt) {
+        if (net.connected) net.broadcast(Object.assign({type: "boltEnd"}, bolt))
     }
     // This node judged an attack on its own knight, for every other node
     function reportStruck(report) {

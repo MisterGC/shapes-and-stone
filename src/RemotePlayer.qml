@@ -124,6 +124,10 @@ PhysicsItem {
         } else if (name === "stun") {
             view.block()
             if (gameWorld && gain > 0) gameWorld.playStun(gain)
+        } else if (name === "bolt") {
+            // The bolt itself flies by its own message (Game.fireBolt)
+            view.parry()
+            if (gameWorld && gain > 0) gameWorld.playBoltShot(gain)
         } else if (name === "dash") {
             view.dash(150)
             if (gameWorld && gain > 0) gameWorld.playDash(gain)

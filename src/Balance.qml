@@ -260,7 +260,7 @@ QtObject {
         stun: { name: "Stun", line: "Bash with the shield: small enemies around you freeze.",
                 mana: stun.mana, momentum: false, ready: true },
         bolt: { name: "Bolt", line: "A blast along your aim hurts the first enemy it meets.",
-                mana: 15, momentum: false, ready: false },
+                mana: bolt.mana, momentum: false, ready: true },
         cardWidth: 220,
         pickColor: "#E8C35A"
     })
@@ -287,6 +287,37 @@ QtObject {
         sparks: 16,
         trauma: 0.3,
         volume: 0.8
+    })
+
+    // The bolt (issue #319), a special: for mana the knight lets loose a
+    // blast from its centre along its aim (its facing). It flies speed wu
+    // a second, size wu across, at most reach wu from where it began, and
+    // hurts the first enemy it meets for damage times the knight's atk -
+    // a blow as any other: a guardian's shield takes it from the front,
+    // and a room's lead or the Warden takes a chip of it on its stance
+    // (Balance.lead.chip) that wears the stance but never breaks it, so
+    // the bolt never opens one. A wall or a closed door ends it, past
+    // reach it fades out; it passes the breakables, as the shots do, and
+    // hurts no knight. It is drawn in color round a core of coreColor,
+    // with a light of light wu; where it ends sparks sparks fly, and it
+    // sounds sound/sfx/bolt_shot as it leaves and sound/sfx/bolt_hit
+    // where it hits an enemy, at shotVolume and hitVolume, and at a wall
+    // at wallGain of that. In a session it flies on every screen; only
+    // the screen of the knight that fired it deals the blow
+    readonly property var bolt: ({
+        mana: 15,
+        damage: 1.0,
+        speed: 16.0,
+        size: 0.35,
+        reach: 12.0,
+        color: "#B98CFF",
+        coreColor: "#F4ECFF",
+        light: 3.0,
+        sparks: 8,
+        trauma: 0.15,
+        shotVolume: 0.7,
+        hitVolume: 0.8,
+        wallGain: 0.5
     })
 
     // The kill chain (issue #270): a kill within window seconds of the

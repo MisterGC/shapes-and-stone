@@ -1845,10 +1845,13 @@ PhysicsItem {
         stance = Math.round(_stanceLeft * 20) / 20
     }
     // A blow outside an opening wears the stance, a charged swing more; a
-    // worn stance breaks
-    function _wearStance(heavy) {
+    // worn stance breaks. A bolt's (spare) wears it, but never below one
+    // wear, so it never breaks it (Balance.bolt)
+    function _wearStance(heavy, spare) {
         _stanceRest = 0
-        _setStance(_stanceLeft - (heavy === true ? Balance.lead.heavyWear : Balance.lead.wear))
+        let left = _stanceLeft - (heavy === true ? Balance.lead.heavyWear : Balance.lead.wear)
+        if (spare === true) left = Math.max(left, Math.min(_stanceLeft, Balance.lead.wear))
+        _setStance(left)
         if (_stanceLeft <= 1e-6) open("worn")
     }
     // No blow for regenDelay seconds: the stance comes back
@@ -1921,12 +1924,19 @@ PhysicsItem {
     function takeShot(amount, attackerX, attackerY) {
         return _struck(amount, attackerX, attackerY, false, lead && !opening ? "shot" : "")
     }
+    // This node's knight's bolt hit it (Balance.bolt, issue #319), coming
+    // from (attackerX, attackerY): a blow of amount as any other, but on a
+    // lead's stance it never breaks it (spare). Returns the damage it does
+    function takeBolt(amount, attackerX, attackerY) {
+        return _struck(amount, attackerX, attackerY, false, "", true)
+    }
     // This node's knight's blow, opens the cause it breaks a lead's
-    // stance with, or ""
-    function _struck(amount, attackerX, attackerY, heavy, opens) {
+    // stance with, or ""; spare for a bolt's, which wears it but never
+    // breaks it
+    function _struck(amount, attackerX, attackerY, heavy, opens, spare) {
         if (_held()) return 0
         if (dormant) return _glance(attackerX, attackerY)
-        if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens)
+        if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens, spare)
         // Remote: the hit looks and counts here, the host applies it
         let b = _blow(amount, attackerX, attackerY, heavy, opens)
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
@@ -1935,7 +1945,7 @@ PhysicsItem {
             gameWorld.countFight("dealt", b.damage)
             gameWorld.impact(_hitKind(b.blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
             gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY,
-                                          heavy: heavy === true, opens: opens})
+                                          heavy: heavy === true, opens: opens, spare: spare === true})
         }
         hitFlashAnimation.restart()
         if (_fx) hitSquash.restart()
@@ -1952,14 +1962,16 @@ PhysicsItem {
     }
 
     // Host: the knight of node byId struck the enemy; that node drew the
-    // hit and counted it, and judged whether it opens a lead (opens)
-    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens) {
-        _takeBlow(amount, attackerX, attackerY, byId, heavy, opens || "")
+    // hit and counted it, and judged whether it opens a lead (opens);
+    // spare for a bolt's blow
+    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens, spare) {
+        _takeBlow(amount, attackerX, attackerY, byId, heavy, opens || "", spare === true)
     }
 
     // A blow from this node's knight (byId "") or another node's; opens
-    // the cause it breaks a lead's stance with, or ""
-    function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens) {
+    // the cause it breaks a lead's stance with, or ""; spare for a bolt's,
+    // which wears a lead's stance but never breaks it
+    function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens, spare) {
         // Asleep, the Warden's stone takes nothing: its fight begins when
         // its room shuts, not with a blow from a knight its room let in
         // while another waits outside
@@ -2019,7 +2031,7 @@ PhysicsItem {
         if (boss) _bossMarks()
         // A lead: the blow breaks its stance, or wears it
         if (opens) open(opens)
-        else if (lead && !opening) _wearStance(heavy)
+        else if (lead && !opening) _wearStance(heavy, spare)
         return finalDamage
     }
 
