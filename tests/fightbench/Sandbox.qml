@@ -626,7 +626,10 @@ Item {
         let aside = () => foes.forEach((e, i) => { e.halt(); put(e, cx - half + 2, cy + half - 2 - i * 1.2) })
         let small = foes.filter(e => !e.lead && e.enemyType !== "guardian")
         let a = small[0], b = small[1]
-        let step = game.physics.timeStep
+        // A step by hand simulates 1/60 s (ClayWorld2d's physicsStep); the
+        // world's timeStep before the first one is the running game's last
+        // frame, longer on a busy machine, and would wait too few steps
+        const step = 1 / 60
         // The knight at the centre facing angle, the combo entered, the
         // button pressed late or not: whether the combo was ready, whether
         // the special was the stronger one and the slowest the knight went

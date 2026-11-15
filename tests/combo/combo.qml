@@ -5,10 +5,10 @@
 // scenario. First the pad's left stick alone, the right stick at rest and
 // the aim the game's own, so the left stick aims as the knight walks, one
 // physics step a turn of the event loop: right a while, then left (away),
-// then right (towards) and R2 fire the stronger bolt, the aim held right
-// through the push away; held left past Balance.combo.aimHold the knight
-// turns round, and right then and R2 fire the normal bolt. Then, the
-// knight aiming up: with the stun, the move keys away from
+// then right (towards) and R2 fire the stronger bolt, along the aim right;
+// an about-turn on the left stick faces the knight left on the first step,
+// and R2 then fires the normal bolt that way. Then, the knight aiming up:
+// with the stun, the move keys away from
 // the aim (S) for a few steps, then towards it (W), and Q fires the
 // stronger stun (Balance.combo.stun) for the stun's mana - an enemy past
 // the stun's reach and inside the stronger one's freezes, for the stronger
@@ -202,10 +202,10 @@ Window {
     }
     // R2 pressed: whether the special was the stronger one, the bolt in
     // flight's size, the facing
-    function stickFire() {
+    function stickFire(x) {
         let g = solo, p = g.player, bolt = null
         p.mana = p.maxMana
-        pad({axisX: 1, triggerR2: 1})
+        pad({axisX: x, triggerR2: 1})
         for (let id in g._boltById) if (g._boltById[id].own) bolt = g._boltById[id]
         stickWent = {strong: p.lastStrong, size: bolt ? bolt.widthWu : 0,
                      facing: p.facingAngle, padAim: p.padAim}
@@ -216,33 +216,34 @@ Window {
               "the pad's left stick alone, right then left then right, the right stick at rest and the aim the "
               + "game's, and R2 fire the stronger bolt (" + (r.strong ? "stronger" : "normal") + ", "
               + r.size + " wu across, facing " + r.facing.toFixed(0) + ")")
-        check(Math.abs(r.facing) < 1, "the push away left the aim right, where the bolt flies (facing "
+        check(Math.abs(r.facing) < 1, "it flies right, the way the stick pushed last (facing "
               + r.facing.toFixed(1) + ")")
-    }
-    function stickCheckTurn() {
-        let r = stickWent
-        check(!r.strong && Math.abs(r.size - Balance.bolt.size) < 1e-6,
-              "held left past the aim's hold, " + Balance.combo.aimHold + " s, the knight turns round: right "
-              + "then and R2 fire the normal bolt (" + (r.strong ? "stronger" : "normal") + ", " + r.size + " wu across)")
     }
     function stickTurned() {
         let p = solo.player
-        check(Math.abs(Math.abs(p.facingAngle) - 180) < 1, "held left that long the knight faces left (facing "
-              + p.facingAngle.toFixed(1) + ")")
+        check(Math.abs(Math.abs(p.facingAngle) - 180) < 1, "an about-turn on the left stick faces the knight left "
+              + "on the first step (facing " + p.facingAngle.toFixed(1) + ")")
     }
-    readonly property int holdSteps: Math.ceil(Balance.combo.aimHold * 60) + 6
+    function stickCheckTurn() {
+        let r = stickWent
+        check(!r.strong && Math.abs(r.size - Balance.bolt.size) < 1e-6 && Math.abs(Math.abs(r.facing) - 180) < 1,
+              "R2 then fires the normal bolt left (" + (r.strong ? "stronger" : "normal") + ", " + r.size
+              + " wu across, facing " + r.facing.toFixed(0) + ")")
+    }
+    // Right longer than Balance.combo.awayMax: the knight faces right
+    // whatever it faced before
+    readonly property int settleSteps: Math.ceil(Balance.combo.awayMax * 60) + 10
     readonly property var stickCases: [].concat(
         [[20, () => stickStart()]],
-        stickSteps({axisX: 1}, 10),
+        stickSteps({axisX: 1}, settleSteps),
         stickSteps({axisX: -1}, 4),
         stickSteps({axisX: 1}, 2),
-        [[20, () => stickFire()], [20, () => { pad({}); bench.stick = {} }], [20, () => stickCheckStrong()]],
+        [[20, () => stickFire(1)], [20, () => { pad({}); bench.stick = {} }], [20, () => stickCheckStrong()]],
         stickSteps({}, 40),
-        stickSteps({axisX: 1}, 10),
-        stickSteps({axisX: -1}, holdSteps),
+        stickSteps({axisX: 1}, settleSteps),
+        stickSteps({axisX: -1}, 1),
         [[20, () => stickTurned()]],
-        stickSteps({axisX: 1}, 2),
-        [[20, () => stickFire()], [20, () => { pad({}); bench.stick = {} }], [20, () => stickCheckTurn()]],
+        [[20, () => stickFire(-1)], [20, () => { pad({}); bench.stick = {} }], [20, () => stickCheckTurn()]],
         stickSteps({}, 40),
         [[20, () => { Clayground.paused = false }]]
     )
