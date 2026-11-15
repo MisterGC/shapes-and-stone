@@ -602,6 +602,17 @@ PhysicsItem {
         // Handle collision with enemies
     }
 
+    // A blow's damage with the kill chain's bonus while it holds
+    // (Game.chainBonus, Balance.chain, issue #321): every swing and the
+    // whirlwind's hits, whole points; without a bonus it is dmg
+    function chained(dmg) {
+        let bonus = gameWorld && gameWorld.chainBonus ? gameWorld.chainBonus : 0
+        if (bonus <= 0) return dmg
+        let more = Math.floor(dmg * (1 + bonus) + 1e-6)
+        if (gameWorld.countFight) gameWorld.countFight("chainBlow", more - dmg)
+        return more
+    }
+
     // Check if an enemy is within the attack arc: a heavy swing's when one
     // is under way
     function isInAttackArc(enemy) {
@@ -655,6 +666,7 @@ PhysicsItem {
                     // lead does not flinch (Enemy.stagger)
                     if (enemy.enemyType === "guardian" && !parried) enemy.stagger()
                 }
+                dmg = chained(dmg)
                 // A lead's stance takes a share of it, or breaks: the
                 // number shows what it did
                 let dealt = enemy.takeDamage(dmg, xWu, yWu, isHeavy, parried)
@@ -781,7 +793,7 @@ PhysicsItem {
             let dx = e.xWu + e.widthWu / 2 - (xWu + widthWu / 2)
             let dy = e.yWu - e.heightWu / 2 - (yWu - heightWu / 2)
             if (dx * dx + dy * dy > reach * reach) continue
-            let dmg = Math.floor(atk * swing)
+            let dmg = chained(Math.floor(atk * swing))
             _hitThisWhirl.add(e)
             e.takeDamage(dmg, xWu, yWu, true)
             hitCount++

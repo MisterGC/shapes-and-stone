@@ -776,23 +776,36 @@ ClayWorld2d {
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
+    //   links: a chainKill's links, its burst's size (Balance.chain)
     // Its world part (sparks, shards, rings, stains) belongs to the place
     // of the hit and shows on every screen; its screen part (shake, kick,
     // hit-stop, flash) only on the screen of whoever hit or was hit. A local
     // hit goes out to the others, who draw its world part only.
-    function impact(kind, x, y, dx, dy, color, local) {
+    function impact(kind, x, y, dx, dy, color, local, links) {
         let len = Math.sqrt(dx * dx + dy * dy)
         let nx = len > 0.001 ? dx / len : 0
         let ny = len > 0.001 ? dy / len : 0
-        _impactWorld(kind, x, y, nx, ny, color)
+        _impactWorld(kind, x, y, nx, ny, color, links)
         if (local === false) return
         _impactScreen(kind, nx, ny)
-        session.sendImpact(kind, x, y, dx, dy, color)
+        session.sendImpact(kind, x, y, dx, dy, color, links)
     }
 
-    function _impactWorld(kind, x, y, nx, ny, color) {
+    // The particles of a kill's burst, its chain's links-th: one link (or
+    // none given) is a kill's own, each link past it adds to it
+    // (Balance.chain.burstLinks, burstShards, burstSparks, burstRing)
+    // The last kill's burst this screen drew, for a bench
+    property var lastDeathBurst: null
+    function deathBurst(links) {
+        let c = Balance.chain
+        let past = Math.max(0, Math.min(links || 1, c.burstLinks) - 1)
+        return { shards: 12 + past * c.burstShards, sparks: 10 + past * c.burstSparks,
+                 ring: 1.6 + past * c.burstRing }
+    }
+
+    function _impactWorld(kind, x, y, nx, ny, color, links) {
         if (!fx) {
-            if (kind === "enemyDeath") spawnDeathParticles(x, y)
+            if (kind === "enemyDeath" || kind === "chainKill") spawnDeathParticles(x, y)
             else if (kind === "parry") spawnParryEffect(x, y)
             else if (kind === "projectileDeflected") spawnDeflectParticles(x, y)
             else if (kind === "projectileBurst") spawnSpitParticles(x, y)
@@ -812,12 +825,15 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
         case "enemyDeath":
-        case "chainKill":
-            spawnShards(x, y, nx, ny, 12, color, 0.3)
-            spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
-            spawnRing(x, y, Qt.lighter(color, 1.4))
+        case "chainKill": {
+            let burst = deathBurst(kind === "chainKill" ? links : 1)
+            lastDeathBurst = burst
+            spawnShards(x, y, nx, ny, burst.shards, color, 0.3)
+            spawnSparks(x, y, nx, ny, burst.sparks, Qt.lighter(color, 1.6))
+            spawnRing(x, y, Qt.lighter(color, 1.4), burst.ring)
             spawnStain(x, y, color)
             break
+        }
         case "playerHit":
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
             break
@@ -1093,8 +1109,8 @@ ClayWorld2d {
         onArrivalReported: (fromId, seed, level, picked) => _introArrival(fromId, seed, level, picked)
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
-        onImpactReceived: (kind, x, y, dx, dy, color) => {
-            if (screen === "game") impact(kind, x, y, dx, dy, color, false)
+        onImpactReceived: (kind, x, y, dx, dy, color, links) => {
+            if (screen === "game") impact(kind, x, y, dx, dy, color, false, links)
         }
         onEnemySpawned: (objectId, props) => _makeEnemy(props, objectId)
         onEnemyDespawned: (objectId) => _dropEnemy(objectId)
@@ -2700,6 +2716,19 @@ ClayWorld2d {
             font.pixelSize: 12
             font.bold: true
         }
+        // The kill chain's bonus to the knight's blows while it holds
+        // (Balance.chain.bonusShare, issue #321): "CHAIN +15%"
+        Text {
+            objectName: "chainBonusHud"
+            anchors.verticalCenter: parent.verticalCenter
+            visible: world.chainBonus > 0
+            text: "CHAIN +" + Math.round(world.chainBonus * 100) + "%"
+            color: Balance.chain.bonusColor
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 12
+            font.bold: true
+        }
     }
     property real _momentumT: 0
     NumberAnimation on _momentumT {
@@ -3423,6 +3452,11 @@ ClayWorld2d {
         // longest one's links
         property int chains: 0
         property int longestChain: 0
+        // Blows the chain's bonus made stronger (Balance.chain.bonusShare),
+        // the points it added before defense and the highest it went
+        property int chainBlows: 0
+        property int chainExtra: 0
+        property real chainPeak: 0
         property int deaths: 0
         // Fallen allies this knight lifted up, and the times an ally lifted
         // it up (a rise at camp is neither)
@@ -3439,6 +3473,7 @@ ClayWorld2d {
         r.bolts = 0; r.boltHits = 0; r.strongSpecials = 0
         r.shotsBack = 0; r.shotBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
+        r.chainBlows = 0; r.chainExtra = 0; r.chainPeak = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
         r.seconds = 0; r.clearSeconds = -1
         breakChain()
@@ -3450,6 +3485,7 @@ ClayWorld2d {
     // stunInterrupted (with the enemies it froze and the wind-ups it
     // ended), bolt (a bolt let loose), boltHit (one hit an enemy), shotBack (a perfect block sent a shot back),
     // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
+    // chainBlow (the chain's bonus added amount points to a blow),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
     // --- The kill chain (Balance.chain, issue #270) ---
@@ -3461,11 +3497,17 @@ ClayWorld2d {
     property real _chainAt: 0
     // The chain hit stops this screen made, for a bench
     property int chainStops: 0
+    // The pips this chain added, one every pipEvery-th link, and the share
+    // of their damage the knight's blows deal on top while it holds
+    // (Balance.chain.bonusShare, bonusCap; issue #321): 0 once it breaks
+    readonly property int chainPips: Math.floor(chainLinks / Balance.chain.pipEvery)
+    readonly property real chainBonus: Math.round(Math.min(Balance.chain.bonusCap,
+                                                           chainPips * Balance.chain.bonusShare) * 1000) / 1000
     function killLanded(x, y, dx, dy, color) {
         let c = Balance.chain
         chainLinks = chainLinks > 0 && physicsSeconds - _chainAt <= c.window ? chainLinks + 1 : 1
         _chainAt = physicsSeconds
-        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color)
+        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color, true, chainLinks)
         playDeathBurst(x, y, c.pitches[Math.min(chainLinks, c.pitches.length) - 1])
         countFight("kill")
         if (chainLinks >= 2) countFight("chain", chainLinks)
@@ -3474,6 +3516,11 @@ ClayWorld2d {
     }
     // A hit taken or a new fight record: the next kill starts a chain
     function breakChain() { chainLinks = 0 }
+    // A chain whose window ran out with no kill is over, on the physics
+    // clock as its links are: a kill after it starts a new one
+    function _stepChain() {
+        if (chainLinks > 0 && physicsSeconds - _chainAt > Balance.chain.window) breakChain()
+    }
     // The hit stop of a chain's link-th kill, in seconds
     function chainFreeze(link) {
         let c = Balance.chain
@@ -3503,6 +3550,11 @@ ClayWorld2d {
         case "bolt": r.bolts++; break
         case "boltHit": r.boltHits++; break
         case "strong": r.strongSpecials++; break
+        case "chainBlow":
+            r.chainBlows++
+            r.chainExtra += amount
+            r.chainPeak = Math.max(r.chainPeak, chainBonus)
+            break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break
@@ -3531,6 +3583,7 @@ ClayWorld2d {
             else if (world.followFightOnSteps && world.fightIntensity > 0)
                 world._stopFollowingFight()
             world._traceMusic()
+            world._stepChain()
             world._pickUpGold()
             world._pickUpPouches()
             world._stepRevive()

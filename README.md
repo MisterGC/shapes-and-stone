@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2046,6 +2046,33 @@ on the host, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/combo/combo.qml
 ```
 
+A kill chain makes the knight's blows stronger while it holds (issue
+#321). Each pip the chain adds - one every `chain.pipEvery`-th link, still
+a momentum pip too - makes every swing (normal, charged, parried, on the
+shield or in a dash) and every hit of the whirlwind deal
+`chain.bonusShare` more of its damage, whole points, up to
+`chain.bonusCap` more: with 0.15 and 0.45, +15 % at 3 links, +30 % at 6,
++45 % from 9 on. The bolt and a shot sent back get no bonus. A hit the
+knight takes ends the chain and the bonus with it, and so does
+`chain.window` running out with no kill; the momentum the chain added
+stays. While the bonus holds the HUD shows it right of the special, "CHAIN
++15%" in `chain.bonusColor`. A kill bursts more the longer its chain:
+each link past the first, up to `chain.burstLinks`, adds
+`chain.burstShards` shards and `chain.burstSparks` sparks and widens its
+ring by `chain.burstRing` wu, on every screen in co-op. The fight record
+counts the blows the bonus made stronger (`chainBlows`), the points it
+added before defense (`chainExtra`) and its peak (`chainPeak`); the
+fight bench prints them as a fight's `chain bonus` line. The kill chain
+bench lands real swings on a grunt with no stance at each pip, past the
+cap, after a hit and after the window, a whirlwind's hit with a pip, and
+checks the HUD's label, the momentum pip and the burst of each link, a
+real kill's and another player's, and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/killchain/killchain.qml
+```
+
 A grunt does not run straight in: from `enemy.circleRange` on it circles
 the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
 `enemy.circleTime` seconds, then commits, goes in and lunges; a knight
@@ -2799,7 +2826,7 @@ Melee attacks have swing recovery (cooldown between attacks):
 - **Timing**: Dodge during enemy telegraph, attack during recovery
 - **Blocking**: Active decision — trade mana for damage reduction
 - **Prioritization**: Choose targets wisely (Spitters first? Focus Dasher mid-charge?)
-- **Kill chains**: a kill within `Balance.chain.window` (2.5 s) of the last one adds to the chain - its death sound climbs a step of the dungeon song's A minor, it gets a short crunchy hit stop on the killer's screen, and every third link adds a momentum pip. A hit taken, or a pause longer than the window, breaks the chain
+- **Kill chains**: a kill within `Balance.chain.window` (2.5 s) of the last one adds to the chain - its death sound climbs a step of the dungeon song's A minor, it gets a short crunchy hit stop on the killer's screen, its burst grows, and every third link adds a momentum pip. Each of those pips makes the knight's blows 15 % stronger while the chain holds, up to 45 %, shown on the HUD. A hit taken, or a pause longer than the window, breaks the chain and ends the bonus
 
 ---
 

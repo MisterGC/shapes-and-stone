@@ -67,6 +67,7 @@ QUICK = [
     ("stun", "stun/stun.qml", []),
     ("bolt", "bolt/bolt.qml", []),
     ("combo", "combo/combo.qml", []),
+    ("killchain", "killchain/killchain.qml", []),
     ("answer", "answer/answer.qml", []),
     ("cues", "cues/cues.qml", []),
     ("lipsync", "lipsync/lipsync.qml", []),
