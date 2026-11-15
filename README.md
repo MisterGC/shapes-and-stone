@@ -2010,7 +2010,10 @@ when they are within `combo.cone` degrees of the way opposite the
 knight's facing, towards when within it of the facing, and nowhere under
 `combo.deadZone` of a full push; towards no later than `combo.gap` seconds
 after the last step away enters the combo. Locked on an enemy, or aiming
-up, it is S then W. The knight walks on through it, and someone who
+up, it is S then W. While a pad's left stick aims - its right stick at
+rest, the knight facing the way it walks - a push away holds the aim for
+`combo.aimHold` seconds, so it reads as away; held away longer, the knight
+turns round, and a combo it turned round in is none. The knight walks on through it, and someone who
 never learns it loses nothing: the button later than the window, the
 combo the other way round or the moves away again after it fire the
 normal special. The stronger versions: the whirlwind spins
@@ -2031,7 +2034,8 @@ for the stick. In co-op the other screens see the name, the ring and the
 stronger whirlwind, hear the swell, fly the stronger bolt big, and the
 host freezes its enemies for the stronger stun's freeze. The fight
 record counts the stronger specials (`strongSpecials`). The combo bench
-enters the combo with the keys, the pad's stick and rebound keys, late,
+enters the combo with the pad's left stick alone, the aim following it,
+with the keys, the pad's stick and rebound keys, late,
 the wrong way round and away again, checks each special's stronger
 version, the choice's combo line, and a joiner's stronger stun and bolt
 on the host, and exits with the number of failed checks:
