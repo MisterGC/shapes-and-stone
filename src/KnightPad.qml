@@ -113,15 +113,49 @@ Item {
     // The right stick aims; at rest the left one does while the knight
     // walks. Once after a change, not per axis: a source writes x and y
     // one after the other, and a diagonal let go would aim along the axis
-    // written last
+    // written last. The left stick pushed away from the aim - within
+    // Balance.combo.cone of the way opposite it - holds the aim for
+    // Balance.combo.aimHold seconds of the physics clock, so the combo
+    // (away from the aim, then towards it, issue #320) reads as away; held
+    // away longer, the knight turns to it
     function _aimLater() { Qt.callLater(_aim) }
+    property bool _aimHeld: false
+    property real _aimHeldUntil: 0
+    function _behind(a, b) {
+        let d = Math.abs(((a - b) % 360 + 540) % 360 - 180)
+        return d >= 180 - Balance.combo.cone - 1e-9
+    }
+    function _now() { return game && game.physicsSeconds !== undefined ? game.physicsSeconds : 0 }
     function _aim() {
-        if (!aiming || !controller || (game && game.talking)) return
+        if (!aiming || !controller || (game && game.talking)) {
+            _aimHeld = false
+            return
+        }
         let c = controller
-        if (Math.hypot(c.axisRightX, c.axisRightY) > deadZone)
+        if (Math.hypot(c.axisRightX, c.axisRightY) > deadZone) {
+            _aimHeld = false
             aimAngle = Math.atan2(c.axisRightY, c.axisRightX) * 180 / Math.PI
-        else if (Math.hypot(c.axisX, c.axisY) > deadZone)
-            aimAngle = Math.atan2(c.axisY, c.axisX) * 180 / Math.PI
+        } else if (Math.hypot(c.axisX, c.axisY) > deadZone) {
+            let a = Math.atan2(c.axisY, c.axisX) * 180 / Math.PI
+            if (_behind(a, aimAngle)) {
+                if (!_aimHeld) {
+                    _aimHeld = true
+                    _aimHeldUntil = _now() + Balance.combo.aimHold
+                }
+                if (_now() < _aimHeldUntil - 1e-9) return
+            }
+            _aimHeld = false
+            aimAngle = a
+        } else {
+            _aimHeld = false
+        }
+    }
+    // While the aim is held, each physics step looks again: the hold over,
+    // the knight turns to the stick
+    Connections {
+        target: knightPad.game ? knightPad.game.physics : null
+        enabled: knightPad._aimHeld
+        function onStepped() { knightPad._aim() }
     }
 
     // In the game, with no menu, title, fallen screen or choice of a

@@ -119,6 +119,7 @@ PhysicsItem {
     // last pointed away (-1 none), the way they point now (-1 away, 1
     // towards, 0 neither) and the step the combo was entered (-1 none)
     property int _comboAwayAt: -1
+    property real _comboAwayFacing: 0
     property int _comboWay: 0
     property int comboAt: -1
     // The special's button now fires the stronger version: the combo was
@@ -141,14 +142,23 @@ PhysicsItem {
         let cone = Math.cos(c.cone * Math.PI / 180)
         return along >= cone - 1e-9 ? 1 : along <= -cone + 1e-9 ? -1 : 0
     }
+    // Whether the knight faces within combo.cone of angle: a knight that
+    // turned round to the way it walked (the pad's left stick aiming,
+    // KnightPad) has entered no combo
+    function _facesStill(angle) {
+        let d = Math.abs(((facingAngle - angle) % 360 + 540) % 360 - 180)
+        return d <= Balance.combo.cone + 1e-9
+    }
     function _readCombo() {
         let way = comboWay()
         if (way === -1) {
             // Away again: a combo entered before is gone
             _comboAwayAt = _steps
+            _comboAwayFacing = facingAngle
             comboAt = -1
         } else if (way === 1 && _comboWay !== 1 && _comboAwayAt >= 0
-                   && (_steps - _comboAwayAt) * world.timeStep <= Balance.combo.gap + 1e-6) {
+                   && (_steps - _comboAwayAt) * world.timeStep <= Balance.combo.gap + 1e-6
+                   && _facesStill(_comboAwayFacing)) {
             comboAt = _steps
             console.log("[Player] Combo entered")
         }

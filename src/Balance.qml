@@ -330,7 +330,11 @@ QtObject {
     // on that step; moves under deadZone of a full push point nowhere. The
     // button within window seconds of it fires the stronger version, later
     // the normal one; a combo entered the other way round, or away again
-    // after it, is none. The knight walks on through it all. Each
+    // after it, is none; so is one the knight turned round in. While the
+    // pad's left stick aims (its right stick at rest), a push away from
+    // the aim holds the aim for aimHold seconds, so it reads as away; held
+    // away longer, the knight turns to it. The knight walks on through it
+    // all. Each
     // special's stronger version has a name, a line of what is stronger
     // and its numbers:
     // - whirlwind: spins duration seconds instead of knight.whirlDuration,
@@ -355,6 +359,7 @@ QtObject {
         gap: 0.25,
         cone: 50,
         deadZone: 0.5,
+        aimHold: 0.4,
         whirlwind: { name: "Tempest", line: "spins longer and wider, hits harder",
                      duration: 0.5, reach: 2.2, swing: 3 },
         stun: { name: "Quake", line: "freezes further and longer",
