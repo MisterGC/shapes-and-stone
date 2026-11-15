@@ -2441,7 +2441,7 @@ and its cracks per appearance;
 then in the one at depth 2 it steps the knight into the room and checks
 the gates, the wake, the Warden's line played and shown on the step the
 room shuts with the Warden awake on it, the banner, the bar, the song's
-parts, phase 2 with
+parts, its own count-in in either phase (issue #330), phase 2 with
 its adds, tempo, light and core, a zone that hurts through a shield and one
 stepped out of, the second wave, and the fall with its line, its gold, its
 open gates, its victory banner and the heal. Last it checks the lines:
@@ -3240,7 +3240,7 @@ rhythm. Its numbers are the table's `boss` group.
 |-----------|-------|
 | **Shape** | Large hollow stone hexagon, a frame turning in its hollow |
 | **Color** | Stone grey (#4A4E57), its core glowing orange-red (#FF5A2A) in phase 2 |
-| **Health** | 2500 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
+| **Health** | 2000 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
 | **Phases** | 2 |
 
 **Phase 1 (100%-50% HP):** three strings of strikes, rests and a feint on
