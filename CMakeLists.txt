@@ -103,6 +103,7 @@ clay_app(shapes_and_stone
         src/CampProp.qml
         src/CampSolid.qml
         src/Creature.qml
+        src/Critter.qml
         src/CaveCat.qml
         src/Fishing.qml
         src/CampDog.qml

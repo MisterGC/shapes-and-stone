@@ -88,11 +88,13 @@ Window {
 
     // What the dungeon is made of, as the danger bench reads it: its
     // rooms and every object laid in it, without the veins' rock faces
-    // when noRock
+    // when noRock. The critters (issue #324) are left out: they draw from
+    // a stream of their own, and the hashes staying as recorded shows the
+    // rest of the dungeon is as it was without them
     function layout(noRock) {
         let out = [JSON.stringify(game.rooms)]
         for (let o of game.dungeonObjects) {
-            if (!o || (noRock && o.objectName === "rockFace")) continue
+            if (!o || o.objectName === "critter" || (noRock && o.objectName === "rockFace")) continue
             // The type without the number QML gives it, or an inline
             // type of Game.qml, in load order: a new type shifts it
             let parts = [String(o).split("(")[0].replace(/_QML(TYPE)?_\d+$/, "")]
