@@ -1,12 +1,11 @@
 // Specials bench - the knight picks one of three specials at the start of
 // a dungeon (issue #317).
 //
-// Alone, with the whirlwind and the stun in the game (issue #318): the
-// first dungeon's intro shows a card for each, the whirlwind's under the
-// keys, and Enter takes it; the count starts, the HUD shows "Whirlwind 20"
-// and the controls hint "Q whirlwind", and Q whirls. Then the bench offers
-// the special not in the game yet too (Game.specialsAll) and the knight buys the balanced
-// blade I at the camp. The next dungeon's intro shows the choice with the
+// Alone, with the whirlwind, the stun (issue #318) and the bolt (issue
+// #319) in the game: the first dungeon's intro shows a card for each, the
+// whirlwind's under the keys, and Enter takes it; the count starts, the HUD
+// shows "Whirlwind 20" and the controls hint "Q whirlwind", and Q whirls.
+// Then the knight buys the balanced blade I at the camp. The next dungeon's intro shows the choice with the
 // depth and the name: three cards with a name, a line and the mana each
 // costs with the blade (Balance.shop.bladeShare), the whirlwind's card
 // under the keys; it waits for the pick, no count and no "Waiting for the
@@ -18,8 +17,8 @@
 // spends the momentum, and the smith says what the blade gives the stun. In the dungeon after the camp the choice opens on
 // the stun; the synthetic pad's stick moves along the cards and A takes
 // the whirlwind, which Q lets loose as today for the blade's mana. In the
-// next one a click takes the bolt, which holds through its dungeon and
-// the camp after it.
+// next one a click takes the bolt, which Q lets loose for the blade's mana
+// and which holds through its dungeon and the camp after it.
 // In a session, a host and a joiner joined over LAN in one process: each
 // picks its own. The host picks first and waits, told so, past
 // Balance.intro.waitMax for the joiner still choosing; the count starts on
@@ -159,6 +158,7 @@ Window {
         g._enterLevel(g.levelIndex + 1)
     }
 
+    property real pickedFrom: 0
     property real pickedAt: 0
     property var spent: null
 
@@ -169,12 +169,12 @@ Window {
         }],
         [() => solo.player && solo.introOn, () => {
             check(Balance.specials.order.join(",") === "whirlwind,stun,bolt"
-                  && solo.specialsOffered.join(",") === "whirlwind,stun",
-                  "the specials are the whirlwind, the stun and the bolt, the whirlwind and the stun in the game ("
+                  && solo.specialsOffered.join(",") === "whirlwind,stun,bolt",
+                  "the specials are the whirlwind, the stun and the bolt, all three in the game ("
                   + solo.specialsOffered.join(",") + ")")
             check(solo.specialChoosing && card(solo, "whirlwind") !== null && card(solo, "stun") !== null
-                  && card(solo, "bolt") === null && solo.specialSelected === 0,
-                  "the first dungeon's intro shows their two cards, the whirlwind's under the keys")
+                  && card(solo, "bolt") !== null && solo.specialSelected === 0,
+                  "the first dungeon's intro shows their three cards, the whirlwind's under the keys")
             key(solo, Qt.Key_Return)
             check(!solo.specialChoosing && solo.introStartsAt >= 0 && solo.player.special === "whirlwind",
                   "Enter takes the whirlwind and the count starts")
@@ -188,7 +188,6 @@ Window {
             key(solo, Qt.Key_Q)
             check(p.isWhirling && p.momentum === 0 && Math.abs(p.maxMana - p.mana - Balance.knight.whirlMana) < 1e-6,
                   "Q whirls for " + (p.maxMana - p.mana) + " mana and the momentum")
-            solo.specialsAll = true
             nextDungeon(solo)
         }],
         [() => solo.levelType === "village" && solo.player, () => {
@@ -250,6 +249,11 @@ Window {
             check(bound && right === 1 && left === -1, "with the moves bound to the arrows Right moves "
                   + right + " card and Left " + left + " (1 and -1)")
             beatsOf(solo).length = 0
+            // The pick is taken on the press, inside keyClick, which then
+            // runs the timers due: the intro's clock may tick once more
+            // before it returns. The pick lies between the clock before the
+            // click and after it, at most one of its steps apart
+            pickedFrom = solo.introClock
             key(solo, Qt.Key_2)
             pickedAt = solo.introClock
             check(solo.player.special === "stun" && !solo.specialChoosing,
@@ -257,8 +261,11 @@ Window {
             check(solo.introStartsAt >= 0 && solo.introHeld, "the count starts on the pick")
         }],
         [() => !solo.introHeld, () => {
-            check(beatsOf(solo).join(",") === "3,2,1" && solo.introStartsAt === pickedAt,
-                  "it counts 3, 2, 1 from the pick (" + beatsOf(solo).join(",") + ") and lets go")
+            let at = solo.introStartsAt
+            check(beatsOf(solo).join(",") === "3,2,1" && at >= pickedFrom && at <= pickedAt
+                  && pickedAt - pickedFrom <= Balance.intro.maxStep * 1000,
+                  "it counts 3, 2, 1 from the pick (" + beatsOf(solo).join(",") + ", from " + at
+                  + " ms on the intro's clock, the click from " + pickedFrom + " to " + pickedAt + ") and lets go")
             let p = solo.player
             check(text(solo, "specialHud") === "Stun " + blade("stun", 1) && p.specialMana === blade("stun", 1),
                   "the HUD shows the stun and its mana with the blade (" + text(solo, "specialHud") + ")")
@@ -316,8 +323,16 @@ Window {
             check(solo.player.special === "bolt" && !solo.specialChoosing, "a click takes the bolt")
         }],
         [() => !solo.introHeld, () => {
-            check(solo.player.special === "bolt" && text(solo, "specialHud").indexOf("Bolt") === 0,
-                  "the bolt holds in its dungeon (" + text(solo, "specialHud") + ")")
+            let p = solo.player
+            check(p.special === "bolt" && text(solo, "specialHud") === "Bolt " + blade("bolt", 1),
+                  "the bolt holds in its dungeon, the HUD with its mana with the blade ("
+                  + text(solo, "specialHud") + ")")
+            ready(p)
+            let bolts = solo.fightRecord.bolts
+            key(solo, Qt.Key_Q)
+            check(!p.isWhirling && Math.abs(p.maxMana - p.mana - blade("bolt", 1)) < 1e-6
+                  && solo.fightRecord.bolts === bolts + 1,
+                  "Q lets a bolt loose for the blade's " + (p.maxMana - p.mana) + " mana")
             nextDungeon(solo)
         }],
         [() => solo.levelType === "village" && solo.player, () => {

@@ -355,6 +355,27 @@ ClayWorld2d {
         stunSound.play(gain === undefined ? 1 : gain)
         logSound("sfx/stun_bash", "stun", 0, _gainDist(gain), gain)
     }
+    // The bolt (Balance.bolt, issue #319): its shot as it leaves the
+    // knight, and its hit where it meets an enemy or, quieter, a wall
+    SfxPlayer {
+        id: boltShotSound
+        source: "../sound/sfx/bolt_shot.sfx.json"
+        volume: muted ? 0 : Balance.bolt.shotVolume * soundVolume
+    }
+    SfxPlayer {
+        id: boltHitSound
+        source: "../sound/sfx/bolt_hit.sfx.json"
+        volume: muted ? 0 : Balance.bolt.hitVolume * soundVolume
+    }
+    function playBoltShot(gain) {
+        boltShotSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/bolt_shot", "boltShot", 0, _gainDist(gain), gain)
+    }
+    // At (xWu, yWu), gain as the hit's own
+    function playBoltHit(gain, xWu, yWu) {
+        boltHitSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/bolt_hit", "boltHit", 0, _distTo(xWu, yWu), gain)
+    }
     // The charge is full: a high tick
     SfxPlayer {
         id: chargeTickSound
@@ -1048,7 +1069,8 @@ ClayWorld2d {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
             if (blow.kind === "damage")
-                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "")
+                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "",
+                                 blow.spare === true)
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
@@ -1087,6 +1109,10 @@ ClayWorld2d {
         onPouchDespawned: (objectId) => pouchClaims.remove(objectId)
         onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
+        onBoltReceived: (fromId, bolt) => {
+            if (screen === "game") _flyBolt(bolt.id, bolt.x, bolt.y, bolt.dx, bolt.dy, 0, false)
+        }
+        onBoltEndReceived: (fromId, bolt) => _boltEndReported(bolt)
         onShotReceived: (shot) => {
             if (screen !== "game" || _shotsBack[shot.id]) return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
@@ -3348,6 +3374,9 @@ ClayWorld2d {
         property int stuns: 0
         property int stunFrozen: 0
         property int stunInterrupted: 0
+        // Bolts (Balance.bolt) let loose, and the ones that hit an enemy
+        property int bolts: 0
+        property int boltHits: 0
         // Shots this knight's perfect block sent back, and the ones of them
         // that hit an enemy (Balance.projectile)
         property int shotsBack: 0
@@ -3370,6 +3399,7 @@ ClayWorld2d {
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
         r.stuns = 0; r.stunFrozen = 0; r.stunInterrupted = 0
+        r.bolts = 0; r.boltHits = 0
         r.shotsBack = 0; r.shotBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
@@ -3381,7 +3411,7 @@ ClayWorld2d {
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
     // enemy it hit), stun (a stun went off), stunFrozen and
     // stunInterrupted (with the enemies it froze and the wind-ups it
-    // ended), shotBack (a perfect block sent a shot back),
+    // ended), bolt (a bolt let loose), boltHit (one hit an enemy), shotBack (a perfect block sent a shot back),
     // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
@@ -3433,6 +3463,8 @@ ClayWorld2d {
         case "stun": r.stuns++; break
         case "stunFrozen": r.stunFrozen += amount; break
         case "stunInterrupted": r.stunInterrupted += amount; break
+        case "bolt": r.bolts++; break
+        case "boltHit": r.boltHits++; break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
         case "fall": r.deaths++; break
@@ -4142,6 +4174,7 @@ ClayWorld2d {
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
+    Component { id: boltComponent; Bolt {} }
     Component { id: npcComponent; Npc {} }
     Component { id: goldDropComponent; GoldDrop {} }
 
@@ -6628,6 +6661,92 @@ ClayWorld2d {
             proj.gone.connect(() => { if (world._shotById[id] === proj) delete world._shotById[id] })
             console.log("[Game] Projectile", id, "spawned at", px.toFixed(1), py.toFixed(1))
         }
+    }
+
+    // --- The bolt (Balance.bolt, issue #319) ---
+    // A knight's bolt flies on every screen: the firing node flies its own
+    // (own), which deals the first enemy it meets its blow, and sends it to
+    // the others, which fly it under the firing node's id to be seen. It
+    // hurts no knight anywhere. Each screen ends it at the first enemy or
+    // wall it meets there, or past its reach; the firing node tells the
+    // others where and how it ended, and a bolt still flying on another
+    // screen ends there that way then
+    property int _boltCount: 0
+    property var _boltById: ({})
+    // A bolt ended on this screen: its id, how ("enemy", "wall" or
+    // "reach", on another screen as the firing node said when its report
+    // came first), the enemy it met or null, the damage it dealt, where
+    // its centre was, how far it had flown, and whether it was this
+    // screen's knight's
+    signal boltEnded(string boltId, string how, var enemy, int dealt, real x, real y,
+                     real travelled, bool own)
+    // This node's knight lets a bolt loose from (x, y), its centre, along
+    // (dx, dy), dealing damage to the first enemy it meets
+    function fireBolt(x, y, dx, dy, damage) {
+        let id = (session.connected ? session.nodeId : "solo") + "-bolt" + (++_boltCount)
+        playBoltShot()
+        session.sendBolt({id: id, x: x, y: y, dx: dx, dy: dy})
+        return _flyBolt(id, x, y, dx, dy, damage, true)
+    }
+    function _flyBolt(id, x, y, dx, dy, damage, own) {
+        let size = Balance.bolt.size
+        let b = boltComponent.createObject(world.room, {
+            boltId: id, own: own, damage: damage,
+            fromX: x, fromY: y, dirX: dx, dirY: dy,
+            xWu: x - size / 2, yWu: y + size / 2,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world,
+            // Solid fixture: a wall or a closed door stops it
+            categories: catProjectile,
+            collidesWith: catWall,
+            // Sensor fixture: the enemies, never a knight
+            sensorCategories: catProjectile,
+            sensorCollidesWith: catEnemy
+        })
+        if (!b) return null
+        _boltById[id] = b
+        b.ended.connect((how, enemy, dealt) => world._boltEnd(b, how, enemy, dealt))
+        console.log("[Game] Bolt", id, own ? "(own)" : "", "from", x.toFixed(1), y.toFixed(1))
+        return b
+    }
+    // Bolt b ended here: sparks and its hit where it met an enemy or a
+    // wall, past its reach it fades without either; the own one counts its
+    // hit, shows its damage and tells the others where and how it ended
+    function _boltEnd(b, how, enemy, dealt) {
+        let id = b.boltId, x = b.centreX, y = b.centreY
+        if (_boltById[id] === b) delete _boltById[id]
+        let bo = Balance.bolt
+        if (fx && how !== "reach")
+            spawnSparks(x, y, -b.dirX, -b.dirY, bo.sparks, bo.coreColor)
+        if (fx) spawnRing(x, y, bo.color, how === "enemy" ? 1.0 : 0.6)
+        if (how === "enemy" || how === "wall") {
+            let gain = b.own ? 1 : remoteGain(x, y)
+            if (how !== "enemy") gain *= bo.wallGain
+            if (gain > 0) playBoltHit(gain, x, y)
+        }
+        if (b.own) {
+            if (how === "enemy" && enemy) {
+                countFight("boltHit")
+                spawnDamageNumber(enemy.xWu, enemy.yWu, dealt, bo.coreColor)
+                if (fx) _trauma(bo.trauma)
+            }
+            session.endBolt({id: id, x: x, y: y, how: how})
+        }
+        console.log("[Game] Bolt", id, "ended:", how, "after", b.travelled.toFixed(2), "wu")
+        boltEnded(id, how, enemy, dealt, x, y, b.travelled, b.own)
+    }
+    // The firing node's bolt ended at (x, y), at an enemy, a wall or its
+    // reach (how): here too, that way, if it flies still
+    function _boltEndReported(r) {
+        let b = _boltById[r.id]
+        delete _boltById[r.id]
+        try {
+            if (!b || b.destroyed) return
+        } catch (err) { return }
+        b.xWu = r.x - b.widthWu / 2
+        b.yWu = r.y + b.heightWu / 2
+        b.end(r.how === "enemy" || r.how === "wall" ? r.how : "reach", null, 0)
     }
 
     function spawnSpitParticles(wx, wy) {

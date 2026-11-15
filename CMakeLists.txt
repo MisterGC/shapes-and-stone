@@ -109,6 +109,7 @@ clay_app(shapes_and_stone
         src/CampTalk.qml
         src/CampSounds.qml
         src/Projectile.qml
+        src/Bolt.qml
         src/Npc.qml
         src/DialoguePanel.qml
         src/TitleScreen.qml

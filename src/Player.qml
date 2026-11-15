@@ -345,7 +345,7 @@ PhysicsItem {
         }
     }
 
-    // A moment others should see: "attack", "heavy", "whirlwind", "stun",
+    // A moment others should see: "attack", "heavy", "whirlwind", "stun", "bolt",
     // "dash", "parry", "block", "perfectBlock", "hurt", "shieldBreak",
     // "sit" or "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
@@ -1119,11 +1119,13 @@ PhysicsItem {
     // The special's button (Q, R2): the special picked and nothing else.
     // The whirlwind, with full momentum and whirlMana: short of the
     // momentum the pips flash, short of the mana the bar does; either way
-    // nothing else happens. The stun (_stun) for its mana alone. A special
-    // not in the game yet does nothing. Returns whether it went off
+    // nothing else happens. The stun (_stun) and the bolt (_bolt) for
+    // their mana alone. A special not in the game yet does nothing.
+    // Returns whether it went off
     function unleash() {
         if (fallen || held || isDashing || openLeft > 0) return false
         if (special === "stun") return _stun()
+        if (special === "bolt") return _bolt()
         if (special !== "whirlwind") {
             console.log("[Player] The special", special, "is not in the game yet")
             return false
@@ -1175,6 +1177,30 @@ PhysicsItem {
             gameWorld.countFight("stunInterrupted", ended)
         }
         console.log("[Player] Stun! Froze", froze, "and ended", ended, "wind-ups")
+        return true
+    }
+
+    // The bolt (Balance.bolt, issue #319): for specialMana - short of it
+    // the mana bar flashes and nothing else happens - the knight lets a
+    // blast loose from its centre along its aim (facingAngle), a charge it
+    // holds let go of; it hurts the first enemy it meets for bolt.damage
+    // times atk (Game.fireBolt). The record counts it. Returns whether it
+    // went off
+    function _bolt() {
+        if (!_afford(specialMana)) return false
+        _spend(specialMana)
+        _cancelCharge()
+        let rad = facingAngle * Math.PI / 180
+        let dx = Math.cos(rad), dy = Math.sin(rad)
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let damage = Math.round(atk * Balance.bolt.damage)
+        view.parry()
+        acted("bolt")
+        if (gameWorld) {
+            gameWorld.fireBolt(cx, cy, dx, dy, damage)
+            gameWorld.countFight("bolt")
+        }
+        console.log("[Player] Bolt! Facing:", facingAngle.toFixed(0), "degrees, damage", damage)
         return true
     }
 

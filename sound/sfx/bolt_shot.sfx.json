@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "bolt_shot",
+  "variation": { "seed": 319, "pool": 4 },
+  "layers": [
+    { "name": "crack", "role": "transient", "source": "noise", "length": 45, "gain": -11,
+      "envelope": { "attack": 0.5, "decay": 40, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 2500, "resonance": 0.1 } },
+    { "name": "zap", "role": "body", "source": "sawtooth", "freq": 880, "length": 230, "gain": -16,
+      "envelope": { "attack": 2, "decay": 225, "sustain": 0, "release": 0 },
+      "pitch": { "start": 7, "end": -17, "time": 220 },
+      "filter": { "type": "lowpass", "cutoff": 3200, "resonance": 0.3 },
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "core", "role": "body", "source": "sine", "freq": 440, "length": 260, "gain": -10,
+      "envelope": { "attack": 3, "decay": 255, "sustain": 0, "release": 0 },
+      "pitch": { "start": 12, "end": -12, "time": 240 } },
+    { "name": "whoosh", "role": "tail", "source": "noise", "length": 320, "gain": -20, "offset": 20,
+      "envelope": { "attack": 30, "decay": 290, "sustain": 0, "release": 0 },
+      "filter": { "type": "bandpass", "cutoff": 1800, "resonance": 0.2 },
+      "vary": { "filter.cutoff": [-200, 200] } }
+  ]
+}

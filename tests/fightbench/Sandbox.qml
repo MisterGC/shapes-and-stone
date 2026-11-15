@@ -46,7 +46,8 @@ Item {
     // answer is how the knight fights: "mix", "block", "parry", "perfect",
     // "heavy" (as mix, but it charges at guardians), "whirlwind" (as mix,
     // but it whirls through every enemy), "stun" (as mix, but it stuns,
-    // issue #318), or one of the pacing pilots
+    // issue #318), "bolt" (as "masher", but it lets bolts loose for the
+    // knight's own mana, issue #319), or one of the pacing pilots
     // "charge", "masher", "skilled" and "person" (Balance.pacing);
     // danger is the danger the fight room is at: its depth and, after the
     // point, the position in the depth's range (Game.applyScenario);
@@ -71,6 +72,8 @@ Item {
         _crushing = new Set()
         whirlsStarted = 0
         _stunAt = -1000
+        _boltAt = -1000
+        boltEnds = []
         cancelledCharges = 0
         _chargeSeen = ""
         engagedSeconds = 0
@@ -97,21 +100,50 @@ Item {
         game.clearSoundLog()
         game.physicsSeconds = 0
         sword = sw === undefined ? 0 : sw < 0 ? usualSword(Math.floor(danger)) : sw
-        // The bench tries the moves, not the mana they cost: plenty of it
+        // The bench tries the moves, not the mana they cost: plenty of it.
+        // The bolt's pilot pays its bolts from the knight's own mana: what
+        // the mana allows is the question its duel asks (issue #319)
         if (game.player) {
-            game.player.maxMana = 1000
-            game.player.mana = 1000
+            game.player.maxMana = answer === "bolt" ? Balance.knight.mana : 1000
+            game.player.mana = game.player.maxMana
             game.player.swordLevel = sword
-            // The special's button lets the stun loose for "stun", else the
-            // whirlwind
-            game.player.special = answer === "stun" ? "stun" : "whirlwind"
+            // The special's button lets the stun loose for "stun", the bolt
+            // for "bolt", else the whirlwind
+            game.player.special = answer === "stun" || answer === "bolt" ? answer : "whirlwind"
         }
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind") bench.whirlsStarted++
         })
         for (let e of game.enemies.filter(alive)) follow(e)
+        if (!_boltsFollowed) {
+            _boltsFollowed = true
+            game.boltEnded.connect(bench.boltEnded)
+        }
         return game.player !== null
+    }
+
+    // Every bolt that ended (issue #319): when, how ("enemy", "wall",
+    // "reach"), how far it flew, where it ended, how far from the room's
+    // centre along either axis, and for an enemy its type, whether a
+    // lead, the damage it dealt and the damages the table allows it -
+    // bolt.damage times atk less its defense, a chip of that on a lead's
+    // stance, that much in an opening, a guardian's shield's share of it
+    property var boltEnds: []
+    property bool _boltsFollowed: false
+    function boltEnded(id, how, enemy, dealt, x, y, travelled, own) {
+        if (!own) return
+        let b = { t: now(), how: how, travelled: round3(travelled), x: round3(x), y: round3(y),
+                  edge: round3(Math.max(Math.abs(x - game._fightRoomCx), Math.abs(y - game._fightRoomCy))) }
+        if (how === "enemy" && enemy) {
+            let p = game.player
+            let base = Math.max(Balance.minDamage, Math.round(p.atk * Balance.bolt.damage) - enemy.def)
+            let allowed = enemy.lead && enemy.opening ? [Math.floor(base * Balance.lead.openingDamage)]
+                : enemy.lead ? [Math.max(Balance.minDamage, Math.round(base * Balance.lead.chip))] : [base]
+            if (enemy.enemyType === "guardian") allowed.push(Math.floor(allowed[0] * Balance.enemy.blockedShare))
+            Object.assign(b, { type: enemy.enemyType, lead: enemy.lead, dealt: dealt, allowed: allowed })
+        }
+        boltEnds.push(b)
     }
     // An enemy the bench follows from now on: from the start, or one that
     // came later (the Warden's adds)
@@ -209,6 +241,16 @@ Item {
             stunFrozen: r.stunFrozen,
             stunInterrupted: r.stunInterrupted,
             stunFreeze: Balance.stun.freeze,
+            // The bolts (Balance.bolt) let loose and the ones that hit, as
+            // the game's record counts them, each one's end, its reach,
+            // its speed, the sword's reach and the room's half width
+            bolts: r.bolts,
+            boltHits: r.boltHits,
+            boltEnds: boltEnds,
+            boltReach: Balance.bolt.reach,
+            boltSpeed: Balance.bolt.speed,
+            swordReach: Balance.knight.attackRange,
+            roomHalf: 15 * game.cellSize / 2,
             kills: r.kills,
             // Kill chains of two links or more, and the longest's links
             chains: r.chains,
@@ -486,6 +528,68 @@ Item {
                                openingTime: Balance.lead.openingTime})
     }
 
+    // ---- the bolt, shot by hand (issue #319) ----
+    // In the flow room after begin(): the pilot rests, every enemy halted
+    // in a corner, the knight at the room's centre, aiming right. Three
+    // bolts: at an enemy 5 wu off, its damage and the HP it took; nothing
+    // in line, an enemy just past the reach, how far the bolt flew and the
+    // HP the enemy lost; from 5 wu before the room's right wall, where it
+    // ended. Each as its end (boltEnded) with the numbers to hold it to,
+    // as JSON
+    function tryBolt() {
+        Clayground.paused = true
+        _rng = null
+        let p = game.player, cx = game._fightRoomCx, cy = game._fightRoomCy
+        let half = 15 * game.cellSize / 2
+        let foes = game.enemies.filter(alive)
+        for (let e of foes) e.halt()
+        p.special = "bolt"
+        p.maxMana = 1000
+        p.maxHp = 100000
+        p.hp = 100000
+        let put = (o, x, y) => {
+            o.xWu = x - o.widthWu / 2
+            o.yWu = y + o.heightWu / 2
+            if (o.body) o.body.linearVelocity = Qt.point(0, 0)
+        }
+        let aside = () => foes.forEach((e, i) => put(e, cx - half + 2, cy + half - 2 - i * 1.2))
+        let shoot = () => {
+            for (let i = 0; i < 2; i++) Clayground.physicsStep(1)
+            p.mana = p.maxMana
+            p.facingAngle = 0
+            let n0 = boltEnds.length
+            let went = p.unleash()
+            let k = 0
+            while (went && boltEnds.length === n0 && k < 200) {
+                Clayground.physicsStep(1)
+                k++
+            }
+            return Object.assign({ went: went, steps: k }, boltEnds.length > n0 ? boltEnds[boltEnds.length - 1] : {})
+        }
+        let a = foes.find(e => !e.lead && e.enemyType !== "guardian")
+        aside()
+        put(p, cx, cy)
+        put(a, cx + 5, cy)
+        let hp = a.hp
+        let hit = shoot()
+        hit.lost = hp - a.hp
+        hit.want = Math.max(Balance.minDamage, Math.round(p.atk * Balance.bolt.damage) - a.def)
+        hit.gap = 5
+        a.hp = a.maxHp
+        put(a, cx + Balance.bolt.reach + 1.2, cy)
+        hp = a.hp
+        let far = shoot()
+        far.lost = hp - a.hp
+        far.enemyAt = Balance.bolt.reach + 1.2
+        aside()
+        put(p, cx + half - 5, cy)
+        let wall = shoot()
+        wall.toWall = 5
+        return JSON.stringify({ hit: hit, far: far, wall: wall, reach: Balance.bolt.reach,
+                                speed: Balance.bolt.speed, swordReach: Balance.knight.attackRange,
+                                roomHalf: half, atk: p.atk })
+    }
+
     // ---- the scripted knight ----
     // Each attack an enemy winds up gets one plan: "parry" waits for the
     // parry window and swings into it, "block" raises the shield towards
@@ -505,7 +609,12 @@ Item {
     // #318): it stuns (Q, unleash) when a weak or normal enemy not frozen
     // stands within the stun's reach, and when a lead winds up within it
     // stunRest seconds or more after its last stun - the wind-ups between
-    // it meets as "mix" does, so the duel goes on.
+    // it meets as "mix" does, so the duel goes on. "bolt" plays as
+    // "masher" does with the bolt for its special and the knight's own
+    // mana (issue #319): with an enemy out of the sword's reach and within
+    // boltFrom of the bolt's reach it lets a bolt loose at it (Q,
+    // unleash), boltRest seconds or more after its last, whenever the
+    // mana is there - a masher who found a way to hurt from afar.
     //
     // The pacing pilots (Balance.pacing): "charge" never raises the shield;
     // it holds a full charge, walks at the nearest enemy and lets go once
@@ -578,6 +687,21 @@ Item {
         return true
     }
 
+    // The last bolt, on the bench's clock, the rest before the next and
+    // the share of the bolt's reach the pilot shoots from
+    property real _boltAt: -1000
+    readonly property real boltRest: 0.3
+    readonly property real boltFrom: 0.9
+    function boltNow(p, near) {
+        if (p.isDashing || p.special !== "bolt" || now() - _boltAt < boltRest) return false
+        if (near.d <= p.attackRange || near.d > Balance.bolt.reach * boltFrom) return false
+        if (p.mana < p.specialMana) return false
+        face(p, near.e)
+        if (!p.unleash()) return false
+        _boltAt = now()
+        return true
+    }
+
     Connections {
         target: game.physics
         enabled: game.player !== null && bench._rng !== null
@@ -591,7 +715,7 @@ Item {
             bench.countCrushes()
             bench.perceive()
             if (bench.answer === "charge") bench.pilotCharge()
-            else if (bench.answer === "masher") bench.pilotMasher()
+            else if (bench.answer === "masher" || bench.answer === "bolt") bench.pilotMasher()
             else if (bench.answer === "skilled") bench.pilotSkilled(game.physics.timeStep)
             else if (bench.answer === "person") bench.pilotPerson(game.physics.timeStep)
             else bench.pilot(game.physics.timeStep)
@@ -843,6 +967,8 @@ Item {
         face(p, target)
         if (near.d > 1.3) moveTowards(p, target.xWu, target.yWu, 1)
         else stand(p)
+        // "bolt": a bolt at an enemy out of the sword's reach
+        if (answer === "bolt" && boltNow(p, near)) return
         p.attack()
     }
 

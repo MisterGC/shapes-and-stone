@@ -14,7 +14,7 @@ intensity).
 
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
-                    [--answer mix|block|parry|perfect|heavy|whirlwind|stun|charge|masher|skilled|person]
+                    [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person]
                     [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--sword N]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
   run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel boss]
@@ -35,6 +35,10 @@ hits and the ones begun. "stun" fights as "mix" does with the stun for its
 special (issue #318): it stuns when a weak or normal enemy not frozen
 stands in the stun's reach, and when a lead winds up in it 3 s or more
 after its last stun; the report has each enemy's stuns and frozen spans.
+"bolt" plays as "masher" does with the bolt for its special and the
+knight's own mana (issue #319): at an enemy out of the sword's reach and
+within 0.9 of the bolt's reach it lets a bolt loose whenever the mana is
+there; the report has each bolt's end.
 The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
 perfect-blocks - crushing blows and shots, which it sends back - and
@@ -84,7 +88,20 @@ Balance.stun.freeze from the stun that froze it last, within two steps,
 the enemy did not move in it and thawed into the chase, never into a
 blow; in the duel it ended the lead's wind-ups, each time from a wind-up
 into the chase, the lead not opened, its stance as it was, and never
-froze it.
+froze it. It also plays "bolt" in the flow room at its first depth and in
+the spitter duel at each depth, banded by no table but the duel's, and
+shoots three bolts by hand in the flow room (Sandbox.tryBolt); --check
+tests the bolt (issue #319): by hand, one at an enemy 5 wu off, out of
+the sword's reach, deals Balance.bolt.damage times atk less its defense,
+one with nothing in line flies Balance.bolt.reach and ends, an enemy just
+past it unhurt, and one shot at the room's wall 5 wu off stops there; in
+the fights it hit enemies, each hit dealt the damage the table allows - a
+chip of it on a lead's stance, a guardian's shield's share from its front
+-, some from out of the sword's reach, no bolt flew past its reach, every
+bolt that ended at a wall ended at the room's wall and none outside the
+room; and in the spitter duel the masher with the bolt takes at least
+Balance.pacing.duelSlow seconds to kill the lead, or falls, as the masher
+must in a duel.
 --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
@@ -108,8 +125,8 @@ import uuid
 from collections import Counter
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ANSWERS = ("mix", "block", "parry", "perfect", "heavy", "whirlwind", "stun", "charge", "masher",
-           "skilled", "person")
+ANSWERS = ("mix", "block", "parry", "perfect", "heavy", "whirlwind", "stun", "bolt", "charge",
+           "masher", "skilled", "person")
 PILOTS = ("charge", "masher", "skilled", "person")
 # The pilot that plays like a person (issue #315): reported, not banded
 PERSON = "person"
@@ -117,6 +134,10 @@ PERSON = "person"
 # banded, in these rooms at the first depth of a pacing run
 STUN = "stun"
 STUN_ROOMS = ("flow", "duel")
+# The bolt's pilot (issue #319): judged by check_bolt and the duel's band
+# alone, in the flow room at the first depth of a pacing run and in the
+# spitter duel at each
+BOLT = "bolt"
 
 
 class Inspect:
@@ -242,6 +263,50 @@ def read_pacing(loader):
     return pacing
 
 
+def shoot_bolts(loader, seed):
+    """The three bolts shot by hand in the flow room (Sandbox.tryBolt,
+    issue #319), or raises FightError"""
+    tmp, bench, proc, log = start_loader(loader)
+    try:
+        if not bench.wait_phase("ready"):
+            raise FightError("the sandbox did not load", tmp)
+        if bench.eval1(f"begin({seed}, '{BOLT}', 0, 'flow', 0)") is not True:
+            raise FightError("the fight room did not start", tmp)
+        time.sleep(1.0)
+        shots = json.loads(bench.eval1("tryBolt()") or "null")
+    except (TimeoutError, json.JSONDecodeError, TypeError) as e:
+        raise FightError(f"the bolts could not be shot: {e}", tmp)
+    finally:
+        stop_loader(proc, log)
+    if not isinstance(shots, dict):
+        raise FightError(f"the bolts shot nothing: {shots!r}", tmp)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return shots
+
+
+def check_bolt_shots(s, step=1 / 60):
+    """(ok, line) for the bolts shot by hand: the damage of one at an
+    enemy out of the sword's reach, the reach of one with nothing in line,
+    the wall that ends one"""
+    hit, far, wall = s["hit"], s["far"], s["wall"]
+    one = s["speed"] * step
+    return [
+        (hit.get("how") == "enemy" and hit.get("dealt") == hit["want"] == hit["lost"]
+         and hit["gap"] > s["swordReach"],
+         f"bolt by hand: at an enemy {hit['gap']} wu off, out of the sword's {s['swordReach']} wu, it deals "
+         f"bolt.damage times atk {s['atk']} less its defense, {hit['want']} ({hit.get('how')}, dealt "
+         f"{hit.get('dealt')}, the enemy lost {hit['lost']})"),
+        (far.get("how") == "reach" and abs(far.get("travelled", 0) - s["reach"]) <= one + 1e-3
+         and far["lost"] == 0,
+         f"bolt by hand: nothing in line it flies its reach of {s['reach']} wu and ends ({far.get('how')} after "
+         f"{far.get('travelled')} wu), the enemy {far['enemyAt']} wu off unhurt (lost {far['lost']})"),
+        (wall.get("how") == "wall" and wall["toWall"] - 1 <= wall.get("travelled", -1) <= wall["toWall"]
+         and abs(wall.get("edge", 0) - s["roomHalf"]) <= 0.6,
+         f"bolt by hand: shot at the room's wall {wall['toWall']} wu off it stops there ({wall.get('how')} after "
+         f"{wall.get('travelled')} wu, {wall.get('edge')} wu from the centre, the wall at {s['roomHalf']})"),
+    ]
+
+
 def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
     """Plays one fight in a loader of its own; returns its report, or raises
     FightError with the directory the logs are kept in"""
@@ -305,6 +370,10 @@ def describe(r):
     if r["answer"] == STUN:
         stun = (f", stuns {r.get('stuns', 0)}, froze {r.get('stunFrozen', 0)}, "
                 f"ended {r.get('stunInterrupted', 0)} wind-ups")
+    if r["answer"] == BOLT:
+        how = Counter(b["how"] for b in r.get("boltEnds", []))
+        stun = (f", bolts {r.get('bolts', 0)}, hits {r.get('boltHits', 0)} ("
+                + ", ".join(f"{k} {n}" for k, n in sorted(how.items())) + ")")
     lines = [f"{r['room']} depth {r['depth']} sword {r['sword']} {r['answer']}: "
              f"{r['outcome']} after {r['seconds']:.2f} s, damage taken {r['damageTaken']}, "
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
@@ -463,6 +532,68 @@ def check_stun(results, step=1 / 60):
                            or "none") + ")"))
             froze = sum(len(e.get("frozenSpans", [])) for e in leads)
             out.append((froze == 0, f"{tag}: the lead never freezes ({froze} frozen spans)"))
+    return out
+
+
+def check_bolt(results, step=1 / 60):
+    """(ok, line) for the bolt's fights (issue #319): in the flow fight it
+    hit enemies; in every bolt fight each hit dealt a damage the table
+    allows, some hit from out of the sword's reach, no bolt flew past its
+    reach and one that ended there flew all of it, every bolt that ended
+    at a wall ended at the room's wall and none outside the room; in the
+    spitter duel the masher with the bolt takes at least duelSlow seconds
+    to kill the lead, or falls, and the masher's own time beside it"""
+    out = []
+    rs = [r for r in results if r["answer"] == BOLT]
+    for r in rs:
+        tag = f"bolt {r['room']} depth {r['depth']}"
+        ends = r.get("boltEnds", [])
+        hits = [b for b in ends if b["how"] == "enemy"]
+        reach, speed, half = r["boltReach"], r["boltSpeed"], r["roomHalf"]
+        if r["room"] == "flow":
+            out.append((r.get("bolts", 0) > 0 and len(hits) > 0 and r.get("boltHits", 0) == len(hits),
+                        f"{tag}: the knight lets bolts loose and hits enemies ({r.get('bolts', 0)} bolts, "
+                        f"{len(hits)} hits, the record {r.get('boltHits', 0)})"))
+        off = [b for b in hits if b["dealt"] not in b["allowed"]]
+        dealt = Counter(f"{b['type']}{' lead' if b['lead'] else ''} {b['dealt']}" for b in hits)
+        out.append((bool(hits) and not off,
+                    f"{tag}: each hit deals the damage the table allows ("
+                    + ", ".join(f"{k} x{n}" for k, n in sorted(dealt.items()))
+                    + (f"; off: {[(b['dealt'], b['allowed']) for b in off]}" if off else "") + ")"))
+        far = [b for b in hits if b["travelled"] > r["swordReach"]]
+        out.append((bool(far), f"{tag}: it hurts from out of the sword's reach ({len(far)} of {len(hits)} hits "
+                               f"flew more than {r['swordReach']} wu, the farthest "
+                               f"{max((b['travelled'] for b in hits), default=0):.2f} wu)"))
+        longest = max((b["travelled"] for b in ends), default=0)
+        at_reach = [b for b in ends if b["how"] == "reach"]
+        short = [b for b in at_reach if b["travelled"] < reach - 1e-3]
+        out.append((longest <= reach + speed * step + 1e-3 and not short,
+                    f"{tag}: no bolt flies past its reach of {reach} wu (the longest {longest:.2f} wu; "
+                    f"{len(at_reach)} ended at it)"))
+        wall = [b for b in ends if b["how"] == "wall"]
+        astray = [b for b in wall if not half - 0.6 <= b["edge"] <= half + 0.1]
+        outside = [b for b in ends if b["edge"] > half + 0.1]
+        out.append((not astray and not outside,
+                    f"{tag}: a bolt that ends at a wall ends at the room's wall, none outside the room "
+                    f"({len(wall)} at a wall, {half - 0.6:.1f}-{half + 0.1:.1f} wu from the centre"
+                    + (f"; astray {[b['edge'] for b in astray]}" if astray else "")
+                    + (f"; outside {[b['edge'] for b in outside]}" if outside else "") + ")"))
+        if r["room"] == "spitterduel":
+            bands = r["pacing"]
+            leads = [e for e in r["enemies"] if e["tier"] == 2] or r["enemies"]
+            t = leads[0]["ttkEngaged"]
+            masher = next((m for m in results if m["answer"] == "masher" and m["room"] == "spitterduel"
+                           and m["depth"] == r["depth"]), None)
+            mt = None
+            if masher:
+                ml = [e for e in masher["enemies"] if e["tier"] == 2] or masher["enemies"]
+                mt = "fell" if masher["outcome"] == "fallen" else "alive" if ml[0]["ttkEngaged"] is None \
+                    else f"{ml[0]['ttkEngaged']:.2f} s"
+            ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
+            what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
+            out.append((ok, f"{tag}: the masher with the bolt takes at least {bands['duelSlow']} s to kill "
+                            f"the spitter lead, or falls ({what}, {len(hits)} bolt hits; the masher without "
+                            f"it {mt or 'not played'})"))
     return out
 
 
@@ -739,13 +870,27 @@ def pacing(args, loader):
         for depth in (boss_depths if room == "boss" else depths):
             for answer in answers:
                 fights.append((room, depth, answer))
-    # The stun's fights (issue #318), at the first depth
+    # The stun's fights (issue #318), at the first depth; the bolt's (issue
+    # #319) in the flow room at the first depth and the spitter duel at each
     if not args.answers:
         fights += [(room, depths[0], STUN) for room in STUN_ROOMS if room in rooms]
+        if "flow" in rooms:
+            fights.append(("flow", depths[0], BOLT))
+        if "spitterduel" in rooms:
+            fights += [("spitterduel", d, BOLT) for d in depths]
     results, errors = {}, []
+    shots = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(play_fight, loader, args.seed, a, d, room, -1, args.max_seconds,
                                args.batch): (room, d, a) for room, d, a in fights}
+        # The bolts shot by hand (issue #319)
+        shooting = pool.submit(shoot_bolts, loader, args.seed) \
+            if not args.answers and "flow" in rooms else None
+        if shooting:
+            try:
+                shots = shooting.result()
+            except FightError as e:
+                errors.append(f"FAIL the bolts by hand: {e}; logs in {e.logs}")
         for fut in concurrent.futures.as_completed(futures):
             key = futures[fut]
             try:
@@ -766,8 +911,9 @@ def pacing(args, loader):
             f.write("\n")
     failed = 0
     # The person's fights are reported, never banded (issue #315), nor are
-    # the stun's (check_stun, issue #318)
-    banded = [r for r in ordered if r["answer"] not in (PERSON, STUN)]
+    # the stun's (check_stun, issue #318) and the bolt's (check_bolt, issue
+    # #319)
+    banded = [r for r in ordered if r["answer"] not in (PERSON, STUN, BOLT)]
     person = person_lines(ordered)
     if person:
         p = ordered[0]["pacing"].get("person", {})
@@ -782,7 +928,9 @@ def pacing(args, loader):
     if args.check and person:
         lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
     if args.check:
-        lines += check_stun(ordered)
+        lines += check_stun(ordered) + check_bolt(ordered)
+        if shots:
+            lines += check_bolt_shots(shots)
     if lines:
         print()
         for ok, line in lines:
