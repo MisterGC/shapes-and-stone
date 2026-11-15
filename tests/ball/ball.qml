@@ -343,6 +343,24 @@ Window {
               "it hurts the slinger it meets for backDamage times the swing " + p.atk + " less its defense, " + want
               + ", the blow whole (lost " + (ehp - e.hp) + "), and opens it (" + (causes.join() || "not opened") + "; "
               + (f ? f.how : "it never fell") + ", the slinger at (" + e.centreXWu.toFixed(2) + ", " + e.centreYWu.toFixed(2) + "))")
+        // 6. Fallen here, then turned by another screen's report (it came
+        // late, as over a network): it gets up and flies on that way, not
+        // faded and not gone after its rest
+        b = g.spawnBall(cx - 4, cy - 4, 0, -1, e.atk)
+        id = b.ballId
+        steps(2)
+        b.fallAt(b.centreX, b.centreY, "report")
+        steps(10)
+        g._ballReported({source: "ball", id: id, result: "blocked", x: cx - 4, y: cy - 4, dx: 0, dy: 1})
+        steps(Math.ceil(Balance.ball.restTime / stepS) + 6)
+        let look2 = alive(b) ? find(b, "ballLook") : null
+        check(alive(b) && ballOf(g, id) === b && !b.fallen && b.back && b.dirY > 0.999 && b.centreY > cy - 4 + 1
+              && !!look2 && look2.opacity === 1,
+              "a ball that fell here and is then reported turned by another screen gets up: "
+              + Balance.ball.restTime + " s later it is " + (alive(b) ? (b.fallen ? "fallen" : "flying")
+              + " the reported way (" + b.dirX.toFixed(2) + ", " + b.dirY.toFixed(2) + "), at opacity "
+              + (look2 ? look2.opacity : "-") : "gone"))
+        if (alive(b)) b.vanish()
         let r2 = g.fightRecord
         check(r2.ballsBack === rec.back + 2 && r2.ballsAimed === rec.aimed + 1 && r2.ballBackHits === rec.hits + 1,
               "the fight record counts the two bounces, the aimed one and its hit (" + (r2.ballsBack - rec.back) + ", "
