@@ -376,6 +376,17 @@ ClayWorld2d {
         boltHitSound.play(gain === undefined ? 1 : gain)
         logSound("sfx/bolt_hit", "boltHit", 0, _distTo(xWu, yWu), gain)
     }
+    // A special's stronger version (Balance.combo, issue #320): a swell
+    // over the special's own sound
+    SfxPlayer {
+        id: surgeSound
+        source: "../sound/sfx/special_surge.sfx.json"
+        volume: muted ? 0 : Balance.combo.volume * soundVolume
+    }
+    function playSurge(gain) {
+        surgeSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/special_surge", "surge", 0, _gainDist(gain), gain)
+    }
     // The charge is full: a high tick
     SfxPlayer {
         id: chargeTickSound
