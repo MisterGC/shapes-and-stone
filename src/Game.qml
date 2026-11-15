@@ -3474,6 +3474,11 @@ ClayWorld2d {
     }
     // A hit taken or a new fight record: the next kill starts a chain
     function breakChain() { chainLinks = 0 }
+    // A chain whose window ran out with no kill is over, on the physics
+    // clock as its links are: a kill after it starts a new one
+    function _stepChain() {
+        if (chainLinks > 0 && physicsSeconds - _chainAt > Balance.chain.window) breakChain()
+    }
     // The hit stop of a chain's link-th kill, in seconds
     function chainFreeze(link) {
         let c = Balance.chain
@@ -3531,6 +3536,7 @@ ClayWorld2d {
             else if (world.followFightOnSteps && world.fightIntensity > 0)
                 world._stopFollowingFight()
             world._traceMusic()
+            world._stepChain()
             world._pickUpGold()
             world._pickUpPouches()
             world._stepRevive()
