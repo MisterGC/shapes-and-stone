@@ -1340,7 +1340,9 @@ QtObject {
     // reaches every screen before it begins, and ends at the same moment
     // on every screen; a knight not arrived after waitMax seconds holds
     // the others no longer, and one that waits waitNote seconds is told
-    // so. The name is an adjective of the dungeon's danger band (as
+    // so. Alone the count's clock moves at most maxStep seconds a frame,
+    // so a stall of the frames holds the count rather than skip a beat.
+    // The name is an adjective of the dungeon's danger band (as
     // danger.looks) and a place, both drawn from its level's seed ^ salt,
     // so every screen of a session shows the same
     readonly property var intro: ({
@@ -1354,6 +1356,7 @@ QtObject {
         lag: 0.15,
         waitMax: 6,
         waitNote: 0.6,
+        maxStep: 0.1,
         salt: 0x64657363,
         adjectives: [
             ["Dripping", "Mossy", "Quiet", "Shallow", "Damp", "Lamplit"],

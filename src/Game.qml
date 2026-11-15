@@ -3871,7 +3871,7 @@ ClayWorld2d {
         }
         let now = Date.now()
         // A stall of the frames holds the count rather than skip a beat
-        if (!gamePaused) introClock += Math.max(0, Math.min(100, now - introTick.last))
+        if (!gamePaused) introClock += Math.max(0, Math.min(Balance.intro.maxStep * 1000, now - introTick.last))
         introTick.last = now
     }
     Timer {
