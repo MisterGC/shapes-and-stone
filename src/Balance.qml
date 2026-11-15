@@ -388,7 +388,7 @@ QtObject {
     // While the chain holds - its window not run out, no hit taken - each
     // pip it added makes the knight's blows (every swing, the whirlwind's
     // hits) deal bonusShare more of their damage, at most bonusCap more
-    // (issue #321)
+    // (issue #321); the HUD shows it in bonusColor beside the special
     readonly property var chain: ({
         window: 2.5,
         pitches: [0, 1, 3, 5, 7, 8, 10, 12],
@@ -399,7 +399,8 @@ QtObject {
         trauma: 0.45,
         pipEvery: 3,
         bonusShare: 0.15,
-        bonusCap: 0.45
+        bonusCap: 0.45,
+        bonusColor: "#FF9A4A"
     })
 
     // The sword-and-shield combo: the right button within window seconds of

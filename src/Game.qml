@@ -2700,6 +2700,19 @@ ClayWorld2d {
             font.pixelSize: 12
             font.bold: true
         }
+        // The kill chain's bonus to the knight's blows while it holds
+        // (Balance.chain.bonusShare, issue #321): "CHAIN +15%"
+        Text {
+            objectName: "chainBonusHud"
+            anchors.verticalCenter: parent.verticalCenter
+            visible: world.chainBonus > 0
+            text: "CHAIN +" + Math.round(world.chainBonus * 100) + "%"
+            color: Balance.chain.bonusColor
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 12
+            font.bold: true
+        }
     }
     property real _momentumT: 0
     NumberAnimation on _momentumT {
