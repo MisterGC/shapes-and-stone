@@ -583,6 +583,39 @@ ClayWorld2d {
         logSound("sfx/spitter", "shot", 0, _distTo(xWu, yWu), 1)
     }
 
+    // A slinger's metal ball (Balance.ball, issue #322): its shot as it
+    // leaves, a clank for every wall it bounces off, and the same clank
+    // lower where it falls; each fading with the distance from this knight
+    SfxPlayer {
+        id: ballShotSound
+        source: "../sound/sfx/ball_shot.sfx.json"
+        volume: muted ? 0 : Balance.ball.shotVolume * soundVolume
+    }
+    SfxPlayer {
+        id: ballBounceSound
+        source: "../sound/sfx/ball_bounce.sfx.json"
+        volume: muted ? 0 : Balance.ball.bounceVolume * soundVolume
+    }
+    function _gainAt(xWu, yWu) {
+        if (!player || xWu === undefined) return 1
+        return Math.max(0, 1 - _distTo(xWu, yWu) / remoteHearingWu)
+    }
+    function playBallShot(xWu, yWu) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        ballShotSound.play(gain)
+        logSound("sfx/ball_shot", "ballShot", 0, _distTo(xWu, yWu), gain)
+    }
+    // what: "bounce" off a wall, "fall" where it falls (Balance.ball.fallPitch)
+    function playBallBounce(xWu, yWu, what) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        let pitch = what === "fall" ? Balance.ball.fallPitch : 0
+        gain *= what === "fall" ? 0.7 : 1
+        ballBounceSound.play(gain, pitch)
+        logSound("sfx/ball_bounce", what || "bounce", pitch, _distTo(xWu, yWu), gain)
+    }
+
     // A tough enemy winds up a crushing blow: a low growl, the spitter's
     // sample pitched down, fading with the distance from this knight
     Sound {
@@ -1170,6 +1203,7 @@ ClayWorld2d {
         onBallReceived: (b) => {
             if (screen !== "game" || _ballsDone[b.id] || _ballById[b.id]) return
             _flyBall(b.id, b.x, b.y, b.dx, b.dy, b.damage)
+            playBallShot(b.x, b.y)
         }
         onStruckReported: (fromId, report) => {
             if (report.source === "shot") _shotReported(report)
@@ -6838,6 +6872,7 @@ ClayWorld2d {
         let id = "ball" + (++_ballCount)
         if (session.connected && session.isHost)
             session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage})
+        playBallShot(x, y)
         return _flyBall(id, x, y, dx, dy, damage)
     }
     // This node's knight met ball id: "hit" where it fell at (x, y), or
@@ -6884,8 +6919,14 @@ ClayWorld2d {
         })
         if (!b) return null
         _ballById[id] = b
-        b.bounced.connect((n, bx, by) => world.ballBounced(id, n, bx, by))
-        b.fell.connect(how => world.ballFell(id, how, b.bounces, b.turnedBy, b.centreX, b.centreY))
+        b.bounced.connect((n, bx, by) => {
+            playBallBounce(bx, by, "bounce")
+            world.ballBounced(id, n, bx, by)
+        })
+        b.fell.connect(how => {
+            playBallBounce(b.centreX, b.centreY, "fall")
+            world.ballFell(id, how, b.bounces, b.turnedBy, b.centreX, b.centreY)
+        })
         b.gone.connect(() => { if (world._ballById[id] === b) delete world._ballById[id] })
         console.log("[Game] Ball", id, "from", x.toFixed(1), y.toFixed(1))
         return b

@@ -139,6 +139,16 @@ Window {
             game.playBoltHit()
             check(shot && hit && shot.lastSeed !== shotSeed && hit.lastSeed !== hitSeed,
                   "the game's own calls play the bolt's shot and hit from their recipes")
+            // The slinger's metal ball: its shot, a bounce and its fall,
+            // the bounce's cue lower (issue #322)
+            let bs = p["sfx/ball_shot.sfx.json"], bb = p["sfx/ball_bounce.sfx.json"]
+            let bsSeed = bs ? bs.lastSeed : null, bbSeed = bb ? bb.lastSeed : null
+            game.playBallShot()
+            game.playBallBounce(undefined, undefined, "bounce")
+            let bbBounce = bb ? bb.lastSeed : null
+            game.playBallBounce(undefined, undefined, "fall")
+            check(bs && bb && bs.lastSeed !== bsSeed && bbBounce !== bbSeed && bb.lastSeed !== bbBounce,
+                  "the game's own calls play the ball's shot, its bounce and its fall from their recipes")
             // A special's stronger version's swell (issue #320)
             let surge = p["sfx/special_surge.sfx.json"], surgeSeed = surge ? surge.lastSeed : null
             game.playSurge()

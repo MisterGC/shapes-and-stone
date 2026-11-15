@@ -1345,6 +1345,36 @@
       },
       "delivered": "2026-11-15T10:54:10.652933+00:00",
       "verdict": null
+    },
+    "sfx/ball_shot": {
+      "category": "sfx",
+      "brief": "the slinger slings a metal ball: a mechanical chunk and a low whump falling in pitch, a short iron ting and a whoosh behind it; once per ball, fading with the distance",
+      "mode": "live",
+      "source": "sfx/ball_shot.sfx.json",
+      "render": "sfx/ball_shot.wav",
+      "report": "sfx/ball_shot.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-15T12:40:10.441974+00:00",
+      "verdict": null
+    },
+    "sfx/ball_bounce": {
+      "category": "sfx",
+      "brief": "a metal ball bounces off a stone wall: a dry clack and a short knock with a bright inharmonic ring and grit; once per bounce, fading with the distance, and 5 semitones lower and quieter where the ball falls",
+      "mode": "live",
+      "source": "sfx/ball_bounce.sfx.json",
+      "render": "sfx/ball_bounce.wav",
+      "report": "sfx/ball_bounce.report.json",
+      "provenance": {
+        "engine": "clay_sound",
+        "version": "2026.12 (clayground 61597b0)",
+        "license": "MIT"
+      },
+      "delivered": "2026-11-15T12:40:10.541647+00:00",
+      "verdict": null
     }
   }
 }
