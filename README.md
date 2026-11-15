@@ -1937,14 +1937,12 @@ and the camp after it, and the next choice opens on it. In co-op every
 knight picks its own; a knight that has arrived and still chooses holds the
 count however long it takes, and a knight that has picked shows "Waiting
 for the party" meanwhile. Only the specials in the game are offered, and with one there is
-no choice: today they are the whirlwind and the stun, and the bolt (#319)
-joins them once it is in. Without an intro (the fight
+no choice: today all three are in. Without an intro (the fight
 room, the dojo's scenarios, a bench that turns it off) the knight keeps the
 special it has, the whirlwind at the start. The Control Input page calls
 the special's button *Special*; it keeps the action id `whirlwind`, under
-which a rebound key is kept. The specials bench offers the specials not in
-the game yet too (`Game.specialsAll`), picks with the keys, the synthetic
-pad and a click, checks what the choice, the HUD, the hint, Q, R2 and the
+which a rebound key is kept. The specials bench picks with the keys, the
+synthetic pad and a click, checks what the choice, the HUD, the hint, Q, R2 and the
 smith's blade do with each, then has a host and a joiner each pick their
 own, and exits with the number of failed checks:
 
@@ -1973,6 +1971,34 @@ the frozen state shows on every screen; the other screens see the knight's
 shield flash and hear the bash, fading with the distance. The fight
 record counts the stuns, the enemies they froze and the wind-ups they
 ended.
+
+The bolt (`Balance.bolt`, issue #319) is the knight's one way to hurt
+something out of the sword's reach: for its mana (`bolt.mana`, 15, the
+balanced blade's share of it) the knight lets a blast loose from its
+centre along its aim, the way it faces. It flies `bolt.speed` wu a second,
+`bolt.size` wu across, at most `bolt.reach` wu, and hurts the first enemy it
+meets for `bolt.damage` times the knight's atk, less the enemy's defense.
+It is a blow as any other: a guardian's shield takes it from the front,
+and a room's lead or the Warden takes a chip of it on its stance that wears
+the stance - but never below one wear, so a bolt never breaks a stance and
+never opens a lead; the sword's next blow does. A wall or a closed door
+ends it, past its reach it fades out, and it passes the breakables as the
+spitter's shots do. It hurts no knight. It is drawn violet round a white
+core with a light of its own; where it ends sparks fly, and it plays its
+cues, `sfx/bolt_shot` as it leaves - a dry crack and a bright zap falling
+away - and `sfx/bolt_hit` where it hits, a snap and a low thud with a
+falling glint, quieter at a wall. In co-op the knight's own screen flies
+the bolt that deals the blow - to an enemy the host runs as an enemy blow -
+and every other screen flies it too, to be seen, ending it where the
+knight's screen says it ended. The fight record counts the bolts and the
+ones that hit. The bolt bench shoots it alone at enemies in a row, up, into
+nothing and at a wall, at a guardian's shield, at a lead and the Warden,
+then has a joiner and a host each shoot through the other's knight, and
+exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/bolt/bolt.qml
+```
 
 A grunt does not run straight in: from `enemy.circleRange` on it circles
 the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
@@ -2283,7 +2309,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -2304,7 +2330,11 @@ stun for its special and stuns whenever a weak or normal enemy not frozen
 stands in its reach, and when a lead winds up in it 3 s or more after its
 last stun (the report counts them as `stuns`, `stunFrozen` and
 `stunInterrupted`, and gives each enemy its stuns and the spans it stood
-frozen). A crushing blow is met by the same plan, so a parry finds
+frozen), `bolt` plays as `masher` does with the bolt for its special and
+the knight's own mana, letting a bolt loose at the nearest enemy whenever
+it is out of the sword's reach and within 0.9 of the bolt's and the mana
+is there (the report counts them as `bolts` and `boltHits` and gives each
+bolt's end in `boltEnds`). A crushing blow is met by the same plan, so a parry finds
 no window; the report counts the crushing wind-ups as `crushBlows`.
 `--danger` puts the fight room at a
 danger, a depth plus a position in its range (`2.5`), and `--depth d` at
@@ -2373,6 +2403,21 @@ never into a blow, and a stun does nothing to a weak or normal enemy but
 freeze it. In the duel the stun ends the lead's wind-ups, each time from a
 wind-up into the chase, the lead is not opened by it, its stance stays as
 it was, no opening comes on a stun's step, and the lead never freezes.
+
+It also plays `bolt` in the flow room at its first depth and in the
+spitter duel at each depth, and shoots three bolts by hand in the flow
+room (issue #319); `--check` tests the bolt. By hand, a bolt at an enemy
+5 wu off, out of the sword's reach, deals `Balance.bolt.damage` times atk
+less its defense; one with nothing in line flies `Balance.bolt.reach` and
+ends, an enemy just past it unhurt; one shot at the room's wall 5 wu off
+stops there. In the fights each hit deals the damage the table allows - a
+chip of it on a lead's stance, a guardian's shield's share from its front
+-, some from out of the sword's reach, no bolt flies past its reach, and a
+bolt that ends at a wall ends at the room's wall, none outside it. In the
+spitter duel, the one place a knight could stand back and shoot, the
+masher with the bolt takes at least `Balance.pacing.duelSlow` seconds to
+kill the lead, or falls, as the masher must in a duel; the report shows
+the masher's own time beside it.
 
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
