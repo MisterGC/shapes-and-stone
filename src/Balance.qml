@@ -1482,7 +1482,7 @@ QtObject {
         draughtPrice: 20,
         draughtMana: 40,
         // The smith's upgrades last the run and have levels: the sword,
-        // the shield, the harness and the blade. At each camp he sells one
+        // the shield, the harness, the blade and the boots. At each camp he sells one
         // level of one of them, the next above the knight's; the camp
         // after depth d offers level L only once d reaches levelDepth[L - 1].
         // Level L costs upgradePrice[L - 1] and gives the L-th entry of
@@ -1503,7 +1503,12 @@ QtObject {
         // Balanced blade: the chosen special (specials) costs this share
         // of its mana, rounded; a whirlwind, its dash included, 20 -> 15,
         // 12, 9
-        bladeShare: [0.75, 0.6, 0.45]
+        bladeShare: [0.75, 0.6, 0.45],
+        // Swift boots (issue #325): the knight walks this many wu a second
+        // instead of knight.moveSpeed; a charge, a raised shield still slow
+        // it by their share of it (knight.chargeSpeed, knight.blockSpeed).
+        // The dash's speed, length and mana stay
+        bootsSpeed: [8.0, 8.5, 9.0]
     })
 
     // The dungeon master's panel (issue #142): with Dungeon Master ticked

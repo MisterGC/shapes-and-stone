@@ -11,7 +11,7 @@
 // muted.
 //
 // Driven by run_fightbench.py (clayliveloader --sbx Sandbox.qml), which
-// calls begin(seed, answer, danger, room, sword), steps and reads report().
+// calls begin(seed, answer, danger, room, sword, boots), steps and reads report().
 
 import QtQuick
 import Clayground.Common
@@ -39,6 +39,7 @@ Item {
     property real danger: 0
     property string room: "mixed"
     property int sword: 0
+    property int boots: 0
     property int steps: 0
     property var _rng: null
 
@@ -53,8 +54,10 @@ Item {
     // point, the position in the depth's range (Game.applyScenario);
     // room who stands in it: "mixed" (Balance.spawn.fightRoom), "flow",
     // "duel", "guardianduel", "spitterduel", "ballduel" or "boss" (Balance.pacing); sword the knight's sword level, -1 for the
-    // one it usually has at that depth (usualSword), 0 when left out
-    function begin(s, a, d, r, sw) {
+    // one it usually has at that depth (usualSword), 0 when left out;
+    // boots the level of its swift boots (Balance.shop.bootsSpeed, issue
+    // #325), 0 when left out
+    function begin(s, a, d, r, sw, bo) {
         Clayground.paused = true
         seed = s
         answer = a === undefined ? "mix" : a
@@ -101,6 +104,7 @@ Item {
         game.clearSoundLog()
         game.physicsSeconds = 0
         sword = sw === undefined ? 0 : sw < 0 ? usualSword(Math.floor(danger)) : sw
+        boots = bo === undefined ? 0 : bo
         // The bench tries the moves, not the mana they cost: plenty of it.
         // The bolt's pilot pays its bolts from the knight's own mana: what
         // the mana allows is the question its duel asks (issue #319)
@@ -108,6 +112,7 @@ Item {
             game.player.maxMana = answer === "bolt" ? Balance.knight.mana : 1000
             game.player.mana = game.player.maxMana
             game.player.swordLevel = sword
+            game.player.bootsLevel = boots
             // The special's button lets the stun loose for "stun", the bolt
             // for "bolt", else the whirlwind
             game.player.special = answer === "stun" || answer === "bolt" ? answer : "whirlwind"
@@ -242,6 +247,8 @@ Item {
             depth: game.depth,
             danger: round3(game.danger),
             sword: sword,
+            boots: boots,
+            moveSpeed: p ? p.maxSpeed : Balance.knight.moveSpeed,
             outcome: cleared ? "cleared" : fallen ? "fallen" : "running",
             steps: steps,
             seconds: round3(r.seconds),

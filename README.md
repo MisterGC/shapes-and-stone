@@ -90,7 +90,7 @@ gamepad, whichever was used last. By default:
 | Effects on and off | V | - |
 | Menu | Esc | Start |
 
-In a dialogue 1 to 5 buy what is offered; on a pad the stick picks a ware,
+In a dialogue 1 to 6 buy what is offered; on a pad the stick picks a ware,
 the potion's button buys it and the dash's closes the dialogue.
 
 *Control Input*, in the menu under *Sound* and on the title, shows the
@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -735,7 +735,7 @@ claims the drops its own knight reaches, and the host gives each to the
 first claim it gets and despawns it, so a drop is picked up once, by one
 knight; each knight's gold is its own node's. In the village the
 innkeeper sells a health potion and a mana draught, and the smith
-upgrades that last the run, through the dialogue panel: E talks, 1 to 4
+upgrades that last the run, through the dialogue panel: E talks, 1 to 6
 buy what the panel offers, each ware named with its effect. Outside the
 panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
 mana back, up to the knight's max - at today's 40 it refills the bar; a
@@ -757,15 +757,20 @@ a lighter rim; the lighter harness makes a dash cost `shop.harnessDashMana`
 instead of `knight.dashMana`, the whirlwind's dash too; the balanced blade
 makes the special the knight picked cost `shop.bladeShare` of its mana,
 rounded: a whirlwind, its dash included, 15, 12 and 9 instead of
-`knight.whirlMana`'s 20. Each of these is a list with one entry per level.
+`knight.whirlMana`'s 20; the swift boots make the knight walk
+`shop.bootsSpeed` wu a second instead of `knight.moveSpeed` - 8, 8.5 and 9
+instead of 7.5 - while a charge and a raised shield still slow it by
+their share (`knight.chargeSpeed`, `knight.blockSpeed`) and a dash goes
+as far and costs as much as without (issue #325). Each of these is a list
+with one entry per level.
 The perfect block's window is the same at every level. At each camp the
-smith sells one level, the next above the knight's in one of the four,
+smith sells one level, the next above the knight's in one of the five,
 for `shop.upgradePrice` of that level, and then nothing more there; the
 camp after depth d sells level L only once d reaches `shop.levelDepth`
 of L - level I from the first camp, II from the camp after depth 2, III
 from the one after depth 4. The knight reads its levels live, so in the
 dojo's fight scenario `eval player.swordLevel = 2` (or `shieldLevel`,
-`harnessLevel`, `bladeLevel`; 0 for none) applies one at once. Gold,
+`harnessLevel`, `bladeLevel`, `bootsLevel`; 0 for none) applies one at once. Gold,
 potions, draughts and the levels go with the knight to the next level; a
 new run starts without them. In a session they are each knight's own,
 bought with its own gold. Prices and effects are the table's `shop`
@@ -778,6 +783,18 @@ number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gold/gold.qml
+```
+
+The boots bench has the first camp's smith offer the swift boots I next to
+his other four upgrades, buys them with 6 while a gem in the pouch puts
+his offer for it first, and reads them in the knight panel; the camps
+after depth 2 and 4 offer boots II and III. In the fight room, at every
+level from none to III, it measures the knight's speed walking, charging
+and behind the shield, and a dash's length and mana. It exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/boots/boots.qml
 ```
 
 While a dialogue is open the knight stands: movement and the dash do
@@ -1614,7 +1631,7 @@ up to `value[1]` with all of them clean (`Balance.deep.shapes`); the HUD
 shows a gem of each shape the pouch holds and how many, beside the gold.
 The pouch goes with the knight from level to level, and the smith buys
 it: talking to him, his first ware is the gems, 1 sells them all for
-their worth (the keys 1 to 5 pick his wares now). A knight that falls
+their worth (the keys 1 to 6 pick his wares now). A knight that falls
 drops its pouch where it fell: another knight whose centre comes within
 `pouchReach` of it, or who lifts the fallen one up, takes it; one left on
 the floor is lost with the level. In a session each screen judges its
@@ -2530,7 +2547,9 @@ guardian lead alone (issue #288, `Balance.pacing`), `--room spitterduel`
 with a spitter lead alone, the third kind of lead (issue #315), `--room
 ballduel` with a slinger lead alone, the fourth (issue #322), and in each the
 knight has the sword level it usually has at that depth (`--sword` sets
-another). Four more answers are the pacing pilots: `charge` holds a full
+another). `--boots N`, in a single fight and with `--pacing`, gives the
+knight the swift boots of level N (`Balance.shop.bootsSpeed`, issue #325);
+each fight's line then names the level and the walking speed. Four more answers are the pacing pilots: `charge` holds a full
 charge and lets go at the nearest enemy, `masher` clicks, `skilled`
 parries, perfect-blocks - crushing blows and shots, which it sends back -
 and strikes in openings, and `person` plays like a person (below). Both
@@ -2543,7 +2562,7 @@ rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all four
 pilots, four loaders at a time:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--boots N] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,

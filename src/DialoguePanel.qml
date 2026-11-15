@@ -16,7 +16,7 @@ Item {
     property color speakerColor: "#C9A227"
     property var lines: []
     property int _lineIndex: 0
-    // What the speaker sells, picked with keys 1 to 5: [{label, price}];
+    // What the speaker sells, picked with keys 1 to 6: [{label, price}];
     // one with sell is what the speaker buys from the knight, for price
     property var wares: []
     // The knight's gold, to grey out what it cannot pay

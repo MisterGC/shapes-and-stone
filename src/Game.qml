@@ -2311,9 +2311,9 @@ ClayWorld2d {
             event.accepted = true
             return
         }
-        // 1 to 5 buy what the dialogue panel offers (the smith's gems and
-        // four upgrades), whatever they are bound to
-        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5
+        // 1 to 6 buy what the dialogue panel offers (the smith's gems and
+        // five upgrades), whatever they are bound to
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6
                 && dialoguePanel.visible && dialoguePanel.wares.length > 0) {
             let i = event.key - Qt.Key_1
             if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
@@ -4467,8 +4467,8 @@ ClayWorld2d {
     // --- The smith's upgrades (issues #38, #81, #98) ---
     // Each lasts the run and has levels (Balance.shop): one level per
     // camp, the next above the knight's, and higher levels only deeper
-    readonly property var smithLines: ["sword", "shield", "harness", "blade"]
-    // The knight's levels, {sword, shield, harness, blade}; all 0 for none
+    readonly property var smithLines: ["sword", "shield", "harness", "blade", "boots"]
+    // The knight's levels, {sword, shield, harness, blade, boots}; all 0 for none
     function smithLevels(knight) {
         let out = {}
         for (let line of smithLines) out[line] = knight ? knight[line + "Level"] : 0
@@ -4494,7 +4494,7 @@ ClayWorld2d {
     // the knight panel say the same
     function smithName(line, level) {
         let name = line === "sword" ? "Sharpened sword" : line === "shield" ? "Reinforced shield"
-            : line === "harness" ? "Lighter harness" : "Balanced blade"
+            : line === "harness" ? "Lighter harness" : line === "boots" ? "Swift boots" : "Balanced blade"
         return level < 1 ? name : name + " " + (["I", "II", "III", "IV", "V"][level - 1] || String(level))
     }
     // The mana the chosen special costs with the balanced blade of level
@@ -4508,6 +4508,7 @@ ClayWorld2d {
             : line === "shield" ? "a block lets " + Math.round(sh.shieldBlockedShare[i] * 100)
                                   + " % through, costs " + sh.shieldBlockMana[i] + " mana"
             : line === "harness" ? "a dash costs " + sh.harnessDashMana[i] + " mana"
+            : line === "boots" ? "walk " + Math.round((sh.bootsSpeed[i] / Balance.knight.moveSpeed - 1) * 100) + " % faster"
             : "a " + specialName.toLowerCase() + " costs " + _bladeMana(level) + " mana"
     }
 
@@ -4541,7 +4542,8 @@ ClayWorld2d {
                 sword: "There. That edge will bite deeper.",
                 shield: "There. That shield will let less through.",
                 harness: "There. Lighter on your feet now.",
-                blade: "There. It'll spin true in your hand."
+                blade: "There. It'll spin true in your hand.",
+                boots: "There. Those will carry you quicker."
             }[ware.id]
         }
         dialoguePanel.wares = _offered(dialoguePanel.wares)
@@ -7671,7 +7673,7 @@ ClayWorld2d {
             { x: sx - 1, y: sy0 + 3, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
+            "Sword, shield, harness, blade or boots - one piece of work per visit, and it lasts the descent.",
             "The deeper you've been, the finer I can make it. Bring gold from below.",
             "Cut stones from the veins down there? I'll buy every one."
         ], "voice/npc_greetings/blacksmith_greeting", [{ id: "gems" }].concat(smithLines.map(line => ({ id: line }))))

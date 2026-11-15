@@ -15,10 +15,10 @@ intensity).
 Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
                     [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person]
-                    [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--sword N]
+                    [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--sword N] [--boots N]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
   run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss]
-                    [--depths 0 2 4] [--answers charge masher skilled person] [--jobs N]
+                    [--depths 0 2 4] [--answers charge masher skilled person] [--boots N] [--jobs N]
                     [--json out.json]
 
 One fight prints its report as JSON. --answer is how the scripted knight
@@ -50,7 +50,11 @@ alone (issue #288), "spitterduel" a spitter lead alone (issue #315),
 walls and the shields (issue #322), and "boss" the Hollow Warden alone, its
 adds coming in its phase 2 (Balance.pacing, Balance.boss). --sword is the
 knight's sword level: by default 0 in the mixed room and in flow and duel
-the one a knight usually has at that depth. --danger is the danger the
+the one a knight usually has at that depth. --boots is the level of the
+knight's swift boots, the smith's upgrade that makes it walk faster
+(Balance.shop.bootsSpeed, issue #325): 0 by default, in a single fight and
+in every fight of --pacing; a report says it and the knight's walking
+speed. --danger is the danger the
 fight room is at, its depth plus a position in the depth's range (2.5:
 half way through depth 2's): the lineup stays, the enemies hit as hard as
 at that danger. --depth d is --danger d, the bottom of the depth's range.
@@ -453,14 +457,14 @@ def check_combos(c):
     return lines
 
 
-def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch):
+def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch, boots=0):
     """Plays one fight in a loader of its own; returns its report, or raises
     FightError with the directory the logs are kept in"""
     tmp, bench, proc, log = start_loader(loader)
     try:
         if not bench.wait_phase("ready"):
             raise FightError("the sandbox did not load", tmp)
-        if bench.eval1(f"begin({seed}, '{answer}', {danger}, '{room}', {sword})") is not True:
+        if bench.eval1(f"begin({seed}, '{answer}', {danger}, '{room}', {sword}, {boots})") is not True:
             raise FightError("the fight room did not start", tmp)
         # Let what the scene sets up on its first frames settle before step 1
         time.sleep(1.0)
@@ -511,6 +515,11 @@ def fmt_s(v):
     return "-" if v is None else f"{v:.2f} s"
 
 
+def boots_tag(r):
+    """" boots 3 (9.0 wu/s)" for a fight with swift boots, else nothing"""
+    return f" boots {r['boots']} ({r['moveSpeed']} wu/s)" if r.get("boots") else ""
+
+
 def describe(r):
     """The report of one fight as lines of text"""
     stun = ""
@@ -521,7 +530,7 @@ def describe(r):
         how = Counter(b["how"] for b in r.get("boltEnds", []))
         stun = (f", bolts {r.get('bolts', 0)}, hits {r.get('boltHits', 0)} ("
                 + ", ".join(f"{k} {n}" for k, n in sorted(how.items())) + ")")
-    lines = [f"{r['room']} depth {r['depth']} sword {r['sword']} {r['answer']}: "
+    lines = [f"{r['room']} depth {r['depth']} sword {r['sword']}{boots_tag(r)} {r['answer']}: "
              f"{r['outcome']} after {r['seconds']:.2f} s, damage taken {r['damageTaken']}, "
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s, shots sent back {r.get('shotsBack', 0)} "
@@ -595,7 +604,7 @@ def person_lines(results):
     for r in results:
         if r["answer"] != PERSON:
             continue
-        tag = f"{r['room']} depth {r['depth']} sword {r['sword']}"
+        tag = f"{r['room']} depth {r['depth']} sword {r['sword']}{boots_tag(r)}"
         leads = [e for e in r["enemies"] if e.get("lead") or e["type"] == "warden"]
         lead = leads[0] if leads else None
         won = r["outcome"] == "cleared"
@@ -1075,7 +1084,7 @@ def pacing(args, loader):
     slung = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(play_fight, loader, args.seed, a, d, room, -1, args.max_seconds,
-                               args.batch): (room, d, a) for room, d, a in fights}
+                               args.batch, args.boots): (room, d, a) for room, d, a in fights}
         # The bolts shot by hand (issue #319)
         shooting = pool.submit(shoot_bolts, loader, args.seed) \
             if not args.answers and "flow" in rooms else None
@@ -1168,6 +1177,8 @@ def main():
                     help="who stands in the fight room")
     ap.add_argument("--sword", type=int,
                     help="the knight's sword level; default 0 in the mixed room, else the usual one")
+    ap.add_argument("--boots", type=int, default=0,
+                    help="the level of the knight's swift boots (Balance.shop.bootsSpeed); default 0")
     ap.add_argument("--depth", type=int, default=0,
                     help="depth the fight room is at, at the bottom of its range")
     ap.add_argument("--danger", type=float,
@@ -1203,7 +1214,7 @@ def main():
     sword = args.sword if args.sword is not None else (0 if args.room == "mixed" else -1)
     try:
         result = play_fight(loader, args.seed, args.answer, danger, args.room, sword,
-                            args.max_seconds, args.batch)
+                            args.max_seconds, args.batch, args.boots)
     except FightError as e:
         print("FAIL", e, "; logs kept at", e.logs, file=sys.stderr)
         sys.exit(1)

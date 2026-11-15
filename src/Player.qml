@@ -55,7 +55,8 @@ PhysicsItem {
         : Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats, from the balance table
-    readonly property real maxSpeed: Balance.knight.moveSpeed
+    // The walking speed, wu a second: swift boots' is higher
+    readonly property real maxSpeed: _level(Balance.shop.bootsSpeed, bootsLevel, Balance.knight.moveSpeed)
     property int hp: Balance.knight.hp
     property int maxHp: Balance.knight.hp
     property int atk: Balance.knight.atk + _level(Balance.shop.swordAtk, swordLevel, 0)
@@ -77,12 +78,14 @@ PhysicsItem {
     property var creel: []
     // The smith's upgrades of the run, each a level from 0 (none) to the
     // table's last (Balance.shop): the sharpened sword, the reinforced
-    // shield, the lighter harness and the balanced blade. Every effect
+    // shield, the lighter harness, the balanced blade and the swift boots.
+    // Every effect
     // reads them live, so setting one applies it at once
     property int swordLevel: 0
     property int shieldLevel: 0
     property int harnessLevel: 0
     property int bladeLevel: 0
+    property int bootsLevel: 0
     // A level bought from the smith at this camp: he sells one per camp,
     // and the knight of the next level starts without it
     property bool smithDone: false
