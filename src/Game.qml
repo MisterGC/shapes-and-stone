@@ -3734,6 +3734,7 @@ ClayWorld2d {
             world._stepHoles()
             world._stepDeepTravellers()
             world._stepCritters(world.physics.timeStep)
+            world._stepFightRoom(world.physics.timeStep)
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -9908,22 +9909,20 @@ ClayWorld2d {
         gameCamera.target = player
     }
 
-    // Auto-respawn enemies in fight room when all dead
-    Timer {
-        id: fightRoomRespawn
-        interval: Balance.spawn.fightRoomRespawn * 1000
-        repeat: true
-        running: fightRoomActive
-        onTriggered: {
-            if (!player) return
-            let alive = 0
-            for (let e of enemies)
-                if (e && e.destroyed === false) alive++
-            if (alive > 0) return
-            enemies = []
-            _spawnFightRoomEnemies()
-            console.log("[Game] Fight room: respawned enemies")
-        }
+    // The fight room fills again Balance.spawn.fightRoomRespawn seconds
+    // after its last enemy fell, on the physics clock: a pause holds it,
+    // and so does a bench between the steps it runs
+    property real _fightRoomEmptyFor: 0
+    function _stepFightRoom(dt) {
+        if (!fightRoomActive || !player) { _fightRoomEmptyFor = 0; return }
+        for (let e of enemies)
+            if (e && e.destroyed === false) { _fightRoomEmptyFor = 0; return }
+        _fightRoomEmptyFor += dt
+        if (_fightRoomEmptyFor < Balance.spawn.fightRoomRespawn - 1e-6) return
+        _fightRoomEmptyFor = 0
+        enemies = []
+        _spawnFightRoomEnemies()
+        console.log("[Game] Fight room: respawned enemies")
     }
 
     // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo
