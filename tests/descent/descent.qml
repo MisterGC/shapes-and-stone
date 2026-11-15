@@ -9,9 +9,13 @@
 // and Go play the count's cue (sfx/descent_count), Go an octave up. Once
 // it lets go, Go shows and D moves the knight. The camp has no intro; the
 // dungeon after it has its own, "Depth 1", and the solo pause holds its
-// count. It passes the record of depth 0 the bench puts into its store:
-// the record's banner waits while the intro holds and goes up only after
-// it lets go.
+// count, as it holds through a stall of the frames: the clock moves at
+// most Balance.intro.maxStep a frame. It passes the record of depth 0 the
+// bench puts into its store: the record's banner waits while the intro
+// holds and goes up only after it lets go.
+// Every length is timed on the intro's own clock, never the wall clock,
+// which a slow machine stretches: each beat and the release land at their
+// time, late by no more than the largest step that clock took.
 // In a session, a host and a joiner joined over LAN in one process: the
 // count starts once both knights are in the dungeon, both screens show the
 // same name, hold the same count and let go at the same moment of the
@@ -48,9 +52,9 @@ Window {
     readonly property int seed: 316316
     readonly property real beatMs: Balance.intro.beat * 1000
     readonly property real leadMs: Balance.intro.lead * 1000
-    // A tick of the intro's clock and of this script, with room for an
-    // offscreen frame that comes late
-    readonly property real slackMs: 80
+    readonly property real holdMs: (Balance.intro.lead + Balance.intro.beats * Balance.intro.beat) * 1000
+    // How long the bench stalls the frames in the dungeon after the camp
+    readonly property real stallMs: 300
 
     function check(ok, what) {
         console.log("[Descent]", ok ? "PASS" : "FAIL", what)
@@ -124,27 +128,41 @@ Window {
         return null
     }
 
-    // What each game's intro did: when it began holding, each beat and
-    // when it let go, in wall-clock ms and on its session clock, and where
-    // the knight and the enemies stood as it let go
+    // What each game's intro did, timed on its own clock (introClock: alone
+    // the intro's, in a session the session clock), which a stall of the
+    // frames moves by at most Balance.intro.maxStep alone: each beat and
+    // when it let go, the largest step the clock took in the count
+    // (maxStep) and while it waited for the party before it (waitStep), and
+    // where the knight and the enemies stood as it let go. The wall clock
+    // only for the record (heldAt, freedAt): a slow machine stretches it
     property var seen: ({})
     function watch(g) {
         let id = String(g)
-        seen[id] = { beats: [], heldAt: -1, freedAt: -1, freedSession: -1, freedPos: null }
+        seen[id] = { beats: [], freed: false, freedClock: -1, freedPos: null, lastClock: 0, maxStep: 0,
+                     waitStep: 0, heldAt: -1, freedAt: -1 }
+        // A step of the clock ending in the count, or before it began
+        let took = (s, clock) => {
+            let step = clock - s.lastClock
+            if (g.introStartsAt >= 0 && clock > g.introStartsAt) s.maxStep = Math.max(s.maxStep, step)
+            else s.waitStep = Math.max(s.waitStep, step)
+            s.lastClock = clock
+        }
         g.introHeldChanged.connect(() => {
             let s = seen[id]
             if (g.introHeld) {
-                s.heldAt = Date.now()
-                s.beats = []
-                s.freedAt = -1
+                Object.assign(s, { beats: [], freed: false, lastClock: g.introClock, maxStep: 0,
+                                   waitStep: 0, heldAt: Date.now(), freedAt: -1 })
                 return
             }
-            s.freedAt = Date.now()
-            s.freedSession = session(g).now()
-            s.freedPos = where(g)
+            took(s, g.introClock)
+            Object.assign(s, { freed: true, freedClock: g.introClock, freedPos: where(g), freedAt: Date.now() })
+        })
+        g.introClockChanged.connect(() => {
+            let s = seen[id]
+            if (g.introHeld) took(s, g.introClock)
         })
         g.introBeatChanged.connect(() => {
-            if (g.introBeat > 0) seen[id].beats.push({ beat: g.introBeat, at: Date.now(), session: session(g).now() })
+            if (g.introBeat > 0) seen[id].beats.push({ beat: g.introBeat, clock: g.introClock })
         })
     }
     function seenOf(g) { return seen[String(g)] }
@@ -161,26 +179,28 @@ Window {
     function countCues(g) {
         return g.soundLog.filter(r => r.cue === "sfx/descent_count").map(r => r.what + (r.pitch ? "@" + r.pitch : ""))
     }
-    // The beats one after the other, beatMs apart, the first leadMs after
-    // the count began: alone as the hold began, in a session at its moment
-    // of the session clock, after the wait for the party
+    // On the intro's clock each beat and the release land at their time
+    // after the count's start (introStartsAt) - the 3 leadMs after it, the
+    // others beatMs apart, the release holdMs after it - never early and
+    // no later than the largest step the clock took, as the clock moves a
+    // step a tick
+    function late(at, due, step) { return at - due >= 0 && at - due <= step }
     function checkCount(g, who) {
         let s = seenOf(g)
         let order = s.beats.map(b => b.beat).join(",")
         check(order === "3,2,1", who + " counts 3, 2, 1 (" + order + ")")
         if (s.beats.length !== 3) return
-        let lead = Math.round(session(g).connected ? s.beats[0].session - g.introStartsAt : s.beats[0].at - s.heldAt)
-        let gaps = [s.beats[1].at - s.beats[0].at, s.beats[2].at - s.beats[1].at, s.freedAt - s.beats[2].at]
-        check(Math.abs(lead - leadMs) <= slackMs, who + ": the depth and the name stand alone "
-              + lead + " ms before the 3 (" + leadMs + " ms)")
-        check(gaps.every(d => Math.abs(d - beatMs) <= slackMs), who + ": each beat lasts "
-              + gaps.join(", ") + " ms (" + beatMs + " ms)")
+        let from = g.introStartsAt, step = s.maxStep
+        let r = v => Math.round(v * 10) / 10
+        let at = s.beats.map(b => r(b.clock - from)).concat([r(s.freedClock - from)])
+        let due = [0, 1, 2, 3].map(i => leadMs + i * beatMs)
+        check(at.every((a, i) => late(a, due[i], step)), who + ": the 3, the 2, the 1 and the release land at "
+              + at.join(", ") + " ms of its clock (" + due.join(", ") + ", each within a step of "
+              + r(step) + " ms)")
     }
 
     property var before: null
-    property real heldFrom: 0
     property real clockAtPause: 0
-    property real pausedMs: 0
     property var hpBefore: ({})
 
     property var soloSteps: [
@@ -191,7 +211,7 @@ Window {
         }],
         [() => solo.player && solo.enemies.length > 0, () => {
             let s = seenOf(solo)
-            check(solo.introOn && solo.introHeld && s.heldAt > 0,
+            check(solo.introOn && solo.introHeld && s.heldAt > 0 && !s.freed,
                   "entering the first dungeon opens its intro")
             check(!solo.physics.running, "the intro holds the world: the physics stands")
             let depth = shown(solo, "introDepth"), name = shown(solo, "introName")
@@ -231,9 +251,10 @@ Window {
         }],
         [() => !solo.introHeld, () => {
             let s = seenOf(solo)
-            let held = s.freedAt - s.heldAt
-            check(Math.abs(held - solo.introSeconds * 1000) <= slackMs, "the intro holds "
-                  + held + " ms (" + solo.introSeconds * 1000 + " ms)")
+            let held = s.freedClock - solo.introStartsAt
+            check(solo.introSeconds * 1000 === holdMs && late(held, holdMs, s.maxStep), "the intro holds "
+                  + held + " ms of its clock (" + holdMs + " ms, within a step of " + s.maxStep + " ms; "
+                  + (s.freedAt - s.heldAt) + " ms on the wall clock)")
             checkCount(solo, "alone it")
             check(movedSince(before, s.freedPos) < 1e-6, "through the hold neither the knight, with D held,"
                   + " nor any of " + before.enemies.length + " enemies moved ("
@@ -268,25 +289,28 @@ Window {
             check(solo.recordPassed && solo._recordWaits && banners.length === 0,
                   "it passes the record of depth 0, and the record's banner waits while the intro holds ("
                   + banners.length + " raised)")
+            // A slow machine's frame: the count must not skip for it
+            let until = Date.now() + stallMs
+            while (Date.now() < until) {}
         }],
         [300, () => {
             solo.openMenu()
             clockAtPause = solo.introClock
-            heldFrom = Date.now()
         }],
         [600, () => {
             check(solo.introHeld && solo.introClock === clockAtPause,
                   "under the solo pause the count stands (" + clockAtPause + " -> " + solo.introClock + " ms)")
             solo.closeMenu()
-            pausedMs = Date.now() - heldFrom
         }],
         [() => !solo.introHeld, () => {
             let s = seenOf(solo)
-            let held = s.freedAt - s.heldAt - pausedMs
-            check(Math.abs(held - solo.introSeconds * 1000) <= 2 * slackMs, "it holds "
-                  + held + " ms besides the pause (" + solo.introSeconds * 1000 + " ms)")
-            check(seenOf(solo).beats.map(b => b.beat).join(",") === "3,2,1",
-                  "after the camp it counts 3, 2, 1 (" + seenOf(solo).beats.map(b => b.beat).join(",") + ")")
+            let held = s.freedClock - solo.introStartsAt
+            let maxStep = Balance.intro.maxStep * 1000
+            check(s.maxStep === maxStep, "a stall of " + stallMs + " ms moves the count's clock by "
+                  + s.maxStep + " ms at most (" + maxStep + " ms)")
+            check(late(held, holdMs, s.maxStep), "with the stall and the pause in it the intro holds " + held
+                  + " ms of its clock (" + holdMs + " ms; " + (s.freedAt - s.heldAt) + " ms on the wall clock)")
+            checkCount(solo, "after the camp it")
             // None went up while it held (checked as it began), and this
             // one went up with the intro no longer held
             let b = banners[0]
@@ -333,18 +357,19 @@ Window {
             let j = joiner.player
             check(j.takeDamage(10, j.xWu + 1, j.yWu) === "ignored", "no blow lands on the joiner's knight")
         }],
-        [() => seenOf(host).freedAt > 0 && seenOf(joiner).freedAt > 0, () => {
+        [() => seenOf(host).freed && seenOf(joiner).freed, () => {
             check(host.introStartsAt > 0 && host.introStartsAt === joiner.introStartsAt,
                   "both count from the same moment of the session clock (" + host.introStartsAt
                   + " / " + joiner.introStartsAt + ")")
             check(host.introStartsAt >= joiner.introArrivedAt && host.introStartsAt >= host.introArrivedAt,
                   "the count starts once both knights have arrived (host " + host.introArrivedAt
                   + ", joiner " + joiner.introArrivedAt + ", count " + host.introStartsAt + ")")
-            let hf = seenOf(host).freedSession, jf = seenOf(joiner).freedSession
-            let end = host.introStartsAt + host.introSeconds * 1000
-            check(Math.abs(hf - jf) <= slackMs && hf >= end && jf >= end,
-                  "both let go at the same moment: host " + hf.toFixed(0) + ", joiner " + jf.toFixed(0)
-                  + " on the session clock, the count's end " + end.toFixed(0))
+            let hs = seenOf(host), js = seenOf(joiner)
+            let end = host.introStartsAt + holdMs
+            check(late(hs.freedClock, end, hs.maxStep) && late(js.freedClock, end, js.maxStep),
+                  "both let go at the count's end " + end.toFixed(0) + " on the session clock, each on its"
+                  + " next tick: host " + hs.freedClock.toFixed(0) + ", joiner " + js.freedClock.toFixed(0)
+                  + " (steps of " + hs.maxStep.toFixed(0) + " and " + js.maxStep.toFixed(0) + " ms)")
             checkCount(host, "the host")
             checkCount(joiner, "the joiner")
             check(countCues(host).length === 4 && countCues(joiner).length === 4,
@@ -366,9 +391,12 @@ Window {
                   "after " + Balance.intro.waitNote + " s it says it waits for the party, the world held")
         }],
         [() => !host.introWaiting, () => {
+            // The host gives up on the tick its clock passes waitMax; the
+            // count's start is read just after that tick's clock
             let waited = host.introStartsAt - Balance.intro.lag * 1000 - host.introArrivedAt
-            check(Math.abs(waited - Balance.intro.waitMax * 1000) <= 2 * slackMs,
-                  "it holds no longer than " + Balance.intro.waitMax + " s for it (" + waited.toFixed(0) + " ms)")
+            check(late(waited, Balance.intro.waitMax * 1000, seenOf(host).waitStep + 1),
+                  "it holds no longer than " + Balance.intro.waitMax + " s for it (" + waited.toFixed(0)
+                  + " ms, within a step of " + seenOf(host).waitStep.toFixed(0) + " ms)")
         }],
         [() => !host.introHeld, () => {
             check(host.physics.running, "then counts and lets go")
