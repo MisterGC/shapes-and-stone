@@ -113,7 +113,7 @@ Item {
         }
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
-            if (a === "whirlwind") bench.whirlsStarted++
+            if (a === "whirlwind" || a === "whirlwind+") bench.whirlsStarted++
         })
         for (let e of game.enemies.filter(alive)) follow(e)
         if (!_boltsFollowed) {
@@ -588,6 +588,123 @@ Item {
         return JSON.stringify({ hit: hit, far: far, wall: wall, reach: Balance.bolt.reach,
                                 speed: Balance.bolt.speed, swordReach: Balance.knight.attackRange,
                                 roomHalf: half, atk: p.atk })
+    }
+
+    // ---- the combo, entered by hand (issue #320) ----
+    // In the flow room after begin(): the pilot rests, every enemy halted
+    // in a corner, the knight at the room's centre. For each special the
+    // knight enters the combo with its moves (moveX, moveY) as a pilot
+    // walks - away from its aim for comboAway steps, then towards it for
+    // comboTowards - and presses the special's button at once, then the
+    // same with the button later than Balance.combo.window: the stun at an
+    // enemy past the stun's reach and inside the stronger one's, whether
+    // it froze; the bolt at an enemy 5 wu off, the damage it took and the
+    // bolt's size; the whirlwind with an enemy either side past its reach
+    // and inside the stronger one's, the damage they took. As JSON
+    readonly property int comboAway: 4
+    readonly property int comboTowards: 2
+    function tryCombo() {
+        Clayground.paused = true
+        _rng = null
+        let p = game.player, cx = game._fightRoomCx, cy = game._fightRoomCy
+        let half = 15 * game.cellSize / 2
+        let foes = game.enemies.filter(alive)
+        for (let e of foes) e.halt()
+        p.maxMana = 1000
+        p.maxHp = 100000
+        p.hp = 100000
+        let put = (o, x, y) => {
+            o.xWu = x - o.widthWu / 2
+            o.yWu = y + o.heightWu / 2
+            if (o.body) o.body.linearVelocity = Qt.point(0, 0)
+        }
+        let aside = () => foes.forEach((e, i) => { e.halt(); put(e, cx - half + 2, cy + half - 2 - i * 1.2) })
+        let small = foes.filter(e => !e.lead && e.enemyType !== "guardian")
+        let a = small[0], b = small[1]
+        let step = game.physics.timeStep
+        // The knight at the centre facing angle, the combo entered, the
+        // button pressed late or not: whether the combo was ready, whether
+        // the special was the stronger one and the slowest the knight went
+        let fire = (angle, late, before) => {
+            aside()
+            put(p, cx, cy)
+            p.momentum = Balance.momentum.max
+            Clayground.physicsStep(2)
+            p.facingAngle = angle
+            if (before) before()
+            let rad = angle * Math.PI / 180
+            let fx = Math.cos(rad), fy = -Math.sin(rad)
+            let slowest = 1e9
+            let walk = (way, n) => {
+                p.moveX = fx * way
+                p.moveY = fy * way
+                for (let i = 0; i < n; i++) {
+                    Clayground.physicsStep(1)
+                    let v = p.body.linearVelocity
+                    slowest = Math.min(slowest, Math.sqrt(v.x * v.x + v.y * v.y))
+                }
+            }
+            walk(-1, comboAway)
+            walk(1, comboTowards)
+            if (late) walk(1, Math.ceil(Balance.combo.window / step) + 1)
+            let ready = p.comboReady()
+            p.mana = p.maxMana
+            let went = p.unleash()
+            return { ready: ready, went: went, strong: went && p.lastStrong, slowest: slowest }
+        }
+        let wake = e => { e.halted = false; e.target = p }
+        let out = { window: Balance.combo.window, away: comboAway, towards: comboTowards,
+                    moveSpeed: Balance.knight.moveSpeed, atk: p.atk }
+        // The stun, aiming up
+        p.special = "stun"
+        let gap = (Balance.stun.reach + Balance.combo.stun.reach) / 2
+        for (let late of [false, true]) {
+            let r = fire(90, late, () => { put(a, p.xWu + p.widthWu / 2 + gap, p.yWu - p.heightWu / 2); wake(a) })
+            r.frozen = a.aiState === "frozen"
+            r.gap = gap
+            out[late ? "stunLate" : "stun"] = r
+            a._attackTimer = 0
+            Clayground.physicsStep(2)
+        }
+        // The bolt, aiming right
+        p.special = "bolt"
+        for (let late of [false, true]) {
+            a.hp = 100000
+            let r = fire(0, late, () => put(a, p.xWu + p.widthWu / 2 + 5, p.yWu - p.heightWu / 2))
+            let bolt = null
+            for (let id in game._boltById) if (game._boltById[id].own) bolt = game._boltById[id]
+            r.size = bolt ? bolt.widthWu : 0
+            let k = 0
+            while (bolt && !bolt.destroyed && k < 120) { Clayground.physicsStep(1); k++ }
+            r.lost = 100000 - a.hp
+            r.want = Math.max(Balance.minDamage, Math.round(p.atk * (late ? Balance.bolt.damage
+                                                                         : Balance.combo.bolt.damage)) - a.def)
+            out[late ? "boltLate" : "bolt"] = r
+        }
+        // The whirlwind, aiming up, an enemy either side as it spins
+        p.special = "whirlwind"
+        let side = (Balance.knight.whirlReach + Balance.combo.whirlwind.reach) / 2
+        for (let late of [false, true]) {
+            a.hp = 100000; b.hp = 100000
+            let beside = () => {
+                let c = { x: p.xWu + p.widthWu / 2, y: p.yWu - p.heightWu / 2 }
+                put(a, c.x + side, c.y)
+                put(b, c.x - side, c.y)
+            }
+            let r = fire(90, late, null)
+            let n = 0
+            while (p.isWhirling && n < 120) { beside(); Clayground.physicsStep(1); n++ }
+            p.moveX = 0
+            p.moveY = 0
+            r.seconds = Math.round(n * step * 1000) / 1000
+            r.lost = [100000 - a.hp, 100000 - b.hp]
+            r.want = Math.max(Balance.minDamage, Math.floor(p.atk * Balance.combo.whirlwind.swing) - a.def)
+            r.side = side
+            out[late ? "whirlLate" : "whirl"] = r
+            Clayground.physicsStep(30)
+        }
+        aside()
+        return JSON.stringify(out)
     }
 
     // ---- the scripted knight ----
