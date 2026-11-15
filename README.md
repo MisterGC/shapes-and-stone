@@ -2390,7 +2390,10 @@ room's lead (`Enemy` type `warden`), counted among the rooms with a lead
 (`spawn.leadShare`), and in the dungeon's plan the witch reads: its
 stance, its openings and three
 strings of its own (`lead.strings.warden`) on a beat of `boss.beat`
-seconds. It sounds like none of the small ones (issue #287): its wind-up
+seconds, each begun with a wind-up of `boss.countIn` seconds where a
+room's other leads wind up for `enemy.windUp` (issue #330): a person who
+sees it a quarter of a second late and swings once more still has the
+rest (`lead.parryRest`) before the parry. It sounds like none of the small ones (issue #287): its wind-up
 and its strike - the lunge setting off, which every screen sees - play
 its own toll, `sfx/warden_toll`, a hollow stone toll on A1, the wind-up a
 fifth up on E (`boss.toll.windUp`), the strike on A (`boss.toll.strike`),
@@ -2399,8 +2402,8 @@ Each appearance is stronger: `boss.hp` times `1 + n *
 boss.hpGrow` HP for its n-th, with `depth.hp` and `party.hpPerKnight` on
 that as any enemy - `depth.hp` counted only up to `boss.depthUpTo`, since
 the smith's sword stops growing at depth 5 (issue #289) -, and a tempo of
-`1 + n * boss.tempoGrow` that its beats are divided by: 3500 HP at tempo 1
-at depth 2, 4725 at 1.05 at depth 5, 4950 at 1.1 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
+`1 + n * boss.tempoGrow` that its beats are divided by: 2800 HP at tempo 1
+at depth 2, 3780 at 1.025 at depth 5, 3960 at 1.05 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
 glows, `boss.adds` weak grunts come out of the floor round it and as many
 more at `boss.waveAt`, it plays `boss.phase2Tempo` times faster - beats,
 feint holds and count-ins -, the room's light turns to `boss.light` and its
@@ -2717,7 +2720,8 @@ A `WIN` counts as "a person can do this": the person cleared the room
 without falling within the bench's 180 s. A `LOSE` (fell, or still
 fighting at 180 s) in a fight meant to be beatable - every flow room,
 every duel, the Warden at depth 2, 5 and 8 - is a finding: a tuning issue
-for that fight, not a reason to change the pilot. A win is not a promise:
+for that fight, not a reason to change the pilot. Since issue #330 it wins
+every one of them on the bench's seed, the Warden in about 76 to 80 s. A win is not a promise:
 the pilot knows every string, never panics and never strays, so it is the
 least a person needs, and the owner's playtest still judges the rest.
 
