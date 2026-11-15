@@ -115,9 +115,18 @@ PhysicsItem {
     // The combo (Balance.combo, issue #320): the moves away from the aim,
     // then towards it, read off moveX and moveY on every physics step -
     // whatever the keys, the stick or the touch pad they come from are
-    // bound to - against the facing of that step. The step the moves
-    // last pointed away (-1 none), the way they point now (-1 away, 1
-    // towards, 0 neither) and the step the combo was entered (-1 none)
+    // bound to. Away is judged against the facing of the step before, so
+    // a pad's left stick that aims as the knight walks (KnightPad) and
+    // turns it round at once still reads as away; from then on, until
+    // combo.gap after the last step away, against the facing kept from
+    // before the first step away, for at most combo.awayMax of pushing
+    // away: longer, the knight has turned round, and the moves are judged
+    // against its facing again. The facing of the step before, the steps
+    // the moves first and last pointed away (-1 none) and the facing
+    // kept, the way they point now (-1 away, 1 towards, 0 neither) and the
+    // step the combo was entered (-1 none)
+    property real _comboFacing: NaN
+    property int _comboAwayFrom: -1
     property int _comboAwayAt: -1
     property real _comboAwayFacing: 0
     property int _comboWay: 0
@@ -130,39 +139,50 @@ PhysicsItem {
     }
     // Whether the last special let loose was the stronger version
     property bool lastStrong: false
-    // The way the moves point against the facing: -1 away, 1 towards, 0
-    // neither or under combo.deadZone
-    function comboWay() {
+    // The way the moves point against facing angle (the knight's now when
+    // left out): -1 away, 1 towards, 0 neither or under combo.deadZone
+    function comboWay(angle) {
         let c = Balance.combo
         let len = Math.sqrt(moveX * moveX + moveY * moveY)
         if (len < c.deadZone) return 0
-        let rad = facingAngle * Math.PI / 180
+        let rad = (angle === undefined ? facingAngle : angle) * Math.PI / 180
         // moveY is screen down, the facing's y is up
         let along = (moveX * Math.cos(rad) - moveY * Math.sin(rad)) / len
         let cone = Math.cos(c.cone * Math.PI / 180)
         return along >= cone - 1e-9 ? 1 : along <= -cone + 1e-9 ? -1 : 0
     }
-    // Whether the knight faces within combo.cone of angle: a knight that
-    // turned round to the way it walked (the pad's left stick aiming,
-    // KnightPad) has entered no combo
+    // Whether the knight faces within combo.cone of angle: a knight aimed
+    // elsewhere meanwhile, by the mouse or the right stick, has entered
+    // no combo
     function _facesStill(angle) {
         let d = Math.abs(((facingAngle - angle) % 360 + 540) % 360 - 180)
         return d <= Balance.combo.cone + 1e-9
     }
     function _readCombo() {
-        let way = comboWay()
+        if (isNaN(_comboFacing)) _comboFacing = facingAngle
+        let awaying = _comboAwayAt >= 0
+            && (_steps - _comboAwayAt) * world.timeStep <= Balance.combo.gap + 1e-6
+        if (awaying && _comboWay === -1
+                && (_steps - _comboAwayFrom) * world.timeStep > Balance.combo.awayMax + 1e-6) {
+            // Pushed away that long the knight has turned round
+            _comboAwayAt = -1
+            awaying = false
+        }
+        let way = comboWay(awaying ? _comboAwayFacing : _comboFacing)
         if (way === -1) {
             // Away again: a combo entered before is gone
+            if (!awaying) {
+                _comboAwayFacing = _comboFacing
+                _comboAwayFrom = _steps
+            }
             _comboAwayAt = _steps
-            _comboAwayFacing = facingAngle
             comboAt = -1
-        } else if (way === 1 && _comboWay !== 1 && _comboAwayAt >= 0
-                   && (_steps - _comboAwayAt) * world.timeStep <= Balance.combo.gap + 1e-6
-                   && _facesStill(_comboAwayFacing)) {
+        } else if (way === 1 && _comboWay !== 1 && awaying && _facesStill(_comboAwayFacing)) {
             comboAt = _steps
             console.log("[Player] Combo entered")
         }
         _comboWay = way
+        _comboFacing = facingAngle
     }
     readonly property real blockDrain: Balance.knight.blockDrain
 
