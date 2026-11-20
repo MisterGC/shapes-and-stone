@@ -161,12 +161,17 @@ RectBoxBody {
         }
     }
 
-    // Proximity healing and mana refill + feedback
-    Timer {
+    // Proximity healing and mana refill + feedback, a tick every healTick
+    // seconds of the physics clock: a pause, a hit stop or a slow runner
+    // holds the heal with the world, and a bench that steps the world
+    // heals the same every run (issue #345)
+    PhysicsTimer {
+        world: campfire.world
         running: true; repeat: true; interval: Balance.campfire.healTick * 1000
         onTriggered: {
-            // Paused, no fire heals: the Esc menu alone and the dojo's pause
-            if (!gameWorld || !gameWorld.player || gameWorld.gamePaused || !gameWorld.physics.running)
+            // The Esc menu alone heals nothing; the dojo's pause holds the
+            // physics, and with it this clock
+            if (!gameWorld || !gameWorld.player || gameWorld.gamePaused)
                 return
             let p = gameWorld.player
             let dx = p.xWu - campfire.xWu

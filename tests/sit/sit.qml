@@ -9,8 +9,9 @@
 // right button (the shield) and a click (a swing) each stand it up in the
 // step they come. A knight standing still out of the fire's warmth for
 // twice sitAfter does not sit. Every sit and stand is one action the knight
-// sends ("sit", "stand"). Then, the world running: five seconds at the fire
-// heal and refill as much seated as for a knight that never sits.
+// sends ("sit", "stand"). Then five seconds at the fire, stepped as
+// restSteps physics steps, heal and refill as much seated as for a knight
+// that never sits: on the physics clock, so a slow machine heals the same.
 // Prints one PASS or FAIL line per check and exits with the number of
 // failures; with a window and an output directory it saves sit.png, the
 // knight seated at the fire.
@@ -65,6 +66,8 @@ Window {
     readonly property real stepS: game ? game.physics.timeStep : 1 / 60
     // The steps standing still that reach sitAfter
     readonly property int sitSteps: Math.ceil(Balance.camp.sitAfter / stepS - 1e-6)
+    // The five seconds each knight rests at the fire, in physics steps
+    readonly property int restSteps: Math.round(5 / stepS)
 
     function find(root, name) {
         if (root.objectName === name) return root
@@ -183,18 +186,14 @@ Window {
                   "a knight standing still away from the fire for twice sitAfter does not sit")
             check(sent.join(" ") === "sit stand sit stand sit stand sit stand",
                   "each sit and each stand was one action sent (" + sent.join(" ") + ")")
-            // The world runs: five seconds at the fire, hurt and dry
+            // Five seconds at the fire, hurt and dry, step by step
             standBy(-1.5)
             p.hp = 40
             p.mana = 0
             hpBefore = p.hp
-            Clayground.paused = false
-        }],
-        [5000, () => {
-            let p = game.player
+            Clayground.physicsStep(restSteps)
             rested.push({hp: p.hp - hpBefore, mana: p.mana, seated: p.seated})
             // The same with a knight that never sits
-            Clayground.paused = true
             p.sitAfter = 1e9
             // Out of the warmth it stands up, and back by the fire
             standBy(Balance.campfire.healRadius + 3)
@@ -202,11 +201,9 @@ Window {
             p.hp = 40
             p.mana = 0
             hpBefore = p.hp
-            Clayground.paused = false
-        }],
-        [5000, () => {
-            let p = game.player
+            Clayground.physicsStep(restSteps)
             rested.push({hp: p.hp - hpBefore, mana: p.mana, seated: p.seated})
+            Clayground.paused = false
             let a = rested[0], b = rested[1]
             let tickHp = Math.round(Balance.campfire.healPerSecond * Balance.campfire.healTick)
             let tickMana = (Balance.campfire.manaPerSecond + Balance.knight.manaRegen) * Balance.campfire.healTick
@@ -231,9 +228,14 @@ Window {
         id: script
         property int i: 0
         property real waitedMs: 0
+        // True while a step runs: a key click spins the event loop, and a
+        // tick inside it would start the next step before this one is
+        // through - on a slow machine it did (issue #345)
+        property bool busy: false
         interval: 20
         repeat: true
         onTriggered: {
+            if (busy) return
             let step = bench.steps[i]
             waitedMs += interval
             let ready = typeof step[0] === "number" ? waitedMs >= step[0] : step[0]()
@@ -246,11 +248,11 @@ Window {
                 return
             }
             waitedMs = 0
-            // Advance first: a key click spins the event loop, and this
-            // timer must not run the same step again inside it
+            // Advance first, so a step that ends the script stops it
             i++
             if (i >= bench.steps.length) stop()
-            step[1]()
+            busy = true
+            try { step[1]() } finally { busy = false }
         }
     }
 }
