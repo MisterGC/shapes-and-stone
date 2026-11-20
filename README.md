@@ -2741,7 +2741,9 @@ The stun comes before an attack it has seen; the whirlwind and the bolt
 only when no attack or shot is coming. It pays the special, its blocks
 and its dashes from the knight's own mana (`Balance.knight.mana`, as the
 `bolt` pilot does), where every other pilot has plenty: a special that
-costs nothing would say nothing about it. It enters no combo. Without
+costs nothing would say nothing about it. It enters no combo: its own
+steps can make one - away from a zone, then at the Warden -, so it lets
+any combo lapse before it presses, and fires the plain special. Without
 `--special` the person plays as before, step for step.
 
 Unless `--answers` is given, or with `--specials`, a pacing run plays the
@@ -2754,7 +2756,11 @@ special or without, says why: what hurt the knight, the most HP first
 (the blows of an enemy by its type, a shot, a metal ball, a zone of the
 Warden's), its missed answers, how often its mana ran dry, and, when it
 was still fighting at the end, how often the lead still standing was
-opened. No band judges these fights either.
+opened. No band judges their wins either; `--check` tests the pilot's own
+rules on them: in each fight with a special the person pressed it, it went
+off and never as the stronger version, and in each of the person's fights
+the HP by cause adds up to the HP the knight lost, the blow that felled it
+included.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
