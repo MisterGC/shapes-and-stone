@@ -626,7 +626,8 @@ def special_line(person):
     sp = person.get("special")
     if not sp:
         return ""
-    return (f"; the {sp['id']} ({sp['mana']:g} mana) fired {sp['fired']} of {times(sp['presses'], 'press', 'presses')}"
+    strong = f", {sp['strong']} stronger" if sp.get("strong") else ""
+    return (f"; the {sp['id']} ({sp['mana']:g} mana) fired {sp['fired']} of {times(sp['presses'], 'press', 'presses')}{strong}"
             f" ({sp['early']} early, {sp['late']} late)")
 
 
@@ -698,6 +699,43 @@ def check_person_misses(results, person):
     return [(abs(missed / answers - share) <= slack + 1e-9,
              f"the person misses {share} of its answers, give or take {slack} "
              f"({missed} of {answers}, {missed / answers:.2f}, in {len(rs)} fights)")]
+
+
+def check_person_specials(results):
+    """(ok, line) per fight of the person's with a special (issue #344):
+    it pressed the special, it went off, and never the stronger version -
+    the pilot's own rule, not a band on its wins"""
+    out = []
+    for r in results:
+        sp = (r.get("person") or {}).get("special") if r["answer"] == PERSON else None
+        if not r.get("special"):
+            continue
+        tag = f"{r['room']} depth {r['depth']} {pilot(r)}"
+        if not sp:
+            out.append((False, f"{tag}: the person was given the {r['special']} (the report has no special)"))
+            continue
+        out.append((sp["presses"] >= 1 and sp["fired"] >= 1 and sp.get("strong", 0) == 0,
+                    f"{tag}: the person pressed its special, it went off and never stronger "
+                    f"({sp['presses']} presses, {sp['fired']} went off, {sp.get('strong', 0)} stronger)"))
+    return out
+
+
+def check_person_hurt(results):
+    """(ok, line) for the person's why lines (issue #344): in each of its
+    fights the HP by cause adds up to the HP the knight lost - its HP at
+    the start less its HP at the end, and what it got back meanwhile -,
+    falls included"""
+    rs = [r for r in results if r["answer"] == PERSON]
+    if not rs:
+        return []
+    off = []
+    for r in rs:
+        lost = r.get("knightStartHp", -1) - r["knightHp"] + r.get("knightHealed", 0)
+        by = sum(h["hp"] for h in (r.get("hurtBy") or {}).values())
+        if r.get("knightStartHp", -1) < 0 or by != lost:
+            off.append(f"{r['room']} depth {r['depth']} {pilot(r)} {by} of {lost}")
+    return [(not off, f"the person's HP by cause adds up to the HP the knight lost in each of its "
+                      f"{len(rs)} fights" + (f" (off: {'; '.join(off)})" if off else ""))]
 
 
 def check_stun(results, step=1 / 60):
@@ -1214,6 +1252,7 @@ def pacing(args, loader):
         lines = check(banded, banded[0]["pacing"])
     if args.check and person:
         lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
+        lines += check_person_specials(ordered) + check_person_hurt(ordered)
     if args.check:
         lines += check_stun(ordered) + check_bolt(ordered) + check_ball(ordered)
         if shots:
