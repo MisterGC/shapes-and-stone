@@ -6,7 +6,13 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.6.0] - 2026-11-14
+## [0.6.0] - 2026-11-20
+
+The knight gets a toolkit: before each dungeon it picks one of three specials - the whirlwind, a stun or a bolt - and a quick move away from its aim and back fires the special's stronger version, while kills in a chain make its blows stronger. A new lead, the slinger, slings metal balls that bounce off walls and off any raised shield, and the Hollow Warden tells, line by line, that it was a knight once. A dungeon opens with a descent intro, critters scurry over its floor, and the smith sells swift boots. Built on Clayground v2026.13.
+
+**Play:** open https://mistergc.dev/shapes-and-stone/ in a current browser.
+
+Not yet playtested by hand: everything new was played by the test pilots, among them one that reacts a quarter of a second late and misses one answer in five; it wins every fight, the Warden at depth 2, 5 and 8 included, with and without each special. Co-op was checked with two games in one process, not over the network. The 16 new sounds - the count of the descent intro, the stun's bash, the bolt's shot and hit, the combo's surge, the ball's shot and bounce, the critter's squash and the Warden's eight lines - still wait for a verdict by ear.
 
 ### Added
 
@@ -284,7 +290,8 @@ The first playable Shapes & Stone: a knight goes down a dungeon depth by depth, 
 - A scripted fight bench reports the same numbers on every run of a seed. (#34)
 - A same-world check runs two games, host and joiner, and compares every enemy's position, HP and AI state; it passes 10 Local and 10 Cloud runs in a row. (#14, #64)
 
-[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/MisterGC/shapes-and-stone/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.6.0
 [0.5.0]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.5.0
 [0.4.2]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.2
 [0.4.1]: https://github.com/MisterGC/shapes-and-stone/releases/tag/v0.4.1
