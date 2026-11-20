@@ -443,9 +443,14 @@ Window {
         id: script
         property int i: 0
         property real waitedMs: 0
+        // True while a step runs: a key click spins the event loop, and a
+        // tick inside it would start the next step before this one is
+        // through - on a slow machine it did (issue #345)
+        property bool busy: false
         interval: 20
         repeat: true
         onTriggered: {
+            if (busy) return
             let step = bench.steps[i]
             waitedMs += interval
             let ready = typeof step[0] === "number" ? waitedMs >= step[0] : step[0]()
@@ -458,11 +463,11 @@ Window {
                 return
             }
             waitedMs = 0
-            // Advance first: a key click spins the event loop, and this
-            // timer must not run the same step again inside it
+            // Advance first, so a step that ends the script stops it
             i++
             if (i >= bench.steps.length) stop()
-            step[1]()
+            busy = true
+            try { step[1]() } finally { busy = false }
         }
     }
 }
