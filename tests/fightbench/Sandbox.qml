@@ -11,7 +11,8 @@
 // muted.
 //
 // Driven by run_fightbench.py (clayliveloader --sbx Sandbox.qml), which
-// calls begin(seed, answer, danger, room, sword, boots), steps and reads report().
+// calls begin(seed, answer, danger, room, sword, boots, special), steps and
+// reads report().
 
 import QtQuick
 import Clayground.Common
@@ -40,6 +41,8 @@ Item {
     property string room: "mixed"
     property int sword: 0
     property int boots: 0
+    // The special the person pilot was given (issue #344), "" for none
+    property string personSpecial: ""
     property int steps: 0
     property var _rng: null
 
@@ -56,13 +59,16 @@ Item {
     // "duel", "guardianduel", "spitterduel", "ballduel" or "boss" (Balance.pacing); sword the knight's sword level, -1 for the
     // one it usually has at that depth (usualSword), 0 when left out;
     // boots the level of its swift boots (Balance.shop.bootsSpeed, issue
-    // #325), 0 when left out
-    function begin(s, a, d, r, sw, bo) {
+    // #325), 0 when left out; special the special the "person" pilot
+    // fires (whirlwind, stun or bolt, issue #344), none when left out or
+    // for any other pilot
+    function begin(s, a, d, r, sw, bo, sp) {
         Clayground.paused = true
         seed = s
         answer = a === undefined ? "mix" : a
         danger = d === undefined ? 0 : d
         room = r === undefined ? "mixed" : r
+        personSpecial = answer === "person" && Balance.specials.order.indexOf(sp) >= 0 ? sp : ""
         steps = 0
         _rng = game.createRng(s)
         _plans = new Map()
@@ -93,6 +99,14 @@ Item {
         personFastest = -1
         _answerCount = 0
         _missPhase = answer === "person" ? missPhaseOf(s, room, danger) : 0
+        if (personSpecial !== "") {
+            personAnswers.special = 0
+            personMissed.special = 0
+        }
+        _specialPlan = null
+        _chanceAt = -1
+        _pressAt = -1
+        specialUse = { presses: 0, fired: 0, early: 0, late: 0 }
         // What would be heard, on the physics steps: muted, logged
         game.logSounds = true
         game.followFightOnSteps = true
@@ -107,15 +121,19 @@ Item {
         boots = bo === undefined ? 0 : bo
         // The bench tries the moves, not the mana they cost: plenty of it.
         // The bolt's pilot pays its bolts from the knight's own mana: what
-        // the mana allows is the question its duel asks (issue #319)
+        // the mana allows is the question its duel asks (issue #319); so
+        // does the person with a special, which pays it as a person does
+        // (issue #344)
         if (game.player) {
-            game.player.maxMana = answer === "bolt" ? Balance.knight.mana : 1000
+            game.player.maxMana = answer === "bolt" || personSpecial !== "" ? Balance.knight.mana : 1000
             game.player.mana = game.player.maxMana
             game.player.swordLevel = sword
             game.player.bootsLevel = boots
             // The special's button lets the stun loose for "stun", the bolt
-            // for "bolt", else the whirlwind
-            game.player.special = answer === "stun" || answer === "bolt" ? answer : "whirlwind"
+            // for "bolt", the person's own for the person given one, else
+            // the whirlwind
+            game.player.special = answer === "stun" || answer === "bolt" ? answer
+                                : personSpecial !== "" ? personSpecial : "whirlwind"
         }
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
@@ -324,7 +342,11 @@ Item {
             person: answer !== "person" ? null : {
                 reaction: Balance.pacing.person.reaction, miss: Balance.pacing.person.miss,
                 answers: personAnswers, missed: personMissed,
-                fastest: personFastest < 0 ? null : round3(personFastest)
+                fastest: personFastest < 0 ? null : round3(personFastest),
+                // Its special (issue #344): which, its presses, the ones
+                // that went off, and its presses one window early or late
+                special: personSpecial === "" ? null : Object.assign({ id: personSpecial,
+                    mana: game.player ? game.player.specialMana : 0 }, specialUse)
             },
             enemies: foes,
             sounds: game.soundLog,
@@ -826,7 +848,8 @@ Item {
     // guardian's guard with the shield dash, and swings only into an
     // opening: an enemy within reach that is not winding up or lunging.
     // "person" plays as "skilled" with a person's reaction and misses
-    // (below, issue #315)
+    // (below, issue #315); given a special, it fires that one too (issue
+    // #344)
     property var _plans: new Map()
     property real _blockLeft: 0     // seconds the shield stays up for a shot
     // Steps before a lunge lands that the "perfect" plan raises the shield
@@ -1425,6 +1448,89 @@ Item {
         return false
     }
 
+    // ---- the person's special (issue #344) ----
+    // Given one, the person fires it where the pilot of that special does,
+    // with its reaction and misses. A chance for it: for the whirlwind,
+    // full momentum and an enemy within whirlFrom (as "whirlwind"); for the
+    // stun, a weak or normal enemy not frozen within the stun's reach, or
+    // a lead winding up within it stunRest seconds after the last stun (as
+    // "stun"); for the bolt, an enemy out of the sword's reach and within
+    // boltFrom of the bolt's, boltRest seconds after the last bolt (as
+    // "bolt") - each with the mana the special costs, which a person
+    // reads off the bar. The person presses no sooner than reaction
+    // seconds after the chance began, the chance still there. Each press
+    // is an answer in the turn of its misses, a fifth of them for 0.2,
+    // rolled as it first looks for a chance: a miss is one window
+    // (Balance.knight.perfectBlockFrames steps, as its other misses) early
+    // - it takes an enemy as near as the knight walks in a window
+    // farther off to be in reach, so it may fire at nothing - or late, a
+    // window after it would have pressed, whatever stands then. The stun
+    // and the shot it is answering come first: the stun before an attack
+    // it has seen, the whirlwind and the bolt only when none is coming.
+    // Combos are not entered: the plain special only
+    property var _specialPlan: null
+    property real _chanceAt: -1
+    property real _pressAt: -1
+    property var specialUse: ({ presses: 0, fired: 0, early: 0, late: 0 })
+    readonly property real specialWindow: Balance.knight.perfectBlockFrames / 60
+    function specialChance(p, foes, slack) {
+        if (p.isDashing) return null
+        let near = nearest(p, foes)
+        if (personSpecial === "whirlwind") {
+            if (p.momentum < Balance.momentum.max || p.mana < p.whirlMana) return null
+            return near.d <= whirlFrom + slack ? near.e : null
+        }
+        if (p.mana < p.specialMana) return null
+        if (personSpecial === "bolt") {
+            if (now() - _boltAt < boltRest) return null
+            let far = slack > 0 ? Balance.bolt.reach + slack : Balance.bolt.reach * boltFrom
+            return near.d > p.attackRange && near.d <= far ? near.e : null
+        }
+        let cx = p.xWu + p.widthWu / 2, cy = p.yWu - p.heightWu / 2
+        let inReach = e => {
+            let dx = e.xWu + e.widthWu / 2 - cx, dy = e.yWu - e.heightWu / 2 - cy
+            let r = Balance.stun.reach * 0.9 + (e.bulk || 0) + slack
+            return dx * dx + dy * dy <= r * r
+        }
+        let small = foes.find(e => !e.lead && e.aiState !== "frozen" && inReach(e))
+        if (small) return small
+        if (now() - _stunAt < stunRest) return null
+        return foes.find(e => e.lead && inReach(e)
+            && (e.aiState === "telegraph" || e.aiState === "crush" || e.aiState === "shoot")) || null
+    }
+    // Whether the person pressed its special's button on this step
+    function personSpecialNow(p, foes) {
+        if (!_specialPlan) _specialPlan = rollMiss()
+        let plan = _specialPlan
+        let early = plan.miss && plan.early, late = plan.miss && !plan.early
+        let target = specialChance(p, foes, early ? Balance.knight.moveSpeed * specialWindow : 0)
+        if (_pressAt < 0) {
+            if (!target) { _chanceAt = -1; return false }
+            if (_chanceAt < 0) _chanceAt = now()
+            if (!seenSince(_chanceAt)) return false
+            if (late) { _pressAt = now() + specialWindow; return false }
+        } else if (now() < _pressAt - 1e-6 || p.isDashing) return false
+        if (!target) target = nearest(p, foes).e
+        letGo(p)
+        p.isBlocking = false
+        face(p, target)
+        if (personSpecial === "whirlwind") moveTowards(p, target.xWu, target.yWu, 1)
+        let went = p.unleash()
+        specialUse.presses++
+        if (went) specialUse.fired++
+        if (early) specialUse.early++
+        if (late) specialUse.late++
+        personAnswers.special++
+        if (plan.miss) personMissed.special++
+        answered(_chanceAt)
+        if (personSpecial === "stun") _stunAt = now()
+        if (personSpecial === "bolt") _boltAt = now()
+        _specialPlan = null
+        _chanceAt = -1
+        _pressAt = -1
+        return true
+    }
+
     function pilotPerson(dt) {
         let p = game.player
         let foes = foesOrRest(p)
@@ -1435,6 +1541,7 @@ Item {
                 answered(at)
                 return true
             })) return
+        if (personSpecial === "stun" && personSpecialNow(p, foes)) return
         let threat = personThreat(p, foes)
         if (threat) {
             answerPerson(p, threat)
@@ -1442,6 +1549,7 @@ Item {
         }
         let near = nearest(p, foes), target = near.e
         if (personShot(p, dt, near.d > 1.3 ? target : null, target)) return
+        if (personSpecial !== "" && personSpecial !== "stun" && personSpecialNow(p, foes)) return
         letGo(p)
         face(p, target)
         if (shieldDash(p, target, near.d)) return
