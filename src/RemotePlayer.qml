@@ -112,6 +112,19 @@ PhysicsItem {
         }
         seated = false
         let gain = gameWorld ? gameWorld.remoteGain(xWu, yWu) : 0
+        // A special's stronger version (Balance.combo, issue #320) comes as
+        // its name and "+": the swell over its own sound, then the special
+        if (name === "whirlwind+" || name === "stun+" || name === "bolt+") {
+            name = name.slice(0, -1)
+            if (gameWorld && gain > 0) gameWorld.playSurge(gain)
+            if (gameWorld) gameWorld.spawnWord(xWu, yWu + 0.4, Balance.combo[name].name.toUpperCase(),
+                                               Balance.combo.wordColor)
+            if (name === "whirlwind") {
+                view.whirl(Balance.combo.whirlwind.duration * 1000, true)
+                if (gameWorld && gain > 0) gameWorld.playWhirlwind(gain)
+                return
+            }
+        }
         if (name === "attack") {
             view.swing()
             if (gameWorld && gain > 0 && actionState !== 3) gameWorld.playSwordSwing(gain)
@@ -121,6 +134,13 @@ PhysicsItem {
         } else if (name === "whirlwind") {
             view.whirl(Balance.knight.whirlDuration * 1000)
             if (gameWorld && gain > 0) gameWorld.playWhirlwind(gain)
+        } else if (name === "stun") {
+            view.block()
+            if (gameWorld && gain > 0) gameWorld.playStun(gain)
+        } else if (name === "bolt") {
+            // The bolt itself flies by its own message (Game.fireBolt)
+            view.parry()
+            if (gameWorld && gain > 0) gameWorld.playBoltShot(gain)
         } else if (name === "dash") {
             view.dash(150)
             if (gameWorld && gain > 0) gameWorld.playDash(gain)

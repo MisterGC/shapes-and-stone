@@ -1,0 +1,122 @@
+{
+  "line": "gates_later",
+  "text": "Still the stone holds me. Strike true.",
+  "audio": "warden/gates_later.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-323/sound/voice/warden/gates_later.wav",
+    "duration": 3.72
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.03,
+      "value": "X"
+    },
+    {
+      "start": 0.03,
+      "end": 0.3,
+      "value": "B"
+    },
+    {
+      "start": 0.3,
+      "end": 0.61,
+      "value": "H"
+    },
+    {
+      "start": 0.61,
+      "end": 0.66,
+      "value": "B"
+    },
+    {
+      "start": 0.66,
+      "end": 0.7,
+      "value": "C"
+    },
+    {
+      "start": 0.7,
+      "end": 0.84,
+      "value": "B"
+    },
+    {
+      "start": 0.84,
+      "end": 0.98,
+      "value": "E"
+    },
+    {
+      "start": 0.98,
+      "end": 1.05,
+      "value": "F"
+    },
+    {
+      "start": 1.05,
+      "end": 1.12,
+      "value": "C"
+    },
+    {
+      "start": 1.12,
+      "end": 1.26,
+      "value": "E"
+    },
+    {
+      "start": 1.26,
+      "end": 1.33,
+      "value": "F"
+    },
+    {
+      "start": 1.33,
+      "end": 1.47,
+      "value": "B"
+    },
+    {
+      "start": 1.47,
+      "end": 1.55,
+      "value": "A"
+    },
+    {
+      "start": 1.55,
+      "end": 1.84,
+      "value": "B"
+    },
+    {
+      "start": 1.84,
+      "end": 2.27,
+      "value": "X"
+    },
+    {
+      "start": 2.27,
+      "end": 2.53,
+      "value": "B"
+    },
+    {
+      "start": 2.53,
+      "end": 2.6,
+      "value": "C"
+    },
+    {
+      "start": 2.6,
+      "end": 2.88,
+      "value": "B"
+    },
+    {
+      "start": 2.88,
+      "end": 3.23,
+      "value": "F"
+    },
+    {
+      "start": 3.23,
+      "end": 3.37,
+      "value": "B"
+    },
+    {
+      "start": 3.37,
+      "end": 3.72,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}

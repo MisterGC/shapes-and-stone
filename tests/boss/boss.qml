@@ -9,13 +9,22 @@
 // dungeon at depth 2, the bench steps the world one physics step at a time:
 // the knight walks into the room, which shuts - the ways in and the shaft -,
 // the Warden wakes, its banner and HP bar show and its song plays part one.
+// A string of its begins with its own count-in, boss.countIn over its
+// speed-up, in either phase (issue #330).
 // At Balance.boss.phaseAt of its HP its phase 2 begins: its adds come, it
 // plays phase2Tempo times faster, the light turns and the song plays part
 // two; a zone opens under the knight, warns, and hurts it through a raised
 // shield, and one it steps out of does not; at waveAt the second wave comes.
 // Beaten, it drops its gold, the gates open, the victory banner shows and
-// the knight is whole again. Prints one PASS or FAIL line per check and
-// exits with the number of failures.
+// the knight is whole again.
+//
+// It speaks (issue #323): as the room shuts the Warden says its
+// appearance's line, played and shown on that same step, with the Warden
+// awake on it - the line holds up nothing -, and as it falls another. Its
+// lines differ per appearance, the last pair is said at every one past
+// them, their words are the voice script's and short enough to read
+// under the banner, and its stone shows a crack per defeat before. Prints
+// one PASS or FAIL line per check and exits with the number of failures.
 //
 //   QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/boss/boss.qml
 
@@ -85,6 +94,59 @@ Window {
         Clayground.paused = true
         checkFight()
         checkDepths()
+        checkLines()
+    }
+
+    // ---- its lines (issue #323) ----
+    function readSound(path) {
+        let xhr = new XMLHttpRequest()
+        xhr.open("GET", Qt.resolvedUrl("../../sound/" + path), false)
+        xhr.send()
+        try { return JSON.parse(xhr.responseText) } catch (e) { return null }
+    }
+    function checkLines() {
+        let b = Balance.boss, pairs = b.lines
+        let script = readSound("voice/warden.voice.json")
+        let sheet = readSound("cues.json")
+        if (!script || !sheet) {
+            check(false, "the Warden's voice script and the cue sheet read (QML_XHR_ALLOW_FILE_READ=1?)")
+            return
+        }
+        let byId = {}
+        for (let l of script.lines) byId[l.id] = l
+        let all = []
+        for (let pr of pairs) all.push(pr.gates, pr.fall)
+        let texts = all.map(l => l.text)
+        check(pairs.length >= 4 && new Set(texts).size === texts.length,
+              pairs.length + " pairs of lines, " + texts.length + " lines, no two the same")
+        let wrong = all.filter(l => !byId[l.id] || byId[l.id].text !== l.text || byId[l.id].voice !== "warden_hollow")
+        check(wrong.length === 0 && script.lines.length === all.length,
+              "every line's words are its line's in sound/voice/warden.voice.json, in the Warden's voice"
+              + (wrong.length ? " - not " + wrong.map(l => l.id).join(", ") : ""))
+        let open = all.filter(l => {
+            let c = sheet.cues["voice/warden/" + l.id]
+            return c && c.category === "voice" && c.mode === "rendered" && c.verdict === null
+                && c.source === "voice/warden.voice.json" && c.render === "voice/warden/" + l.id + ".wav"
+        })
+        check(open.length === all.length, open.length + " of " + all.length
+              + " lines are voice cues of the sound factory with an open verdict")
+        let longest = 0, words = 0
+        for (let l of all) {
+            let c = sheet.cues["voice/warden/" + l.id], r = c ? readSound(c.report) : null
+            longest = Math.max(longest, r ? r.duration_s : 99)
+            words = Math.max(words, l.text.split(/\s+/).length)
+        }
+        check(words <= 8 && longest <= b.lineShow,
+              "each is short: at most " + words + " words, its render at most " + longest
+              + " s, shown for " + b.lineShow + " s")
+        let n1 = game.wardenLine(0, "gates").id, n2 = game.wardenLine(1, "gates").id
+        let n3 = game.wardenLine(2, "gates").id, n4 = game.wardenLine(3, "gates").id
+        let later = [3, 4, 7, 20].every(n => game.wardenLine(n, "gates") === pairs[pairs.length - 1].gates
+                                         && game.wardenLine(n, "fall") === pairs[pairs.length - 1].fall)
+        check(new Set([n1, n2, n3, n4]).size === 4 && later,
+              "its first, second and third appearance say their own lines (" + [n1, n2, n3].join(", ")
+              + "), every later one " + n4 + " and " + game.wardenLine(3, "fall").id)
+        console.log("[Boss] its story:", pairs.map(pr => pr.gates.text + " / " + pr.fall.text).join(" // "))
     }
 
     // ---- the boss rooms of depths 0 to 8 ----
@@ -126,6 +188,8 @@ Window {
                   && Math.abs(hp - Math.round(b.hp * (1 + n * b.hpGrow) * (1 + Math.min(game.danger, b.depthUpTo) * Balance.depth.hp))) <= 0,
                   "depth " + d + ": appearance " + n + ", HP " + w.maxHp + " (table " + hp + "), tempo "
                   + r1(w.tempo * 100) / 100 + " (table " + tempo + "), a beat of " + r1(w.beatLen * 100) / 100 + " s")
+            check(w.cracks === n && f.appearance === n,
+                  "depth " + d + ": its stone shows " + w.cracks + " cracks, one per defeat before")
             rows.push({d: d, hp: w.maxHp, tempo: w.tempo})
         }
         check(JSON.stringify(found) === JSON.stringify([2, 5, 8]),
@@ -156,6 +220,26 @@ Window {
     function keep(p) {
         p.hp = p.maxHp
         p.graceLeft = 0
+    }
+    // The Warden begins a string that opens with a strike at a knight 1
+    // wu off: its first wind-up is its count-in (issue #330). It stands
+    // halted, not thinking, again after
+    function countIn(w) {
+        let list = Balance.lead.strings.warden
+        let i = list.findIndex(x => x.beats[0] === 1)
+        w.target = {xWu: w.aimXWu + 1, yWu: w.aimYWu}
+        w.beginString(i, false)
+        let r = {state: w.aiState, wound: w._attackTimer, name: w.stringName,
+                 want: Math.max(Balance.enemy.minTelegraph, Balance.boss.countIn / w.speedUp)}
+        w.halt()
+        w.halted = false
+        return r
+    }
+    function countInLine(c, phase) {
+        return "in its phase " + phase + " a string (" + c.name + ") begins with its own count-in: "
+            + Math.round(c.wound * 1000) / 1000 + " s wound up (boss.countIn " + Balance.boss.countIn
+            + " over its speed-up, " + Math.round(c.want * 1000) / 1000 + " s; enemy.windUp "
+            + Balance.enemy.windUp + ")"
     }
 
     function checkFight() {
@@ -194,8 +278,22 @@ Window {
         walkTo(g.cxWu, g.cyWu, 600)
         stepN(2)
         check(f.stage === "waiting" && w.dormant, "in the doorway the room is still open, the Warden asleep")
+        game.logSounds = true
+        game.soundLog = []
+        let shut = null
+        let onBegan = () => { shut = {t: Math.round(game.physicsSeconds * 1000) / 1000, awake: !w.dormant,
+                                      said: f.said.slice()} }
+        f.began.connect(onBegan)
         walkTo(into.x, into.y, 600)
         stepN(2)
+        f.began.disconnect(onBegan)
+        let gatesLine = game.wardenLine(0, "gates")
+        let heard = game.soundLog.filter(x => x.cue.indexOf("voice/warden/") === 0)
+        check(shut !== null && shut.awake && JSON.stringify(shut.said) === JSON.stringify([gatesLine.id])
+              && heard.length === 1 && heard[0].cue === "voice/warden/" + gatesLine.id && heard[0].t === shut.t,
+              "as the room shuts the Warden says \"" + gatesLine.text + "\" (" + (heard.length ? heard[0].cue : "none")
+              + " at " + (heard.length ? heard[0].t : "-") + " s), awake on that same step ("
+              + (shut ? shut.t : "-") + " s): the line holds up nothing")
         let shutAll = f.gates.every(x => x.shut)
         check(f.stage === "fight" && shutAll && !w.dormant,
               "a few steps in the room shuts: " + f.gates.filter(x => x.shut).length + " of "
@@ -206,6 +304,10 @@ Window {
         check(banner && banner.opacity > 0.5 && banner.text === Balance.boss.name.toUpperCase()
               && barItem && barItem.visible,
               "its name shows as a banner (\"" + (banner ? banner.text : "") + "\") and its HP as a bar")
+        let caption = f.children.find(x => x.objectName === "bossLine")
+        check(caption && caption.opacity > 0.5 && caption.text.indexOf(gatesLine.text) >= 0
+              && caption.y > barItem.y - caption.height - 20 && caption.y + caption.height <= barItem.y,
+              "its words show as a subtitle above its HP bar: " + (caption ? caption.text : ""))
         check(game.bossSong && game.bossSongPlayer().state === "one" && game.bossSongPlayer().wanted
               && !game.dungeonMusicWanted(),
               "its song plays part one in place of the dungeon's (" + game.bossSongPlayer().state + ")")
@@ -213,6 +315,9 @@ Window {
         let before = {x: p.xWu, y: p.yWu}
         walkTo(g.cxWu, g.cyWu, steps(1.5))
         check(f.inside(p.xWu + 0.5, p.yWu - 0.5, 0), "the shut gate holds the knight in the room")
+
+        let c1 = countIn(w)
+        check(c1.state === "telegraph" && Math.abs(c1.wound - c1.want) < 1e-6, countInLine(c1, 1))
 
         // ---- phase 2 ----
         w.halt()
@@ -231,6 +336,9 @@ Window {
               && game.bossSongPlayer().state === "two",
               "it plays " + b.phase2Tempo + " times faster (a beat of " + r1(w.beatLen * 100) / 100
               + " s), the light turns and the song plays part two")
+        let c2 = countIn(w)
+        check(c2.state === "telegraph" && Math.abs(c2.wound - c2.want) < 1e-6
+              && Math.abs(c2.want - Balance.boss.countIn / (w.tempo * b.phase2Tempo)) < 1e-9, countInLine(c2, 2))
         let core = null
         for (let it of [w].concat(game.glowParent().children))
             if (it.objectName === "wardenCore") core = it
@@ -291,8 +399,15 @@ Window {
         p.hp = 10
         p.mana = 0
         let goldBefore = game.goldDrops.length
+        let fellAt = Math.round(game.physicsSeconds * 1000) / 1000
+        game.soundLog = []
         w.takeDamage(100000, p.xWu, p.yWu, false)
         stepN(2)
+        let fallLine = game.wardenLine(0, "fall")
+        let fallHeard = game.soundLog.filter(x => x.cue.indexOf("voice/warden/") === 0)
+        check(JSON.stringify(f.said) === JSON.stringify([gatesLine.id, fallLine.id]) && fallHeard.length === 1
+              && fallHeard[0].cue === "voice/warden/" + fallLine.id && fallHeard[0].t - fellAt <= 2 / 60 + 1e-6,
+              "as it falls it says \"" + fallLine.text + "\" (" + (fallHeard.length ? fallHeard[0].cue : "none") + ")")
         let drops = game.goldDrops.length - goldBefore
         let total = game.goldDrops.slice(goldBefore).reduce((t, x) => t + x.amount, 0)
         let want = b.gold + b.goldGrow * game.bossAppearance(2)
@@ -304,6 +419,9 @@ Window {
         let victory = f.children.find(x => x.objectName === "victoryBanner")
         check(victory && victory.opacity > 0.5 && !barItem.visible,
               "the victory banner shows (\"" + (victory ? victory.text : "") + "\"), the HP bar is gone")
+        check(caption.opacity > 0.5 && caption.text.indexOf(fallLine.text) >= 0,
+              "its last words show under it: " + caption.text)
+        game.logSounds = false
         check(p.hp === p.maxHp && p.mana === p.maxMana,
               "the knight is healed to full HP and mana (" + p.hp + "/" + p.maxHp + ", " + Math.round(p.mana)
               + "/" + p.maxMana + ")")

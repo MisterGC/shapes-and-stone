@@ -243,6 +243,138 @@ QtObject {
         color: "#FFC85A"
     })
 
+    // The knight's special (issue #317): one of order, picked for each
+    // dungeon before its descent intro counts, let loose with the
+    // special's button (Q, R2) for its mana; the smith's balanced blade
+    // lowers it (shop.bladeShare). Each has a name, a line of what it
+    // does and its mana; momentum: it also needs full momentum, as the
+    // whirlwind does. Only the ones ready are in the game and offered;
+    // with one the choice does not show and the knight has that one. A
+    // choice holds for its dungeon and the camp after it, and the next
+    // choice starts on it. The choice's cards are cardWidth px wide; the
+    // one under the keys or the stick is drawn in pickColor
+    readonly property var specials: ({
+        order: ["whirlwind", "stun", "bolt"],
+        whirlwind: { name: "Whirlwind", line: "Spin forward through every enemy in reach. Needs full momentum.",
+                     mana: knight.whirlMana, momentum: true, ready: true },
+        stun: { name: "Stun", line: "Bash with the shield: small enemies around you freeze.",
+                mana: stun.mana, momentum: false, ready: true },
+        bolt: { name: "Bolt", line: "A blast along your aim hurts the first enemy it meets.",
+                mana: bolt.mana, momentum: false, ready: true },
+        cardWidth: 220,
+        pickColor: "#E8C35A"
+    })
+
+    // The stun (issue #318), a special: the knight bashes with its shield
+    // for mana, and every weak and normal enemy whose centre is within
+    // reach wu of the knight's, all round it, freezes for freeze seconds of
+    // the physics clock: it neither moves nor strikes, an attack it had
+    // under way is over, a blow does not knock it back and a guardian's
+    // shield takes none. A room's lead or the Warden in reach (reach
+    // grows by its bulk) loses the wind-up it is in - a strike's, a
+    // crushing blow's or a shot's - and goes for the knight again at once,
+    // its stance as it was: it is never frozen and never opened. A frozen
+    // enemy is drawn in color with a rim of rimColor and stops breathing;
+    // the bash rings out to reach in color with sparks sparks round the
+    // knight, shakes the screen by trauma and sounds sound/sfx/stun_bash
+    // at volume
+    readonly property var stun: ({
+        mana: 15,
+        reach: 2.5,
+        freeze: 1.5,
+        color: "#9CCFE8",
+        rimColor: "#E8F7FF",
+        sparks: 16,
+        trauma: 0.3,
+        volume: 0.8
+    })
+
+    // The bolt (issue #319), a special: for mana the knight lets loose a
+    // blast from its centre along its aim (its facing). It flies speed wu
+    // a second, size wu across, at most reach wu from where it began, and
+    // hurts the first enemy it meets for damage times the knight's atk -
+    // a blow as any other: a guardian's shield takes it from the front,
+    // and a room's lead or the Warden takes a chip of it on its stance
+    // (Balance.lead.chip) that wears the stance but never breaks it, so
+    // the bolt never opens one. A wall or a closed door ends it, past
+    // reach it fades out; it passes the breakables, as the shots do, and
+    // hurts no knight. It is drawn in color round a core of coreColor,
+    // with a light of light wu; where it ends sparks sparks fly, and it
+    // sounds sound/sfx/bolt_shot as it leaves and sound/sfx/bolt_hit
+    // where it hits an enemy, at shotVolume and hitVolume, and at a wall
+    // at wallGain of that. In a session it flies on every screen; only
+    // the screen of the knight that fired it deals the blow
+    readonly property var bolt: ({
+        mana: 15,
+        damage: 1.0,
+        speed: 16.0,
+        size: 0.35,
+        reach: 12.0,
+        color: "#B98CFF",
+        coreColor: "#F4ECFF",
+        light: 3.0,
+        sparks: 8,
+        trauma: 0.15,
+        shotVolume: 0.7,
+        hitVolume: 0.8,
+        wallGain: 0.5
+    })
+
+    // The combo (issue #320): a short combo of directions entered with the
+    // moves - keys, stick or touch pad, as they are bound - just before the
+    // special's button fires the special's stronger version for the same
+    // mana. The combo is away from the knight's aim, then towards it: the
+    // moves point within cone degrees of the way away from its facing on a
+    // physics step, then within cone degrees of its facing no later than
+    // gap seconds after the last step they pointed away, the combo entered
+    // on that step; moves under deadZone of a full push point nowhere. The
+    // button within window seconds of it fires the stronger version, later
+    // the normal one; a combo entered the other way round, or away again
+    // after it, is none, and so is one the knight was aimed elsewhere in.
+    // Away is judged against the facing from before the moves turned it,
+    // for at most awayMax seconds of pushing away, so a pad's left stick
+    // that aims as the knight walks turns the knight round at once and
+    // still enters the combo; pushed away longer, the knight has turned
+    // round. The knight walks on through it all. Each
+    // special's stronger version has a name, a line of what is stronger
+    // and its numbers:
+    // - whirlwind: spins duration seconds instead of knight.whirlDuration,
+    //   hits every standing enemy within reach instead of
+    //   knight.whirlReach for swing times atk instead of knight.whirlSwing;
+    //   it still needs full momentum
+    // - stun: freezes for freeze seconds instead of stun.freeze, every
+    //   weak and normal enemy within reach instead of stun.reach; a lead
+    //   or the Warden in it still only loses its wind-up, never opened
+    // - bolt: damage times atk instead of bolt.damage, size wu across
+    //   instead of bolt.size, at speed instead of bolt.speed; on a lead or
+    //   the Warden still a chip that never breaks the stance
+    // As it fires the knight shows the stronger version's name in
+    // wordColor over it, a ring of color out to ring wu and sparks sparks
+    // round it, and plays sound/sfx/special_surge at volume over the
+    // special's own sound; a stronger whirlwind's blade glows color, a
+    // stronger stun's ring and a stronger bolt are drawn in color, and a
+    // stronger stun shakes the screen by trauma. In a session every screen
+    // sees and hears it
+    readonly property var combo: ({
+        window: 0.35,
+        gap: 0.25,
+        cone: 50,
+        deadZone: 0.5,
+        awayMax: 0.5,
+        whirlwind: { name: "Tempest", line: "spins longer and wider, hits harder",
+                     duration: 0.5, reach: 2.2, swing: 3 },
+        stun: { name: "Quake", line: "freezes further and longer",
+                freeze: 2.5, reach: 3.5 },
+        bolt: { name: "Lance", line: "a bigger, faster blast, twice the damage",
+                damage: 2.0, size: 0.6, speed: 22.0 },
+        color: "#FFD45A",
+        wordColor: "#FFE89A",
+        ring: 1.4,
+        sparks: 18,
+        trauma: 0.45,
+        volume: 0.8
+    })
+
     // The kill chain (issue #270): a kill within window seconds of the
     // knight's last one, on the physics clock, is the next link of its
     // chain; a kill later than that starts a new one, and a hit the knight
@@ -253,7 +385,14 @@ QtObject {
     // screen alone: freeze seconds, plus freezeStep for each link past the
     // second, at most freezeMax, the world at freezeScale, and trauma for
     // the shake. Every pipEvery-th link adds a momentum pip. A chain is
-    // counted (fightRecord.chains) once it reaches two links
+    // counted (fightRecord.chains) once it reaches two links.
+    // While the chain holds - its window not run out, no hit taken - each
+    // pip it added makes the knight's blows (every swing, the whirlwind's
+    // hits) deal bonusShare more of their damage, at most bonusCap more
+    // (issue #321); the HUD shows it in bonusColor beside the special.
+    // A chain's kill bursts more the longer the chain, on every screen:
+    // each link past the first, up to burstLinks, adds burstShards shards
+    // and burstSparks sparks and widens its ring by burstRing wu
     readonly property var chain: ({
         window: 2.5,
         pitches: [0, 1, 3, 5, 7, 8, 10, 12],
@@ -262,7 +401,14 @@ QtObject {
         freezeMax: 0.17,
         freezeScale: 0,
         trauma: 0.45,
-        pipEvery: 3
+        pipEvery: 3,
+        bonusShare: 0.15,
+        bonusCap: 0.45,
+        bonusColor: "#FF9A4A",
+        burstLinks: 8,
+        burstShards: 3,
+        burstSparks: 3,
+        burstRing: 0.3
     })
 
     // The sword-and-shield combo: the right button within window seconds of
@@ -300,16 +446,16 @@ QtObject {
 
     // The dungeon music (sound/music/dungeon.song.json) follows the fight:
     // its intensity is how many enemies within reach world units of the
-    // knight are after it - chasing, winding up or striking - out of
-    // fullAt, eased up at rise and down at fall per second, so the pulse
-    // layer (0.15..0.5) comes in with the first enemy and the battle layer
-    // (0.5..1) with the second and third
+    // knight are after it - chasing, winding up, striking or frozen by a
+    // stun (stun) - out of fullAt, eased up at rise and down at fall per
+    // second, so the pulse layer (0.15..0.5) comes in with the first enemy
+    // and the battle layer (0.5..1) with the second and third
     readonly property var music: ({
         fullAt: 3,
         reach: 14,
         rise: 1.5,
         fall: 0.2,
-        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash"]
+        engaged: ["chase", "telegraph", "crush", "lunge", "shoot", "kite", "bash", "frozen"]
     })
 
     // A grunt or a guardian winding up its lunge screams like a goblin,
@@ -354,8 +500,13 @@ QtObject {
         grunt: { hpBonus: 2, leadHp: 0.67, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         guardian: { hpBonus: 0, leadHp: 0.67, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -2, leadHp: 1, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
-        // The Hollow Warden (Balance.boss): its HP is the boss table's
-        warden: { hpBonus: 0, leadHp: 1, atk: 22, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
+        // The slinger (issue #322): a lead of iron that slings metal balls
+        // (Balance.ball), only ever a room's lead (spawn.slingerChance);
+        // it keeps its distance as the spitter does
+        slinger: { hpBonus: -2, leadHp: 1, atk: 14, def: 1, chaseSpeed: 2.4, patrolSpeed: 0.9 },
+        // The Hollow Warden (Balance.boss): its HP is the boss table's; its
+        // blow is light for a boss, as its strings land many (issue #330)
+        warden: { hpBonus: 0, leadHp: 1, atk: 10, def: 2, chaseSpeed: 2.6, patrolSpeed: 0 },
         // How often an enemy decides, and how often a chase re-plans its path
         thinkInterval: 0.1,
         repathInterval: 1.0,
@@ -412,7 +563,7 @@ QtObject {
         crushMana: 15,
         crushLockout: 0.5,
         crushShare: 0.6,
-        // Spitter: keeps its distance and shoots
+        // A spitter or a slinger: keeps its distance and shoots
         preferredDist: 5.0,
         // Backs off below this share of preferredDist, closes in above the other
         tooClose: 0.7,
@@ -438,6 +589,38 @@ QtObject {
         backDamage: 1.0
     })
 
+    // A slinger's metal ball (issue #322): size wu across, flying from the
+    // slinger's centre at the knight's at speed. It bounces off the walls
+    // and a shut door bounces times, mirrored; the next wall it meets it
+    // falls at, lies restTime seconds and is gone. lifetime seconds after
+    // it left, or after a shield sent it, it falls where it is. A knight it
+    // meets takes the slinger's atk; a dash goes through it. Any raised
+    // shield facing it bounces it, at the shield's mana as a blocked shot:
+    // a plain block off the shield like a mirror, at least glance degrees
+    // off the line it came along, at the speed it had; a perfect block
+    // along the way the knight faces at backSpeed. A ball a shield bounced
+    // hurts no knight; the first enemy it meets takes backDamage times the
+    // swing (atk) of the knight whose shield sent it, and it falls; a lead
+    // it hits opens (cause "ball"), the blow landing whole. A shield's
+    // bounce is no wall's: it does not count. It is color, a shield's
+    // turnedColor; its shot plays at shotVolume, a bounce at bounceVolume,
+    // its fall the bounce fallPitch semitones down
+    readonly property var ball: ({
+        size: 0.36,
+        speed: 8.0,
+        backSpeed: 12.0,
+        bounces: 4,
+        glance: 35,
+        lifetime: 10.0,
+        restTime: 0.6,
+        backDamage: 1.0,
+        color: "#8A949E",
+        turnedColor: "#DDF4FF",
+        shotVolume: 0.7,
+        bounceVolume: 0.6,
+        fallPitch: -5
+    })
+
     readonly property var spawn: ({
         // Rooms per dungeon, rolled evenly from roomsMin to roomsMax, each
         // roomSizeMin to roomSizeMax cells a side; the build and the witch's
@@ -460,6 +643,11 @@ QtObject {
         guardianChance: 0.15,
         guardianChanceTough: 0.4,
         spitterChance: 0.2,
+        // The slinger (issue #322), a kind of lead: from depth slingerDepth
+        // on, slingerChance of the rooms' leads are slingers; the type
+        // rolls above share the rest out as before
+        slingerDepth: 1,
+        slingerChance: 0.25,
         // The village fight room: who stands where, offset in wu from its
         // centre, and how long after it is cleared it fills up again
         fightRoom: [
@@ -528,6 +716,31 @@ QtObject {
         guardianDuel: [
             { dx: 0, dy: 4, tier: 2, type: "guardian" }
         ],
+        // spitterDuel the same with a spitter lead, the third kind a
+        // room's lead can be (spawn.spitterChance); no band of this table
+        // checks it, the person below plays it (issue #315)
+        spitterDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "spitter" }
+        ],
+        // ballDuel the same with a slinger lead, the fourth kind (issue
+        // #322); no band of this table checks it either
+        ballDuel: [
+            { dx: 0, dy: 4, tier: 2, type: "slinger" }
+        ],
+        // The person (issue #315): a fourth pilot, "person", plays as
+        // "skilled" does with a person's reaction and misses. It answers
+        // an attack, a shot or a zone of the Warden's no sooner than
+        // reaction seconds after it began - a wind-up begun, a shot
+        // fired, a zone warning - and once it has seen it times its press
+        // to the window as "skilled" does, but misses miss of its parries
+        // and perfect blocks in turn - one in every five for 0.2, the
+        // first one's place picked by the seed, the room and its danger -
+        // by one window early or late, as the seed rolls. Its results are
+        // reported, not banded:
+        // a win is a fight a person can do (README, "The person pilot").
+        // --check fails when its misses over all its fights lie more than
+        // missSlack off miss
+        person: { reaction: 0.25, miss: 0.2, missSlack: 0.05 },
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
         // one charged swing, two or three swings, parries among them for
@@ -629,6 +842,12 @@ QtObject {
                 { name: "volley", beats: [1, 1, 1] },
                 { name: "stutter", beats: [1, 0, 1, 2] }
             ],
+            // The slinger's (issue #322): one ball, then rests while it
+            // bounces about
+            slinger: [
+                { name: "serve", beats: [1, 0, 0] },
+                { name: "feint-serve", beats: [2, 0, 0, 1, 0, 0] }
+            ],
             // The Hollow Warden's three (Balance.boss), on its own beat
             warden: [
                 { name: "toll", beats: [1, 0, 1, 0, 1] },
@@ -696,22 +915,43 @@ QtObject {
     // wind-up and its strike, the lunge setting off, play its own toll
     // (sfx/warden_toll, a hollow stone toll on A1) at toll.volume, fading
     // with the distance as the scream does, the wind-up toll.windUp
-    // semitones off the cue's own, the strike toll.strike
+    // semitones off the cue's own, the strike toll.strike.
+    // It speaks (issue #323): it was a knight once. At its n-th appearance
+    // it says lines[n].gates as its gates shut and lines[n].fall as it
+    // falls - the last pair at every appearance past them -, on every
+    // screen, at lineVolume; each a voiced line of the sound factory
+    // (sound/voice/warden.voice.json, the cue voice/warden/<id>), its words
+    // shown under the banner for lineShow seconds. Read in order they tell
+    // its story. Its stone shows a crack for every defeat before, n of
+    // them, up to cracks.
+    // Each of its strings begins with a wind-up of countIn seconds,
+    // divided by its tempo, where a room's other leads wind up for
+    // enemy.windUp. A person can beat it at depth 2, 5 and 8 (issue
+    // #330): the fight bench's person pilot (pacing.person) sees a
+    // wind-up a quarter of a second late and may still swing as it
+    // begins, so the count-in is long enough that its parry comes
+    // lead.parryRest after that swing; a slower tempoGrow does the same
+    // for a string's later wind-ups at depth 8. enemy.warden.atk keeps
+    // the blows its missed parries let through under the knight's HP, hp
+    // asks fewer answers of it while "skilled" stays within
+    // pacing.bossSkilled, and zone.every leaves room between a zone and
+    // the Warden's strings
     readonly property var boss: ({
         every: 3,
         name: "The Hollow Warden",
-        hp: 2500,
+        hp: 2000,
         hpGrow: 0.05,
         depthUpTo: 4,
-        tempoGrow: 0.05,
+        tempoGrow: 0.025,
         // Its size a side, wu; its reach and its blow's reach grow with it
         size: 1.8,
         beat: 1.0,
+        countIn: 1.0,
         phaseAt: 0.5,
         phase2Tempo: 1.25,
         adds: 3,
         waveAt: 0.25,
-        zone: { every: 3.5, warn: 1.2, radius: 1.3, damage: 18, grow: 4, linger: 0.4 },
+        zone: { every: 5.0, warn: 1.2, radius: 1.3, damage: 18, grow: 4, linger: 0.4 },
         gold: 120,
         goldGrow: 60,
         drops: 8,
@@ -721,7 +961,20 @@ QtObject {
         hexColor: "#4A4E57",
         coreColor: "#FF5A2A",
         gateColor: "#2F3640",
-        toll: { windUp: 7, strike: 0, volume: 0.9 }
+        toll: { windUp: 7, strike: 0, volume: 0.9 },
+        lines: [
+            { gates: { id: "gates_1", text: "None who come this deep go home." },
+              fall: { id: "fall_1", text: "This stone... remembers a sword." } },
+            { gates: { id: "gates_2", text: "I came down too, once. Like you." },
+              fall: { id: "fall_2", text: "The stone took me, as it took them." } },
+            { gates: { id: "gates_3", text: "I was sworn to bring them home." },
+              fall: { id: "fall_3", text: "I was a knight... once. Free them." } },
+            { gates: { id: "gates_later", text: "Still the stone holds me. Strike true." },
+              fall: { id: "fall_later", text: "Climb, knight. Climb for us both." } }
+        ],
+        lineVolume: 0.9,
+        lineShow: 4.0,
+        cracks: 6
     })
 
     // A dungeon's danger is its depth plus a position in [0, 1) in that
@@ -1139,6 +1392,51 @@ QtObject {
         ]
     })
 
+    // The dungeon's critters (issue #324): spiders, mice and rats on the
+    // floor of its rooms and corridors, there to make it feel alive and
+    // nothing more. Drawn only: no body, so they never hurt and never block
+    // the way; no enemy, so they count for no kill chain and the lock-on
+    // never picks one. Each screen runs its own from the level's seed: the
+    // same critters in the same places, each fleeing and squashed by the
+    // knights that screen shows, nothing sent over the network.
+    // A room holds perRoom of them on average (a whole number, its fraction
+    // a chance of one more), the corridors one per perCorridorCells of
+    // their cells, none within clearOfSpawn wu of where the knights come in.
+    // Each is one of kinds, picked by share: size wu across, running at
+    // speed wu per second (below the knight's moveSpeed, so a knight that
+    // goes for one catches it), noticing a standing knight within notice
+    // wu. A noticed knight startles it for startle seconds, then it runs
+    // from the nearest knight, sliding along the walls, until none is
+    // within forget wu. Resting, every rest[0] to rest[1] seconds it
+    // scurries up to wander wu at wanderSpeed of its speed. A knight's
+    // centre within squash wu of a critter's edge squashes it: the squash
+    // plays pitch semitones from the cue at squashVolume, fading with the
+    // distance, and a mark of its kind's colour, markSize times its size,
+    // stays on the floor for the level. Only critters within awake wu of a
+    // knight move; the rest wait where they are
+    readonly property var critters: ({
+        perRoom: 1.6,
+        perCorridorCells: 14,
+        clearOfSpawn: 4,
+        kinds: {
+            mouse: { share: 0.4, size: 0.36, speed: 5.5, notice: 3.0, pitch: 0,
+                     color: "#8C8279", mark: "#4A1E1A" },
+            rat: { share: 0.25, size: 0.52, speed: 5.0, notice: 3.5, pitch: -4,
+                   color: "#5C4B3F", mark: "#3E1712" },
+            spider: { share: 0.35, size: 0.42, speed: 4.2, notice: 2.2, pitch: 4,
+                      color: "#2B2326", mark: "#2E3A1C" }
+        },
+        startle: 0.18,
+        forget: 6,
+        rest: [2, 7],
+        wander: 1.2,
+        wanderSpeed: 0.35,
+        squash: 0.5,
+        markSize: 1.7,
+        squashVolume: 0.55,
+        awake: 18
+    })
+
     // Gold: what a killed enemy drops where it fell, for a knight to pick up
     readonly property var loot: ({
         // By tier: weak, normal, tough. The fight room drops none
@@ -1198,7 +1496,7 @@ QtObject {
         draughtPrice: 20,
         draughtMana: 40,
         // The smith's upgrades last the run and have levels: the sword,
-        // the shield, the harness and the blade. At each camp he sells one
+        // the shield, the harness, the blade and the boots. At each camp he sells one
         // level of one of them, the next above the knight's; the camp
         // after depth d offers level L only once d reaches levelDepth[L - 1].
         // Level L costs upgradePrice[L - 1] and gives the L-th entry of
@@ -1216,9 +1514,15 @@ QtObject {
         // Lighter harness: a dash costs this much mana instead of
         // knight.dashMana, the whirlwind's dash too
         harnessDashMana: [6, 4, 3],
-        // Balanced blade: a whirlwind costs this much mana, its dash
-        // included, instead of knight.whirlMana
-        bladeWhirlMana: [15, 12, 9]
+        // Balanced blade: the chosen special (specials) costs this share
+        // of its mana, rounded; a whirlwind, its dash included, 20 -> 15,
+        // 12, 9
+        bladeShare: [0.75, 0.6, 0.45],
+        // Swift boots (issue #325): the knight walks this many wu a second
+        // instead of knight.moveSpeed; a charge, a raised shield still slow
+        // it by their share of it (knight.chargeSpeed, knight.blockSpeed).
+        // The dash's speed, length and mana stay
+        bootsSpeed: [8.0, 8.5, 9.0]
     })
 
     // The dungeon master's panel (issue #142): with Dungeon Master ticked
@@ -1307,6 +1611,43 @@ QtObject {
         volume: 0.7,
         chime: [0, 4, 7, 12],
         step: 0.12
+    })
+
+    // Entering a dungeon opens with a descent intro (issue #316): its
+    // depth and its name for lead seconds, then a count of beats (3, 2,
+    // 1), beat seconds each, while the world is held: nothing moves,
+    // strikes or takes damage. Go shows for go seconds once the count
+    // ends; the name fades in over fade seconds. Each beat plays the
+    // count's knock (sfx/descent_count) at volume, the release pitched
+    // goPitch semitones up. In a session the count starts once every
+    // knight has arrived, lag seconds ahead on the session clock so it
+    // reaches every screen before it begins, and ends at the same moment
+    // on every screen; a knight not arrived after waitMax seconds holds
+    // the others no longer, and one that waits waitNote seconds is told
+    // so. Alone the count's clock moves at most maxStep seconds a frame,
+    // so a stall of the frames holds the count rather than skip a beat.
+    // The name is an adjective of the dungeon's danger band (as
+    // danger.looks) and a place, both drawn from its level's seed ^ salt,
+    // so every screen of a session shows the same
+    readonly property var intro: ({
+        lead: 0.5,
+        beat: 0.5,
+        beats: 3,
+        go: 0.6,
+        fade: 0.25,
+        volume: 0.7,
+        goPitch: 12,
+        lag: 0.15,
+        waitMax: 6,
+        waitNote: 0.6,
+        maxStep: 0.1,
+        salt: 0x64657363,
+        adjectives: [
+            ["Dripping", "Mossy", "Quiet", "Shallow", "Damp", "Lamplit"],
+            ["Pale", "Hollow", "Cold", "Silent", "Grey", "Forgotten"],
+            ["Burning", "Red", "Scorched", "Howling", "Ashen", "Bleeding"]
+        ],
+        places: ["Halls", "Vaults", "Deeps", "Galleries", "Warrens", "Cisterns", "Crypts", "Passages"]
     })
 
     readonly property var campfire: ({

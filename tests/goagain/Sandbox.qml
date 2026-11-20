@@ -20,6 +20,8 @@ Item {
     Game {
         id: game
         anchors.fill: parent
+        // The descent intro would hold each dungeon's first seconds (issue #316)
+        descentIntro: false
         muted: true
         // A record of its own: the bench keeps no best depth of the player's
         recordStoreName: "ShapesAndStoneGoAgainBench"
@@ -103,7 +105,7 @@ Item {
             connected: connected, nodes: nodeCount,
             knight: p ? {hp: p.hp, maxHp: p.maxHp, mana: p.mana, maxMana: p.maxMana, gold: p.gold,
                          potions: p.potions, draughts: p.draughts,
-                         levels: p.swordLevel + p.shieldLevel + p.harnessLevel + p.bladeLevel,
+                         levels: p.swordLevel + p.shieldLevel + p.harnessLevel + p.bladeLevel + p.bootsLevel,
                          downed: _viewOf(p) ? _viewOf(p).downed : null} : null,
             others: others,
             fallenScreen: _fallenScreen() ? {title: _find(_fallenScreen(), "fallenTitle").text,

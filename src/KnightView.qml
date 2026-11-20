@@ -96,10 +96,13 @@ Item {
 
     // The whirlwind: the blade spins Balance.whirl.turns times round the
     // knight in durationMs, glowing, with the dash's afterimages
-    function whirl(durationMs) {
+    // strong: the stronger version (Balance.combo, issue #320), its blade
+    // glowing Balance.combo.color out to its wider reach
+    function whirl(durationMs, strong) {
         attackAnimation.stop()
         attackArc.heavy = true
         attackArc.whirl = true
+        attackArc.strong = strong === true
         attackArc.swingProgress = 0
         attackArc.swingOpacity = 0.9
         whirlSpin.duration = durationMs
@@ -1054,6 +1057,8 @@ Item {
         // The whirlwind: full turns (Balance.whirl), the smear behind the
         // blade no longer than Balance.whirl.smear
         property bool whirl: false
+        // A stronger whirlwind (Balance.combo): its glow and reach
+        property bool strong: false
 
         onSwingProgressChanged: requestPaint()
 
@@ -1064,6 +1069,8 @@ Item {
             var centerX = width / 2
             var centerY = height / 2
             var reach = heavy ? Balance.knight.heavyRange : 1
+            if (whirl && strong) reach *= Balance.combo.whirlwind.reach / Balance.knight.whirlReach
+            var glow = whirl && strong ? Balance.combo.color : view._glow
             var radius = view.host.width * 1.6 * reach
             var innerRadius = view.host.width * 0.6
 
@@ -1088,7 +1095,7 @@ Item {
                     ctx.arc(centerX, centerY, radius * (0.96 + 0.04 * k), a0, a1)
                     ctx.arc(centerX, centerY, inner, a1, a0, true)
                     ctx.closePath()
-                    ctx.fillStyle = heavy ? view._rgba(view._glow, swingOpacity * 0.75 * k * k)
+                    ctx.fillStyle = heavy ? view._rgba(glow, swingOpacity * 0.75 * k * k)
                                           : "rgba(210, 236, 255, " + (swingOpacity * 0.55 * k * k) + ")"
                     ctx.fill()
                 }
@@ -1102,7 +1109,7 @@ Item {
                 var trailOpacity = swingOpacity * (1.0 - i * 0.25)
                 ctx.beginPath()
                 ctx.arc(centerX, centerY, trailRadius, trailOffset - arcSpan/2, trailOffset + arcSpan/2)
-                ctx.strokeStyle = view._rgba(heavy ? view._glow : view.accentColor, trailOpacity)
+                ctx.strokeStyle = view._rgba(heavy ? glow : view.accentColor, trailOpacity)
                 ctx.lineWidth = heavy ? 3 : 2
                 ctx.stroke()
             }
@@ -1118,7 +1125,7 @@ Item {
             var perpY = Math.cos(currentAngle)
 
             view._swordPath(ctx, centerX, centerY, currentAngle, innerRadius, radius)
-            ctx.fillStyle = view._rgba(heavy ? view._glow : view.bladeColor, swingOpacity)
+            ctx.fillStyle = view._rgba(heavy ? glow : view.bladeColor, swingOpacity)
             ctx.fill()
             var sharp = view.swordLevel > 0
             ctx.strokeStyle = view._rgba(sharp ? view._edgeColor : view.accentColor, swingOpacity)

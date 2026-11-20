@@ -1,0 +1,87 @@
+{
+  "line": "fall_2",
+  "text": "The stone took me, as it took them.",
+  "audio": "warden/fall_2.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-323/sound/voice/warden/fall_2.wav",
+    "duration": 2.72
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.03,
+      "value": "X"
+    },
+    {
+      "start": 0.03,
+      "end": 0.2,
+      "value": "B"
+    },
+    {
+      "start": 0.2,
+      "end": 0.34,
+      "value": "E"
+    },
+    {
+      "start": 0.34,
+      "end": 0.62,
+      "value": "F"
+    },
+    {
+      "start": 0.62,
+      "end": 0.69,
+      "value": "B"
+    },
+    {
+      "start": 0.69,
+      "end": 0.79,
+      "value": "A"
+    },
+    {
+      "start": 0.79,
+      "end": 1.35,
+      "value": "B"
+    },
+    {
+      "start": 1.35,
+      "end": 1.49,
+      "value": "C"
+    },
+    {
+      "start": 1.49,
+      "end": 1.56,
+      "value": "B"
+    },
+    {
+      "start": 1.56,
+      "end": 1.77,
+      "value": "F"
+    },
+    {
+      "start": 1.77,
+      "end": 1.91,
+      "value": "B"
+    },
+    {
+      "start": 1.91,
+      "end": 2.05,
+      "value": "C"
+    },
+    {
+      "start": 2.05,
+      "end": 2.22,
+      "value": "A"
+    },
+    {
+      "start": 2.22,
+      "end": 2.72,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}

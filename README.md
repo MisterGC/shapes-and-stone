@@ -79,7 +79,8 @@ gamepad, whichever was used last. By default:
 | Strike (hold to charge, at a vein dig, at a pond cast) | left button | R1 |
 | Shield | right button | L1 |
 | Dash | Space | B |
-| Whirlwind | Q | R2 |
+| Special (the one picked for the dungeon) | Q | R2 |
+| Its stronger version: move away from your aim, then towards it, then | Q | R2 |
 | Talk, open a door | E | A |
 | Potion | 1 | X |
 | Draught | 2 | Y |
@@ -89,7 +90,7 @@ gamepad, whichever was used last. By default:
 | Effects on and off | V | - |
 | Menu | Esc | Start |
 
-In a dialogue 1 to 5 buy what is offered; on a pad the stick picks a ware,
+In a dialogue 1 to 6 buy what is offered; on a pad the stick picks a ware,
 the potion's button buys it and the dash's closes the dialogue.
 
 *Control Input*, in the menu under *Sound* and on the title, shows the
@@ -144,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -336,12 +337,16 @@ it, where it came from, and a person's verdict once it has been heard.
   too: its part `one`, a low choir, the bass tolling the root and a brass
   call, and from the Warden's phase 2 on its part `two`, the bass running
   in eighths under kick, snare and hat, moving on the next bar.
-- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings and
-  the knight's whirlwind shout are lines of the voice scripts
-  `sound/voice/<name>.voice.json`, spoken by vocli through `sp say`, cleaned
-  to -18 LUFS and lip-synced by Rhubarb. A greeting plays its render, and the
-  dialogue panel moves the speaker's mouth from the line's viseme cues,
-  `<line>.visemes.json` beside the render.
+- **Voice**: the innkeeper's, the blacksmith's and the witch's greetings,
+  the knight's whirlwind shout and the Hollow Warden's eight lines are
+  lines of the voice scripts `sound/voice/<name>.voice.json`, spoken by
+  vocli through `sp say`, cleaned to -18 LUFS and lip-synced by Rhubarb. A
+  greeting plays its render, and the dialogue panel moves the speaker's
+  mouth from the line's viseme cues, `<line>.visemes.json` beside the
+  render. The Warden has no mouth, so nothing reads its lines' cues; its
+  voice, `warden_hollow`, was designed by vocli's `create` (a big, weary
+  man near sixty, hoarse and unhurried), and each take records that
+  design's model and seed.
 
 The build ships what the sheet names: a live cue's recipe or song, a
 rendered cue's render, and a voiced line's viseme cues. A changed recipe is
@@ -417,9 +422,9 @@ plays that part from its next bar, a parry stings once, the lead's opening
 stings and plays the slow motion for its steps, a lock on the lead closes
 the view in round the knight (on no other enemy), with the session's
 `hitStopMode` `"view"` the slow motion is the picture's and the physics
-runs on, and its fall brings the flow part back. With no audio output, as on CI's runner, the song's
-playhead stands and its segment never moves (clayground#507): the bench
-then prints a SKIP line for that one check:
+runs on, and its fall brings the flow part back. With no audio output, as on
+CI's runner, Clayground's sound engine runs on its own clock
+(clayground#507), so the song moves to its duel part there too:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/lipsync/lipsync.qml
@@ -730,7 +735,7 @@ claims the drops its own knight reaches, and the host gives each to the
 first claim it gets and despawns it, so a drop is picked up once, by one
 knight; each knight's gold is its own node's. In the village the
 innkeeper sells a health potion and a mana draught, and the smith
-upgrades that last the run, through the dialogue panel: E talks, 1 to 4
+upgrades that last the run, through the dialogue panel: E talks, 1 to 6
 buy what the panel offers, each ware named with its effect. Outside the
 panel, 1 drinks a potion and 2 a draught, which gives `shop.draughtMana`
 mana back, up to the knight's max - at today's 40 it refills the bar; a
@@ -750,16 +755,22 @@ through a held block instead of `knight.blockedShare`, a blow it stops
 costs `shop.shieldBlockMana` mana instead of `knight.blockMana`, and shows
 a lighter rim; the lighter harness makes a dash cost `shop.harnessDashMana`
 instead of `knight.dashMana`, the whirlwind's dash too; the balanced blade
-makes a whirlwind cost `shop.bladeWhirlMana`, its dash included, instead
-of `knight.whirlMana`. Each of these is a list with one entry per level.
+makes the special the knight picked cost `shop.bladeShare` of its mana,
+rounded: a whirlwind, its dash included, 15, 12 and 9 instead of
+`knight.whirlMana`'s 20; the swift boots make the knight walk
+`shop.bootsSpeed` wu a second instead of `knight.moveSpeed` - 8, 8.5 and 9
+instead of 7.5 - while a charge and a raised shield still slow it by
+their share (`knight.chargeSpeed`, `knight.blockSpeed`) and a dash goes
+as far and costs as much as without (issue #325). Each of these is a list
+with one entry per level.
 The perfect block's window is the same at every level. At each camp the
-smith sells one level, the next above the knight's in one of the four,
+smith sells one level, the next above the knight's in one of the five,
 for `shop.upgradePrice` of that level, and then nothing more there; the
 camp after depth d sells level L only once d reaches `shop.levelDepth`
 of L - level I from the first camp, II from the camp after depth 2, III
 from the one after depth 4. The knight reads its levels live, so in the
 dojo's fight scenario `eval player.swordLevel = 2` (or `shieldLevel`,
-`harnessLevel`, `bladeLevel`; 0 for none) applies one at once. Gold,
+`harnessLevel`, `bladeLevel`, `bootsLevel`; 0 for none) applies one at once. Gold,
 potions, draughts and the levels go with the knight to the next level; a
 new run starts without them. In a session they are each knight's own,
 bought with its own gold. Prices and effects are the table's `shop`
@@ -772,6 +783,18 @@ number of failed checks:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/gold/gold.qml
+```
+
+The boots bench has the first camp's smith offer the swift boots I next to
+his other four upgrades, buys them with 6 while a gem in the pouch puts
+his offer for it first, and reads them in the knight panel; the camps
+after depth 2 and 4 offer boots II and III. In the fight room, at every
+level from none to III, it measures the knight's speed walking, charging
+and behind the shield, and a dash's length and mana. It exits with the
+number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/boots/boots.qml
 ```
 
 While a dialogue is open the knight stands: movement and the dash do
@@ -788,8 +811,8 @@ QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/dialogue/dialogue.qml
 
 At the camp the witch reads the next dungeon: where it sits in its depth's
 range - high, in the middle or low - and what lives there, how many
-enemies, how many of them tough and weak, how many guardians and
-spitters, and when it hides a secret room that a hidden chamber lies
+enemies, how many of them tough and weak, how many guardians,
+spitters and slingers, and when it hides a secret room that a hidden chamber lies
 below and how to find it. She reads it off the run's seed, the next
 dungeon's position and the knights the party has, the way the dungeon is
 built (`Game.foretell`, `Game.secretsOf`), so the dungeon the knights
@@ -873,8 +896,11 @@ swing, and every screen shows it seated, facing the fire there. The pose's
 numbers are `camp.sit`. The sit bench steps the world one physics step at
 a time: the knight sits on the step that reaches sitAfter, a press of D,
 Space, the right button or a click each stands it up in the next step,
-out of the fire's warmth it never sits, and five seconds at the fire heal
-and refill the same seated as for a knight that never sits. It exits with
+out of the fire's warmth it never sits, and five seconds at the fire, 300
+steps, heal and refill the same seated as for a knight that never sits.
+The fire heals a tick every `campfire.healTick` seconds of the physics
+clock, not the wall clock, so a pause holds it and a slow machine heals
+the same in those steps as a fast one. It exits with
 the number of failed checks; with a window and an output directory it
 saves the knight seated as `sit.png`. The danger party bench below sits
 both knights of a two-process session at the first camp's fire and checks
@@ -1142,14 +1168,20 @@ enemies are fodder, weak and normal, so the rooms without a lead fight
 in larger groups as the count grows; a creature out of a hole is fodder
 too. The mix is dealt, not rolled: the share of rooms with a lead, rounded,
 picked among the rooms that hold an enemy, and `spawn.weakChance` of its
-enemies weak, so it follows the depth on every seed. In the dojo,
+enemies weak, so it follows the depth on every seed. From depth
+`spawn.slingerDepth` (1) on, `spawn.slingerChance` (a quarter) of the
+leads are slingers, the lead that slings metal balls (issue #322, below);
+the other leads keep the mix of types they had, and a slinger is never
+fodder nor comes out of a hole. In the dojo,
 `applyScenario("dungeon", 4)` through `eval` lands in the dungeon at
 depth 4 (the village and the fight room take a depth the same way), and
 the balance bench checks depth 0, 2 and 4 against the table. The leads
-bench plans 50 seeds at each of depths 0, 2, 4 and 8, checks that no room
+bench plans 50 seeds at each of depths 0, 1, 2, 4 and 8, checks that no room
 holds two tough enemies, that each has the table's count of rooms with a
-lead and that a seed planned twice is the same dungeon, then builds the
-dungeon at each depth and checks it is the planned one:
+lead, that a seed planned twice is the same dungeon and that the slingers
+are leads only, none before depth 1 and about a quarter of the leads
+after, then builds the dungeon at each depth and checks it is the planned
+one:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/leads/leads.qml
@@ -1602,7 +1634,7 @@ up to `value[1]` with all of them clean (`Balance.deep.shapes`); the HUD
 shows a gem of each shape the pouch holds and how many, beside the gold.
 The pouch goes with the knight from level to level, and the smith buys
 it: talking to him, his first ware is the gems, 1 sells them all for
-their worth (the keys 1 to 5 pick his wares now). A knight that falls
+their worth (the keys 1 to 6 pick his wares now). A knight that falls
 drops its pouch where it fell: another knight whose centre comes within
 `pouchReach` of it, or who lifts the fallen one up, takes it; one left on
 the floor is lost with the level. In a session each screen judges its
@@ -1902,6 +1934,206 @@ run out after it, and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/hitstop/hitstop.qml
 ```
 
+Entering a dungeon - a run's first and each one after a camp - opens with a
+descent intro: the depth and the dungeon's name for half a second, then a
+count of 3, 2, 1, half a second a beat, then Go. Until Go the world is held
+as under the solo pause: nothing moves, the knight's swing, shield, dash and
+whirlwind are refused and no blow lands on a knight or an enemy. Each beat
+plays the count's knock (`sfx/descent_count`), Go an octave up. The name is
+an adjective of the dungeon's danger band and a place, drawn from the
+level's seed, so in co-op every screen shows the same. In co-op the count
+starts once every knight has arrived in the dungeon, on the session clock,
+so it ends at the same moment on every screen; a knight not arrived after
+6 s holds the others no longer. The camp, the fight room and the dojo's
+scenarios have no intro. The lengths, the names and the wait are
+`Balance.intro`. The game's window and the dojo show it; a bench that
+builds the game itself goes on without unless it sets `descentIntro`, and
+the party benches turn it off. The descent bench steps through the intro
+alone and in a session of a host and a joiner in one process, checks the
+hold, the beats and its length, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/descent/descent.qml
+```
+
+Before the intro counts, the knight picks its special for the dungeon: the
+whirlwind, the stun or the bolt (`Balance.specials`). The choice shows a
+card for each with its name, a line of what it does and the mana it costs
+this knight, under the depth and the name, and the count starts once it is
+made. The arrows, A and D or a pad's stick move along the cards; 1 to 3, a
+click, Enter, Space, E or the pad's A take one. Q or R2 then let loose the
+special picked and nothing else, the HUD shows its name and mana right of
+the mana bar and the controls hint names it. The pick holds for the dungeon
+and the camp after it, and the next choice opens on it. In co-op every
+knight picks its own; a knight that has arrived and still chooses holds the
+count however long it takes, and a knight that has picked shows "Waiting
+for the party" meanwhile. Only the specials in the game are offered, and with one there is
+no choice: today all three are in. Without an intro (the fight
+room, the dojo's scenarios, a bench that turns it off) the knight keeps the
+special it has, the whirlwind at the start. The Control Input page calls
+the special's button *Special*; it keeps the action id `whirlwind`, under
+which a rebound key is kept. The specials bench picks with the keys, the
+synthetic pad and a click, checks what the choice, the HUD, the hint, Q, R2 and the
+smith's blade do with each, then has a host and a joiner each pick their
+own, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/specials/specials.qml
+```
+
+The stun (`Balance.stun`, issue #318) is the special for a crowd: for its
+mana (`stun.mana`, 15, the balanced blade's share of it) the knight bashes
+with its shield where it stands, and every weak and normal enemy whose
+centre is within `stun.reach` wu of the knight's, all round it, freezes
+for `stun.freeze` seconds of the physics clock. A frozen enemy neither
+moves nor strikes: an attack it had under way is over, no blow knocks it
+back, nothing pushes it, a guardian's shield takes no blow and a shield
+push or a bash does not stagger it out of the freeze. It is drawn in ice
+blue with a white rim and holds its breath, and thaws into the chase. A
+room's lead or the Warden in reach is never frozen: a stun in its wind-up
+- a strike's, a crushing blow's or a shot's - ends it, no blow comes of
+it and its string is over, and it goes for the knight again at once,
+neither staggered nor in its recovery and its stance as it was, so the
+stun never opens it; out of a wind-up a stun does nothing to it. The bash
+rings out to the stun's reach with sparks all round and plays its own
+cue, `sfx/stun_bash`, a deep thump with a short iron ring and frost over
+it. In co-op the host applies a joiner's stun to the enemies it runs, and
+the frozen state shows on every screen; the other screens see the knight's
+shield flash and hear the bash, fading with the distance. The fight
+record counts the stuns, the enemies they froze and the wind-ups they
+ended.
+
+The bolt (`Balance.bolt`, issue #319) is the knight's one way to hurt
+something out of the sword's reach: for its mana (`bolt.mana`, 15, the
+balanced blade's share of it) the knight lets a blast loose from its
+centre along its aim, the way it faces. It flies `bolt.speed` wu a second,
+`bolt.size` wu across, at most `bolt.reach` wu, and hurts the first enemy it
+meets for `bolt.damage` times the knight's atk, less the enemy's defense.
+It is a blow as any other: a guardian's shield takes it from the front,
+and a room's lead or the Warden takes a chip of it on its stance that wears
+the stance - but never below one wear, so a bolt never breaks a stance and
+never opens a lead; the sword's next blow does. A wall or a closed door
+ends it, past its reach it fades out, and it passes the breakables as the
+spitter's shots do. It hurts no knight. It is drawn violet round a white
+core with a light of its own; where it ends sparks fly, and it plays its
+cues, `sfx/bolt_shot` as it leaves - a dry crack and a bright zap falling
+away - and `sfx/bolt_hit` where it hits, a snap and a low thud with a
+falling glint, quieter at a wall. In co-op the knight's own screen flies
+the bolt that deals the blow - to an enemy the host runs as an enemy blow -
+and every other screen flies it too, to be seen, ending it where the
+knight's screen says it ended. The fight record counts the bolts and the
+ones that hit. The bolt bench shoots it alone at enemies in a row, up, into
+nothing and at a wall, at a guardian's shield, at a lead and the Warden,
+then has a joiner and a host each shoot through the other's knight, and
+exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/bolt/bolt.qml
+```
+
+A combo of two directions just before the special's button fires the
+special's stronger version for the same mana (`Balance.combo`, issue
+#320): the moves away from the knight's aim, then towards it - with the
+keys, the stick or the touch pad, as they are bound - and the button
+within `combo.window` seconds. On a physics step the moves point away
+when they are within `combo.cone` degrees of the way opposite the
+knight's facing, towards when within it of the facing, and nowhere under
+`combo.deadZone` of a full push; towards no later than `combo.gap` seconds
+after the last step away enters the combo. Locked on an enemy, or aiming
+up, it is S then W. Away is judged against the facing from before the
+moves turned it, for at most `combo.awayMax` seconds of pushing away, so
+with a pad's left stick aiming - its right stick at rest, the knight
+facing the way it walks - the knight turns round at once and the push
+still reads as away; pushed away longer, it has turned round. The knight walks on through it, and someone who
+never learns it loses nothing: the button later than the window, the
+combo the other way round or the moves away again after it fire the
+normal special. The stronger versions: the whirlwind spins
+`combo.whirlwind.duration` seconds, hits within `combo.whirlwind.reach`
+for `combo.whirlwind.swing` times atk and still needs full momentum; the
+stun freezes for `combo.stun.freeze` seconds within `combo.stun.reach`, a
+lead or the Warden in it still only losing its wind-up; the bolt deals
+`combo.bolt.damage` times atk, `combo.bolt.size` wu across at
+`combo.bolt.speed`, still a chip on a lead's stance that never breaks it.
+Each has a name - *Tempest*, *Quake*, *Lance* - that shows over the
+knight as it fires, with a gold ring and sparks round it and the swell
+`sfx/special_surge` over the special's own sound; the stronger whirlwind's
+blade glows gold, the stronger stun's ring and the stronger bolt are gold.
+A whirlwind out of a full charge and a dash stays the normal one. The
+choice of specials names each one's stronger version on its card and
+the combo under the cards, in the keys as bound ("aiming up: S W Q") or
+for the stick. In co-op the other screens see the name, the ring and the
+stronger whirlwind, hear the swell, fly the stronger bolt big, and the
+host freezes its enemies for the stronger stun's freeze. The fight
+record counts the stronger specials (`strongSpecials`). The combo bench
+enters the combo with the pad's left stick alone, the aim following it,
+checks that an about-turn on it faces the knight the new way at once,
+then with the keys, the pad's stick and rebound keys, late,
+the wrong way round and away again, checks each special's stronger
+version, the choice's combo line, and a joiner's stronger stun and bolt
+on the host, and exits with the number of failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/combo/combo.qml
+```
+
+A kill chain makes the knight's blows stronger while it holds (issue
+#321). Each pip the chain adds - one every `chain.pipEvery`-th link, still
+a momentum pip too - makes every swing (normal, charged, parried, on the
+shield or in a dash) and every hit of the whirlwind deal
+`chain.bonusShare` more of its damage, whole points, up to
+`chain.bonusCap` more: with 0.15 and 0.45, +15 % at 3 links, +30 % at 6,
++45 % from 9 on. The bolt and a shot sent back get no bonus. A hit the
+knight takes ends the chain and the bonus with it, and so does
+`chain.window` running out with no kill; the momentum the chain added
+stays. While the bonus holds the HUD shows it right of the special, "CHAIN
++15%" in `chain.bonusColor`. A kill bursts more the longer its chain:
+each link past the first, up to `chain.burstLinks`, adds
+`chain.burstShards` shards and `chain.burstSparks` sparks and widens its
+ring by `chain.burstRing` wu, on every screen in co-op. The fight record
+counts the blows the bonus made stronger (`chainBlows`), the points it
+added before defense (`chainExtra`) and its peak (`chainPeak`); the
+fight bench prints them as a fight's `chain bonus` line. The kill chain
+bench lands real swings on a grunt with no stance at each pip, past the
+cap, after a hit and after the window, a whirlwind's hit with a pip, and
+checks the HUD's label, the momentum pip and the burst of each link, a
+real kill's and another player's, and exits with the number of failed
+checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/killchain/killchain.qml
+```
+
+Spiders, mice and rats scurry over the dungeon's floor (`Balance.critters`,
+issue #324), there to make it feel alive and nothing more. A room holds
+`critters.perRoom` of them on average and the corridors one per
+`critters.perCorridorCells` of their cells, none within
+`critters.clearOfSpawn` wu of where the knights come in; each kind has its
+size, speed and the distance at which it notices a knight. A knight coming
+near startles one, and after `critters.startle` seconds it runs from the
+nearest knight, sliding along the walls, until none is within
+`critters.forget` wu; resting, it scurries a little now and then. A knight
+walking over one squashes it: the squash (`sfx/critter_squash`, a live cue,
+a rat's lower and a spider's higher) and a mark in its kind's colour on
+the floor for the rest of the level. A critter is drawn only - no body, no
+enemy - so it never hurts, never blocks the way, counts for no kill and no
+chain link and is no target for the lock-on. In co-op every screen lays
+out the same critters from the level's seed and runs them itself: they
+flee from and are squashed by the knights that screen shows, and nothing
+about them is sent over the network, as nothing in the game depends on
+them. Only critters within `critters.awake` wu of a knight move. The
+critter bench surveys 8 dungeons' critters, checks another screen lays out
+the same, that one out of reach scurries and one near a standing knight
+runs, walks the knight at one and checks its squash, sound and mark, the
+knight's HP, kills, chain and lock-on, and exits with the number of failed
+checks; `-- fps`, with a window, counts the frames drawn with no
+critters, the game's and a dungeon full of them while the knight walks
+from room to room:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/critters/critters.qml
+qml -I build/bin/qml tests/critters/critters.qml -- fps
+```
+
 A grunt does not run straight in: from `enemy.circleRange` on it circles
 the knight `enemy.circleDist` wu off at `enemy.circleSpeed` for
 `enemy.circleTime` seconds, then commits, goes in and lunges; a knight
@@ -2072,10 +2304,9 @@ closes the view in to `duel.zoom` times its size round the knight, the HUD
 as it was. An opening plays a slow motion: the physics at
 `duel.slowScale` for `duel.slowTime` seconds of the physics clock, so a
 bench that steps the world sees it last the same steps on every run
-(Clayground's `hitStop()` ends on the wall clock; until clayground#506
-gives a slow motion of its own the game binds the physics' time scale
-itself). In a session the slow motion is the picture's, as the hit stop
-is, so the host's simulation never slows for the others; every screen
+(Clayground's `slowMotion()`, clayground#506). In a session the slow
+motion is the picture's, as the hit stop is, so the host's simulation
+never slows for the others; every screen
 follows its own knight's duel from the replicated `lead` and `aiState`,
 growls and stings for the openings near it.
 A perfect block sends a spitter's shot back too (issue #283, the table's
@@ -2095,8 +2326,46 @@ in steps and exits with the number of failed checks:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/answer/answer.qml
 ```
 
+The slinger (issue #322, the table's `ball` group and `enemy.slinger`) is
+the fourth kind of lead, from depth 1 on: a block of grey iron with rounded
+corners, a visor's slit for its one cold eye and a muzzle below it, where
+every other enemy is round. It keeps its distance as the spitter does and
+slings a metal ball instead of a shot: a dark iron ball, `ball.size` wu
+across, at `ball.speed`, in strings of its own (`lead.strings.slinger`,
+one ball and then two beats of rest while it bounces about), its stance
+and openings a lead's. A ball bounces off the walls and a shut door,
+mirrored off the grid's cells, so its path is the same at any frame rate;
+after `ball.bounces` (4) bounces it falls at the next wall it meets, lies
+`ball.restTime` seconds and is gone, and `ball.lifetime` seconds after it
+left it falls where it is. A ball no shield has touched passes the
+enemies and hurts the knight it meets for the slinger's `atk`, and falls
+there; a dash goes through it. Any raised shield facing it bounces it,
+for the shield's mana as a blocked shot: a plain block off the shield like
+a mirror, at least `ball.glance` (35) degrees off the line it came along,
+so it never goes straight back; a perfect block along the way the knight
+faces at `ball.backSpeed`, which is how a knight aims it. A shield's ball
+glows pale, hurts no knight, and the first enemy it meets takes
+`ball.backDamage` times the swing of the knight whose shield sent it, and
+it falls there; a lead it hits opens (cause `ball`), the blow landing
+whole. So a room with a slinger plays a little like Pong: the shield is
+the paddle. The ball's shot, its bounce and, lower, its fall are the cues
+`sfx/ball_shot` and `sfx/ball_bounce`. In a session the host's slinger
+slings on every screen and every screen bounces the ball off the walls
+itself; the knight's own screen judges a hit or a shield's bounce and
+tells the others where the ball fell, or where it was turned and which
+way, and the screen whose knight turned it judges the enemy it hits. The
+fight record counts `ballsBack`, `ballsAimed` and `ballBackHits`. The
+ball bench checks its look beside the spitter's, its bounces against the
+mirror path, its fall, the knight it hurts, the dash, both shields and the
+lead a shield's ball opens, and in a session the same bounces and the
+same turn on both screens and the host's lead opened once:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/ball/ball.qml
+```
+
 A lead attacks in strings (issue #272), in the arrow slits' beat notation:
-`lead.strings` holds each lead type's, 1 a strike, 2 a feint, 0 a rest,
+`lead.strings` holds each lead type's - the slinger's among them -, 1 a strike, 2 a feint, 0 a rest,
 `lead.beat` seconds a beat, and the parry ring closes once per beat. A
 feint's wind-up holds `lead.feintHold` longer, its ring standing at
 `lead.feintRing`, then strikes; a rest is a recovery a charged swing
@@ -2124,7 +2393,10 @@ room's lead (`Enemy` type `warden`), counted among the rooms with a lead
 (`spawn.leadShare`), and in the dungeon's plan the witch reads: its
 stance, its openings and three
 strings of its own (`lead.strings.warden`) on a beat of `boss.beat`
-seconds. It sounds like none of the small ones (issue #287): its wind-up
+seconds, each begun with a wind-up of `boss.countIn` seconds where a
+room's other leads wind up for `enemy.windUp` (issue #330): a person who
+sees it a quarter of a second late and swings once more still has the
+rest (`lead.parryRest`) before the parry. It sounds like none of the small ones (issue #287): its wind-up
 and its strike - the lunge setting off, which every screen sees - play
 its own toll, `sfx/warden_toll`, a hollow stone toll on A1, the wind-up a
 fifth up on E (`boss.toll.windUp`), the strike on A (`boss.toll.strike`),
@@ -2133,8 +2405,8 @@ Each appearance is stronger: `boss.hp` times `1 + n *
 boss.hpGrow` HP for its n-th, with `depth.hp` and `party.hpPerKnight` on
 that as any enemy - `depth.hp` counted only up to `boss.depthUpTo`, since
 the smith's sword stops growing at depth 5 (issue #289) -, and a tempo of
-`1 + n * boss.tempoGrow` that its beats are divided by: 3500 HP at tempo 1
-at depth 2, 4725 at 1.05 at depth 5, 4950 at 1.1 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
+`1 + n * boss.tempoGrow` that its beats are divided by: 2800 HP at tempo 1
+at depth 2, 3780 at 1.025 at depth 5, 3960 at 1.05 at depth 8. At `boss.phaseAt` of its HP its phase 2 begins: its core
 glows, `boss.adds` weak grunts come out of the floor round it and as many
 more at `boss.waveAt`, it plays `boss.phase2Tempo` times faster - beats,
 feint holds and count-ins -, the room's light turns to `boss.light` and its
@@ -2149,14 +2421,36 @@ adds and opens the zones and the gates - and keeps it as the session
 property `boss`, so every screen shuts and opens its gates, shows the
 banners and draws the zones; each screen judges the zones under its own
 knight and heals its own knight. The Warden's `phase` and `dormant` are
-replicated with the rest of an enemy. The boss bench builds the dungeons of
+replicated with the rest of an enemy.
+
+It was a knight once, and it tells it (issue #323): at its n-th appearance
+it says `boss.lines[n].gates` as its gates shut and `boss.lines[n].fall`
+as it falls - the last pair at its fourth appearance and every one after -,
+each a voiced line, the cue `voice/warden/<id>`, at `boss.lineVolume`, its
+words shown as a subtitle above the HP bar for `boss.lineShow` seconds.
+Read in order the lines tell its story: *None who come this deep go home.*
+/ *This stone... remembers a sword.* / *I came down too, once. Like you.* /
+*The stone took me, as it took them.* / *I was sworn to bring them home.* /
+*I was a knight... once. Free them.*, and after that *Still the stone holds
+me. Strike true.* / *Climb, knight. Climb for us both.* A line goes with
+its stage on every screen - the gates' on the step they shut, the Warden
+awake on that same step -, so it holds nothing up, and in co-op every
+screen hears the same line. Its stone shows a crack for every defeat
+before, n of them up to `boss.cracks`, the core's ember in each; the host
+spawns the Warden with its `cracks`, so every screen draws the same. The boss bench builds the dungeons of
 depths 0 to 8 and checks the boss rooms at exactly 2, 5 and 8, each the
 room of the exit's shaft, and the Warden's HP and tempo per appearance;
+and its cracks per appearance;
 then in the one at depth 2 it steps the knight into the room and checks
-the gates, the wake, the banner, the bar, the song's parts, phase 2 with
+the gates, the wake, the Warden's line played and shown on the step the
+room shuts with the Warden awake on it, the banner, the bar, the song's
+parts, its own count-in in either phase (issue #330), phase 2 with
 its adds, tempo, light and core, a zone that hurts through a shield and one
-stepped out of, the second wave, and the fall with its gold, its open
-gates, its victory banner and the heal:
+stepped out of, the second wave, and the fall with its line, its gold, its
+open gates, its victory banner and the heal. Last it checks the lines:
+every appearance's own up to the third, the last pair after, their words
+the voice script's, each a voice cue with an open verdict, none over eight
+words or `boss.lineShow` seconds, and it prints the story in order:
 
 ```
 QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/boss/boss.qml
@@ -2168,24 +2462,28 @@ depth at or past the danger given, the knight in the corridor at the
 Warden's door; an edit of the table's `boss` group changes the next fight
 after a reload. The boss capture renders one frame of the fight with
 Clayground's `clayrender` - `shot` `"banner"`, `"phase1"`, `"phase2"` or
-`"victory"` - with the copied shaders:
+`"victory"`, at the boss depth `depth` (2 when left out; 5, 8 and 11 show
+the Warden cracked by one, two and three defeats) - with the copied
+shaders; it logs what the frame shows as `[Capture] {...}`:
 
 ```
-clayrender tests/boss/Capture.qml --out boss.png --size 1100x700 --set 'shot="phase2"' --wait-for 'ready' --settle
+clayrender tests/boss/Capture.qml --out boss.png --size 1100x700 --set 'shot="phase2"' --set 'depth=5' --wait-for 'ready' --settle
 ```
 
 The boss party bench checks it over the network: a host and a joiner go
-down to depth 2; both build the boss room with the same gates and show the
-same Warden asleep, its HP the table's for two knights; with one knight in
+down to depth 2 (`--depth` another boss depth); both build the boss room
+with the same gates and show the same Warden asleep, its HP the table's
+for two knights and its cracks alike; with one knight in
 the room it stays open on both screens, with both in it shuts on both and
-the Warden wakes; struck to its phase 2 it shows on both with the same
+the Warden wakes, and both hear and show its same line; struck to its
+phase 2 it shows on both with the same
 adds by id, the light turned and the host's zones; when it falls every
-gate opens on both, both show the victory banner and each heals its
-knight. It needs the live loader and exits with the number of failed
-checks:
+gate opens on both, both show the victory banner and its same last line,
+and each heals its knight. It needs the live loader and exits with the
+number of failed checks:
 
 ```
-python3 tests/bossparty/run_bossparty.py --mode local
+python3 tests/bossparty/run_bossparty.py --mode local [--depth 5]
 ```
 
 The ring bench steps a grunt's wind-up in the paused fight room and saves
@@ -2212,7 +2510,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind] [--depth 0 | --danger 0.0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person] [--special whirlwind|stun|bolt] [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -2228,7 +2526,16 @@ guardian is in reach (the report counts them as `heavySwings` and
 back from the nearest enemy and, full, lets go and dashes at it, by turns
 just before and just after the dash's start (the report counts the
 whirlwinds that landed as `whirlwinds`, their hits as `whirlHits` and the
-ones begun as `whirlsStarted`). A crushing blow is met by the same plan, so a parry finds
+ones begun as `whirlsStarted`), `stun` meets attacks as `mix` does with the
+stun for its special and stuns whenever a weak or normal enemy not frozen
+stands in its reach, and when a lead winds up in it 3 s or more after its
+last stun (the report counts them as `stuns`, `stunFrozen` and
+`stunInterrupted`, and gives each enemy its stuns and the spans it stood
+frozen), `bolt` plays as `masher` does with the bolt for its special and
+the knight's own mana, letting a bolt loose at the nearest enemy whenever
+it is out of the sword's reach and within 0.9 of the bolt's and the mana
+is there (the report counts them as `bolts` and `boltHits` and gives each
+bolt's end in `boltEnds`). A crushing blow is met by the same plan, so a parry finds
 no window; the report counts the crushing wind-ups as `crushBlows`.
 `--danger` puts the fight room at a
 danger, a depth plus a position in its range (`2.5`), and `--depth d` at
@@ -2242,17 +2549,26 @@ flows - weak and normal enemies falling to a stroke or two, kill after
 kill - or is a duel that a button-masher loses and a reader of its rhythm
 wins. `--room flow` fills the fight room with fodder only, `--room duel`
 with a room's lead alone, a tough grunt, `--room guardianduel` with a
-guardian lead alone (issue #288, `Balance.pacing`), and in each the
+guardian lead alone (issue #288, `Balance.pacing`), `--room spitterduel`
+with a spitter lead alone, the third kind of lead (issue #315), `--room
+ballduel` with a slinger lead alone, the fourth (issue #322), and in each the
 knight has the sword level it usually has at that depth (`--sword` sets
-another). Three more answers are the pacing pilots: `charge` holds a full
+another). `--boots N`, in a single fight and with `--pacing`, gives the
+knight the swift boots of level N (`Balance.shop.bootsSpeed`, issue #325);
+each fight's line then names the level and the walking speed. Four more answers are the pacing pilots: `charge` holds a full
 charge and lets go at the nearest enemy, `masher` clicks, `skilled`
 parries, perfect-blocks - crushing blows and shots, which it sends back -
-and strikes in openings. `--pacing` plays the
-rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all three
-pilots, four loaders at a time, in about 15 s:
+and strikes in openings, and `person` plays like a person (below). Both
+meet a metal ball as a shot, facing it so the perfect block aims it at
+the lead, as near the lead's way as the shield's arc still meets the
+ball; each fight reports the balls slung, their wall bounces, the ones the
+shield bounced and aimed and the ones that hit.
+`--pacing` plays the
+rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all four
+pilots, four loaders at a time:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel boss] [--depths 0 2 4] [--answers charge masher skilled] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--specials whirlwind stun bolt] [--boots N] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,
@@ -2285,6 +2601,43 @@ growls and stings heard. Since the lead's stance (#271) every band
 passes, and the CI job `slow-benches` fails on a red one. Its report is
 kept as the run's `pacing` artifact.
 
+Unless `--answers` is given, a pacing run also plays `stun` in the flow
+room and in the duel at its first depth (issue #318); no band of
+`Balance.pacing` judges them, `--check` tests the stun on them. In the flow
+fight the knight stuns and freezes enemies, each span an enemy stands
+frozen lasts `Balance.stun.freeze` from the stun that froze it last, within
+two physics steps, the enemy does not move in it and thaws into the chase,
+never into a blow, and a stun does nothing to a weak or normal enemy but
+freeze it. In the duel the stun ends the lead's wind-ups, each time from a
+wind-up into the chase, the lead is not opened by it, its stance stays as
+it was, no opening comes on a stun's step, and the lead never freezes.
+
+It also plays `bolt` in the flow room at its first depth and in the
+spitter duel at each depth, and shoots three bolts by hand in the flow
+room (issue #319); `--check` tests the bolt. By hand, a bolt at an enemy
+5 wu off, out of the sword's reach, deals `Balance.bolt.damage` times atk
+less its defense; one with nothing in line flies `Balance.bolt.reach` and
+ends, an enemy just past it unhurt; one shot at the room's wall 5 wu off
+stops there. In the fights each hit deals the damage the table allows - a
+chip of it on a lead's stance, a guardian's shield's share from its front
+-, some from out of the sword's reach, no bolt flies past its reach, and a
+bolt that ends at a wall ends at the room's wall, none outside it. In the
+spitter duel, the one place a knight could stand back and shoot, the
+masher with the bolt takes at least `Balance.pacing.duelSlow` seconds to
+kill the lead, or falls, as the masher must in a duel; the report shows
+the masher's own time beside it.
+
+It also enters the combo by hand in the flow room (issue #320): for each
+special the knight's moves away from its aim, then towards it, as a pilot
+walks, and the special's button at once, then the same with the button
+later than `Balance.combo.window`. `--check` tests that the combo fires
+each stronger version - the stun freezes an enemy past the stun's reach,
+the bolt deals `Balance.combo.bolt.damage` times atk less its defense, the
+whirlwind hits an enemy either side past its reach for
+`Balance.combo.whirlwind.swing` times atk and spins longer -, that the late
+button fires the normal one, and that the knight walks on through every
+combo. No pilot enters the combo in its fights.
+
 Nothing is heard in a bench: the game is muted and the loader starts with
 `CLAY_SOUND_MUTE=1`, so it runs on a machine with no audio output device,
 like CI's runner. What would have been heard is the game's sound log: with
@@ -2310,9 +2663,107 @@ knight. The skilled pilot steps out of a zone while it warns. At each of
 `charge` fall or take at least `bossSlow` times as long. In every boss
 fight the Warden's wind-ups and strikes play its toll and nothing screams
 before its adds come, and in no flow or duel fight is its toll heard
-(issue #287). The four rooms are the dojo's
-scenarios `flow`, `duel`, `guardianduel` and `boss` too: a reload lands in them, and an
+(issue #287). No band checks the spitter duel or the ball duel; `--check`
+tests the slinger's balls instead (issue #322): in every ball duel each
+ball that fell at a wall bounced `ball.bounces` times first and none
+more, every bounce at the room's walls, and at each depth a ball the
+skilled pilot's shield bounced hits the lead and opens it; and one ball
+slung by hand across the room (`Sandbox.tryBall`) bounces off its walls
+`ball.bounces` times, each where the mirror path off the walls puts it,
+and falls at the next wall. The six rooms are the dojo's
+scenarios `flow`, `duel`, `guardianduel`, `spitterduel`, `ballduel` and `boss` too: a reload lands in them, and an
 edit of `Balance.pacing` changes who stands there.
+
+**The person pilot** (issue #315). The other pilots play frame-perfectly or mash, so a fight can pass the
+bench and still be too hard for a person: until issue #315 the Warden at
+depth 5 and 8 was only shown to fall to `skilled`. The `person` pilot is
+there so a fight's difficulty can be judged without the owner playing it.
+It plays as `skilled` does, with a person's reaction and a person's misses,
+both in `Balance.pacing.person`:
+
+- **Reaction**, `reaction: 0.25`: it answers an attack, a shot or a zone of
+  the Warden's no sooner than 0.25 s after it began - an enemy's wind-up
+  begun, a shot fired, a zone's warning shown. Until then it does what it
+  did, and may swing at an enemy that is winding up; after an attack it
+  waits as long before it swings at that enemy again. Once it has seen an
+  attack it times its press to the window, as a player reading the ring
+  does. The seconds are the game's physics clock: a duel's slow motion
+  gives it no more time.
+- **Misses**, `miss: 0.2`: one in every five of its parries and perfect
+  blocks (shots included) is mistimed, in turn, the place of the first
+  miss picked by the seed, the room and its danger, so the fights of one
+  run miss on answers of their own - a roll per answer would leave a
+  fight of ten answers to luck. A miss is one window early - a swing under way before
+  the parry window, the shield up before the perfect block's, an ordinary
+  block - or late, no press before the blow lands, as the seed rolls.
+  Zones are not missed, only seen late. A spitter's shot begins with the
+  spitter's wind-up, which a person sees, not with its flight.
+
+The same seed gives the same run. Each of its fights reports its answers
+and misses by kind and its fastest answer, which is never under 0.25 s.
+Where the numbers come from: 0.25 s and one miss in five are the starting
+point the issue set. A quarter of a second is a little under the median
+of 273 ms reported for Human Benchmark's online reaction test (a click
+when a box turns green; reported by articles quoting the site, not read
+on the site itself), and a fight's wind-ups give some warning that a
+green box does not. One miss in five is a guess for a player who knows the
+fight, not a measurement; the owner's own play is what would correct
+either number.
+
+The pacing run plays it in every room at every depth, and prints a section
+of its own after the fights: one `WIN` or `LOSE` line per fight, a win in
+how many seconds - the room's clear time and, in a duel or the boss room,
+the lead's time from its engagement -, a loss with what still stood and
+its HP. `--check` sets no band on its wins and losses, and the bands of the
+other pilots stay as they are; it checks the pilot's own rule only: over
+all its fights its misses lie within `missSlack` (0.05) of `miss`, and a
+FAIL there fails the run.
+
+A `WIN` counts as "a person can do this": the person cleared the room
+without falling within the bench's 180 s. A `LOSE` (fell, or still
+fighting at 180 s) in a fight meant to be beatable - every flow room,
+every duel, the Warden at depth 2, 5 and 8 - is a finding: a tuning issue
+for that fight, not a reason to change the pilot. Since issue #330 it wins
+every one of them on the bench's seed, the Warden in about 76 to 80 s. A win is not a promise:
+the pilot knows every string, never panics and never strays, so it is the
+least a person needs, and the owner's playtest still judges the rest.
+
+**The person with a special** (issue #344). `--answer person --special
+whirlwind|stun|bolt` gives the person a special, and it fires it where
+the pilot of that special does: the whirlwind with full momentum and an
+enemy close (as `whirlwind`), the stun at a weak or normal enemy in its
+reach and at a lead's wind-up 3 s after its last stun (as `stun`), the
+bolt at an enemy out of the sword's reach and inside the bolt's (as
+`bolt`). It does so with its reaction and its misses: it presses no
+sooner than 0.25 s after the chance began, and each press is one of its
+answers, a fifth of them missed - one window
+(`Balance.knight.perfectBlockFrames` steps, as its other misses) early,
+taking an enemy as far off as the knight walks in a window for one in
+reach, so it may fire at nothing, or a window late, whatever stands then.
+The stun comes before an attack it has seen; the whirlwind and the bolt
+only when no attack or shot is coming. It pays the special, its blocks
+and its dashes from the knight's own mana (`Balance.knight.mana`, as the
+`bolt` pilot does), where every other pilot has plenty: a special that
+costs nothing would say nothing about it. It enters no combo: its own
+steps can make one - away from a zone, then at the Warden -, so it lets
+any combo lapse before it presses, and fires the plain special. Without
+`--special` the person plays as before, step for step.
+
+Unless `--answers` is given, or with `--specials`, a pacing run plays the
+person with each of the three specials in the flow room and in every duel
+at its first depth, and in the boss room at its first boss depth (the
+Warden at depth 2). Each of these fights is a line of the person's
+section, `WIN` or `LOSE`, with its seconds and how often it pressed the
+special and how often it went off. Every `LOSE` of the person's, with a
+special or without, says why: what hurt the knight, the most HP first
+(the blows of an enemy by its type, a shot, a metal ball, a zone of the
+Warden's), its missed answers, how often its mana ran dry, and, when it
+was still fighting at the end, how often the lead still standing was
+opened. No band judges their wins either; `--check` tests the pilot's own
+rules on them: in each fight with a special the person pressed it, it went
+off and never as the stronger version, and in each of the person's fights
+the HP by cause adds up to the HP the knight lost, the blow that felled it
+included.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
@@ -2343,7 +2794,8 @@ crushing blows among its attacks before and after setting
 its stance bar, the opening's length and damage, and the new length after
 setting `lead.openingTime` to 2.5, in the `guardianduel` scenario it
 checks the guardian lead's HP before and after setting
-`enemy.guardian.leadHp` to 0.5, and in the `flow` scenario it strikes
+`enemy.guardian.leadHp` to 0.5, in the `spitterduel` scenario that one
+spitter lead of tier 2 stands alone, and in the `flow` scenario it strikes
 two enemies down 2 s apart, a chain at `chain.window` 2.5 s and two lone
 kills after setting it to 1.5, and in the `bossroom` scenario it has
 the Warden wind up and strike once: its toll at `boss.toll`'s pitches and
@@ -2397,7 +2849,7 @@ python3 packaging/web-bundle.py --runtime clayground-starter.zip --qsb <Qt>/6.10
 `.github/workflows/pages.yml` does the same with the runtime of a Clayground
 release and, when the check passes, puts `build/web/` on GitHub Pages. It
 runs by hand (*Run workflow*, with the Clayground release to take the
-runtime from, `v2026.11.1` by default) and when a release of the game is
+runtime from, `v2026.13` by default) and when a release of the game is
 published, never on a push. Pages must be set to deploy from GitHub Actions
 (*Settings > Pages > Source*).
 
@@ -2554,7 +3006,7 @@ Melee attacks have swing recovery (cooldown between attacks):
 - **Timing**: Dodge during enemy telegraph, attack during recovery
 - **Blocking**: Active decision — trade mana for damage reduction
 - **Prioritization**: Choose targets wisely (Spitters first? Focus Dasher mid-charge?)
-- **Kill chains**: a kill within `Balance.chain.window` (2.5 s) of the last one adds to the chain - its death sound climbs a step of the dungeon song's A minor, it gets a short crunchy hit stop on the killer's screen, and every third link adds a momentum pip. A hit taken, or a pause longer than the window, breaks the chain
+- **Kill chains**: a kill within `Balance.chain.window` (2.5 s) of the last one adds to the chain - its death sound climbs a step of the dungeon song's A minor, it gets a short crunchy hit stop on the killer's screen, its burst grows, and every third link adds a momentum pip. Each of those pips makes the knight's blows 15 % stronger while the chain holds, up to 45 %, shown on the HUD. A hit taken, or a pause longer than the window, breaks the chain and ends the bonus
 
 ---
 
@@ -2828,7 +3280,7 @@ rhythm. Its numbers are the table's `boss` group.
 |-----------|-------|
 | **Shape** | Large hollow stone hexagon, a frame turning in its hollow |
 | **Color** | Stone grey (#4A4E57), its core glowing orange-red (#FF5A2A) in phase 2 |
-| **Health** | 2500 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
+| **Health** | 2000 at its first appearance, 5 % more each time after, with depth (up to depth 4) and party |
 | **Phases** | 2 |
 
 **Phase 1 (100%-50% HP):** three strings of strikes, rests and a feint on

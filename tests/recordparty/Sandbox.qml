@@ -22,7 +22,8 @@ Item {
     property var game: null
     property string storeName: "ShapesAndStoneRecordPartyBench"
     KeyValueStore { id: store; name: bench.storeName }
-    Component { id: gameComponent; Game {} }
+    // The descent intro would hold each dungeon's first seconds (issue #316)
+    Component { id: gameComponent; Game { descentIntro: false } }
 
     // ---- the game's Session and its Network, found by what they offer ----
     readonly property var session: {

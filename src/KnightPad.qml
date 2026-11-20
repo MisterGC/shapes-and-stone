@@ -124,10 +124,10 @@ Item {
             aimAngle = Math.atan2(c.axisY, c.axisX) * 180 / Math.PI
     }
 
-    // In the game, with no menu, title or fallen screen over it: those own
-    // the pad then (MenuPad, issue #201)
+    // In the game, with no menu, title, fallen screen or choice of a
+    // special over it: those own the pad then (MenuPad, issues #201, #317)
     function _playing() {
-        return !!game && !!game.player && !game.overlayUp && !game.masterOpen
+        return !!game && !!game.player && !game.overlayUp && !game.masterOpen && !game.specialChoosing
     }
     function _free() { return _playing() && !game.talking }
 
@@ -163,10 +163,10 @@ Item {
         if (action !== "") _act(action, down)
     }
 
-    // A press that closed a menu, the title or the fallen screen (MenuPad's
-    // A, B or Start) is theirs: the game, playing again from that moment,
-    // does not act on it too
-    readonly property bool _overlay: !!game && (game.overlayUp || game.masterOpen)
+    // A press that closed a menu, the title, the fallen screen or the
+    // choice of a special (MenuPad's A, B or Start) is theirs: the game,
+    // playing again from that moment, does not act on it too
+    readonly property bool _overlay: !!game && (game.overlayUp || game.masterOpen || game.specialChoosing)
     property bool _overlayLeft: false
     on_OverlayChanged: if (!_overlay) {
         _overlayLeft = true

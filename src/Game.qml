@@ -344,6 +344,49 @@ ClayWorld2d {
         logSound("sfx/sword_swing", "whirlwind", Balance.whirl.swingPitch, _gainDist(gain), gain)
         logSound("voice/knight/whirl_shout", "whirlShout", Balance.whirl.shoutPitch, _gainDist(gain), gain)
     }
+    // The stun (Balance.stun, issue #318): the shield's bash, a cue of its
+    // own
+    SfxPlayer {
+        id: stunSound
+        source: "../sound/sfx/stun_bash.sfx.json"
+        volume: muted ? 0 : Balance.stun.volume * soundVolume
+    }
+    function playStun(gain) {
+        stunSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/stun_bash", "stun", 0, _gainDist(gain), gain)
+    }
+    // The bolt (Balance.bolt, issue #319): its shot as it leaves the
+    // knight, and its hit where it meets an enemy or, quieter, a wall
+    SfxPlayer {
+        id: boltShotSound
+        source: "../sound/sfx/bolt_shot.sfx.json"
+        volume: muted ? 0 : Balance.bolt.shotVolume * soundVolume
+    }
+    SfxPlayer {
+        id: boltHitSound
+        source: "../sound/sfx/bolt_hit.sfx.json"
+        volume: muted ? 0 : Balance.bolt.hitVolume * soundVolume
+    }
+    function playBoltShot(gain) {
+        boltShotSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/bolt_shot", "boltShot", 0, _gainDist(gain), gain)
+    }
+    // At (xWu, yWu), gain as the hit's own
+    function playBoltHit(gain, xWu, yWu) {
+        boltHitSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/bolt_hit", "boltHit", 0, _distTo(xWu, yWu), gain)
+    }
+    // A special's stronger version (Balance.combo, issue #320): a swell
+    // over the special's own sound
+    SfxPlayer {
+        id: surgeSound
+        source: "../sound/sfx/special_surge.sfx.json"
+        volume: muted ? 0 : Balance.combo.volume * soundVolume
+    }
+    function playSurge(gain) {
+        surgeSound.play(gain === undefined ? 1 : gain)
+        logSound("sfx/special_surge", "surge", 0, _gainDist(gain), gain)
+    }
     // The charge is full: a high tick
     SfxPlayer {
         id: chargeTickSound
@@ -540,6 +583,56 @@ ClayWorld2d {
         logSound("sfx/spitter", "shot", 0, _distTo(xWu, yWu), 1)
     }
 
+    // A slinger's metal ball (Balance.ball, issue #322): its shot as it
+    // leaves, a clank for every wall it bounces off, and the same clank
+    // lower where it falls; each fading with the distance from this knight
+    SfxPlayer {
+        id: ballShotSound
+        source: "../sound/sfx/ball_shot.sfx.json"
+        volume: muted ? 0 : Balance.ball.shotVolume * soundVolume
+    }
+    SfxPlayer {
+        id: ballBounceSound
+        source: "../sound/sfx/ball_bounce.sfx.json"
+        volume: muted ? 0 : Balance.ball.bounceVolume * soundVolume
+    }
+    function _gainAt(xWu, yWu) {
+        if (!player || xWu === undefined) return 1
+        return Math.max(0, 1 - _distTo(xWu, yWu) / remoteHearingWu)
+    }
+    function playBallShot(xWu, yWu) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        ballShotSound.play(gain)
+        logSound("sfx/ball_shot", "ballShot", 0, _distTo(xWu, yWu), gain)
+    }
+    // what: "bounce" off a wall, "fall" where it falls (Balance.ball.fallPitch)
+    function playBallBounce(xWu, yWu, what) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        let pitch = what === "fall" ? Balance.ball.fallPitch : 0
+        gain *= what === "fall" ? 0.7 : 1
+        ballBounceSound.play(gain, pitch)
+        logSound("sfx/ball_bounce", what || "bounce", pitch, _distTo(xWu, yWu), gain)
+    }
+
+    // A critter squashed under a knight's foot (Balance.critters, issue
+    // #324): a crunch, pitched by its kind, fading with the distance from
+    // this knight
+    SfxPlayer {
+        id: critterSquashSound
+        source: "../sound/sfx/critter_squash.sfx.json"
+        volume: muted ? 0 : Balance.critters.squashVolume * soundVolume
+    }
+    function playCritterSquash(xWu, yWu, kind) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        let k = Balance.critters.kinds[kind]
+        let pitch = k ? k.pitch : 0
+        critterSquashSound.play(gain, pitch)
+        logSound("sfx/critter_squash", kind || "squash", pitch, _distTo(xWu, yWu), gain)
+    }
+
     // A tough enemy winds up a crushing blow: a low growl, the spitter's
     // sample pitched down, fading with the distance from this knight
     Sound {
@@ -637,7 +730,11 @@ ClayWorld2d {
         if (!player || !enemy) return
         if (Math.hypot(enemy.xWu - player.xWu, enemy.yWu - player.yWu) > Balance.music.reach) return
         playSting()
-        slowMotion(Balance.duel.slowTime, Balance.duel.slowScale)
+        // ClayWorld2d's slow motion counts the physics clock, so a pause
+        // holds it and a bench that steps the world sees it end on the same
+        // step every run. In a session (hitStopMode "view") it slows the
+        // picture, not the simulation the others share
+        slowMotion(Balance.duel.slowTime * 1000, Balance.duel.slowScale)
     }
 
     // The NPCs' greetings are voiced lines of the sound factory
@@ -673,6 +770,71 @@ ClayWorld2d {
         greeting.play()
         logSound(cue, "greeting", 0, 0, 1)
         dialoguePanel.lipSync(Qt.resolvedUrl("../sound/" + cue + ".visemes.json"))
+    }
+
+    // The Hollow Warden's words (Balance.boss.lines, issue #323): voiced
+    // lines of the sound factory (sound/voice/warden.voice.json), each a
+    // cue "voice/warden/<id>" of sound/cues.json. It has no mouth, so
+    // nothing reads their viseme cues
+    Sound {
+        id: wardenGates1
+        source: "../sound/voice/warden/gates_1.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFall1
+        source: "../sound/voice/warden/fall_1.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenGates2
+        source: "../sound/voice/warden/gates_2.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFall2
+        source: "../sound/voice/warden/fall_2.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenGates3
+        source: "../sound/voice/warden/gates_3.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFall3
+        source: "../sound/voice/warden/fall_3.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenGatesLater
+        source: "../sound/voice/warden/gates_later.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    Sound {
+        id: wardenFallLater
+        source: "../sound/voice/warden/fall_later.wav"
+        volume: muted ? 0 : Balance.boss.lineVolume * soundVolume
+    }
+    readonly property var _wardenLines: ({
+        "gates_1": wardenGates1, "fall_1": wardenFall1,
+        "gates_2": wardenGates2, "fall_2": wardenFall2,
+        "gates_3": wardenGates3, "fall_3": wardenFall3,
+        "gates_later": wardenGatesLater, "fall_later": wardenFallLater
+    })
+    // The line of the Warden's appearance n (0 at the first boss depth)
+    // for when, "gates" or "fall": {id, text}; past the table's last pair
+    // the last one
+    function wardenLine(n, when) {
+        let lines = Balance.boss.lines
+        return lines[Math.max(0, Math.min(lines.length - 1, n))][when]
+    }
+    // The Warden says its line id: every screen plays its own
+    function playWardenLine(id) {
+        let line = _wardenLines[id]
+        if (!line) return
+        line.play()
+        logSound("voice/warden/" + id, "wardenLine", 0, 0, 1)
     }
 
     // Apply screen shake via transform on room
@@ -723,28 +885,42 @@ ClayWorld2d {
     // one place. With fx off it falls back to the original shake only.
     //   kind: enemyHit, heavyHit, enemyBlocked, enemyDeath, chainKill (a death
     //         that chains, killLanded), playerHit, playerBlocked,
-    //         perfectBlock, crushBlow, parry, whirlwind, projectileHit,
-    //         projectileDeflected, projectileBurst
+    //         perfectBlock, crushBlow, parry, whirlwind, stun (the
+    //         knight's shield bash, Balance.stun, at its centre),
+    //         projectileHit, projectileDeflected, projectileBurst
     //   (x, y): where it happened; (dx, dy): direction the blow travelled
     //   color: the struck thing's colour (shards and stains)
     //   local: false for another player's hit (default true)
+    //   links: a chainKill's links, its burst's size (Balance.chain)
     // Its world part (sparks, shards, rings, stains) belongs to the place
     // of the hit and shows on every screen; its screen part (shake, kick,
     // hit-stop, flash) only on the screen of whoever hit or was hit. A local
     // hit goes out to the others, who draw its world part only.
-    function impact(kind, x, y, dx, dy, color, local) {
+    function impact(kind, x, y, dx, dy, color, local, links) {
         let len = Math.sqrt(dx * dx + dy * dy)
         let nx = len > 0.001 ? dx / len : 0
         let ny = len > 0.001 ? dy / len : 0
-        _impactWorld(kind, x, y, nx, ny, color)
+        _impactWorld(kind, x, y, nx, ny, color, links)
         if (local === false) return
         _impactScreen(kind, nx, ny)
-        session.sendImpact(kind, x, y, dx, dy, color)
+        session.sendImpact(kind, x, y, dx, dy, color, links)
     }
 
-    function _impactWorld(kind, x, y, nx, ny, color) {
+    // The particles of a kill's burst, its chain's links-th: one link (or
+    // none given) is a kill's own, each link past it adds to it
+    // (Balance.chain.burstLinks, burstShards, burstSparks, burstRing)
+    // The last kill's burst this screen drew, for a bench
+    property var lastDeathBurst: null
+    function deathBurst(links) {
+        let c = Balance.chain
+        let past = Math.max(0, Math.min(links || 1, c.burstLinks) - 1)
+        return { shards: 12 + past * c.burstShards, sparks: 10 + past * c.burstSparks,
+                 ring: 1.6 + past * c.burstRing }
+    }
+
+    function _impactWorld(kind, x, y, nx, ny, color, links) {
         if (!fx) {
-            if (kind === "enemyDeath") spawnDeathParticles(x, y)
+            if (kind === "enemyDeath" || kind === "chainKill") spawnDeathParticles(x, y)
             else if (kind === "parry") spawnParryEffect(x, y)
             else if (kind === "projectileDeflected") spawnDeflectParticles(x, y)
             else if (kind === "projectileBurst") spawnSpitParticles(x, y)
@@ -764,12 +940,15 @@ ClayWorld2d {
             spawnSparks(x - nx * 0.45, y - ny * 0.45, -nx, -ny, 9, "#FFB060")
             break
         case "enemyDeath":
-        case "chainKill":
-            spawnShards(x, y, nx, ny, 12, color, 0.3)
-            spawnSparks(x, y, nx, ny, 10, Qt.lighter(color, 1.6))
-            spawnRing(x, y, Qt.lighter(color, 1.4))
+        case "chainKill": {
+            let burst = deathBurst(kind === "chainKill" ? links : 1)
+            lastDeathBurst = burst
+            spawnShards(x, y, nx, ny, burst.shards, color, 0.3)
+            spawnSparks(x, y, nx, ny, burst.sparks, Qt.lighter(color, 1.6))
+            spawnRing(x, y, Qt.lighter(color, 1.4), burst.ring)
             spawnStain(x, y, color)
             break
+        }
         case "playerHit":
             spawnShards(x, y, nx, ny, 5, "#7AB8D4", 0.18)
             break
@@ -794,6 +973,33 @@ ClayWorld2d {
             spawnSparks(x, y, nx, ny, Balance.whirl.sparks, Balance.whirl.glow)
             spawnRing(x, y, Balance.whirl.glow)
             break
+        case "stun":
+            // The shield's bash (Balance.stun): from the knight's centre a
+            // ring out to the stun's reach and sparks all round
+            for (let k = 0; k < 4; k++)
+                spawnSparks(x, y, Math.cos(k * Math.PI / 2), Math.sin(k * Math.PI / 2),
+                            Math.ceil(Balance.stun.sparks / 4), Balance.stun.rimColor)
+            spawnRing(x, y, Balance.stun.color, Balance.stun.reach)
+            spawnRing(x, y, Balance.stun.rimColor)
+            break
+        case "stunStrong":
+            // The stronger stun (Balance.combo.stun): out to its reach, in
+            // the combo's colour, with a ring of the stun's own inside it
+            for (let k = 0; k < 8; k++)
+                spawnSparks(x, y, Math.cos(k * Math.PI / 4), Math.sin(k * Math.PI / 4),
+                            Math.ceil(Balance.stun.sparks / 4), Balance.stun.rimColor)
+            spawnRing(x, y, Balance.combo.color, Balance.combo.stun.reach)
+            spawnRing(x, y, Balance.stun.color, Balance.stun.reach)
+            spawnRing(x, y, Balance.stun.rimColor)
+            break
+        case "surge":
+            // A special's stronger version went off (Balance.combo): a ring
+            // and sparks all round the knight
+            for (let k = 0; k < 6; k++)
+                spawnSparks(x, y, Math.cos(k * Math.PI / 3), Math.sin(k * Math.PI / 3),
+                            Math.ceil(Balance.combo.sparks / 6), Balance.combo.color)
+            spawnRing(x, y, Balance.combo.color, Balance.combo.ring)
+            break
         case "projectileHit":
         case "projectileBurst":
             spawnShards(x, y, nx, ny, 5, "#8EBB5A", 0.1)
@@ -807,7 +1013,8 @@ ClayWorld2d {
     function _impactScreen(kind, nx, ny) {
         if (!fx) {
             let legacyShake = {enemyHit: 1.5, heavyHit: 2, enemyBlocked: 0.5, playerHit: 3,
-                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5,
+                               playerBlocked: 1, perfectBlock: 1, crushBlow: 3, whirlwind: 1.5, stun: 1,
+                               stunStrong: 1.5, surge: 0.5,
                                projectileHit: 1, projectileDeflected: 0.5}[kind] || 0
             if (legacyShake > 0) shake(legacyShake)
             return
@@ -865,6 +1072,12 @@ ClayWorld2d {
             _trauma(Balance.whirl.trauma)
             _kick(nx * Balance.whirl.kick, ny * Balance.whirl.kick)
             break
+        case "stun":
+            _trauma(Balance.stun.trauma)
+            break
+        case "stunStrong":
+            _trauma(Balance.combo.trauma)
+            break
         case "projectileDeflected":
             _trauma(0.12)
             break
@@ -882,45 +1095,6 @@ ClayWorld2d {
     }
     function _freeze(ms, scale) {
         if (world.hitStop) world.hitStop(ms, scale === undefined ? 0 : scale)
-    }
-
-    // A slow motion on the physics clock (Balance.duel): the physics runs
-    // at scale for seconds of simulated time, counted on the physics steps
-    // (slowLeft), so a pause holds it and a bench that steps the world
-    // sees it last the same steps on every run. In a session the
-    // simulation must not stall for the others: there it is the picture's,
-    // a view hit stop of seconds / scale of the wall clock
-    property real slowLeft: 0
-    property real slowScale: 1
-    readonly property bool slowing: slowLeft > 0
-    function slowMotion(seconds, scale) {
-        if (!(seconds > 0) || !(scale > 0) || scale >= 1) return
-        if (hitStopMode === "view") {
-            _freeze(seconds / scale * 1000, scale)
-            return
-        }
-        slowScale = slowing ? Math.min(slowScale, scale) : scale
-        slowLeft = Math.max(slowLeft, seconds)
-    }
-    function _stepSlowMotion(dt) {
-        if (slowLeft <= 0) return
-        // A step's share of a second is not exact: what is left of one
-        // step at most a millionth of a second over ends here too
-        slowLeft = slowLeft - dt < 1e-6 ? 0 : slowLeft - dt
-        if (slowLeft === 0) slowScale = 1
-    }
-    // Workaround: ClayWorld2d's hitStop() ends on the wall clock and its
-    // physics time scale is the global one times the hit stop's, with no
-    // slow motion of the game's own (clayground#506). While one runs this
-    // binds the scale to the same product times slowScale, the hit stop's
-    // share read from ClayWorld2d's _hitStopScale, and gives ClayWorld2d's
-    // binding back when it ends
-    Binding {
-        target: world.physics
-        property: "timeScale"
-        when: world.slowing && world.hitStopMode !== "view"
-        value: Clayground.timeScale * world._hitStopScale * world.slowScale
-        restoreMode: Binding.RestoreBindingOrValue
     }
 
     Component { id: fxParticleComp; FxParticle {} }
@@ -967,6 +1141,8 @@ ClayWorld2d {
             property real xWu: 0
             property real yWu: 0
             property real rWu: 0.2
+            // The radius it grows to
+            property real toWu: 1.6
             width: rWu * 2 * pixelPerUnit
             height: width
             radius: width / 2
@@ -977,15 +1153,16 @@ ClayWorld2d {
             z: 5
             ParallelAnimation {
                 running: true
-                NumberAnimation { target: _ring; property: "rWu"; to: 1.6; duration: 280; easing.type: Easing.OutCubic }
+                NumberAnimation { target: _ring; property: "rWu"; to: _ring.toWu; duration: 280; easing.type: Easing.OutCubic }
                 NumberAnimation { target: _ring; property: "opacity"; from: 0.9; to: 0; duration: 280 }
                 onFinished: _ring.destroy()
             }
         }
     }
-    function spawnRing(x, y, color) {
+    // A ring growing from (x, y) to toWu wu, 1.6 without it
+    function spawnRing(x, y, color, toWu) {
         let r = ringComp.createObject(glowParent(), {
-            xWu: x, yWu: y, pixelPerUnit: world.pixelPerUnit
+            xWu: x, yWu: y, pixelPerUnit: world.pixelPerUnit, toWu: toWu === undefined ? 1.6 : toWu
         })
         if (r) r.border.color = color
     }
@@ -1044,10 +1221,11 @@ ClayWorld2d {
         onRecordBroken: (banner) => _hostRecordBroken(banner)
         onNameEdited: (name) => world.playerName = name
         onAdvanceRequested: _hostAdvanceLevel()
+        onArrivalReported: (fromId, seed, level, picked) => _introArrival(fromId, seed, level, picked)
         onLobbyStartRequested: _startMultiplayerGame()
         onLobbyLeft: screen = "title"
-        onImpactReceived: (kind, x, y, dx, dy, color) => {
-            if (screen === "game") impact(kind, x, y, dx, dy, color, false)
+        onImpactReceived: (kind, x, y, dx, dy, color, links) => {
+            if (screen === "game") impact(kind, x, y, dx, dy, color, false, links)
         }
         onEnemySpawned: (objectId, props) => _makeEnemy(props, objectId)
         onEnemyDespawned: (objectId) => _dropEnemy(objectId)
@@ -1055,10 +1233,12 @@ ClayWorld2d {
             let e = _enemyById[blow.id]
             if (!e || e.destroyed) return
             if (blow.kind === "damage")
-                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "")
+                e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "",
+                                 blow.spare === true)
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
+            else if (blow.kind === "stun") e.stun(blow.seconds)
         }
         onKnightBlowReceived: (blow) => _holdKnightBlow(blow)
         onPartyChanged: _checkPartyDown()
@@ -1093,13 +1273,23 @@ ClayWorld2d {
         onPouchDespawned: (objectId) => pouchClaims.remove(objectId)
         onPouchClaimed: (fromId, objectId) => pouchClaims.give(fromId, objectId)
         onPouchGranted: (grant) => _takePouch(grant.gems)
+        onBoltReceived: (fromId, bolt) => {
+            if (screen === "game") _flyBolt(bolt.id, bolt.x, bolt.y, bolt.dx, bolt.dy, 0, false, bolt.strong === true)
+        }
+        onBoltEndReceived: (fromId, bolt) => _boltEndReported(bolt)
         onShotReceived: (shot) => {
             if (screen !== "game" || _shotsBack[shot.id]) return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
             playSpitShot(shot.x, shot.y)
         }
+        onBallReceived: (b) => {
+            if (screen !== "game" || _ballsDone[b.id] || _ballById[b.id]) return
+            _flyBall(b.id, b.x, b.y, b.dx, b.dy, b.damage)
+            playBallShot(b.x, b.y)
+        }
         onStruckReported: (fromId, report) => {
             if (report.source === "shot") _shotReported(report)
+            else if (report.source === "ball") _ballReported(report)
             else if (report.source === "arrow") _arrowReported(report)
             world.struckReported(fromId, report.source, report.id, report.result)
         }
@@ -1465,7 +1655,7 @@ ClayWorld2d {
         let enemies = rollEnemies(rms, spawnRolls(depthOf(index) + position, knights), rand,
                                   isBossDepth(depthOf(index)))
         let out = { depth: depthOf(index), band: dangerBand(position), enemies: enemies.length,
-                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0, warden: 0,
+                    weak: 0, normal: 0, tough: 0, grunt: 0, guardian: 0, spitter: 0, slinger: 0, warden: 0,
                     secrets: secretsOf(index, position) }
         for (let e of enemies) {
             out[["weak", "normal", "tough"][e.tier]]++
@@ -1519,7 +1709,9 @@ ClayWorld2d {
                    + (tiers.length > 0 ? ", " + tiers.join(", ") : "") + ".")
         let kinds = [f.guardian > 0 ? f.guardian + " behind shields" : "",
                      f.spitter > 0 ? f.spitter + (f.spitter === 1 ? " that spits" : " that spit")
-                                     + " from afar" : ""].filter(t => t !== "")
+                                     + " from afar" : "",
+                     f.slinger > 0 ? f.slinger + (f.slinger === 1 ? " of iron that slings" : " of iron that sling")
+                                     + " balls off the walls" : ""].filter(t => t !== "")
         lines.push(kinds.length > 0 ? "Among them " + kinds.join(" and ") + "."
                                     : "No shields, nothing that spits - only teeth.")
         if (f.secrets > 0)
@@ -1750,12 +1942,14 @@ ClayWorld2d {
     onOverlayUpChanged: if (!overlayUp) world.forceActiveFocus()
     // Paused by stopping the world: the first step after resuming is one
     // frame long, not the whole pause (clayground#338), so no cooldown or
-    // AI timer runs out on it.
+    // AI timer runs out on it. The descent intro holds the world the same
+    // way, in a session too: there every screen holds until the same
+    // moment
     Binding {
         target: world.physics
         property: "running"
         value: false
-        when: world.gamePaused
+        when: world.gamePaused || world.introHeld
         restoreMode: Binding.RestoreBindingOrValue
     }
     components: []
@@ -1802,7 +1996,8 @@ ClayWorld2d {
     // Every control of the knight, kept with the record under "controls"
     // (issue #218): the key handler, the MouseArea, the pad and the hints
     // read it
-    ControlTable { id: controlTable; store: records }
+    // The hint names the chosen special for the special's button
+    ControlTable { id: controlTable; store: records; specialName: world.specialName.toLowerCase() }
     readonly property alias controls: controlTable
     // What action is bound to on the device in use, for a hint: "E", "LMB",
     // or the pad's button while a pad is in use
@@ -1816,6 +2011,7 @@ ClayWorld2d {
         runSecrets = 0
         runStartRecord = ownRecord.depth
         recordPassed = false
+        _recordWaits = false
     }
     function _today() { return Qt.formatDate(new Date(), "yyyy-MM-dd") }
     // The knights of this run: alone this one, in a session every node's
@@ -1847,7 +2043,15 @@ ClayWorld2d {
         recordPassed = true
         if (banner && screen === "game") _raiseRecordBanner()
     }
-    function _raiseRecordBanner() {
+    // A record passed while a level is built or its descent intro holds
+    // waits for its Go, or, in a level without an intro, for the level to
+    // stand (_recordAfterIntro). now raises it whatever
+    property bool _recordWaits: false
+    function _raiseRecordBanner(now) {
+        if (!now && (resetting || _building || introHeld)) {
+            _recordWaits = true
+            return
+        }
         recordBannerShow.restart()
         recordChime.step = 0
         recordChime.restart()
@@ -1930,6 +2134,7 @@ ClayWorld2d {
                 dungeonAmbience.start()
                 dungeonMusic.start()
                 generateDungeon()
+                _beginIntro()
             }
             // Alone the dungeon master sets the first dungeon here, in a
             // session the host did before the start
@@ -2101,9 +2306,14 @@ ClayWorld2d {
     // Input handling: each key does the action it is bound to in the
     // control table; the moves are the controller's (knightPad.keyboardKeys)
     Keys.onPressed: (event) => {
-        // 1 to 5 buy what the dialogue panel offers (the smith's gems and
-        // four upgrades), whatever they are bound to
-        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5
+        // The choice of a special takes its keys first (issue #317)
+        if (specialChoosing && !overlayUp && !event.isAutoRepeat && _specialKey(event.key)) {
+            event.accepted = true
+            return
+        }
+        // 1 to 6 buy what the dialogue panel offers (the smith's gems and
+        // five upgrades), whatever they are bound to
+        if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6
                 && dialoguePanel.visible && dialoguePanel.wares.length > 0) {
             let i = event.key - Qt.Key_1
             if (i < dialoguePanel.wares.length) buyWare(dialoguePanel.wares[i])
@@ -2330,6 +2540,7 @@ ClayWorld2d {
         if (screen === "lobby") return session.lobby
         if (screen === "game" && fallen) return fallenLoader.item
         if (screen === "game" && menuOpen) return pauseLoader.item
+        if (screen === "game" && specialChoosing) return specialLoader.item
         return null
     }
     MenuPad {
@@ -2560,9 +2771,11 @@ ClayWorld2d {
         }
     }
 
-    // Momentum (Balance.momentum): a pip for each one earned, right of the
-    // mana bar; full, they glow and Q is named. Q short of them flashes
-    // them for momentum.flash seconds
+    // The chosen special (issue #317), right of the mana bar: its name and
+    // its mana, then, for one that needs it, momentum (Balance.momentum):
+    // a pip for each one earned; full, they glow and the special's button
+    // is named. The button short of them flashes them for momentum.flash
+    // seconds
     Row {
         id: momentumHud
         objectName: "momentumHud"
@@ -2574,6 +2787,18 @@ ClayWorld2d {
         visible: player !== null
         readonly property int have: player ? player.momentum : 0
         readonly property bool full: have >= Balance.momentum.max
+        readonly property bool needs: !!player && !!Balance.specials[player.special]
+                                      && Balance.specials[player.special].momentum === true
+        Text {
+            objectName: "specialHud"
+            anchors.verticalCenter: parent.verticalCenter
+            text: player ? world.specialName + " " + player.specialMana : ""
+            color: "#DDDDDD"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 12
+            font.bold: true
+        }
         property bool flashing: false
         Timer {
             id: momentumFlash
@@ -2588,9 +2813,10 @@ ClayWorld2d {
             }
         }
         Repeater {
-            model: Balance.momentum.max
+            model: momentumHud.needs ? Balance.momentum.max : 0
             Rectangle {
                 required property int index
+                anchors.verticalCenter: parent.verticalCenter
                 width: 10; height: 10
                 rotation: 45
                 color: index >= momentumHud.have ? "#2A2A2A"
@@ -2602,10 +2828,25 @@ ClayWorld2d {
             }
         }
         Text {
-            visible: momentumHud.full
-            // The whirlwind's key or pad button, from the control table
+            objectName: "specialKey"
+            anchors.verticalCenter: parent.verticalCenter
+            visible: momentumHud.full || !momentumHud.needs
+            // The special's key or pad button, from the control table
             text: world.controlName("whirlwind")
             color: Balance.momentum.color
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 12
+            font.bold: true
+        }
+        // The kill chain's bonus to the knight's blows while it holds
+        // (Balance.chain.bonusShare, issue #321): "CHAIN +15%"
+        Text {
+            objectName: "chainBonusHud"
+            anchors.verticalCenter: parent.verticalCenter
+            visible: world.chainBonus > 0
+            text: "CHAIN +" + Math.round(world.chainBonus * 100) + "%"
+            color: Balance.chain.bonusColor
             style: Text.Outline
             styleColor: "#000000"
             font.pixelSize: 12
@@ -2911,6 +3152,109 @@ ClayWorld2d {
         PauseAnimation { duration: Math.max(0, Balance.record.banner - 2 * Balance.record.fade) * 1000 }
         NumberAnimation { target: recordBannerText; property: "opacity"; to: 0; duration: Balance.record.fade * 1000 }
     }
+
+    // The descent intro (issue #316): the dungeon's depth and name, under
+    // them the count, then Go
+    Item {
+        id: introPanel
+        objectName: "descentIntro"
+        anchors.fill: parent
+        z: 1000
+        visible: world.introOn && (world.introHeld || introGoText.opacity > 0)
+        Column {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.2
+            spacing: 6
+            opacity: world.introHeld ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: Balance.intro.fade * 1000 } }
+            Text {
+                objectName: "introDepth"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Depth " + world.depth
+                color: "#DDDDDD"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 20
+                font.bold: true
+                font.letterSpacing: 4
+            }
+            Text {
+                objectName: "introName"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: world.dungeonName
+                color: "#E8C35A"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 40
+                font.bold: true
+                font.letterSpacing: 2
+            }
+            Text {
+                objectName: "introWait"
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: world.introWaiting && !world.specialChoosing
+                         && world.introClock - world.introArrivedAt > Balance.intro.waitNote * 1000
+                text: "Waiting for the party"
+                color: "#AAAAAA"
+                style: Text.Outline
+                styleColor: "#000000"
+                font.pixelSize: 16
+            }
+        }
+        Text {
+            objectName: "introCount"
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.36
+            visible: world.introBeat > 0
+            text: String(world.introBeat)
+            color: "#FFFFFF"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 72
+            font.bold: true
+        }
+        Text {
+            id: introGoText
+            objectName: "introGo"
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.36
+            opacity: 0
+            text: "Go"
+            color: "#E8C35A"
+            style: Text.Outline
+            styleColor: "#000000"
+            font.pixelSize: 72
+            font.bold: true
+        }
+    }
+    // The choice of a special, under the depth and the name while the
+    // intro waits for it (issue #317)
+    Loader {
+        id: specialLoader
+        anchors.fill: parent
+        z: 1001
+        active: world.specialChoosing
+        sourceComponent: Component {
+            SpecialChoice {
+                cards: world.specialCards
+                selected: world.specialSelected
+                pad: world.padInUse
+                padLabels: world.padLabels
+                keysMove: controlTable.keyName(controlTable.key("moveLeft")) + "/"
+                          + controlTable.keyName(controlTable.key("moveRight"))
+                combo: world.comboHint
+                onMoved: (by) => world.moveSpecial(by)
+                onPointed: (index) => world.specialSelected = index
+                onTaken: (index) => world.chooseSpecial(world.specialOffer[index])
+            }
+        }
+    }
+    SequentialAnimation {
+        id: introGoShow
+        PropertyAction { target: introGoText; property: "opacity"; value: 1 }
+        PauseAnimation { duration: Balance.intro.go * 500 }
+        NumberAnimation { target: introGoText; property: "opacity"; to: 0; duration: Balance.intro.go * 500 }
+    }
     SfxPlayer {
         id: recordChimeSound
         source: "../sound/sfx/menu_confirm.sfx.json"
@@ -3211,15 +3555,36 @@ ClayWorld2d {
         // Whirlwinds that hit an enemy, and the enemies they hit
         property int whirlwinds: 0
         property int whirlHits: 0
+        // Stuns (Balance.stun), the enemies they froze and the wind-ups of
+        // a lead or the Warden they ended
+        property int stuns: 0
+        property int stunFrozen: 0
+        property int stunInterrupted: 0
+        // Bolts (Balance.bolt) let loose, and the ones that hit an enemy
+        property int bolts: 0
+        property int boltHits: 0
+        // Specials let loose as their stronger version, by the combo
+        // (Balance.combo)
+        property int strongSpecials: 0
         // Shots this knight's perfect block sent back, and the ones of them
         // that hit an enemy (Balance.projectile)
         property int shotsBack: 0
         property int shotBackHits: 0
+        // Metal balls this knight's shield bounced, the ones of them a
+        // perfect block aimed, and the ones that hit an enemy (Balance.ball)
+        property int ballsBack: 0
+        property int ballsAimed: 0
+        property int ballBackHits: 0
         property int kills: 0
         // Kill chains of two links or more (Balance.chain), and the
         // longest one's links
         property int chains: 0
         property int longestChain: 0
+        // Blows the chain's bonus made stronger (Balance.chain.bonusShare),
+        // the points it added before defense and the highest it went
+        property int chainBlows: 0
+        property int chainExtra: 0
+        property real chainPeak: 0
         property int deaths: 0
         // Fallen allies this knight lifted up, and the times an ally lifted
         // it up (a rise at camp is neither)
@@ -3232,8 +3597,12 @@ ClayWorld2d {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
         r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
+        r.stuns = 0; r.stunFrozen = 0; r.stunInterrupted = 0
+        r.bolts = 0; r.boltHits = 0; r.strongSpecials = 0
         r.shotsBack = 0; r.shotBackHits = 0
+        r.ballsBack = 0; r.ballsAimed = 0; r.ballBackHits = 0
         r.kills = 0; r.chains = 0; r.longestChain = 0
+        r.chainBlows = 0; r.chainExtra = 0; r.chainPeak = 0
         r.deaths = 0; r.lifts = 0; r.lifted = 0
         r.seconds = 0; r.clearSeconds = -1
         breakChain()
@@ -3241,8 +3610,13 @@ ClayWorld2d {
     // what: dealt, taken (with the damage), parry, block, perfectBlock
     // (counted as a block too), crushed (a crushing blow broke the held
     // shield), whirlwind (a whirlwind hit its first enemy), whirlHit (an
-    // enemy it hit), shotBack (a perfect block sent a shot back),
-    // shotBackHit (a shot it sent back hit an enemy), kill, chain (a kill made a chain amount links long),
+    // enemy it hit), stun (a stun went off), stunFrozen and
+    // stunInterrupted (with the enemies it froze and the wind-ups it
+    // ended), bolt (a bolt let loose), boltHit (one hit an enemy), shotBack (a perfect block sent a shot back),
+    // shotBackHit (a shot it sent back hit an enemy), ballBack (its shield
+    // bounced a metal ball, amount 1 for a perfect block's), ballBackHit (a
+    // ball it bounced hit an enemy), kill, chain (a kill made a chain amount links long),
+    // chainBlow (the chain's bonus added amount points to a blow),
     // fall, lift (this knight lifted an ally up) or lifted (an ally lifted
     // it up)
     // --- The kill chain (Balance.chain, issue #270) ---
@@ -3254,11 +3628,17 @@ ClayWorld2d {
     property real _chainAt: 0
     // The chain hit stops this screen made, for a bench
     property int chainStops: 0
+    // The pips this chain added, one every pipEvery-th link, and the share
+    // of their damage the knight's blows deal on top while it holds
+    // (Balance.chain.bonusShare, bonusCap; issue #321): 0 once it breaks
+    readonly property int chainPips: Math.floor(chainLinks / Balance.chain.pipEvery)
+    readonly property real chainBonus: Math.round(Math.min(Balance.chain.bonusCap,
+                                                           chainPips * Balance.chain.bonusShare) * 1000) / 1000
     function killLanded(x, y, dx, dy, color) {
         let c = Balance.chain
         chainLinks = chainLinks > 0 && physicsSeconds - _chainAt <= c.window ? chainLinks + 1 : 1
         _chainAt = physicsSeconds
-        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color)
+        impact(chainLinks >= 2 ? "chainKill" : "enemyDeath", x, y, dx, dy, color, true, chainLinks)
         playDeathBurst(x, y, c.pitches[Math.min(chainLinks, c.pitches.length) - 1])
         countFight("kill")
         if (chainLinks >= 2) countFight("chain", chainLinks)
@@ -3267,6 +3647,11 @@ ClayWorld2d {
     }
     // A hit taken or a new fight record: the next kill starts a chain
     function breakChain() { chainLinks = 0 }
+    // A chain whose window ran out with no kill is over, on the physics
+    // clock as its links are: a kill after it starts a new one
+    function _stepChain() {
+        if (chainLinks > 0 && physicsSeconds - _chainAt > Balance.chain.window) breakChain()
+    }
     // The hit stop of a chain's link-th kill, in seconds
     function chainFreeze(link) {
         let c = Balance.chain
@@ -3290,8 +3675,24 @@ ClayWorld2d {
         case "crushed": r.crushed++; break
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
+        case "stun": r.stuns++; break
+        case "stunFrozen": r.stunFrozen += amount; break
+        case "stunInterrupted": r.stunInterrupted += amount; break
+        case "bolt": r.bolts++; break
+        case "boltHit": r.boltHits++; break
+        case "strong": r.strongSpecials++; break
+        case "chainBlow":
+            r.chainBlows++
+            r.chainExtra += amount
+            r.chainPeak = Math.max(r.chainPeak, chainBonus)
+            break
         case "shotBack": r.shotsBack++; break
         case "shotBackHit": r.shotBackHits++; break
+        case "ballBack":
+            r.ballsBack++
+            if (amount === 1) r.ballsAimed++
+            break
+        case "ballBackHit": r.ballBackHits++; break
         case "fall": r.deaths++; break
         case "lift": r.lifts++; break
         case "lifted": r.lifted++; break
@@ -3313,12 +3714,12 @@ ClayWorld2d {
         function onStepped() {
             world._physicsSteps++
             world.physicsSeconds += world.physics.timeStep
-            world._stepSlowMotion(world.physics.timeStep)
             if (world.followFightOnSteps && world._followingFight)
                 world._followFight(world.physics.timeStep)
             else if (world.followFightOnSteps && world.fightIntensity > 0)
                 world._stopFollowingFight()
             world._traceMusic()
+            world._stepChain()
             world._pickUpGold()
             world._pickUpPouches()
             world._stepRevive()
@@ -3332,6 +3733,8 @@ ClayWorld2d {
             fishing.step(world.physics.timeStep)
             world._stepHoles()
             world._stepDeepTravellers()
+            world._stepCritters(world.physics.timeStep)
+            world._stepFightRoom(world.physics.timeStep)
             world._forecastDanger()
             if (world.player && !world.fallen) {
                 world.fightRecord.seconds += world.physics.timeStep
@@ -3387,6 +3790,7 @@ ClayWorld2d {
         levelType = "dungeon"
         _startRunRecord()
         generateDungeon()
+        _beginIntro()
         minimap.requestPaint()
     }
 
@@ -3672,13 +4076,17 @@ ClayWorld2d {
     // for, the host's in a session; alone they are settled here, before
     // the knight and its record are gone. d.master is the dungeon's
     // overrides, the dungeon master's
+    // True while _enterLevel builds the next level
+    property bool _building: false
     function _enterLevel(newIndex, d) {
+        _building = true
         d = d || _dangerFor(newIndex)
         let carried = player ? { hp: player.hp, mana: player.mana, gold: player.gold, pouch: player.pouch,
                                  potions: player.potions, draughts: player.draughts, creel: player.creel,
-                                 momentum: player.momentum, levels: smithLevels(player) }
+                                 momentum: player.momentum, levels: smithLevels(player), special: player.special }
                              : { hp: Balance.knight.hp, mana: Balance.knight.mana, gold: 0, pouch: [],
-                                 potions: 0, draughts: 0, creel: [], momentum: 0, levels: smithLevels(null) }
+                                 potions: 0, draughts: 0, creel: [], momentum: 0, levels: smithLevels(null),
+                                 special: Balance.specials.order[0] }
         console.log("[Game] Level", newIndex, "carrying HP:", carried.hp, "mana:", carried.mana,
                     "gold:", carried.gold, "gems:", carried.pouch.length, "potions:", carried.potions, "draughts:", carried.draughts,
                     "smith:", JSON.stringify(carried.levels))
@@ -3702,9 +4110,264 @@ ClayWorld2d {
             player.draughts = carried.draughts
             player.creel = carried.creel
             player.momentum = carried.momentum
+            player.special = carried.special
         }
         // A knight still down when the party reaches the camp rises there
         if (session.connected && levelType === "village") _rise("camp")
+        _building = false
+        _beginIntro()
+    }
+
+    // --- The descent intro (issue #316) ---
+    // Entering a dungeon - a run's first and each after a camp - shows its
+    // depth and its name and counts 3, 2, 1 (Balance.intro) while the
+    // world is held: the physics stops as under the solo pause, the
+    // knight's swing, shield, dash and whirlwind are refused and no blow
+    // lands on a knight or an enemy. The camp, the fight room and the
+    // dojo's scenarios have none. The game's own windows show it - Main.qml
+    // and the dojo; a bench that builds the game itself turns it on to
+    // test it, the others go on without
+    property bool descentIntro: Clayground.runsInSandbox
+    // The level the intro is for, -1 for none
+    property int introLevel: -1
+    // When its lead - the depth and the name alone - began on the intro
+    // clock, ms; -1 while this node waits for the party
+    property real introStartsAt: -1
+    // The intro clock, ms: alone it runs while the game is not paused, in
+    // a session it is the session clock
+    property real introClock: 0
+    // When this node arrived in the dungeon, on the intro clock
+    property real introArrivedAt: 0
+    readonly property real introSeconds: Balance.intro.lead + Balance.intro.beats * Balance.intro.beat
+    readonly property bool introOn: introLevel >= 0 && introLevel === levelIndex && levelType === "dungeon"
+                                    && !fightRoomActive && screen === "game"
+    readonly property bool introWaiting: introOn && introStartsAt < 0
+    readonly property bool introHeld: introOn && (introStartsAt < 0 || introClock < introStartsAt + introSeconds * 1000)
+    // The beat counted now: 3, 2 and 1 in the count, 0 in the lead, while
+    // waiting and once it is over
+    readonly property int introBeat: {
+        if (!introHeld || introStartsAt < 0) return 0
+        let t = (introClock - introStartsAt) / 1000 - Balance.intro.lead
+        return t < 0 ? 0 : Math.max(1, Balance.intro.beats - Math.floor(t / Balance.intro.beat))
+    }
+    // The dungeon's name, the same on every screen of a session
+    readonly property string dungeonName: dungeonNameOf(levelSeedNow(), dangerBand(dangerPosition))
+    function dungeonNameOf(seed, band) {
+        let rand = createRng(seed ^ Balance.intro.salt)
+        let a = Balance.intro.adjectives[band], p = Balance.intro.places
+        let adjective = a[Math.floor(rand() * a.length)]
+        return "The " + adjective + " " + p[Math.floor(rand() * p.length)]
+    }
+    // A dungeon is built: its intro begins, alone at once, in a session
+    // once the host says every knight is there
+    function _beginIntro() {
+        specialPending = false
+        _keepOfferedSpecial()
+        if (!descentIntro || levelType !== "dungeon" || fightRoomActive) {
+            introLevel = -1
+            _recordAfterIntro()
+            return
+        }
+        introStartsAt = -1
+        introClock = session.connected ? session.now() : 0
+        introArrivedAt = introClock
+        introLevel = levelIndex
+        _offerSpecials()
+        if (!session.connected) {
+            if (!specialPending) introStartsAt = 0
+            return
+        }
+        _introFromHost()
+        if (introStartsAt >= 0) return
+        if (session.isHost) _introCheck()
+        else session.reportArrival(session.runSeed, levelIndex, !specialPending)
+    }
+    // Host: the knights that arrived in each dungeon ("seed:level" ->
+    // {nodeId: true}), until its count is set
+    property var _introArrivals: ({})
+    // picked: false while that knight still chooses its special
+    function _introArrival(fromId, seed, level, picked) {
+        let key = seed + ":" + level
+        let a = _introArrivals[key] || {}
+        a[fromId] = picked !== false
+        _introArrivals[key] = a
+        _introCheck()
+    }
+    // Host: once every knight has arrived and picked its special, or the
+    // wait for one not arrived is over, the count starts on every screen
+    // at the same moment of the session clock. A knight that arrived and
+    // still chooses holds the count however long it takes (issue #317)
+    function _introCheck() {
+        if (!session.connected || !session.isHost || !introWaiting || specialPending) return
+        let a = _introArrivals[session.runSeed + ":" + levelIndex] || {}
+        let others = session.nodeIds().filter(id => id !== session.nodeId)
+        if (others.some(id => a[id] === false)) return
+        let all = others.every(id => a[id] === true)
+        if (!all && session.now() < introArrivedAt + Balance.intro.waitMax * 1000) return
+        let at = session.now() + Balance.intro.lag * 1000
+        _introArrivals = ({})
+        session.publishIntro({ seed: session.runSeed, level: levelIndex, at: at })
+        introStartsAt = at
+        console.log("[Game] Descent intro of level", levelIndex, all ? "for every knight" : "without a knight not arrived")
+    }
+    // A joiner: the host's count for the dungeon it waits in
+    readonly property var _hostIntro: session.intro
+    on_HostIntroChanged: _introFromHost()
+    function _introFromHost() {
+        let v = session.intro
+        if (!introWaiting || !v || v.seed !== session.runSeed || v.level !== introLevel) return
+        // A count that starts without this knight's pick (it arrived after
+        // the host's wait) takes the special under the keys
+        if (specialPending) _pickSpecial(specialOffer[specialSelected] || player.special)
+        introStartsAt = v.at
+    }
+    function _stepIntro() {
+        if (session.connected) {
+            introClock = session.now()
+            _introCheck()
+            return
+        }
+        let now = Date.now()
+        // A stall of the frames holds the count rather than skip a beat
+        if (!gamePaused) introClock += Math.max(0, Math.min(Balance.intro.maxStep * 1000, now - introTick.last))
+        introTick.last = now
+    }
+    Timer {
+        id: introTick
+        property real last: 0
+        interval: 16
+        repeat: true
+        running: world.introHeld
+        onRunningChanged: last = Date.now()
+        onTriggered: world._stepIntro()
+    }
+    onIntroBeatChanged: if (introBeat > 0) _playIntroBeat(0, "beat" + introBeat)
+    onIntroHeldChanged: {
+        if (introHeld) return
+        // Released: Go, unless the count is long over (a knight that
+        // joins the run in this dungeon)
+        if (introOn && introStartsAt >= 0
+                && introClock <= introStartsAt + (introSeconds + Balance.intro.go) * 1000) {
+            _playIntroBeat(Balance.intro.goPitch, "go")
+            introGoShow.restart()
+        }
+        if (screen === "game") _recordAfterIntro()
+    }
+    // The record's banner that waited, once no intro holds
+    function _recordAfterIntro() {
+        if (!_recordWaits || introHeld) return
+        _recordWaits = false
+        _raiseRecordBanner(true)
+    }
+    // The count's knock: the beats on its own pitch, the release up
+    SfxPlayer {
+        id: introCountSound
+        source: "../sound/sfx/descent_count.sfx.json"
+        volume: muted ? 0 : Balance.intro.volume * soundVolume
+    }
+    function _playIntroBeat(pitch, what) {
+        introCountSound.play(1, pitch)
+        logSound("sfx/descent_count", what, pitch, 0, 1)
+    }
+
+    // --- The knight's special (issue #317) ---
+    // Before a dungeon's descent intro counts, the knight picks one of the
+    // specials (Balance.specials) for that dungeon: the choice shows while
+    // the intro waits, with the depth and the name, and the count starts
+    // once it is made - in a session once every knight has made its own.
+    // Only the specials in the game are offered; with one there is no
+    // choice and the knight has that one. Without an intro (the fight
+    // room, the dojo's scenarios, a bench that turns it off) the knight
+    // keeps the special it has. specialsAll offers the specials not in the
+    // game yet too, for a bench that tests the choice: picked, one does
+    // nothing
+    property bool specialsAll: false
+    readonly property var specialsOffered: Balance.specials.order.filter(
+        id => specialsAll || Balance.specials[id].ready === true)
+    // This node's knight has its choice to make in this dungeon
+    property bool specialPending: false
+    readonly property bool specialChoosing: specialPending && introWaiting && !!player
+    // The specials on the choice's cards, and the one under the keys or
+    // the stick
+    property var specialOffer: []
+    property int specialSelected: 0
+    // The choice's cards: name, line and the mana each costs this knight,
+    // its balanced blade's share taken off
+    readonly property var specialCards: specialOffer.map(id => ({
+        id: id, name: Balance.specials[id].name, line: Balance.specials[id].line,
+        mana: player ? player.specialManaOf(id) : Balance.specials[id].mana,
+        strongName: Balance.combo[id] ? Balance.combo[id].name : "",
+        strongLine: Balance.combo[id] ? Balance.combo[id].line : "" }))
+    // The combo for a special's stronger version (Balance.combo, issue
+    // #320), as the choice shows it: away from the aim, then towards it,
+    // then the special's button, in the moves and the button as they are
+    // bound on the device in use; on the keys also the two move keys that
+    // make it while the knight aims up or is locked on an enemy
+    readonly property string comboHint: {
+        let button = controlName("whirlwind")
+        if (padInUse || touchControls) return "Combo: the stick away from your aim, then towards it, then " + button
+        let k = n => controlTable.keyName(controlTable.key(n))
+        return "Combo: away from your aim, then towards it, then " + button
+            + "  (aiming up: " + k("moveDown") + " " + k("moveUp") + " " + button + ")"
+    }
+    // The chosen special's name, for the HUD and the controls hint
+    readonly property string specialName: player && Balance.specials[player.special]
+                                          ? Balance.specials[player.special].name : ""
+    // A special no longer offered gives way to the first that is
+    function _keepOfferedSpecial() {
+        if (player && specialsOffered.indexOf(player.special) < 0 && specialsOffered.length > 0)
+            player.special = specialsOffered[0]
+    }
+    // The intro begins: with two or more specials the choice opens on the
+    // knight's last one
+    function _offerSpecials() {
+        specialOffer = specialsOffered.slice()
+        specialPending = !!player && specialOffer.length > 1
+        specialSelected = player ? Math.max(0, specialOffer.indexOf(player.special)) : 0
+        if (specialPending) console.log("[Game] The knight chooses its special:", specialOffer.join(", "))
+    }
+    function _pickSpecial(id) {
+        specialPending = false
+        player.special = id
+        console.log("[Game] The knight picked the special", id, "for level", levelIndex)
+    }
+    // The knight takes the special id: alone the count starts, in a
+    // session the host hears of it. False when no choice is open or id is
+    // not offered
+    function chooseSpecial(id) {
+        if (!specialChoosing || specialOffer.indexOf(id) < 0) return false
+        specialSelected = specialOffer.indexOf(id)
+        _pickSpecial(id)
+        if (!session.connected) introStartsAt = introClock
+        else if (session.isHost) _introCheck()
+        else session.reportArrival(session.runSeed, levelIndex, true)
+        return true
+    }
+    function moveSpecial(by) {
+        specialSelected = Math.max(0, Math.min(specialOffer.length - 1, specialSelected + by))
+    }
+    // A key while the choice is open: the arrows left and right move along
+    // the cards, 1 to 3 take one, Enter, Space or the talk key take the one
+    // under the keys. Returns whether it was the choice's. The move keys
+    // are the keyboard's stick, which reaches the choice as a pad's does
+    // (_padMenu), so they are not handled here too - nor an arrow bound to
+    // the move left or right, which would move the choice twice
+    function _specialKey(k) {
+        let n = specialOffer.length
+        if (k === controlTable.key("moveLeft") || k === controlTable.key("moveRight"))
+            return false
+        if (k === Qt.Key_Left)
+            moveSpecial(-1)
+        else if (k === Qt.Key_Right)
+            moveSpecial(1)
+        else if (k >= Qt.Key_1 && k < Qt.Key_1 + n)
+            chooseSpecial(specialOffer[k - Qt.Key_1])
+        else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space
+                 || k === controlTable.key("talk"))
+            chooseSpecial(specialOffer[specialSelected])
+        else
+            return false
+        return true
     }
 
     // Component factories
@@ -3754,6 +4417,8 @@ ClayWorld2d {
     Component { id: floorComponent; Floor {} }
     Component { id: campfireComponent; Campfire {} }
     Component { id: projectileComponent; Projectile {} }
+    Component { id: ballComponent; MetalBall {} }
+    Component { id: boltComponent; Bolt {} }
     Component { id: npcComponent; Npc {} }
     Component { id: goldDropComponent; GoldDrop {} }
 
@@ -3802,8 +4467,8 @@ ClayWorld2d {
     // --- The smith's upgrades (issues #38, #81, #98) ---
     // Each lasts the run and has levels (Balance.shop): one level per
     // camp, the next above the knight's, and higher levels only deeper
-    readonly property var smithLines: ["sword", "shield", "harness", "blade"]
-    // The knight's levels, {sword, shield, harness, blade}; all 0 for none
+    readonly property var smithLines: ["sword", "shield", "harness", "blade", "boots"]
+    // The knight's levels, {sword, shield, harness, blade, boots}; all 0 for none
     function smithLevels(knight) {
         let out = {}
         for (let line of smithLines) out[line] = knight ? knight[line + "Level"] : 0
@@ -3829,8 +4494,13 @@ ClayWorld2d {
     // the knight panel say the same
     function smithName(line, level) {
         let name = line === "sword" ? "Sharpened sword" : line === "shield" ? "Reinforced shield"
-            : line === "harness" ? "Lighter harness" : "Balanced blade"
+            : line === "harness" ? "Lighter harness" : line === "boots" ? "Swift boots" : "Balanced blade"
         return level < 1 ? name : name + " " + (["I", "II", "III", "IV", "V"][level - 1] || String(level))
+    }
+    // The mana the chosen special costs with the balanced blade of level
+    function _bladeMana(level) {
+        let s = Balance.specials[player ? player.special : Balance.specials.order[0]]
+        return Math.round(s.mana * Balance.shop.bladeShare[Math.min(level, Balance.shop.bladeShare.length) - 1])
     }
     function smithGives(line, level) {
         let sh = Balance.shop, i = level - 1
@@ -3838,7 +4508,8 @@ ClayWorld2d {
             : line === "shield" ? "a block lets " + Math.round(sh.shieldBlockedShare[i] * 100)
                                   + " % through, costs " + sh.shieldBlockMana[i] + " mana"
             : line === "harness" ? "a dash costs " + sh.harnessDashMana[i] + " mana"
-            : "a whirlwind costs " + sh.bladeWhirlMana[i] + " mana"
+            : line === "boots" ? "walk " + Math.round((sh.bootsSpeed[i] / Balance.knight.moveSpeed - 1) * 100) + " % faster"
+            : "a " + specialName.toLowerCase() + " costs " + _bladeMana(level) + " mana"
     }
 
     // --- The village's wares (issue #38) ---
@@ -3871,7 +4542,8 @@ ClayWorld2d {
                 sword: "There. That edge will bite deeper.",
                 shield: "There. That shield will let less through.",
                 harness: "There. Lighter on your feet now.",
-                blade: "There. It'll spin true in your hand."
+                blade: "There. It'll spin true in your hand.",
+                boots: "There. Those will carry you quicker."
             }[ware.id]
         }
         dialoguePanel.wares = _offered(dialoguePanel.wares)
@@ -3998,6 +4670,8 @@ ClayWorld2d {
             let py = (startRoom.y + startRoom.h / 2) * cellSize
             console.log("[Game] Spawning player at:", px, py)
             spawnPlayer(px, py)
+            // Step 6b: the critters, clear of where the knights come in
+            if (levelType === "dungeon") placeCritters(planCritters(levelSeed, px, py))
         }
 
         // Step 7: Block the entrance so player can't backtrack
@@ -4258,8 +4932,16 @@ ClayWorld2d {
             let ex = (room.x + 1 + rand() * (room.w - 2)) * cellSize
             let ey = (room.y + 1 + rand() * (room.h - 2)) * cellSize
             let tier = i < spawnRooms.length && leads.indexOf(r) >= 0 ? 2 : tiers[fodder++]
-            // Enemy type: guardian, spitter, else grunt
+            // Enemy type: guardian, spitter, else grunt; a lead may be a
+            // slinger (issue #322), and the others share the rest of the
+            // roll out as before
             let typeRoll = rand()
+            let sc = tier === 2 ? (sb.slingerChance || 0) : 0
+            if (sc > 0 && typeRoll < sc) {
+                out.push({x: ex, y: ey, tier: tier, type: "slinger", room: r})
+                continue
+            }
+            if (sc > 0) typeRoll = (typeRoll - sc) / (1 - sc)
             let guardianChance = tier === 2 ? sb.guardianChanceTough : sb.guardianChance
             let type = typeRoll < guardianChance ? "guardian"
                 : typeRoll < guardianChance + sb.spitterChance ? "spitter" : "grunt"
@@ -4600,6 +5282,186 @@ ClayWorld2d {
         impactSound.play(0.35)
         logSound("sfx/punch_hitting", "bones", 0, _distTo(pile.xWu, pile.yWu), 0.35)
         pile.destroy()
+    }
+
+    // The dungeon's critters (Balance.critters, issue #324): spiders, mice
+    // and rats on the floor of its rooms and corridors. They are drawn
+    // only - no body, no enemy - so they never hurt, never block the way,
+    // count for no kill chain and are no target for the lock-on. Every
+    // screen lays out the same ones from the level's seed and runs them
+    // itself: they flee from the knights it shows and are squashed by
+    // them, nothing sent over the network
+    Component { id: critterComponent; Critter {} }
+    property var critters: []
+    // How many were squashed in this level, and the marks they left
+    property int crittersSquashed: 0
+    property var critterMarks: []
+    // A critter of kind was squashed at (x, y) by knight
+    signal critterSquashed(string kind, real x, real y, var knight)
+    // The critters of the level built from levelSeed, none within
+    // clearOfSpawn wu of (spawnX, spawnY): [{kind, x, y, seed}], x and y
+    // its centre in wu. Drawn from their own stream, so the rest of the
+    // level stays as it was without them
+    function planCritters(levelSeed, spawnX, spawnY) {
+        let t = Balance.critters
+        let rand = createRng(levelSeed ^ 0x63726974)
+        let out = []
+        let add = (x, y) => {
+            let kind = _critterKind(rand()), seed = rand()
+            if (Math.hypot(x - spawnX, y - spawnY) < t.clearOfSpawn || !critterFree(x, y)) return
+            if (doors.length > 0 && doorAt(Math.floor(x / cellSize) + "," + Math.floor(y / cellSize))) return
+            out.push({ kind: kind, x: x, y: y, seed: seed })
+        }
+        for (let room of rooms) {
+            // A whole number per room, its fraction a chance of one more
+            let n = Math.floor(t.perRoom + rand())
+            for (let i = 0; i < n; i++)
+                add((room.x + 0.5 + rand() * (room.w - 1)) * cellSize,
+                    (room.y + 0.5 + rand() * (room.h - 1)) * cellSize)
+        }
+        let halls = []
+        for (let gy = 0; gy < gridHeight; gy++)
+            for (let gx = 0; gx < gridWidth; gx++)
+                if (grid[gy][gx] === cellHallway) halls.push([gx, gy])
+        let n = halls.length > 0 ? Math.floor(halls.length / t.perCorridorCells + rand()) : 0
+        for (let i = 0; i < n; i++) {
+            let c = halls[Math.floor(rand() * halls.length)]
+            add((c[0] + 0.3 + 0.4 * rand()) * cellSize, (c[1] + 0.3 + 0.4 * rand()) * cellSize)
+        }
+        return out
+    }
+    // The kind a draw r of 0..1 picks, by the kinds' shares
+    function _critterKind(r) {
+        let kinds = Balance.critters.kinds, total = 0
+        for (let k in kinds) total += kinds[k].share
+        let at = r * total, last = ""
+        for (let k in kinds) {
+            last = k
+            at -= kinds[k].share
+            if (at < 0) return k
+        }
+        return last
+    }
+    function placeCritters(list) {
+        critters = []
+        crittersSquashed = 0
+        critterMarks = []
+        for (let p of list) {
+            let k = Balance.critters.kinds[p.kind]
+            let c = critterComponent.createObject(world.room, {
+                kind: p.kind, xWu: p.x, yWu: p.y, sizeWu: k.size, color: k.color, seed: p.seed,
+                heading: p.seed * 2 * Math.PI,
+                moodLeft: Balance.critters.rest[0] + p.seed * (Balance.critters.rest[1] - Balance.critters.rest[0]),
+                pixelPerUnit: Qt.binding(() => world.pixelPerUnit)
+            })
+            if (!c) continue
+            critters.push(c)
+            dungeonObjects.push(c)
+        }
+    }
+    // Whether a critter may stand at (x, y): on a floor cell, not in a
+    // shut door
+    function critterFree(x, y) {
+        let gx = Math.floor(x / cellSize), gy = Math.floor(y / cellSize)
+        if (gx < 0 || gy < 0 || gx >= gridWidth || gy >= gridHeight || grid[gy][gx] === cellWall) return false
+        return doors.length === 0 || !doorShut(gx + "," + gy)
+    }
+    // c runs dist wu toward angle a, or as near to it as the walls let it:
+    // straight on, else turned ever further to either side. False when
+    // it is cornered and stays
+    function _critterRun(c, a, dist, dt) {
+        let edge = c.sizeWu / 2
+        for (let turn of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, 2.6, -2.6]) {
+            let b = a + (c.seed < 0.5 ? turn : -turn)
+            let cx = Math.cos(b), cy = Math.sin(b)
+            let nx = c.xWu + cx * dist, ny = c.yWu + cy * dist
+            if (!critterFree(nx + cx * edge, ny + cy * edge)) continue
+            c.xWu = nx
+            c.yWu = ny
+            c.gait += dist
+            // It turns fast but not at once
+            let d = Math.atan2(Math.sin(b - c.heading), Math.cos(b - c.heading))
+            c.heading += d * Math.min(1, dt * 18)
+            return true
+        }
+        return false
+    }
+    // Each physics step: a critter a knight stands on is squashed; one a
+    // knight comes near startles and runs from it until none is near; the
+    // rest scurry about now and then. Only those within awake wu of a
+    // knight move
+    function _stepCritters(dt) {
+        if (critters.length === 0) return
+        let t = Balance.critters
+        let knights = knightsHere()
+        for (let c of critters.slice()) {
+            let k = t.kinds[c.kind]
+            let near = null, nd = Infinity
+            for (let n of knights) {
+                let d = Math.hypot(n.x - c.xWu, n.y - c.yWu)
+                if (d < nd) { nd = d; near = n }
+            }
+            if (nd > t.awake) continue
+            if (nd <= t.squash + c.sizeWu / 2) { squashCritter(c, near.knight); continue }
+            let noticed = near && !near.seated && nd < k.notice
+            if (noticed && (c.mood === "rest" || c.mood === "wander")) {
+                c.mood = "startled"
+                c.moodLeft = t.startle
+                c.from = near.knight
+                continue
+            }
+            if (c.mood === "startled") {
+                c.moodLeft -= dt
+                if (c.moodLeft <= 0) c.mood = "flee"
+            } else if (c.mood === "flee") {
+                if (nd > t.forget) {
+                    c.mood = "rest"
+                    c.from = null
+                    c.moodLeft = t.rest[0] + Math.random() * (t.rest[1] - t.rest[0])
+                    continue
+                }
+                c.from = near.knight
+                let away = Math.atan2(c.yWu - near.y, c.xWu - near.x)
+                _critterRun(c, away + 0.35 * Math.sin(c.gait * 2 + c.seed * 6), k.speed * dt, dt)
+            } else if (c.mood === "wander") {
+                let dx = c.toXWu - c.xWu, dy = c.toYWu - c.yWu
+                let step = k.speed * t.wanderSpeed * dt, left = Math.hypot(dx, dy)
+                if (left <= step || !_critterRun(c, Math.atan2(dy, dx), Math.min(step, left), dt)) {
+                    c.mood = "rest"
+                    c.moodLeft = t.rest[0] + Math.random() * (t.rest[1] - t.rest[0])
+                }
+            } else {
+                c.moodLeft -= dt
+                if (c.moodLeft > 0) continue
+                let a = Math.random() * 2 * Math.PI, d = t.wander * (0.4 + 0.6 * Math.random())
+                c.toXWu = c.xWu + Math.cos(a) * d
+                c.toYWu = c.yWu + Math.sin(a) * d
+                c.mood = "wander"
+            }
+        }
+    }
+    // A knight stood on c: gone with a squash, its mark left on the floor
+    function squashCritter(c, knight) {
+        let t = Balance.critters, k = t.kinds[c.kind]
+        let i = critters.indexOf(c)
+        if (i < 0) return
+        critters.splice(i, 1)
+        let j = dungeonObjects.indexOf(c)
+        if (j >= 0) dungeonObjects.splice(j, 1)
+        c.squashed = true
+        crittersSquashed++
+        let m = stainComp.createObject(world.room, {
+            xWu: c.xWu, yWu: c.yWu, color: k.mark, sizeWu: c.sizeWu * t.markSize, seed: c.seed,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            visible: Qt.binding(() => world.fx)
+        })
+        if (m) {
+            critterMarks.push(m)
+            dungeonObjects.push(m)
+        }
+        playCritterSquash(c.xWu, c.yWu, c.kind)
+        critterSquashed(c.kind, c.xWu, c.yWu, knight)
+        c.destroy()
     }
 
     // The dungeon's features (Balance.dungeon): [{kind, gx, gy, xWu, yWu}],
@@ -5917,7 +6779,9 @@ ClayWorld2d {
             leadShare: Math.max(0, Math.min(bd.leadCap, sb.leadShare + d * bd.leadShare)),
             guardianChance: Math.min(bd.typeCap, sb.guardianChance + d * bd.guardianChance),
             guardianChanceTough: Math.min(bd.typeCap, sb.guardianChanceTough + d * bd.guardianChance),
-            spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance)
+            spitterChance: Math.min(bd.typeCap, sb.spitterChance + d * bd.spitterChance),
+            // From its depth on, a share of the leads are slingers (issue #322)
+            slingerChance: Math.floor(d) >= sb.slingerDepth ? sb.slingerChance : 0
         }
     }
 
@@ -5994,14 +6858,15 @@ ClayWorld2d {
     }
     function wardenTempo(n) { return 1 + n * Balance.boss.tempoGrow }
     // The Warden at appearance n, its corner at (ex, ey), for knights;
-    // dormant until its room shuts. In a session only the host spawns
+    // dormant until its room shuts, its stone cracked by the n defeats
+    // before. In a session only the host spawns
     function spawnWarden(ex, ey, n, knights, dormant) {
         let ehp = wardenHp(n, knights, danger)
         let props = {
             xWu: ex, yWu: ey, widthWu: Balance.boss.size, heightWu: Balance.boss.size,
             hp: ehp, maxHp: ehp, atk: enemyAtk("warden", danger), def: Balance.enemy.warden.def,
             tier: 2, enemyType: "warden", tempo: wardenTempo(n), dormant: dormant === true,
-            fromHole: ""
+            cracks: Math.min(n, Balance.boss.cracks), fromHole: ""
         }
         if (!session.connected) _makeEnemy(props)
         else if (session.isHost) session.spawnEnemy(props)
@@ -6237,6 +7102,193 @@ ClayWorld2d {
         }
     }
 
+    // --- The slinger's metal balls (Balance.ball, issue #322) ---
+    // In a session the host's slinger slings on every node: each node
+    // flies the ball under the host's id for it and bounces it off the
+    // walls itself - mirrored off the grid's cells, so its path is the
+    // same on every screen. It hurts only that node's knight: that node
+    // judges it by its knight's own state and reports it - "hit" where
+    // the ball fell, or "blocked" or "perfect" where the shield met it and
+    // the way it went -, and every other node puts its ball of that id
+    // there, falling or turned. The node whose knight's shield turned it
+    // judges the enemy it hits and reports where it fell ("enemy"). A
+    // ball that falls at a wall or at the end of its time falls on each
+    // screen alone.
+    property int _ballCount: 0
+    property var _ballById: ({})
+    // Balls a report reached before the host's ball did, by id: it flies
+    // no more when it comes
+    property var _ballsDone: ({})
+    // Ball id bounced off a wall here, its n-th, its centre at (x, y)
+    signal ballBounced(string ballId, int n, real x, real y)
+    // A shield turned ball id: by "blocked" or "perfect", this node's
+    // knight's (local) or another's, which reported it; (dx, dy) the way
+    // it went
+    signal ballTurned(string ballId, string by, bool local, real dx, real dy)
+    // Ball id fell here: how (MetalBall.fell), its wall bounces, by what a
+    // shield turned it ("" none), and where its centre was
+    signal ballFell(string ballId, string how, int bounces, string turnedBy, real x, real y)
+    // Whether cell (gx, gy) stops a ball: a wall, a shut door, or past the
+    // grid's edge
+    function ballSolid(gx, gy) {
+        if (gy < 0 || gy >= grid.length || !grid[gy] || gx < 0 || gx >= grid[gy].length) return true
+        if (grid[gy][gx] === cellWall) return true
+        return doors.length > 0 && doorShut(gx + "," + gy)
+    }
+    // A slinger slings a ball from its centre (x, y) along (dx, dy),
+    // damage the blow it deals a knight: the host's on every node
+    function spawnBall(x, y, dx, dy, damage) {
+        let id = "ball" + (++_ballCount)
+        if (session.connected && session.isHost)
+            session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage})
+        playBallShot(x, y)
+        return _flyBall(id, x, y, dx, dy, damage)
+    }
+    // This node's knight met ball id: "hit" where it fell at (x, y), or
+    // "blocked" or "perfect" where its shield turned it there, along
+    // (dx, dy)
+    function ballLanded(id, result, x, y, dx, dy) {
+        let report = {source: "ball", id: id, result: result, x: x, y: y}
+        if (result === "blocked" || result === "perfect") {
+            report.dx = dx
+            report.dy = dy
+            countFight("ballBack", result === "perfect" ? 1 : 0)
+            ballTurned(id, result, true, dx, dy)
+        }
+        if (session.connected) session.reportStruck(report)
+    }
+    // Another node's knight met ball id, or its shield's ball an enemy:
+    // here it falls there, or is turned from there the way it went
+    function _ballReported(r) {
+        let b = _ballById[r.id]
+        if (r.result === "blocked" || r.result === "perfect") {
+            if (!b || b.destroyed) b = _flyBall(r.id, r.x, r.y, r.dx, r.dy, 0)
+            _ballsDone[r.id] = true
+            if (b) b.turn(r.result, false, 0, r.x, r.y, r.dx, r.dy)
+            ballTurned(r.id, r.result, false, r.dx, r.dy)
+            return
+        }
+        _ballsDone[r.id] = true
+        if (b && !b.destroyed) b.fallAt(r.x, r.y, "report")
+    }
+    function _flyBall(id, x, y, dx, dy, damage) {
+        let size = Balance.ball.size
+        let b = ballComponent.createObject(world.room, {
+            ballId: id,
+            xWu: x - size / 2, yWu: y + size / 2,
+            dirX: dx, dirY: dy,
+            damage: damage,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world,
+            // Its sensor: the knight, and the enemy a shield's ball hits;
+            // the walls are the grid's (ballSolid)
+            sensorCategories: catProjectile,
+            sensorCollidesWith: catPlayer | catEnemy
+        })
+        if (!b) return null
+        _ballById[id] = b
+        b.bounced.connect((n, bx, by) => {
+            playBallBounce(bx, by, "bounce")
+            world.ballBounced(id, n, bx, by)
+        })
+        b.fell.connect(how => {
+            playBallBounce(b.centreX, b.centreY, "fall")
+            world.ballFell(id, how, b.bounces, b.turnedBy, b.centreX, b.centreY)
+        })
+        b.gone.connect(() => { if (world._ballById[id] === b) delete world._ballById[id] })
+        console.log("[Game] Ball", id, "from", x.toFixed(1), y.toFixed(1))
+        return b
+    }
+
+    // --- The bolt (Balance.bolt, issue #319) ---
+    // A knight's bolt flies on every screen: the firing node flies its own
+    // (own), which deals the first enemy it meets its blow, and sends it to
+    // the others, which fly it under the firing node's id to be seen. It
+    // hurts no knight anywhere. Each screen ends it at the first enemy or
+    // wall it meets there, or past its reach; the firing node tells the
+    // others where and how it ended, and a bolt still flying on another
+    // screen ends there that way then
+    property int _boltCount: 0
+    property var _boltById: ({})
+    // A bolt ended on this screen: its id, how ("enemy", "wall" or
+    // "reach", on another screen as the firing node said when its report
+    // came first), the enemy it met or null, the damage it dealt, where
+    // its centre was, how far it had flown, and whether it was this
+    // screen's knight's
+    signal boltEnded(string boltId, string how, var enemy, int dealt, real x, real y,
+                     real travelled, bool own)
+    // This node's knight lets a bolt loose from (x, y), its centre, along
+    // (dx, dy), dealing damage to the first enemy it meets; strong, the
+    // stronger version (Balance.combo.bolt), bigger and faster, on every
+    // screen
+    function fireBolt(x, y, dx, dy, damage, strong) {
+        let id = (session.connected ? session.nodeId : "solo") + "-bolt" + (++_boltCount)
+        playBoltShot()
+        session.sendBolt({id: id, x: x, y: y, dx: dx, dy: dy, strong: strong === true})
+        return _flyBolt(id, x, y, dx, dy, damage, true, strong === true)
+    }
+    function _flyBolt(id, x, y, dx, dy, damage, own, strong) {
+        let size = strong ? Balance.combo.bolt.size : Balance.bolt.size
+        let b = boltComponent.createObject(world.room, {
+            boltId: id, own: own, damage: damage, strong: strong === true,
+            fromX: x, fromY: y, dirX: dx, dirY: dy,
+            xWu: x - size / 2, yWu: y + size / 2,
+            pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
+            world: world.physics,
+            gameWorld: world,
+            // Solid fixture: a wall or a closed door stops it
+            categories: catProjectile,
+            collidesWith: catWall,
+            // Sensor fixture: the enemies, never a knight
+            sensorCategories: catProjectile,
+            sensorCollidesWith: catEnemy
+        })
+        if (!b) return null
+        _boltById[id] = b
+        b.ended.connect((how, enemy, dealt) => world._boltEnd(b, how, enemy, dealt))
+        console.log("[Game] Bolt", id, own ? "(own)" : "", "from", x.toFixed(1), y.toFixed(1))
+        return b
+    }
+    // Bolt b ended here: sparks and its hit where it met an enemy or a
+    // wall, past its reach it fades without either; the own one counts its
+    // hit, shows its damage and tells the others where and how it ended
+    function _boltEnd(b, how, enemy, dealt) {
+        let id = b.boltId, x = b.centreX, y = b.centreY
+        if (_boltById[id] === b) delete _boltById[id]
+        let bo = Balance.bolt
+        if (fx && how !== "reach")
+            spawnSparks(x, y, -b.dirX, -b.dirY, bo.sparks, bo.coreColor)
+        if (fx) spawnRing(x, y, b.strong ? Balance.combo.color : bo.color, how === "enemy" ? 1.0 : 0.6)
+        if (how === "enemy" || how === "wall") {
+            let gain = b.own ? 1 : remoteGain(x, y)
+            if (how !== "enemy") gain *= bo.wallGain
+            if (gain > 0) playBoltHit(gain, x, y)
+        }
+        if (b.own) {
+            if (how === "enemy" && enemy) {
+                countFight("boltHit")
+                spawnDamageNumber(enemy.xWu, enemy.yWu, dealt, bo.coreColor)
+                if (fx) _trauma(bo.trauma)
+            }
+            session.endBolt({id: id, x: x, y: y, how: how})
+        }
+        console.log("[Game] Bolt", id, "ended:", how, "after", b.travelled.toFixed(2), "wu")
+        boltEnded(id, how, enemy, dealt, x, y, b.travelled, b.own)
+    }
+    // The firing node's bolt ended at (x, y), at an enemy, a wall or its
+    // reach (how): here too, that way, if it flies still
+    function _boltEndReported(r) {
+        let b = _boltById[r.id]
+        delete _boltById[r.id]
+        try {
+            if (!b || b.destroyed) return
+        } catch (err) { return }
+        b.xWu = r.x - b.widthWu / 2
+        b.yWu = r.y + b.heightWu / 2
+        b.end(r.how === "enemy" || r.how === "wall" ? r.how : "reach", null, 0)
+    }
+
     function spawnSpitParticles(wx, wy) {
         let colors = ["#6B8E4A", "#8EBB5A", "#AADD66", "#4A6B2A"]
         for (let i = 0; i < 5; i++) {
@@ -6425,6 +7477,8 @@ ClayWorld2d {
         holeEvents = []
         holeSounds = []
         deepTravellers = []
+        critters = []
+        critterMarks = []
         _deepRuns = ({})
         deepTravellerEvents = []
         deepTravellerSounds = []
@@ -6476,6 +7530,11 @@ ClayWorld2d {
         }
         _shotById = {}
         _shotsBack = {}
+        for (let id in _ballById) {
+            try { if (_ballById[id] && !_ballById[id].destroyed) _ballById[id].vanish() } catch(err) {}
+        }
+        _ballById = {}
+        _ballsDone = {}
 
         grid = []
         rooms = []
@@ -6614,7 +7673,7 @@ ClayWorld2d {
             { x: sx - 1, y: sy0 + 3, duration: 2, text: "*inspecting blade*" }
         ], [
             "Ah, another one from the depths. Your blade's seen some work.",
-            "Sword, shield, harness or blade - one piece of work per visit, and it lasts the descent.",
+            "Sword, shield, harness, blade or boots - one piece of work per visit, and it lasts the descent.",
             "The deeper you've been, the finer I can make it. Bring gold from below.",
             "Cut stones from the veins down there? I'll buy every one."
         ], "voice/npc_greetings/blacksmith_greeting", [{ id: "gems" }].concat(smithLines.map(line => ({ id: line }))))
@@ -8850,22 +9909,20 @@ ClayWorld2d {
         gameCamera.target = player
     }
 
-    // Auto-respawn enemies in fight room when all dead
-    Timer {
-        id: fightRoomRespawn
-        interval: Balance.spawn.fightRoomRespawn * 1000
-        repeat: true
-        running: fightRoomActive
-        onTriggered: {
-            if (!player) return
-            let alive = 0
-            for (let e of enemies)
-                if (e && e.destroyed === false) alive++
-            if (alive > 0) return
-            enemies = []
-            _spawnFightRoomEnemies()
-            console.log("[Game] Fight room: respawned enemies")
-        }
+    // The fight room fills again Balance.spawn.fightRoomRespawn seconds
+    // after its last enemy fell, on the physics clock: a pause holds it,
+    // and so does a bench between the steps it runs
+    property real _fightRoomEmptyFor: 0
+    function _stepFightRoom(dt) {
+        if (!fightRoomActive || !player) { _fightRoomEmptyFor = 0; return }
+        for (let e of enemies)
+            if (e && e.destroyed === false) { _fightRoomEmptyFor = 0; return }
+        _fightRoomEmptyFor += dt
+        if (_fightRoomEmptyFor < Balance.spawn.fightRoomRespawn - 1e-6) return
+        _fightRoomEmptyFor = 0
+        enemies = []
+        _spawnFightRoomEnemies()
+        console.log("[Game] Fight room: respawned enemies")
     }
 
     // Who stands in the fight room (as Balance.spawn.fightRoom); a dojo
@@ -8900,11 +9957,12 @@ ClayWorld2d {
     // "flow" and "duel" are the fight room with the pacing bench's rooms
     // (Balance.pacing): fodder only, and a room's lead alone, a grunt;
     // "guardianduel" the same with a guardian lead (Balance.pacing
-    // .guardianDuel)
+    // .guardianDuel), "spitterduel" with a spitter lead (.spitterDuel),
+    // "ballduel" with a slinger lead (.ballDuel, issue #322)
     // "boss" is the fight room with the Hollow Warden alone (Balance.pacing
     // .boss), "bossroom" the dungeon at the boss depth's danger with the
     // knight at the Warden's door (Balance.boss)
-    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "boss", "bossroom", "features", "deep"] }
+    function scenarios() { return ["dungeon", "village", "fight", "flow", "duel", "guardianduel", "spitterduel", "ballduel", "boss", "bossroom", "features", "deep"] }
     // atDanger (0 when left out) is the danger the dungeon, the village or
     // the fight room is at: its depth and, after the point, its position
     // in the depth's range, e.g. applyScenario("dungeon", 4.8) through eval
@@ -8943,6 +10001,10 @@ ClayWorld2d {
             enterFightRoom(Balance.pacing[name])
         else if (name === "guardianduel")
             enterFightRoom(Balance.pacing.guardianDuel)
+        else if (name === "spitterduel")
+            enterFightRoom(Balance.pacing.spitterDuel)
+        else if (name === "ballduel")
+            enterFightRoom(Balance.pacing.ballDuel)
         else if (name === "bossroom") {
             generateDungeon()
             toBossDoor()

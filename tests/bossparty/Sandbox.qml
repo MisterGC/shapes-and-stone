@@ -19,6 +19,8 @@ Item {
     Game {
         id: game
         anchors.fill: parent
+        // The descent intro would hold each dungeon's first seconds (issue #316)
+        descentIntro: false
         muted: true
         // A record of its own: the bench keeps no best depth of the player's
         recordStoreName: "ShapesAndStoneBossPartyBench"
@@ -97,7 +99,8 @@ Item {
             level: game.levelIndex, stage: f.stage, phase: f.phase, room: r,
             gates: f.gates.map(g => ({ cell: g.cell, exit: g.exit, shut: g.shut })),
             warden: w ? { id: w.objectId, hp: w.hp, maxHp: w.maxHp, phase: w.phase, dormant: w.dormant,
-                          remote: w.remote } : null,
+                          remote: w.remote, cracks: w.cracks } : null,
+            appearance: f.appearance, said: f.said, line: f.lineText,
             adds: adds.map(e => e.objectId).sort(),
             zones: f.zones.map(z => z.id).sort(),
             banner: banner ? banner.opacity : 0, victory: victory ? victory.opacity : 0,

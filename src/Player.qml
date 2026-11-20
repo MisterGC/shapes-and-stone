@@ -55,7 +55,8 @@ PhysicsItem {
         : Math.atan2(playerScreenY - mouseScreenY, mouseScreenX - playerScreenX) * 180 / Math.PI
 
     // Stats, from the balance table
-    readonly property real maxSpeed: Balance.knight.moveSpeed
+    // The walking speed, wu a second: swift boots' is higher
+    readonly property real maxSpeed: _level(Balance.shop.bootsSpeed, bootsLevel, Balance.knight.moveSpeed)
     property int hp: Balance.knight.hp
     property int maxHp: Balance.knight.hp
     property int atk: Balance.knight.atk + _level(Balance.shop.swordAtk, swordLevel, 0)
@@ -77,12 +78,14 @@ PhysicsItem {
     property var creel: []
     // The smith's upgrades of the run, each a level from 0 (none) to the
     // table's last (Balance.shop): the sharpened sword, the reinforced
-    // shield, the lighter harness and the balanced blade. Every effect
+    // shield, the lighter harness, the balanced blade and the swift boots.
+    // Every effect
     // reads them live, so setting one applies it at once
     property int swordLevel: 0
     property int shieldLevel: 0
     property int harnessLevel: 0
     property int bladeLevel: 0
+    property int bootsLevel: 0
     // A level bought from the smith at this camp: he sells one per camp,
     // and the knight of the next level starts without it
     property bool smithDone: false
@@ -96,17 +99,104 @@ PhysicsItem {
                                                 Balance.knight.blockedShare)
     readonly property real blockMana: _level(Balance.shop.shieldBlockMana, shieldLevel,
                                              Balance.knight.blockMana)
-    // The mana a dash costs, and a whirlwind with its dash: a lighter
-    // harness's and a balanced blade's are lower
+    // The mana a dash costs: a lighter harness's is lower
     readonly property real dashMana: _level(Balance.shop.harnessDashMana, harnessLevel,
                                             Balance.knight.dashMana)
-    readonly property real whirlMana: _level(Balance.shop.bladeWhirlMana, bladeLevel,
-                                             Balance.knight.whirlMana)
+    // The special (Balance.specials) the knight picked for this dungeon:
+    // the special's button lets it loose (unleash)
+    property string special: Balance.specials.order[0]
+    // The mana a special costs, a whirlwind's with its dash: a balanced
+    // blade's share of it (Balance.shop.bladeShare), rounded
+    function specialManaOf(id) {
+        let s = Balance.specials[id]
+        if (!s) return 0
+        return bladeLevel > 0 ? Math.round(s.mana * _level(Balance.shop.bladeShare, bladeLevel, 1)) : s.mana
+    }
+    readonly property real specialMana: specialManaOf(special)
+    readonly property real whirlMana: specialManaOf("whirlwind")
+
+    // The combo (Balance.combo, issue #320): the moves away from the aim,
+    // then towards it, read off moveX and moveY on every physics step -
+    // whatever the keys, the stick or the touch pad they come from are
+    // bound to. Away is judged against the facing of the step before, so
+    // a pad's left stick that aims as the knight walks (KnightPad) and
+    // turns it round at once still reads as away; from then on, until
+    // combo.gap after the last step away, against the facing kept from
+    // before the first step away, for at most combo.awayMax of pushing
+    // away: longer, the knight has turned round, and the moves are judged
+    // against its facing again. It all counts the simulated seconds of
+    // each physics step (_comboClock), so a frame longer than another does
+    // not stretch it. The facing of the step before, when the moves first
+    // and last pointed away (-1 none) and the facing kept, the way they
+    // point now (-1 away, 1 towards, 0 neither) and when the combo was
+    // entered (-1 none), on that clock
+    property real _comboClock: 0
+    property real _comboFacing: NaN
+    property real _comboAwayFrom: -1
+    property real _comboAwayAt: -1
+    property real _comboAwayFacing: 0
+    property int _comboWay: 0
+    property real comboAt: -1
+    // The special's button now fires the stronger version: the combo was
+    // entered at most combo.window seconds ago
+    function comboReady() {
+        return comboAt >= 0 && _comboClock - comboAt <= Balance.combo.window + 1e-6
+    }
+    // Whether the last special let loose was the stronger version
+    property bool lastStrong: false
+    // The way the moves point against facing angle (the knight's now when
+    // left out): -1 away, 1 towards, 0 neither or under combo.deadZone
+    function comboWay(angle) {
+        let c = Balance.combo
+        let len = Math.sqrt(moveX * moveX + moveY * moveY)
+        if (len < c.deadZone) return 0
+        let rad = (angle === undefined ? facingAngle : angle) * Math.PI / 180
+        // moveY is screen down, the facing's y is up
+        let along = (moveX * Math.cos(rad) - moveY * Math.sin(rad)) / len
+        let cone = Math.cos(c.cone * Math.PI / 180)
+        return along >= cone - 1e-9 ? 1 : along <= -cone + 1e-9 ? -1 : 0
+    }
+    // Whether the knight faces within combo.cone of angle: a knight aimed
+    // elsewhere meanwhile, by the mouse or the right stick, has entered
+    // no combo
+    function _facesStill(angle) {
+        let d = Math.abs(((facingAngle - angle) % 360 + 540) % 360 - 180)
+        return d <= Balance.combo.cone + 1e-9
+    }
+    function _readCombo(dt) {
+        _comboClock += dt
+        let now = _comboClock
+        if (isNaN(_comboFacing)) _comboFacing = facingAngle
+        let awaying = _comboAwayAt >= 0 && now - _comboAwayAt <= Balance.combo.gap + 1e-6
+        if (awaying && _comboWay === -1 && now - _comboAwayFrom > Balance.combo.awayMax + 1e-6) {
+            // Pushed away that long the knight has turned round
+            _comboAwayAt = -1
+            awaying = false
+        }
+        let way = comboWay(awaying ? _comboAwayFacing : _comboFacing)
+        if (way === -1) {
+            // Away again: a combo entered before is gone
+            if (!awaying) {
+                _comboAwayFacing = _comboFacing
+                _comboAwayFrom = now
+            }
+            _comboAwayAt = now
+            comboAt = -1
+        } else if (way === 1 && _comboWay !== 1 && awaying && _facesStill(_comboAwayFacing)) {
+            comboAt = now
+            console.log("[Player] Combo entered")
+        }
+        _comboWay = way
+        _comboFacing = facingAngle
+    }
     readonly property real blockDrain: Balance.knight.blockDrain
 
     // At 0 HP the knight has fallen: it stands still, takes no more hits
     // and can neither swing nor dash
     readonly property bool fallen: hp <= 0
+    // The descent intro holds the world (issue #316): the knight neither
+    // swings, raises its shield, dashes nor whirls, and takes no blow
+    readonly property bool held: !!gameWorld && gameWorld.introHeld === true
 
     // In a session: the fallen ally this knight lifts up (its node's id,
     // "" for none) and how far, 0..1 (Game._stepRevive); a hit starts it
@@ -184,6 +274,8 @@ PhysicsItem {
     // The dash under way is a whirlwind (Balance.knight.whirl...), let
     // loose with Q (unleash)
     property bool isWhirling: false
+    // The whirlwind under way is the stronger version (Balance.combo)
+    property bool whirlStrong: false
     // Momentum (Balance.momentum): pips earned by blows that land, all of
     // them spent by a whirlwind. _swingEarned is what the swing under way
     // has earned so far: it earns its best blow once, not per enemy
@@ -250,6 +342,7 @@ PhysicsItem {
         function onStepped() {
             let dt = player.world.timeStep
             _steps++
+            _readCombo(dt)
             _countSteps(dt)
             attackCooldown = Math.max(0, attackCooldown - dt)
             dashCooldown = Math.max(0, dashCooldown - dt)
@@ -333,9 +426,10 @@ PhysicsItem {
         }
     }
 
-    // A moment others should see: "attack", "heavy", "whirlwind", "dash",
-    // "parry", "block", "perfectBlock", "hurt", "shieldBreak", "sit" or
-    // "stand".
+    // A moment others should see: "attack", "heavy", "whirlwind", "stun", "bolt",
+    // a special's stronger version as "whirlwind+", "stun+" or "bolt+",
+    // "dash", "parry", "block", "perfectBlock", "hurt", "shieldBreak",
+    // "sit" or "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -511,6 +605,17 @@ PhysicsItem {
         // Handle collision with enemies
     }
 
+    // A blow's damage with the kill chain's bonus while it holds
+    // (Game.chainBonus, Balance.chain, issue #321): every swing and the
+    // whirlwind's hits, whole points; without a bonus it is dmg
+    function chained(dmg) {
+        let bonus = gameWorld && gameWorld.chainBonus ? gameWorld.chainBonus : 0
+        if (bonus <= 0) return dmg
+        let more = Math.floor(dmg * (1 + bonus) + 1e-6)
+        if (gameWorld.countFight) gameWorld.countFight("chainBlow", more - dmg)
+        return more
+    }
+
     // Check if an enemy is within the attack arc: a heavy swing's when one
     // is under way
     function isInAttackArc(enemy) {
@@ -564,6 +669,7 @@ PhysicsItem {
                     // lead does not flinch (Enemy.stagger)
                     if (enemy.enemyType === "guardian" && !parried) enemy.stagger()
                 }
+                dmg = chained(dmg)
                 // A lead's stance takes a share of it, or breaks: the
                 // number shows what it did
                 let dealt = enemy.takeDamage(dmg, xWu, yWu, isHeavy, parried)
@@ -680,15 +786,17 @@ PhysicsItem {
     function whirlEnemies() {
         if (!gameWorld || !gameWorld.enemies) return 0
         let k = Balance.knight
-        _breakBones(k.whirlReach, false)
-        _breakThings(k.whirlReach, false)
+        let reach = whirlStrong ? Balance.combo.whirlwind.reach : k.whirlReach
+        let swing = whirlStrong ? Balance.combo.whirlwind.swing : k.whirlSwing
+        _breakBones(reach, false)
+        _breakThings(reach, false)
         let hitCount = 0
         for (let e of gameWorld.enemies) {
             if (!e || e.destroyed !== false || _hitThisWhirl.has(e)) continue
             let dx = e.xWu + e.widthWu / 2 - (xWu + widthWu / 2)
             let dy = e.yWu - e.heightWu / 2 - (yWu - heightWu / 2)
-            if (dx * dx + dy * dy > k.whirlReach * k.whirlReach) continue
-            let dmg = Math.floor(atk * k.whirlSwing)
+            if (dx * dx + dy * dy > reach * reach) continue
+            let dmg = chained(Math.floor(atk * swing))
             _hitThisWhirl.add(e)
             e.takeDamage(dmg, xWu, yWu, true)
             hitCount++
@@ -747,7 +855,7 @@ PhysicsItem {
     // throws the knight back along; without it, from the attacker's centre
     // through the knight's.
     function takeDamage(amount, attackerX, attackerY, attackerSize, crush, alongX, alongY) {
-        if (fallen) return "ignored"
+        if (fallen || held) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
@@ -793,7 +901,7 @@ PhysicsItem {
     // lands whole, no defence, shield or grace takes any of it, and a
     // dash under way avoids it all. "hit", "dodged" or "ignored"
     function takeTrapDamage(amount) {
-        if (fallen) return "ignored"
+        if (fallen || held) return "ignored"
         if (isDashing) return "dodged"
         hp = Math.max(0, hp - amount)
         _cancelCharge()
@@ -968,7 +1076,7 @@ PhysicsItem {
     // The right button: raises the shield, or, with no mana, answers with
     // a dull click and the mana bar's flash so it is no dead input
     function raiseShield() {
-        if (fallen) return
+        if (fallen || held) return
         _shieldWanted = true
         // Broken by a crushing blow, or open after a charged swing that
         // missed: it rises when that is over
@@ -1098,53 +1206,153 @@ PhysicsItem {
     // A dash costs dashMana; it cancels a charge. Open after a charged
     // swing that missed, the knight does not dash
     function dash() {
-        if (fallen || dashCooldown > 0 || isDashing || openLeft > 0) return
+        if (fallen || held || dashCooldown > 0 || isDashing || openLeft > 0) return
         if (!_aimDash() || !_afford(dashMana)) return
         _spend(dashMana)
         _startDash()
     }
 
-    // Q: the whirlwind, with full momentum and whirlMana. Short of the
+    // The special's button (Q, R2): the special picked and nothing else.
+    // The whirlwind, with full momentum and whirlMana: short of the
     // momentum the pips flash, short of the mana the bar does; either way
-    // nothing else happens. Returns whether it whirled
+    // nothing else happens. The stun (_stun) and the bolt (_bolt) for
+    // their mana alone. A special not in the game yet does nothing. With
+    // the combo just entered (comboReady) it is the stronger version for
+    // the same mana (Balance.combo), and the combo is spent.
+    // Returns whether it went off
     function unleash() {
-        if (fallen || isDashing || openLeft > 0) return false
-        if (momentum < Balance.momentum.max) {
+        if (fallen || held || isDashing || openLeft > 0) return false
+        let strong = comboReady()
+        let went = false
+        if (special === "stun") went = _stun(strong)
+        else if (special === "bolt") went = _bolt(strong)
+        else if (special !== "whirlwind") {
+            console.log("[Player] The special", special, "is not in the game yet")
+            return false
+        } else if (momentum < Balance.momentum.max) {
             momentumShort()
             return false
+        } else if (_aimDash() && _afford(whirlMana)) {
+            _spend(whirlMana)
+            momentum = 0
+            _startDash()
+            _whirl(strong)
+            went = true
         }
-        if (!_aimDash() || !_afford(whirlMana)) return false
-        _spend(whirlMana)
-        momentum = 0
-        _startDash()
-        _whirl()
+        if (went) {
+            lastStrong = strong
+            comboAt = -1
+            if (strong) _surge()
+        }
+        return went
+    }
+
+    // A stronger special went off (Balance.combo): its name over the
+    // knight, a ring and sparks round it and the swell over its sound, on
+    // this screen; the others see and hear it by its action (special+)
+    function _surge() {
+        let c = Balance.combo
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        if (gameWorld) {
+            gameWorld.playSurge()
+            gameWorld.spawnWord(xWu, yWu + 0.4, c[special].name.toUpperCase(), c.wordColor)
+            if (gameWorld.impact) gameWorld.impact("surge", cx, cy, 0, 0, c.color)
+            gameWorld.countFight("strong")
+        }
+        console.log("[Player] The stronger", special, "-", c[special].name)
+    }
+
+    // The stun (Balance.stun, issue #318): for specialMana - short of it
+    // the mana bar flashes and nothing else happens - the knight bashes
+    // with its shield where it stands, a charge it holds let go of, and
+    // every enemy whose centre is within stun.reach of the knight's, all
+    // round it, is stunned (Enemy.stun): a weak or normal one freezes, a
+    // lead or the Warden loses its wind-up. Its ring shows on every
+    // screen; the record counts the bash, the enemies it froze and the
+    // wind-ups it ended. Returns whether it bashed
+    function _stun(strong) {
+        if (!_afford(specialMana)) return false
+        _spend(specialMana)
+        _cancelCharge()
+        let s = strong ? Balance.combo.stun : Balance.stun
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let froze = 0, ended = 0
+        for (let e of (gameWorld && gameWorld.enemies) || []) {
+            if (!e || e.destroyed !== false) continue
+            let dx = e.xWu + e.widthWu / 2 - cx
+            let dy = e.yWu - e.heightWu / 2 - cy
+            let r = s.reach + (e.bulk || 0)
+            if (dx * dx + dy * dy > r * r) continue
+            let what = e.stun(s.freeze)
+            if (what === "frozen") froze++
+            else if (what === "interrupted") ended++
+        }
+        view.block()
+        acted(strong ? "stun+" : "stun")
+        if (gameWorld) {
+            gameWorld.playStun()
+            if (gameWorld.impact) gameWorld.impact(strong ? "stunStrong" : "stun", cx, cy, 0, 0,
+                                                   strong ? Balance.combo.color : Balance.stun.color)
+            gameWorld.countFight("stun")
+            gameWorld.countFight("stunFrozen", froze)
+            gameWorld.countFight("stunInterrupted", ended)
+        }
+        console.log("[Player]", strong ? "Strong stun!" : "Stun!", "Froze", froze, "and ended", ended, "wind-ups")
+        return true
+    }
+
+    // The bolt (Balance.bolt, issue #319): for specialMana - short of it
+    // the mana bar flashes and nothing else happens - the knight lets a
+    // blast loose from its centre along its aim (facingAngle), a charge it
+    // holds let go of; it hurts the first enemy it meets for bolt.damage
+    // times atk (Game.fireBolt). The record counts it. Returns whether it
+    // went off
+    function _bolt(strong) {
+        if (!_afford(specialMana)) return false
+        _spend(specialMana)
+        _cancelCharge()
+        let rad = facingAngle * Math.PI / 180
+        let dx = Math.cos(rad), dy = Math.sin(rad)
+        let cx = xWu + widthWu / 2, cy = yWu - heightWu / 2
+        let damage = Math.round(atk * (strong ? Balance.combo.bolt.damage : Balance.bolt.damage))
+        view.parry()
+        acted(strong ? "bolt+" : "bolt")
+        if (gameWorld) {
+            gameWorld.fireBolt(cx, cy, dx, dy, damage, strong)
+            gameWorld.countFight("bolt")
+        }
+        console.log("[Player]", strong ? "Strong bolt!" : "Bolt!", "Facing:", facingAngle.toFixed(0),
+                    "degrees, damage", damage)
         return true
     }
 
     // The whirlwind: the dash under way goes on as one, whirlDuration
-    // seconds at whirlSpeed from now
-    function _whirl() {
+    // seconds at whirlSpeed from now; strong, the stronger version's
+    // (Balance.combo.whirlwind)
+    function _whirl(strong) {
         let k = Balance.knight
+        let duration = strong ? Balance.combo.whirlwind.duration : k.whirlDuration
         isAttacking = false
         isHeavy = false
         isWhirling = true
+        whirlStrong = strong === true
         _hitThisWhirl = new Set()
         _whirlLanded = false
-        _dashTimer = k.whirlDuration
-        dashCooldown = k.whirlDuration + dashCooldownTime
-        attackCooldown = k.whirlDuration
-        view.whirl(k.whirlDuration * 1000)
-        acted("whirlwind")
+        _dashTimer = duration
+        dashCooldown = duration + dashCooldownTime
+        attackCooldown = duration
+        view.whirl(duration * 1000, whirlStrong)
+        acted(whirlStrong ? "whirlwind+" : "whirlwind")
         if (gameWorld) {
             gameWorld.playWhirlwind()
             if (gameWorld.impact)
                 gameWorld.impact("whirlwind", xWu, yWu, _dashDirX, -_dashDirY)
         }
-        console.log("[Player] Whirlwind!")
+        console.log("[Player]", whirlStrong ? "Strong whirlwind!" : "Whirlwind!")
     }
 
     function attack() {
-        if (!fallen && attackCooldown <= 0 && !isAttacking) {
+        if (!fallen && !held && attackCooldown <= 0 && !isAttacking) {
             isAttacking = true
             isHeavy = false
             _swingTimer = attackDuration + Balance.knight.swingFade
@@ -1168,7 +1376,7 @@ PhysicsItem {
     // followed by knight.heavyRecovery seconds before the next swing once
     // its arc has faded. Returns whether it swung
     function heavyAttack() {
-        if (fallen || attackCooldown > 0 || isAttacking) return false
+        if (fallen || held || attackCooldown > 0 || isAttacking) return false
         isAttacking = true
         isHeavy = true
         _heavyLanded = false
@@ -1194,7 +1402,7 @@ PhysicsItem {
     // a pause or a hit stop holds the charge. Game.qml hands the mouse
     // button's events to pressSwing() and releaseSwing(); a bench can call
     // them without one.
-    function pressSwing(mouse) { return swingInput.press(mouse) }
+    function pressSwing(mouse) { return held ? false : swingInput.press(mouse) }
     function releaseSwing(mouse) { return swingInput.release(mouse) }
     // The button is let go of without a swing: a menu took the input
     function dropSwing() {

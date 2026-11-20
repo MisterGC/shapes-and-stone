@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "ball_shot",
+  "variation": { "seed": 322, "pool": 4 },
+  "layers": [
+    { "name": "chunk", "role": "transient", "source": "noise", "length": 26, "gain": -9,
+      "envelope": { "attack": 0.5, "decay": 25, "sustain": 0, "release": 0, "decayCurve": 1 },
+      "filter": { "type": "bandpass", "cutoff": 1300, "resonance": 0.4 } },
+    { "name": "whump", "role": "body", "source": "sawtooth", "freq": 110, "length": 170, "gain": -2.5,
+      "envelope": { "attack": 2, "decay": 165, "sustain": 0, "release": 0, "decayCurve": 1 },
+      "pitch": { "start": 5, "end": -7, "time": 150 },
+      "filter": { "type": "lowpass", "cutoff": 900, "resonance": 0.2 },
+      "vary": { "detune": [-0.4, 0.4] } },
+    { "name": "ting", "role": "tail", "source": "sine", "freq": 1180, "length": 130, "gain": -11, "offset": 8,
+      "envelope": { "attack": 0.5, "decay": 125, "sustain": 0, "release": 0, "decayCurve": 1 } },
+    { "name": "whoosh", "role": "tail", "source": "noise", "length": 260, "gain": -13, "offset": 20,
+      "envelope": { "attack": 40, "decay": 220, "sustain": 0, "release": 0 },
+      "filter": { "type": "bandpass", "cutoff": 900, "resonance": 0.2 },
+      "vary": { "filter.cutoff": [-120, 120] } }
+  ]
+}

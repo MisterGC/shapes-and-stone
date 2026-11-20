@@ -128,6 +128,36 @@ Window {
             game.playHoleSound("groan", null)
             check(crumble.lastSeed !== before[0] && rumble.lastSeed !== before[1] && groan.lastSeed !== before[2],
                   "the game's own calls play the crumble, the rumble and the groan from their recipes")
+            // The stun's shield bash (issue #318)
+            let bash = p["sfx/stun_bash.sfx.json"], bashSeed = bash ? bash.lastSeed : null
+            game.playStun()
+            check(bash && bash.lastSeed !== bashSeed, "the game's own call plays the stun's bash from its recipe")
+            // The bolt's shot and hit (issue #319)
+            let shot = p["sfx/bolt_shot.sfx.json"], hit = p["sfx/bolt_hit.sfx.json"]
+            let shotSeed = shot ? shot.lastSeed : null, hitSeed = hit ? hit.lastSeed : null
+            game.playBoltShot()
+            game.playBoltHit()
+            check(shot && hit && shot.lastSeed !== shotSeed && hit.lastSeed !== hitSeed,
+                  "the game's own calls play the bolt's shot and hit from their recipes")
+            // The slinger's metal ball: its shot, a bounce and its fall,
+            // the bounce's cue lower (issue #322)
+            let bs = p["sfx/ball_shot.sfx.json"], bb = p["sfx/ball_bounce.sfx.json"]
+            let bsSeed = bs ? bs.lastSeed : null, bbSeed = bb ? bb.lastSeed : null
+            game.playBallShot()
+            game.playBallBounce(undefined, undefined, "bounce")
+            let bbBounce = bb ? bb.lastSeed : null
+            game.playBallBounce(undefined, undefined, "fall")
+            check(bs && bb && bs.lastSeed !== bsSeed && bbBounce !== bbSeed && bb.lastSeed !== bbBounce,
+                  "the game's own calls play the ball's shot, its bounce and its fall from their recipes")
+            // A critter squashed under a knight's foot (issue #324)
+            let sq = p["sfx/critter_squash.sfx.json"], sqSeed = sq ? sq.lastSeed : null
+            game.playCritterSquash(undefined, undefined, "rat")
+            check(sq && sq.lastSeed !== sqSeed, "the game's own call plays a critter's squash from its recipe")
+            // A special's stronger version's swell (issue #320)
+            let surge = p["sfx/special_surge.sfx.json"], surgeSeed = surge ? surge.lastSeed : null
+            game.playSurge()
+            check(surge && surge.lastSeed !== surgeSeed,
+                  "the game's own call plays a stronger special's swell from its recipe")
             let n = game.veinSoundCount
             game.playChink(-1)
             game.playTink(4)

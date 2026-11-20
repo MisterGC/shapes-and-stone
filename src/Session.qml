@@ -40,13 +40,19 @@ Item {
     signal levelChanged(int levelIndex, real position, real next, int knights, var dm)
     // Host only: a player reached the exit, the host decides to advance
     signal advanceRequested()
+    // Host: a node's knight arrived in the dungeon level of the run seed,
+    // its descent intro waiting for the party (issue #316) and, before its
+    // count, for each knight to pick its special (issue #317): picked is
+    // false while it still chooses
+    signal arrivalReported(string fromId, int seed, int level, bool picked)
     // The host pressed start in the lobby; the game picks the seed and
     // calls start()
     signal lobbyStartRequested()
     // The lobby was left without starting
     signal lobbyLeft()
-    // Another player hit or was hit; this screen draws the hit, no more
-    signal impactReceived(string kind, real x, real y, real dx, real dy, var color)
+    // Another player hit or was hit; this screen draws the hit, no more.
+    // links: a chained kill's links (Game.impact), else 0
+    signal impactReceived(string kind, real x, real y, real dx, real dy, var color, int links)
     // The host runs every enemy as a replicated object of type "enemy"; it
     // came to life or went on this node - a joiner's too, also one that
     // joins late (issue #13)
@@ -64,6 +70,14 @@ Item {
     signal enemyKillReceived(var kill)
     // A spitter of the host's fired (id, x, y, dx, dy, damage)
     signal shotReceived(var shot)
+    // A slinger of the host's slung a metal ball (Balance.ball): ball.id,
+    // its centre (x, y), its way (dx, dy) and damage
+    signal ballReceived(var ball)
+    // Another node's knight let a bolt loose (Balance.bolt): bolt.id, its
+    // start (x, y) and way (dx, dy); and where and how one ended on that
+    // node, bolt.id at (x, y), bolt.how "enemy", "wall" or "reach"
+    signal boltReceived(string fromId, var bolt)
+    signal boltEndReceived(string fromId, var bolt)
     // The host owns every gold drop as a replicated object of type "gold",
     // as it owns the enemies; it came to life or went on this node
     signal goldSpawned(string objectId, var props)
@@ -113,8 +127,8 @@ Item {
     // it is on another level (issue #169)
     signal pouchDropAnswered(bool ok)
     // Another node judged an attack on its own knight: report.source is
-    // "lunge" (id: the enemy's) or "shot" (id: the shot's), report.result
-    // what became of it (Game.knightStruck)
+    // "lunge" (id: the enemy's), "shot" (id: the shot's) or "ball" (id: the
+    // metal ball's), report.result what became of it (Game.knightStruck)
     signal struckReported(string fromId, var report)
     // Another knight's HP changed or its node left: the party may be down
     // now
@@ -215,6 +229,11 @@ Item {
     property bool _leaving: false
     // The host's dungeon master panel is up (the session property
     // "mastering"): the joiners wait for the next dungeon and are told so
+    // The descent intro's count of the dungeon the host plays, the session
+    // property "intro" ({seed, level, at}): it starts at at on the session
+    // clock on every screen; null before any (issue #316)
+    readonly property var intro: net.connected && net.sessionProperties.intro
+                                 ? net.sessionProperties.intro : null
     readonly property bool mastering: net.connected && net.sessionProperties.mastering === true
     function setMastering(on) {
         if (net.connected && net.isHost) net.setSessionProperty("mastering", on)
@@ -259,7 +278,8 @@ Item {
                 let rp = remotePlayers[fromId]
                 if (rp) rp.triggerAction(data.action)
             } else if (data.type === "impact") {
-                session.impactReceived(data.kind, data.x, data.y, data.dx, data.dy, data.color)
+                session.impactReceived(data.kind, data.x, data.y, data.dx, data.dy, data.color,
+                                       data.links || 0)
             } else if (data.type === "enemyBlow") {
                 if (net.isHost) session.enemyBlowReceived(fromId, data)
             } else if (data.type === "knightBlow") {
@@ -298,6 +318,12 @@ Item {
                 session.goldGranted(data)
             } else if (data.type === "shot") {
                 session.shotReceived(data)
+            } else if (data.type === "ball") {
+                session.ballReceived(data)
+            } else if (data.type === "bolt") {
+                session.boltReceived(fromId, data)
+            } else if (data.type === "boltEnd") {
+                session.boltEndReceived(fromId, data)
             } else if (data.type === "struck") {
                 session.struckReported(fromId, data)
             } else if (data.type === "lift") {
@@ -308,6 +334,8 @@ Item {
                 if (!net.isHost) session.recordBroken(data.banner === true)
             } else if (data.type === "runEnd") {
                 if (!net.isHost) session.runEnded()
+            } else if (data.type === "arrived") {
+                if (net.isHost) session.arrivalReported(fromId, data.seed, data.level, data.picked !== false)
             } else if (data.type === "exitReached") {
                 // Host is level authority: any player reaching the exit
                 // advances the whole session
@@ -490,10 +518,11 @@ Item {
     }
 
     // A hit the local player landed or took, for the others to draw
-    function sendImpact(kind, x, y, dx, dy, color) {
+    function sendImpact(kind, x, y, dx, dy, color, links) {
         if (net.connected && inGame)
             net.broadcast({type: "impact", kind: kind, x: x, y: y, dx: dx, dy: dy,
-                           color: color === undefined ? undefined : String(color)})
+                           color: color === undefined ? undefined : String(color),
+                           links: links || 0})
     }
 
     // The local player reached the exit: the host advances, a joiner asks
@@ -504,6 +533,23 @@ Item {
         else
             net.broadcast({type: "exitReached"})
     }
+
+    // This node's knight arrived in the dungeon level of the run seed: the
+    // host starts its descent intro once every knight has (issue #316) and
+    // has picked its special (issue #317). picked: false while it still
+    // chooses, and once it has picked it reports again
+    function reportArrival(seed, level, picked) {
+        if (!net.connected) return
+        let p = picked !== false
+        if (net.isHost) arrivalReported(net.nodeId, seed, level, p)
+        else net.sendTo(net.hostId, {type: "arrived", seed: seed, level: level, picked: p})
+    }
+    // Host: the count of the descent intro, for every screen
+    function publishIntro(v) {
+        if (net.isHost) net.setSessionProperty("intro", v)
+    }
+    // The nodes of the session, as the network lists them
+    function nodeIds() { return net.connected ? net.nodes : [] }
 
     // Leave the session, e.g. for the title after the knight has fallen
     function leave() {
@@ -677,6 +723,18 @@ Item {
     // Host: a spitter fired, every node flies the shot
     function sendShot(shot) {
         net.broadcast(Object.assign({type: "shot"}, shot))
+    }
+    // Host: a slinger slung a metal ball, every node flies it
+    function sendBall(ball) {
+        net.broadcast(Object.assign({type: "ball"}, ball))
+    }
+    // This node's knight let a bolt loose, every node flies it; and where
+    // it ended here
+    function sendBolt(bolt) {
+        if (net.connected) net.broadcast(Object.assign({type: "bolt"}, bolt))
+    }
+    function endBolt(bolt) {
+        if (net.connected) net.broadcast(Object.assign({type: "boltEnd"}, bolt))
     }
     // This node judged an attack on its own knight, for every other node
     function reportStruck(report) {

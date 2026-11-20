@@ -29,12 +29,15 @@ CaveOverhang 1.0 CaveOverhang.qml
 CampProp 1.0 CampProp.qml
 CampSolid 1.0 CampSolid.qml
 Creature 1.0 Creature.qml
+Critter 1.0 Critter.qml
 CaveCat 1.0 CaveCat.qml
 Fishing 1.0 Fishing.qml
 CampDog 1.0 CampDog.qml
 CampTalk 1.0 CampTalk.qml
 CampSounds 1.0 CampSounds.qml
 Projectile 1.0 Projectile.qml
+Bolt 1.0 Bolt.qml
+MetalBall 1.0 MetalBall.qml
 Npc 1.0 Npc.qml
 DialoguePanel 1.0 DialoguePanel.qml
 TitleScreen 1.0 TitleScreen.qml
@@ -52,6 +55,7 @@ MultiplayerLobby 1.0 MultiplayerLobby.qml
 RemotePlayer 1.0 RemotePlayer.qml
 Session 1.0 Session.qml
 DepthGauge 1.0 DepthGauge.qml
+SpecialChoice 1.0 SpecialChoice.qml
 Door 1.0 Door.qml
 BossGate 1.0 BossGate.qml
 BossZone 1.0 BossZone.qml

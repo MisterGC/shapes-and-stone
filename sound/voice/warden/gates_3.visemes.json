@@ -1,0 +1,97 @@
+{
+  "line": "gates_3",
+  "text": "I was sworn to bring them home.",
+  "audio": "warden/gates_3.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-323/sound/voice/warden/gates_3.wav",
+    "duration": 2.64
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.03,
+      "value": "X"
+    },
+    {
+      "start": 0.03,
+      "end": 0.11,
+      "value": "C"
+    },
+    {
+      "start": 0.11,
+      "end": 0.18,
+      "value": "B"
+    },
+    {
+      "start": 0.18,
+      "end": 0.25,
+      "value": "F"
+    },
+    {
+      "start": 0.25,
+      "end": 0.53,
+      "value": "B"
+    },
+    {
+      "start": 0.53,
+      "end": 0.6,
+      "value": "F"
+    },
+    {
+      "start": 0.6,
+      "end": 0.88,
+      "value": "E"
+    },
+    {
+      "start": 0.88,
+      "end": 1.02,
+      "value": "F"
+    },
+    {
+      "start": 1.02,
+      "end": 1.1,
+      "value": "A"
+    },
+    {
+      "start": 1.1,
+      "end": 1.46,
+      "value": "B"
+    },
+    {
+      "start": 1.46,
+      "end": 1.53,
+      "value": "C"
+    },
+    {
+      "start": 1.53,
+      "end": 1.63,
+      "value": "A"
+    },
+    {
+      "start": 1.63,
+      "end": 1.84,
+      "value": "E"
+    },
+    {
+      "start": 1.84,
+      "end": 1.91,
+      "value": "F"
+    },
+    {
+      "start": 1.91,
+      "end": 2.06,
+      "value": "A"
+    },
+    {
+      "start": 2.06,
+      "end": 2.64,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}

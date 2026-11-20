@@ -1,11 +1,14 @@
 // Boss capture - one frame of the Hollow Warden's fight (issue #274), for
-// clayrender: the dungeon at depth 2 on the scenario's seed, the knight
+// clayrender: the boss dungeon at or past `depth` (2 when left out) on
+// the scenario's seed - 5, 8 and 11 its second, third and fourth
+// appearance, cracked by the defeats before (issue #323) -, the knight
 // stepped into the Warden's room, and the world stepped to the moment
 // `shot` names - "banner" its name banner as the room shuts, "phase1" a
 // wind-up of its phase 1, "phase2" its phase 2 with its adds, its core
 // and a zone warning under the knight, "victory" the victory banner over
-// its gold with the gates open. `ready` holds the capture until then, and
-// `info` says what the frame shows. The same shot gives the same frame on
+// its gold with the gates open; the banners with the Warden's line under
+// them. `ready` holds the capture until then, and `info` says what the
+// frame shows. The same shot gives the same frame on
 // every run.
 //
 //   clayrender tests/boss/Capture.qml --out f.png --size 1100x700 \
@@ -22,6 +25,7 @@ Item {
     height: 700
 
     property string shot: "phase1"
+    property int depth: 2
     property bool ready: false
     property var info: ({})
 
@@ -47,7 +51,7 @@ Item {
         onTriggered: {
             if (stage === 0) {
                 if (game.screen !== "title") return
-                game.applyScenario("bossroom", 2)
+                game.applyScenario("bossroom", capture.depth)
                 stage = 1
                 return
             }
@@ -107,15 +111,18 @@ Item {
             let banner = f.children.find(x => x.objectName === "bossBanner")
             let victory = f.children.find(x => x.objectName === "victoryBanner")
             capture.info = {
-                shot: shot, stage: f.stage, phase: f.phase,
+                shot: shot, depth: game.depth, appearance: f.appearance, stage: f.stage, phase: f.phase,
+                cracks: alive(w) ? w.cracks : null, line: f.lineText,
                 warden: alive(w) ? { hp: w.hp, maxHp: w.maxHp, state: w.aiState,
                                      ring: Math.round(w.ringProgress * 100) / 100 } : null,
                 adds: game.enemies.filter(e => alive(e) && !e.boss && f.inside(e.xWu + 0.4, e.yWu - 0.4, 0)).length,
                 zones: f.zones.length, gatesShut: f.gates.filter(g => g.shut).length, gates: f.gates.length,
                 banner: banner ? Math.round(banner.opacity * 100) / 100 : 0,
                 victory: victory ? Math.round(victory.opacity * 100) / 100 : 0,
-                gold: game.goldDrops.length, knightHp: p.hp
+                gold: game.goldDrops.length, knightHp: p.hp,
+                wardenAt: alive(w) ? w.mapToItem(capture, w.width / 2, w.height / 2) : null
             }
+            console.log("[Capture]", JSON.stringify(capture.info))
             capture.ready = true
         }
     }

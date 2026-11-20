@@ -56,7 +56,7 @@ endforeach()
 
 clay_app(shapes_and_stone
 
-    VERSION 0.5.0
+    VERSION 0.6.0
 
     LINK_LIBS
         Qt::Core
@@ -103,12 +103,15 @@ clay_app(shapes_and_stone
         src/CampProp.qml
         src/CampSolid.qml
         src/Creature.qml
+        src/Critter.qml
         src/CaveCat.qml
         src/Fishing.qml
         src/CampDog.qml
         src/CampTalk.qml
         src/CampSounds.qml
         src/Projectile.qml
+        src/Bolt.qml
+        src/MetalBall.qml
         src/Npc.qml
         src/DialoguePanel.qml
         src/TitleScreen.qml
@@ -126,6 +129,7 @@ clay_app(shapes_and_stone
         src/RemotePlayer.qml
         src/Session.qml
         src/DepthGauge.qml
+        src/SpecialChoice.qml
         src/DungeonMasterPanel.qml
 
     RES_FILES

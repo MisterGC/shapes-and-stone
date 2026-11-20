@@ -10,7 +10,7 @@
 // enemy.crushChance, for enemy.crushWindUp, and one on a held shield
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
 // shield for enemy.crushLockout; the smith sells level I of the sword,
-// the shield, the harness and the blade for shop.upgradePrice, each
+// the shield, the harness, the blade and the boots for shop.upgradePrice, each
 // level taking the shop's values; the
 // campfire refills a dry knight's mana on top of the rest's knight.manaRegen,
 // away from it only the rest does, and the
@@ -230,32 +230,35 @@ Window {
             check(same(shop.levelDepth, [0, 2, 4]) && same(shop.upgradePrice, [30, 45, 60])
                   && same(shop.swordAtk, [5, 9, 12]) && same(shop.shieldBlockedShare, [0.15, 0.1, 0.05])
                   && same(shop.shieldBlockMana, [4, 3, 2]) && same(shop.harnessDashMana, [6, 4, 3])
-                  && same(shop.bladeWhirlMana, [15, 12, 9]),
+                  && same(shop.bladeShare, [0.75, 0.6, 0.45]) && same(shop.bootsSpeed, [8.0, 8.5, 9.0]),
                   "the shop's levelDepth " + shop.levelDepth + ", upgradePrice " + shop.upgradePrice
                   + ", swordAtk " + shop.swordAtk + ", shieldBlockedShare " + shop.shieldBlockedShare
                   + ", shieldBlockMana " + shop.shieldBlockMana + ", harnessDashMana " + shop.harnessDashMana
-                  + ", bladeWhirlMana " + shop.bladeWhirlMana)
+                  + ", bladeShare " + shop.bladeShare + ", bootsSpeed " + shop.bootsSpeed)
             let smith = game.room.children.find(c => c.objectName === "npc" && c.npcName === "Blacksmith")
             let wares = smith ? game._offered(smith.wares) : []
-            check(wares.map(w => w.id).join(" ") === "sword shield harness blade"
+            check(wares.map(w => w.id).join(" ") === "sword shield harness blade boots"
                   && wares.every(w => w.level === 1 && w.price === shop.upgradePrice[0]),
-                  "the first camp's smith sells level I of the sword, the shield, the harness and the blade for "
+                  "the first camp's smith sells level I of the sword, the shield, the harness, the blade and the boots for "
                   + "upgradePrice[0] (" + wares.map(w => w.id + " " + w.level + " " + w.price).join(", ") + ")")
             // Each level takes its entry of the table, every effect read live
             let levels = [1, 2, 3].every(l => {
                 let i = l - 1
-                p.swordLevel = l; p.shieldLevel = l; p.harnessLevel = l; p.bladeLevel = l
+                p.swordLevel = l; p.shieldLevel = l; p.harnessLevel = l; p.bladeLevel = l; p.bootsLevel = l
                 return p.atk === Balance.knight.atk + shop.swordAtk[i]
                     && near(p.blockedShare, shop.shieldBlockedShare[i]) && near(p.blockMana, shop.shieldBlockMana[i])
-                    && near(p.dashMana, shop.harnessDashMana[i]) && near(p.whirlMana, shop.bladeWhirlMana[i])
-                    && near(p.blockDrain, Balance.knight.blockDrain)
+                    && near(p.dashMana, shop.harnessDashMana[i]) && near(p.whirlMana, [15, 12, 9][i])
+                    && near(p.whirlMana, Math.round(Balance.knight.whirlMana * shop.bladeShare[i]))
+                    && near(p.blockDrain, Balance.knight.blockDrain) && near(p.maxSpeed, shop.bootsSpeed[i])
             })
-            p.swordLevel = 0; p.shieldLevel = 0; p.harnessLevel = 0; p.bladeLevel = 0
+            p.swordLevel = 0; p.shieldLevel = 0; p.harnessLevel = 0; p.bladeLevel = 0; p.bootsLevel = 0
             check(levels && p.atk === Balance.knight.atk
                   && near(p.blockedShare, Balance.knight.blockedShare) && near(p.blockMana, Balance.knight.blockMana)
-                  && near(p.dashMana, Balance.knight.dashMana) && near(p.whirlMana, Balance.knight.whirlMana),
+                  && near(p.dashMana, Balance.knight.dashMana) && near(p.whirlMana, Balance.knight.whirlMana)
+                  && near(p.maxSpeed, Balance.knight.moveSpeed),
                   "levels I to III of the sword add swordAtk, of the shield take shieldBlockedShare and "
-                  + "shieldBlockMana, of the harness harnessDashMana and of the blade bladeWhirlMana; "
+                  + "shieldBlockMana, of the harness harnessDashMana and of the blade bladeShare of the "
+                  + "whirlwind's mana, 15, 12 and 9, of the boots walk at bootsSpeed; "
                   + "level 0 the knight's own")
             // Hurt and dry, away from the fire
             game.player.xWu = campfire.xWu + Balance.campfire.healRadius + 4

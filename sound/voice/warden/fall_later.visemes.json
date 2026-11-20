@@ -1,0 +1,122 @@
+{
+  "line": "fall_later",
+  "text": "Climb, knight. Climb for us both.",
+  "audio": "warden/fall_later.wav",
+  "metadata": {
+    "soundFile": "/Users/mistergc/dev/gamedev/shapes-and-stone-issue-323/sound/voice/warden/fall_later.wav",
+    "duration": 3.32
+  },
+  "mouthCues": [
+    {
+      "start": 0.0,
+      "end": 0.06,
+      "value": "B"
+    },
+    {
+      "start": 0.06,
+      "end": 0.12,
+      "value": "H"
+    },
+    {
+      "start": 0.12,
+      "end": 0.26,
+      "value": "D"
+    },
+    {
+      "start": 0.26,
+      "end": 0.33,
+      "value": "B"
+    },
+    {
+      "start": 0.33,
+      "end": 0.51,
+      "value": "A"
+    },
+    {
+      "start": 0.51,
+      "end": 0.66,
+      "value": "C"
+    },
+    {
+      "start": 0.66,
+      "end": 1.01,
+      "value": "B"
+    },
+    {
+      "start": 1.01,
+      "end": 1.22,
+      "value": "X"
+    },
+    {
+      "start": 1.22,
+      "end": 1.44,
+      "value": "B"
+    },
+    {
+      "start": 1.44,
+      "end": 1.58,
+      "value": "H"
+    },
+    {
+      "start": 1.58,
+      "end": 1.65,
+      "value": "C"
+    },
+    {
+      "start": 1.65,
+      "end": 1.72,
+      "value": "B"
+    },
+    {
+      "start": 1.72,
+      "end": 1.81,
+      "value": "A"
+    },
+    {
+      "start": 1.81,
+      "end": 1.93,
+      "value": "G"
+    },
+    {
+      "start": 1.93,
+      "end": 2.0,
+      "value": "E"
+    },
+    {
+      "start": 2.0,
+      "end": 2.07,
+      "value": "B"
+    },
+    {
+      "start": 2.07,
+      "end": 2.14,
+      "value": "C"
+    },
+    {
+      "start": 2.14,
+      "end": 2.22,
+      "value": "A"
+    },
+    {
+      "start": 2.22,
+      "end": 2.49,
+      "value": "E"
+    },
+    {
+      "start": 2.49,
+      "end": 2.84,
+      "value": "F"
+    },
+    {
+      "start": 2.84,
+      "end": 3.32,
+      "value": "X"
+    }
+  ],
+  "provenance": {
+    "engine": "rhubarb",
+    "version": "1.14.0",
+    "recognizer": "pocketSphinx",
+    "license": "MIT"
+  }
+}

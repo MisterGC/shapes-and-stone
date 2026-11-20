@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "bolt_hit",
+  "variation": { "seed": 3190, "pool": 4 },
+  "layers": [
+    { "name": "snap", "role": "transient", "source": "noise", "length": 60, "gain": -6,
+      "envelope": { "attack": 0.5, "decay": 55, "sustain": 0, "release": 0 },
+      "filter": { "type": "bandpass", "cutoff": 1400, "resonance": 0.3 } },
+    { "name": "thud", "role": "body", "source": "sine", "freq": 110, "length": 200, "gain": -6,
+      "envelope": { "attack": 1, "decay": 195, "sustain": 0, "release": 0 },
+      "pitch": { "start": 5, "end": -3, "time": 120 } },
+    { "name": "burst", "role": "body", "source": "triangle", "freq": 660, "length": 180, "gain": -15,
+      "envelope": { "attack": 1, "decay": 175, "sustain": 0, "release": 0 },
+      "pitch": { "start": 0, "end": -12, "time": 170 },
+      "vary": { "detune": [-0.3, 0.3] } },
+    { "name": "fizz", "role": "tail", "source": "noise", "length": 420, "gain": -21, "offset": 25,
+      "envelope": { "attack": 15, "decay": 400, "sustain": 0, "release": 0 },
+      "filter": { "type": "highpass", "cutoff": 4500, "resonance": 0.1 } },
+    { "name": "ring", "role": "tail", "source": "sine", "freq": 1318.5, "length": 380, "gain": -23, "offset": 15,
+      "envelope": { "attack": 5, "decay": 370, "sustain": 0, "release": 0 } }
+  ]
+}

@@ -1,13 +1,16 @@
 // Leads bench - at most one tough enemy per room, the room's lead
 // (issue #269).
 //
-// Plans 50 seeds at each of depths 0, 2, 4 and 8 the way the game builds
+// Plans 50 seeds at each of depths 0, 1, 2, 4 and 8 the way the game builds
 // a dungeon (Game.planDungeon, the seed and the depth set as the dungeon
 // master sets them, at position 0): no room holds two tough enemies, the
 // start room none, and the rooms with a lead are as many as the table
 // gives at that depth (spawnRolls' leadShare of the rooms but the start
 // room, rounded, no more than hold an enemy). Each seed planned twice
-// gives the same grid, rooms and enemies. Then it builds the dungeon at
+// gives the same grid, rooms and enemies. A slinger (issue #322) is only
+// ever a lead, none before spawn.slingerDepth, and from it on about
+// spawn.slingerChance of the leads are slingers (within 0.1 over the 50
+// seeds). Then it builds the dungeon at
 // each depth on the scenario seed and checks that the enemies spawned are
 // the planned ones and again no room holds two tough. Prints the share of
 // rooms with a lead per depth against the table's, one PASS or FAIL line
@@ -26,7 +29,7 @@ Window {
     visible: true
     color: "#1a1a2e"
 
-    readonly property var depths: [0, 2, 4, 8]
+    readonly property var depths: [0, 1, 2, 4, 8]
     readonly property int seeds: 50
     property var game: null
     property int failures: 0
@@ -75,7 +78,7 @@ Window {
 
     function planned(d) {
         let crowded = [], inStart = [], off = [], differs = []
-        let leads = 0, rooms = 0
+        let leads = 0, rooms = 0, slingers = 0, small = 0
         for (let s = 1; s <= seeds; s++) {
             let m = { depth: d, seed: s }
             let p = game.planDungeon(0, 0, 1, m)
@@ -88,6 +91,11 @@ Window {
             if (have !== want) off.push("seed " + s + ": " + have + " of " + want)
             leads += have
             rooms += p.rooms.length - 1
+            for (let e of p.enemies) {
+                if (e.type !== "slinger") continue
+                slingers++
+                if (e.tier !== 2) small++
+            }
             if (planOf(game.planDungeon(0, 0, 1, m)) !== planOf(p)) differs.push("seed " + s)
         }
         let share = game.spawnRolls(d, 1).leadShare
@@ -101,6 +109,14 @@ Window {
               + Math.round(share * 100) + " % of its rooms)" + (off.length ? " - " + off.join(", ") : ""))
         check(differs.length === 0, "at depth " + d + " each seed planned twice is the same dungeon"
               + (differs.length ? " - " + differs.join(", ") : ""))
+        // The slinger, a kind of lead (issue #322)
+        let sb = Balance.spawn
+        let want = d >= sb.slingerDepth ? sb.slingerChance : 0
+        let got = leads > 0 ? slingers / leads : 0
+        check(small === 0 && Math.abs(got - want) <= 0.1 && (want > 0) === (slingers > 0),
+              "at depth " + d + " " + slingers + " of the " + leads + " leads are slingers (" + got.toFixed(2)
+              + ", the table's " + want + (d < sb.slingerDepth ? ", none before depth " + sb.slingerDepth : "")
+              + "), " + small + " slingers that are no lead")
     }
 
     // The dungeon built at depth d on the scenario seed is the planned one
