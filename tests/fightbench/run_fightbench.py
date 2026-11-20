@@ -16,10 +16,11 @@ Usage:
   run_fightbench.py [--loader <clayliveloader>] [--seed 424242]
                     [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person]
                     [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--sword N] [--boots N]
+                    [--special whirlwind|stun|bolt]
                     [--depth 0 | --danger 0.0] [--max-seconds 180] [--json out.json]
   run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss]
                     [--depths 0 2 4] [--answers charge masher skilled person] [--boots N] [--jobs N]
-                    [--json out.json]
+                    [--specials whirlwind stun bolt] [--json out.json]
 
 One fight prints its report as JSON. --answer is how the scripted knight
 meets a grunt's or a guardian's attack: "mix" parries or blocks as the
@@ -43,7 +44,9 @@ The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
 perfect-blocks - crushing blows and shots, which it sends back - and
 strikes in openings, "person" plays as "skilled" with a person's reaction
-time and misses (Balance.pacing.person, issue #315). --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
+time and misses (Balance.pacing.person, issue #315); --special gives it a
+special it fires with the same reaction and misses, paid from the
+knight's own mana (issue #344). --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
 only, "duel" a room's lead alone, a grunt, "guardianduel" a guardian lead
 alone (issue #288), "spitterduel" a spitter lead alone (issue #315),
 "ballduel" a slinger lead alone, the lead whose metal balls bounce off the
@@ -124,7 +127,13 @@ freezes an enemy past the stun's reach, the bolt deals
 Balance.combo.bolt.damage times atk, the whirlwind hits enemies past its
 reach for Balance.combo.whirlwind.swing times atk and spins longer - the
 late button the normal one, and that the knight walks on through it.
---json writes every report in full, sound log
+Unless --answers is given, or with --specials, it also plays the person
+with each special of --specials (by default the whirlwind, the stun and
+the bolt) in the flow room and each duel at the first depth and in the
+boss room at the first boss depth (issue #344); its section reports for
+each how often it pressed and fired the special, and for each fight it
+lost why: what hurt the knight, its misses and its mana, or what still
+stood when the time ran out. --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
 
@@ -160,6 +169,15 @@ STUN_ROOMS = ("flow", "duel")
 # alone, in the flow room at the first depth of a pacing run and in the
 # spitter duel at each
 BOLT = "bolt"
+# The specials the person plays with (issue #344), in these rooms at the
+# first depth of a pacing run, and in the boss room at the first boss depth
+SPECIALS = ("whirlwind", "stun", "bolt")
+SPECIAL_ROOMS = ("flow", "duel", "guardianduel", "spitterduel", "ballduel", "boss")
+
+
+def pilot(r):
+    """The pilot of fight r, the person's special with it: "person with the stun\""""
+    return r["answer"] + (f" with the {r['special']}" if r.get("special") else "")
 
 
 class Inspect:
@@ -457,14 +475,14 @@ def check_combos(c):
     return lines
 
 
-def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch, boots=0):
+def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch, boots=0, special=""):
     """Plays one fight in a loader of its own; returns its report, or raises
     FightError with the directory the logs are kept in"""
     tmp, bench, proc, log = start_loader(loader)
     try:
         if not bench.wait_phase("ready"):
             raise FightError("the sandbox did not load", tmp)
-        if bench.eval1(f"begin({seed}, '{answer}', {danger}, '{room}', {sword}, {boots})") is not True:
+        if bench.eval1(f"begin({seed}, '{answer}', {danger}, '{room}', {sword}, {boots}, '{special}')") is not True:
             raise FightError("the fight room did not start", tmp)
         # Let what the scene sets up on its first frames settle before step 1
         time.sleep(1.0)
@@ -485,6 +503,7 @@ def play_fight(loader, seed, answer, danger, room, sword, max_seconds, batch, bo
 
         result = json.loads(bench.eval1("JSON.stringify(report())") or "{}")
         result["pacing"] = json.loads(bench.eval1("JSON.stringify(Balance.pacing)") or "{}")
+        result["special"] = special
         result["clayground"] = clayground_commit()
     except TimeoutError as e:
         raise FightError(str(e), tmp)
@@ -530,7 +549,7 @@ def describe(r):
         how = Counter(b["how"] for b in r.get("boltEnds", []))
         stun = (f", bolts {r.get('bolts', 0)}, hits {r.get('boltHits', 0)} ("
                 + ", ".join(f"{k} {n}" for k, n in sorted(how.items())) + ")")
-    lines = [f"{r['room']} depth {r['depth']} sword {r['sword']}{boots_tag(r)} {r['answer']}: "
+    lines = [f"{r['room']} depth {r['depth']} sword {r['sword']}{boots_tag(r)} {pilot(r)}: "
              f"{r['outcome']} after {r['seconds']:.2f} s, damage taken {r['damageTaken']}, "
              f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s, shots sent back {r.get('shotsBack', 0)} "
@@ -589,22 +608,63 @@ def answers_line(person):
     """The person's answers and misses (issue #315) as text"""
     a, m = person["answers"], person["missed"]
     fastest = person.get("fastest")
+    kinds = ("parry", "perfect", "shot") + (("special",) if "special" in a else ())
     return (f"missed {sum(m.values())} of {sum(a.values())} answers ("
-            + ", ".join(f"{k} {m[k]}/{a[k]}" for k in ("parry", "perfect", "shot"))
+            + ", ".join(f"{k} {m[k]}/{a[k]}" for k in kinds)
             + "), fastest answer " + ("-" if fastest is None else f"{fastest:.3f} s")
             + f" after it began (reaction {person['reaction']} s, miss {person['miss']})")
+
+
+def times(n, what, plural=None):
+    """n what, its plural with any n but 1: "1 hit", "3 hits\""""
+    return f"{n} {what if n == 1 else plural or what + 's'}"
+
+
+def special_line(person):
+    """The person's special (issue #344) as text: its presses, the ones
+    that went off and the misses among them"""
+    sp = person.get("special")
+    if not sp:
+        return ""
+    strong = f", {sp['strong']} stronger" if sp.get("strong") else ""
+    return (f"; the {sp['id']} ({sp['mana']:g} mana) fired {sp['fired']} of {times(sp['presses'], 'press', 'presses')}{strong}"
+            f" ({sp['early']} early, {sp['late']} late)")
+
+
+def why_lost(r):
+    """Why the person lost fight r (issue #344): what hurt the knight,
+    most HP first, its misses and how often its mana ran dry - or, still
+    fighting when it was stopped, how often the leads still standing were
+    opened"""
+    hurt = sorted((r.get("hurtBy") or {}).items(), key=lambda kv: -kv[1]["hp"])
+    parts = []
+    if hurt:
+        parts.append("hurt by " + ", ".join(f"{c} {h['hp']} HP ({times(h['hits'], 'hit')})" for c, h in hurt))
+    m = r["person"]["missed"]
+    if sum(m.values()):
+        parts.append(f"{sum(m.values())} missed answers ("
+                     + ", ".join(f"{k} {n}" for k, n in m.items() if n) + ")")
+    if r.get("manaDry"):
+        parts.append(f"its mana ran dry {times(r['manaDry'], 'time')}")
+    if r["outcome"] != "fallen":
+        standing = [e for e in r["enemies"] if e["diedAt"] is None and (e.get("lead") or e["type"] == "warden")]
+        for e in standing:
+            parts.append(f"the {e['type']} opened {times(e['openings'], 'time')} in {r['seconds']:.0f} s")
+    return "; ".join(parts) or "nothing hurt it"
 
 
 def person_lines(results):
     """(won, line) per fight of the person (issue #315): won is the room
     cleared without falling; the line says in how many seconds, or how it
-    lost - fell, or still at it when the fight was stopped - and what
-    stood then"""
+    lost - fell, or still at it when the fight was stopped - what stood
+    then and why (issue #344); with a special, how often it fired it"""
     out = []
     for r in results:
         if r["answer"] != PERSON:
             continue
         tag = f"{r['room']} depth {r['depth']} sword {r['sword']}{boots_tag(r)}"
+        if r.get("special"):
+            tag += f" with the {r['special']}"
         leads = [e for e in r["enemies"] if e.get("lead") or e["type"] == "warden"]
         lead = leads[0] if leads else None
         won = r["outcome"] == "cleared"
@@ -619,6 +679,9 @@ def person_lines(results):
                 what += ", standing: " + ", ".join(
                     f"{e['type']} {e.get('hpLeft', '?')} of {e['hp']} HP" for e in standing)
         what += f"; knight HP {r['knightHp']}, damage taken {r['damageTaken']}"
+        what += special_line(r["person"])
+        if not won:
+            what += f"; why: {why_lost(r)}"
         out.append((won, f"{tag}: {what}; {answers_line(r['person'])}"))
     return out
 
@@ -636,6 +699,43 @@ def check_person_misses(results, person):
     return [(abs(missed / answers - share) <= slack + 1e-9,
              f"the person misses {share} of its answers, give or take {slack} "
              f"({missed} of {answers}, {missed / answers:.2f}, in {len(rs)} fights)")]
+
+
+def check_person_specials(results):
+    """(ok, line) per fight of the person's with a special (issue #344):
+    it pressed the special, it went off, and never the stronger version -
+    the pilot's own rule, not a band on its wins"""
+    out = []
+    for r in results:
+        sp = (r.get("person") or {}).get("special") if r["answer"] == PERSON else None
+        if not r.get("special"):
+            continue
+        tag = f"{r['room']} depth {r['depth']} {pilot(r)}"
+        if not sp:
+            out.append((False, f"{tag}: the person was given the {r['special']} (the report has no special)"))
+            continue
+        out.append((sp["presses"] >= 1 and sp["fired"] >= 1 and sp.get("strong", 0) == 0,
+                    f"{tag}: the person pressed its special, it went off and never stronger "
+                    f"({sp['presses']} presses, {sp['fired']} went off, {sp.get('strong', 0)} stronger)"))
+    return out
+
+
+def check_person_hurt(results):
+    """(ok, line) for the person's why lines (issue #344): in each of its
+    fights the HP by cause adds up to the HP the knight lost - its HP at
+    the start less its HP at the end, and what it got back meanwhile -,
+    falls included"""
+    rs = [r for r in results if r["answer"] == PERSON]
+    if not rs:
+        return []
+    off = []
+    for r in rs:
+        lost = r.get("knightStartHp", -1) - r["knightHp"] + r.get("knightHealed", 0)
+        by = sum(h["hp"] for h in (r.get("hurtBy") or {}).values())
+        if r.get("knightStartHp", -1) < 0 or by != lost:
+            off.append(f"{r['room']} depth {r['depth']} {pilot(r)} {by} of {lost}")
+    return [(not off, f"the person's HP by cause adds up to the HP the knight lost in each of its "
+                      f"{len(rs)} fights" + (f" (off: {'; '.join(off)})" if off else ""))]
 
 
 def check_stun(results, step=1 / 60):
@@ -772,7 +872,7 @@ def check_ball(results):
     out = []
     rs = [r for r in results if r["room"] == "ballduel"]
     for r in rs:
-        tag = f"ballduel depth {r['depth']} {r['answer']}"
+        tag = f"ballduel depth {r['depth']} {pilot(r)}"
         balls, most = r.get("balls") or [], r["ballBounces"]
         wall = [b for b in balls if b.get("fell") and b["fell"]["how"] == "wall"]
         short = [b["id"] for b in wall if len(b["bounces"]) != most]
@@ -1002,7 +1102,7 @@ def check_warden_sound(results):
     never heard"""
     out = []
     for r in results:
-        tag = f"{r['room']} depth {r['depth']} {r['answer']}"
+        tag = f"{r['room']} depth {r['depth']} {pilot(r)}"
         tolls = [s for s in r["sounds"] if s["cue"] == TOLL]
         if r["room"] != "boss":
             out.append((not tolls, f"{tag}: the Warden's toll is never heard ({len(tolls)})"))
@@ -1069,22 +1169,28 @@ def pacing(args, loader):
     for room in rooms:
         for depth in (boss_depths if room == "boss" else depths):
             for answer in answers:
-                fights.append((room, depth, answer))
+                fights.append((room, depth, answer, ""))
     # The stun's fights (issue #318), at the first depth; the bolt's (issue
     # #319) in the flow room at the first depth and the spitter duel at each
     if not args.answers:
-        fights += [(room, depths[0], STUN) for room in STUN_ROOMS if room in rooms]
+        fights += [(room, depths[0], STUN, "") for room in STUN_ROOMS if room in rooms]
         if "flow" in rooms:
-            fights.append(("flow", depths[0], BOLT))
+            fights.append(("flow", depths[0], BOLT, ""))
         if "spitterduel" in rooms:
-            fights += [("spitterduel", d, BOLT) for d in depths]
+            fights += [("spitterduel", d, BOLT, "") for d in depths]
+    # The person with each special (issue #344): the flow room and the
+    # duels at the first depth, the Warden at its first
+    specials = args.specials if args.specials is not None else ([] if args.answers else list(SPECIALS))
+    for room in SPECIAL_ROOMS:
+        if room in rooms:
+            fights += [(room, (boss_depths if room == "boss" else depths)[0], PERSON, sp) for sp in specials]
     results, errors = {}, []
     shots = None
     combos = None
     slung = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         futures = {pool.submit(play_fight, loader, args.seed, a, d, room, -1, args.max_seconds,
-                               args.batch, args.boots): (room, d, a) for room, d, a in fights}
+                               args.batch, args.boots, sp): (room, d, a, sp) for room, d, a, sp in fights}
         # The bolts shot by hand (issue #319)
         shooting = pool.submit(shoot_bolts, loader, args.seed) \
             if not args.answers and "flow" in rooms else None
@@ -1114,7 +1220,8 @@ def pacing(args, loader):
             try:
                 results[key] = fut.result()
             except FightError as e:
-                errors.append(f"FAIL {key[0]} depth {key[1]} {key[2]}: {e}; logs in {e.logs}")
+                errors.append(f"FAIL {key[0]} depth {key[1]} {key[2]}{' with the ' + key[3] if key[3] else ''}: "
+                              f"{e}; logs in {e.logs}")
     ordered = [results[k] for k in fights if k in results]
     for r in ordered:
         print("\n".join(describe(r)))
@@ -1145,6 +1252,7 @@ def pacing(args, loader):
         lines = check(banded, banded[0]["pacing"])
     if args.check and person:
         lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
+        lines += check_person_specials(ordered) + check_person_hurt(ordered)
     if args.check:
         lines += check_stun(ordered) + check_bolt(ordered) + check_ball(ordered)
         if shots:
@@ -1195,6 +1303,11 @@ def main():
     ap.add_argument("--rooms", nargs="+", choices=ROOMS, help="--pacing: these rooms")
     ap.add_argument("--depths", nargs="+", type=int, help="--pacing: these depths")
     ap.add_argument("--answers", nargs="+", choices=ANSWERS, help="--pacing: these pilots")
+    ap.add_argument("--special", choices=SPECIALS,
+                    help="the special the person pilot fires (--answer person only)")
+    ap.add_argument("--specials", nargs="*", choices=SPECIALS,
+                    help="--pacing: the specials the person plays with; by default all three "
+                         "unless --answers is given")
     ap.add_argument("--jobs", type=int, default=max(1, min(4, (os.cpu_count() or 2) // 2)),
                     help="--pacing: loaders at a time")
     args = ap.parse_args()
@@ -1206,6 +1319,8 @@ def main():
         sys.exit(2 if args.pacing else 1)
     if args.check and not args.pacing:
         ap.error("--check needs --pacing")
+    if args.special and args.answer != PERSON:
+        ap.error("--special needs --answer person")
     if args.pacing:
         pacing(args, loader)
         return
@@ -1214,7 +1329,7 @@ def main():
     sword = args.sword if args.sword is not None else (0 if args.room == "mixed" else -1)
     try:
         result = play_fight(loader, args.seed, args.answer, danger, args.room, sword,
-                            args.max_seconds, args.batch, args.boots)
+                            args.max_seconds, args.batch, args.boots, args.special or "")
     except FightError as e:
         print("FAIL", e, "; logs kept at", e.logs, file=sys.stderr)
         sys.exit(1)

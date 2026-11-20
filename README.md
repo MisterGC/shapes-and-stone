@@ -2507,7 +2507,7 @@ Clayground's live loader, which the build makes when asked:
 ```
 cmake -S . -B build -DCLAYGROUND_WITH_TOOLS=ON
 cmake --build build --target clayliveloader
-python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person] [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
+python3 tests/fightbench/run_fightbench.py [--seed 424242] [--answer mix|block|parry|perfect|heavy|whirlwind|stun|bolt|charge|masher|skilled|person] [--special whirlwind|stun|bolt] [--room mixed|flow|duel|guardianduel|spitterduel|ballduel|boss] [--depth 0 | --danger 0.0] [--json out.json]
 ```
 
 `--answer` is how the scripted knight meets a grunt's or a guardian's
@@ -2565,7 +2565,7 @@ rooms at depths 0, 2 and 4 (`Balance.pacing.depths`) with all four
 pilots, four loaders at a time:
 
 ```
-python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--boots N] [--jobs 4] [--json pacing.json]
+python3 tests/fightbench/run_fightbench.py --pacing [--check] [--rooms flow duel guardianduel spitterduel ballduel boss] [--depths 0 2 4] [--answers charge masher skilled person] [--specials whirlwind stun bolt] [--boots N] [--jobs 4] [--json pacing.json]
 ```
 
 It prints each fight: per enemy its hits to kill and its time to kill,
@@ -2724,6 +2724,43 @@ for that fight, not a reason to change the pilot. Since issue #330 it wins
 every one of them on the bench's seed, the Warden in about 76 to 80 s. A win is not a promise:
 the pilot knows every string, never panics and never strays, so it is the
 least a person needs, and the owner's playtest still judges the rest.
+
+**The person with a special** (issue #344). `--answer person --special
+whirlwind|stun|bolt` gives the person a special, and it fires it where
+the pilot of that special does: the whirlwind with full momentum and an
+enemy close (as `whirlwind`), the stun at a weak or normal enemy in its
+reach and at a lead's wind-up 3 s after its last stun (as `stun`), the
+bolt at an enemy out of the sword's reach and inside the bolt's (as
+`bolt`). It does so with its reaction and its misses: it presses no
+sooner than 0.25 s after the chance began, and each press is one of its
+answers, a fifth of them missed - one window
+(`Balance.knight.perfectBlockFrames` steps, as its other misses) early,
+taking an enemy as far off as the knight walks in a window for one in
+reach, so it may fire at nothing, or a window late, whatever stands then.
+The stun comes before an attack it has seen; the whirlwind and the bolt
+only when no attack or shot is coming. It pays the special, its blocks
+and its dashes from the knight's own mana (`Balance.knight.mana`, as the
+`bolt` pilot does), where every other pilot has plenty: a special that
+costs nothing would say nothing about it. It enters no combo: its own
+steps can make one - away from a zone, then at the Warden -, so it lets
+any combo lapse before it presses, and fires the plain special. Without
+`--special` the person plays as before, step for step.
+
+Unless `--answers` is given, or with `--specials`, a pacing run plays the
+person with each of the three specials in the flow room and in every duel
+at its first depth, and in the boss room at its first boss depth (the
+Warden at depth 2). Each of these fights is a line of the person's
+section, `WIN` or `LOSE`, with its seconds and how often it pressed the
+special and how often it went off. Every `LOSE` of the person's, with a
+special or without, says why: what hurt the knight, the most HP first
+(the blows of an enemy by its type, a shot, a metal ball, a zone of the
+Warden's), its missed answers, how often its mana ran dry, and, when it
+was still fighting at the end, how often the lead still standing was
+opened. No band judges their wins either; `--check` tests the pilot's own
+rules on them: in each fight with a special the person pressed it, it went
+off and never as the stronger version, and in each of the person's fights
+the HP by cause adds up to the HP the knight lost, the blow that felled it
+included.
 
 The fight bench plays the dojo's `fight` scenario, so the perfect block is
 tried the same way by hand: reload the dojo into `fight` and raise the
