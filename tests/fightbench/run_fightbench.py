@@ -131,7 +131,9 @@ Unless --answers is given, or with --specials, it also plays the person
 with each special of --specials (by default the whirlwind, the stun and
 the bolt) in the flow room and each duel at the first depth and in the
 boss room at the first boss depth (issue #344); its section reports for
-each how often it pressed and fired the special. --json writes every report in full, sound log
+each how often it pressed and fired the special, and for each fight it
+lost why: what hurt the knight, its misses and its mana, or what still
+stood when the time ran out. --json writes every report in full, sound log
 and music trace included. Exits 1 when a band fails under --check, 2 when
 a fight could not be played.
 
@@ -628,11 +630,33 @@ def special_line(person):
             f" ({sp['early']} early, {sp['late']} late)")
 
 
+def why_lost(r):
+    """Why the person lost fight r (issue #344): what hurt the knight,
+    most HP first, its misses and how often its mana ran dry - or, still
+    fighting when it was stopped, how often the leads still standing were
+    opened"""
+    hurt = sorted((r.get("hurtBy") or {}).items(), key=lambda kv: -kv[1]["hp"])
+    parts = []
+    if hurt:
+        parts.append("hurt by " + ", ".join(f"{c} {h['hp']} HP ({times(h['hits'], 'hit')})" for c, h in hurt))
+    m = r["person"]["missed"]
+    if sum(m.values()):
+        parts.append(f"{sum(m.values())} missed answers ("
+                     + ", ".join(f"{k} {n}" for k, n in m.items() if n) + ")")
+    if r.get("manaDry"):
+        parts.append(f"its mana ran dry {times(r['manaDry'], 'time')}")
+    if r["outcome"] != "fallen":
+        standing = [e for e in r["enemies"] if e["diedAt"] is None and (e.get("lead") or e["type"] == "warden")]
+        for e in standing:
+            parts.append(f"the {e['type']} opened {times(e['openings'], 'time')} in {r['seconds']:.0f} s")
+    return "; ".join(parts) or "nothing hurt it"
+
+
 def person_lines(results):
     """(won, line) per fight of the person (issue #315): won is the room
     cleared without falling; the line says in how many seconds, or how it
-    lost - fell, or still at it when the fight was stopped - and what
-    stood then; with a special, how often it fired it (issue #344)"""
+    lost - fell, or still at it when the fight was stopped - what stood
+    then and why (issue #344); with a special, how often it fired it"""
     out = []
     for r in results:
         if r["answer"] != PERSON:
@@ -655,6 +679,8 @@ def person_lines(results):
                     f"{e['type']} {e.get('hpLeft', '?')} of {e['hp']} HP" for e in standing)
         what += f"; knight HP {r['knightHp']}, damage taken {r['damageTaken']}"
         what += special_line(r["person"])
+        if not won:
+            what += f"; why: {why_lost(r)}"
         out.append((won, f"{tag}: {what}; {answers_line(r['person'])}"))
     return out
 

@@ -107,6 +107,12 @@ Item {
         _chanceAt = -1
         _pressAt = -1
         specialUse = { presses: 0, fired: 0, early: 0, late: 0 }
+        hurtBy = ({})
+        _knightHp = -1
+        _zoneHitsSeen = game.bossFight.zoneHits
+        _hurtCause = ""
+        manaDry = 0
+        _dry = false
         // What would be heard, on the physics steps: muted, logged
         game.logSounds = true
         game.followFightOnSteps = true
@@ -138,6 +144,7 @@ Item {
         if (game.player) game.player.acted.connect(a => {
             if (a === "heavy") bench.heavySwings++
             if (a === "whirlwind" || a === "whirlwind+") bench.whirlsStarted++
+            if (a === "hurt" || a === "block") bench._hurtCause = bench.hurtCause(game.player)
         })
         for (let e of game.enemies.filter(alive)) follow(e)
         if (!_boltsFollowed) {
@@ -348,6 +355,10 @@ Item {
                 special: personSpecial === "" ? null : Object.assign({ id: personSpecial,
                     mana: game.player ? game.player.specialMana : 0 }, specialUse)
             },
+            // What hurt the knight, by cause: hits and HP (issue #344),
+            // and how often its mana ran dry
+            hurtBy: hurtBy,
+            manaDry: manaDry,
             enemies: foes,
             sounds: game.soundLog,
             music: game.musicTrace
@@ -423,6 +434,54 @@ Item {
     function trackCharge(p) {
         if ((_chargeSeen === "charging" || _chargeSeen === "full") && p._charge === "spent")
             cancelledCharges++
+    }
+
+    // ---- what hurt the knight (issue #344) ----
+    // Per cause the hits that cost the knight HP and the HP: a zone of
+    // the Warden's, a shot, a metal ball, or the blow of the enemy that
+    // struck - its type, "lead" for a room's lead -, as hurtCause names
+    // it the moment the knight is hurt or blocks. Mana ran dry each time
+    // it fell below a block's cost, the shield then soon down
+    property var hurtBy: ({})
+    property real _knightHp: -1
+    property int _zoneHitsSeen: 0
+    property string _hurtCause: ""
+    property int manaDry: 0
+    property bool _dry: false
+    function trackHurt(p) {
+        let zone = game.bossFight.zoneHits > _zoneHitsSeen
+        _zoneHitsSeen = game.bossFight.zoneHits
+        let dry = p.mana < p.blockMana
+        if (dry && !_dry) manaDry++
+        _dry = dry
+        let lost = _knightHp < 0 ? 0 : _knightHp - p.hp
+        _knightHp = p.hp
+        let cause = zone ? "zone" : _hurtCause !== "" ? _hurtCause : "unknown"
+        _hurtCause = ""
+        if (lost <= 0) return
+        let h = hurtBy[cause] || { hits: 0, hp: 0 }
+        h.hits++
+        h.hp += lost
+        hurtBy[cause] = h
+    }
+    // What is hurting the knight now: a shot or a ball close by, else the
+    // blow of the nearest enemy
+    function hurtCause(p) {
+        let best = "", bestD = 2.5
+        for (let o of game.room.children) {
+            if (!(o.objectName === "projectile" || o.objectName === "ball") || o.destroyed !== false || o.back)
+                continue
+            let d = distTo(p, o.xWu, o.yWu)
+            if (d < bestD) { bestD = d; best = o.objectName === "ball" ? "ball" : "shot" }
+        }
+        if (best !== "") return best
+        let near = null, nearD = 1e9
+        for (let e of game.enemies.filter(alive)) {
+            let d = distTo(p, ex(e), ey(e))
+            if (d < nearD) { nearD = d; near = e }
+        }
+        if (!near) return "unknown"
+        return near.enemyType + (near.lead && !near.boss ? " lead" : "") + " blow"
     }
 
     // ---- the charge, tried as in the dojo (run_reload.py) ----
@@ -934,6 +993,7 @@ Item {
             if (game.player) {
                 bench.countGuardBreaks(game.player)
                 bench.trackCharge(game.player)
+                bench.trackHurt(game.player)
             }
             bench.countCrushes()
             bench.perceive()
