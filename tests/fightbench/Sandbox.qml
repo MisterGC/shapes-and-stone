@@ -106,9 +106,11 @@ Item {
         _specialPlan = null
         _chanceAt = -1
         _pressAt = -1
-        specialUse = { presses: 0, fired: 0, early: 0, late: 0 }
+        specialUse = { presses: 0, fired: 0, strong: 0, early: 0, late: 0 }
         hurtBy = ({})
         _knightHp = -1
+        _knightStartHp = -1
+        knightHealed = 0
         _zoneHitsSeen = game.bossFight.zoneHits
         _hurtCause = ""
         manaDry = 0
@@ -240,8 +242,10 @@ Item {
     function now() { return round3(game.physicsSeconds) }
 
     function report() {
-        // A death on the last step is seen now
+        // A death on the last step is seen now, and the blow that felled
+        // the knight
         track(0)
+        if (game.player) trackHurt(game.player)
         let r = record
         let p = game.player
         let foes = _foes.map(f => ({
@@ -358,6 +362,8 @@ Item {
             // What hurt the knight, by cause: hits and HP (issue #344),
             // and how often its mana ran dry
             hurtBy: hurtBy,
+            knightStartHp: _knightStartHp,
+            knightHealed: knightHealed,
             manaDry: manaDry,
             enemies: foes,
             sounds: game.soundLog,
@@ -441,9 +447,12 @@ Item {
     // the Warden's, a shot, a metal ball, or the blow of the enemy that
     // struck - its type, "lead" for a room's lead -, as hurtCause names
     // it the moment the knight is hurt or blocks. Mana ran dry each time
-    // it fell below a block's cost, the shield then soon down
+    // it fell below a block's cost, the shield then soon down; the HP it
+    // got back meanwhile is knightHealed
     property var hurtBy: ({})
     property real _knightHp: -1
+    property real _knightStartHp: -1
+    property real knightHealed: 0
     property int _zoneHitsSeen: 0
     property string _hurtCause: ""
     property int manaDry: 0
@@ -454,10 +463,12 @@ Item {
         let dry = p.mana < p.blockMana
         if (dry && !_dry) manaDry++
         _dry = dry
+        if (_knightStartHp < 0) _knightStartHp = p.hp
         let lost = _knightHp < 0 ? 0 : _knightHp - p.hp
         _knightHp = p.hp
         let cause = zone ? "zone" : _hurtCause !== "" ? _hurtCause : "unknown"
         _hurtCause = ""
+        if (lost < 0) knightHealed -= lost
         if (lost <= 0) return
         let h = hurtBy[cause] || { hits: 0, hp: 0 }
         h.hits++
@@ -1527,11 +1538,14 @@ Item {
     // window after it would have pressed, whatever stands then. The stun
     // and the shot it is answering come first: the stun before an attack
     // it has seen, the whirlwind and the bolt only when none is coming.
-    // Combos are not entered: the plain special only
+    // Combos are not entered: its own steps can make one (away from a
+    // zone, then at the Warden), so it lets any combo lapse before it
+    // presses - the plain special only, and the report counts any that
+    // went off stronger
     property var _specialPlan: null
     property real _chanceAt: -1
     property real _pressAt: -1
-    property var specialUse: ({ presses: 0, fired: 0, early: 0, late: 0 })
+    property var specialUse: ({ presses: 0, fired: 0, strong: 0, early: 0, late: 0 })
     readonly property real specialWindow: Balance.knight.perfectBlockFrames / 60
     function specialChance(p, foes, slack) {
         if (p.isDashing) return null
@@ -1575,9 +1589,11 @@ Item {
         p.isBlocking = false
         face(p, target)
         if (personSpecial === "whirlwind") moveTowards(p, target.xWu, target.yWu, 1)
+        p.comboAt = -1
         let went = p.unleash()
         specialUse.presses++
         if (went) specialUse.fired++
+        if (went && p.lastStrong) specialUse.strong++
         if (early) specialUse.early++
         if (late) specialUse.late++
         personAnswers.special++
