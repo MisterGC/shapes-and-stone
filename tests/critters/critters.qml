@@ -110,24 +110,45 @@ Window {
         }
     }
 
-    // The critter nearest this knight's spawn with floor on side `dir` of
-    // it, d wu off, and no enemy within 12 wu: [critter, x, y] where the
-    // knight goes, or null
-    function pickCritter(g, d, dirs) {
+    // A critter set up for the knight to stand by or walk at, the same
+    // on every run however far the critters have scurried: the floor cell
+    // nearest this knight whose centre has floor on side `dir` of it, d wu
+    // off, room for the knight's box on the way to it and on past it, no
+    // enemy within 12 wu and no other critter within d + 3 wu. The resting
+    // or wandering critter nearest that cell, not `skip`, is put on its
+    // centre to rest there. [critter, x, y, dir], x and y where the knight
+    // goes, or null
+    function setUpCritter(g, d, dirs, skip) {
         let k = knightAt(g)
-        let list = g.critters.slice().sort((a, b) => Math.hypot(a.xWu - k.x, a.yWu - k.y)
-                                                     - Math.hypot(b.xWu - k.x, b.yWu - k.y))
-        for (let c of list) {
-            if (c.mood !== "rest" && c.mood !== "wander") continue
-            if (enemyNear(g, c.xWu, c.yWu, 12)) continue
+        let cells = []
+        for (let gy = 0; gy < g.gridHeight; gy++)
+            for (let gx = 0; gx < g.gridWidth; gx++)
+                if (g.grid[gy][gx] !== g.cellWall)
+                    cells.push([(gx + 0.5) * g.cellSize, (gy + 0.5) * g.cellSize])
+        cells.sort((a, b) => Math.hypot(a[0] - k.x, a[1] - k.y) - Math.hypot(b[0] - k.x, b[1] - k.y))
+        let free = (x, y, dir) => {
+            // The knight's box, and the way to the critter and on past it
+            for (let s = -0.6; s <= d + 1.6; s += 0.25)
+                for (let o of [-0.55, 0, 0.55])
+                    if (!g.critterFree(x + dir[0] * s - dir[1] * o, y + dir[1] * s + dir[0] * o)) return false
+            return true
+        }
+        for (let p of cells) {
+            if (!g.critterFree(p[0], p[1]) || enemyNear(g, p[0], p[1], 12)) continue
+            if (g.critters.some(c => Math.hypot(c.xWu - p[0], c.yWu - p[1]) < d + 3)) continue
             for (let dir of dirs) {
-                let x = c.xWu - dir[0] * d, y = c.yWu - dir[1] * d
-                let free = true
-                // The knight's box, and the way to the critter and on past it
-                for (let s = -0.6; s <= d + 1.6; s += 0.25)
-                    for (let o of [-0.55, 0, 0.55])
-                        if (!g.critterFree(x + dir[0] * s - dir[1] * o, y + dir[1] * s + dir[0] * o)) free = false
-                if (free) return [c, x, y, dir]
+                let x = p[0] - dir[0] * d, y = p[1] - dir[1] * d
+                if (!free(x, y, dir)) continue
+                let list = g.critters.filter(c => c !== skip && (c.mood === "rest" || c.mood === "wander"))
+                list.sort((a, b) => Math.hypot(a.xWu - p[0], a.yWu - p[1]) - Math.hypot(b.xWu - p[0], b.yWu - p[1]))
+                if (list.length === 0) return null
+                let c = list[0]
+                c.xWu = p[0]
+                c.yWu = p[1]
+                c.mood = "rest"
+                c.moodLeft = 60
+                c.from = null
+                return [c, x, y, dir]
             }
         }
         return null
@@ -186,7 +207,7 @@ Window {
         // A knight standing near one: it startles and runs
         s.push([() => true, () => {
             before = { hp: game.player.hp, kills: game.runKills, chain: game.chainLinks }
-            let p = pickCritter(game, 1.6, [[1, 0], [-1, 0], [0, 1], [0, -1]])
+            let p = setUpCritter(game, 1.6, [[1, 0], [-1, 0], [0, 1], [0, -1]], null)
             if (!p) { check(false, "a critter with room round it to stand by"); return }
             fled = { c: p[0], kind: p[0].kind, x: p[0].xWu, y: p[0].yWu, moods: {} }
             placeKnight(game, p[1], p[2])
@@ -209,7 +230,7 @@ Window {
         s.push([() => true, () => {
             game.logSounds = true
             game.clearSoundLog()
-            let p = pickCritter(game, 1.3, [[1, 0], [-1, 0]])
+            let p = setUpCritter(game, 1.3, [[1, 0], [-1, 0]], fled ? fled.c : null)
             if (!p) { check(false, "a critter with room to walk at it"); return }
             stomp = { c: p[0], kind: p[0].kind, x: p[0].xWu, y: p[0].yWu, dir: p[3], squashed: 0,
                       count: game.critters.length, marks: game.critterMarks.length }
