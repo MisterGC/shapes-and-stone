@@ -896,8 +896,11 @@ swing, and every screen shows it seated, facing the fire there. The pose's
 numbers are `camp.sit`. The sit bench steps the world one physics step at
 a time: the knight sits on the step that reaches sitAfter, a press of D,
 Space, the right button or a click each stands it up in the next step,
-out of the fire's warmth it never sits, and five seconds at the fire heal
-and refill the same seated as for a knight that never sits. It exits with
+out of the fire's warmth it never sits, and five seconds at the fire, 300
+steps, heal and refill the same seated as for a knight that never sits.
+The fire heals a tick every `campfire.healTick` seconds of the physics
+clock, not the wall clock, so a pause holds it and a slow machine heals
+the same in those steps as a fast one. It exits with
 the number of failed checks; with a window and an output directory it
 saves the knight seated as `sit.png`. The danger party bench below sits
 both knights of a two-process session at the first camp's fire and checks
