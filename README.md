@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `pace`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2379,6 +2379,37 @@ window on every beat:
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/strings/strings.qml
 ```
 
+A room's lead fights at the duel pace (issue #361, the table's `pace`
+group): it plays its side of a duel more slowly than the rest of the
+table gives it, by one factor. The game plays at Standard, factor 1.65;
+the other steps are Swift, 1.3, and Deliberate, 2. A lead's beat
+(`lead.beat`), its count-in, every wind-up of its - a strike's, a
+crushing blow's, a shot's, a guardian's counter, the blow it strikes a
+charging knight with -, a feint's hold and its recovery last that many
+times as long: at Standard a melee lead's blows come 1.16 s apart where
+they came 0.7 s apart. It walks, kites and steps back in its wind-up
+that many times slower: a melee lead walks 2.4 wu/s at Standard and 2.0
+at Deliberate, slower than the knight behind its shield (3.0), so the
+knight can back away from it; at Swift it walks 3.1. A guardian lead
+turns its shield at `enemy.shieldTurnSpeed` divided by the factor, 73
+degrees a second at Standard. Against a lead the knight's windows widen
+by the same factor, rounded to physics steps: the parry window
+(`enemy.parryFrames`, `lead.parryStart`) is 15 steps at Standard where
+it is 9, the perfect block (`knight.perfectBlockFrames`) 13 where it is
+8. The lunge itself, the knight's own swing, shield, charge and dash,
+and every weak and normal enemy keep their timing. The Hollow Warden
+keeps its own tempo and plays at factor 1 for now (issue #368). The
+game's `duelPace` names the step and `duelPaceFactor` is its factor; in
+a session a lead's blow, shot or ball carries its windows to the knight's
+screen, which judges it at the host's pace. The pace bench plays each
+step in the paused fight room and checks a lead's timings, speeds and
+windows against the factor, and that the weak and normal enemies, the
+knight and the Warden keep theirs:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pace/pace.qml
+```
+
 Every third dungeon ends in a boss room (issue #274, the table's `boss`
 group): at depth 2, 5, 8 and so on the dungeon's last room, the one the
 exit stairs' shaft leaves from, holds the Hollow Warden alone - no other
@@ -2586,7 +2617,7 @@ pilot and no two kills lie more than `flowGap` seconds apart; in either
 duel `masher` and `charge` take at least `duelSlow` seconds or fall, hits
 cancel at least `duelCancelled` of `charge`'s charges (#272), and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
-both. The kill chain's lines (issue #270) read the flow fights' sound
+both, every duel band at the Standard duel pace (issue #361). The kill chain's lines (issue #270) read the flow fights' sound
 logs: the death sound climbs a step of the dungeon song's scale over a
 4-kill chain in one of them and falls back after a break in one, and each
 fight's counted chains are the ones its death sounds tell. How a duel
@@ -2696,6 +2727,8 @@ both in `Balance.pacing.person`:
   fight of ten answers to luck. A miss is one window early - a swing under way before
   the parry window, the shield up before the perfect block's, an ordinary
   block - or late, no press before the blow lands, as the seed rolls.
+  The window is the enemy's own: a lead's, wider at its duel pace, is
+  missed by as much more (issue #361).
   Zones are not missed, only seen late. A spitter's shot begins with the
   spitter's wind-up, which a person sees, not with its flight.
 
