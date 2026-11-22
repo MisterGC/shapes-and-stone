@@ -96,8 +96,16 @@ wall. The
 person's fights get no band either: a section of their own says of each
 whether the person won - cleared the room without falling - and in how
 many seconds, or how it lost, with its answers and misses (issue #315);
---check tests its own rule instead: its misses over all its fights lie
-within Balance.pacing.person.missSlack of its share. Unless --answers is
+--check tests its own rules instead: its misses over all its fights lie
+within Balance.pacing.person.missSlack of its share, and in the duel with
+a grunt and with a guardian lead, at each depth, it fells the lead in
+Balance.pacing.personExchanges exchanges - strings of the lead's in which
+it wound up a blow - and stands (issue #364). Each duel's report has the
+lead's exchanges and the HP it lost by the moment the blow landed in:
+its guard, a rest, its retreat or an opening. In the duel with a grunt
+and with a guardian lead "masher" takes at least Balance.pacing.mashSlow
+times as long to kill the lead as "skilled" and the person do, or falls
+(issue #364). Unless --answers is
 given, the run also plays "stun" in the flow and the duel room at its
 first depth, banded by no table; --check tests the stun on them (issue
 #318): in the flow fight it froze enemies, each frozen span lasted
@@ -113,12 +121,13 @@ the sword's reach, deals Balance.bolt.damage times atk less its defense,
 one with nothing in line flies Balance.bolt.reach and ends, an enemy just
 past it unhurt, and one shot at the room's wall 5 wu off stops there; in
 the fights it hit enemies, each hit dealt the damage the table allows - a
-chip of it on a lead's stance, a guardian's shield's share from its front
--, some from out of the sword's reach, no bolt flew past its reach, every
-bolt that ended at a wall ended at the room's wall and none outside the
-room; and in the spitter duel the masher with the bolt takes at least
-Balance.pacing.duelSlow seconds to kill the lead, or falls, as the masher
-must in a duel. It also enters the combo by hand in the flow room
+lead's share of it by the moment it landed in (Balance.lead), a guardian's
+shield's share from its front -, some from out of the sword's reach, no
+bolt flew past its reach, every bolt that ended at a wall ended at the
+room's wall and none outside the room; and in the spitter duel the masher
+with the bolt takes at least Balance.pacing.mashSlow times as long to kill
+the lead as "skilled" and the person do there, or falls, as the masher
+must in a duel (issue #364). It also enters the combo by hand in the flow room
 (Sandbox.tryCombo, issue #320): for each special the knight's moves away
 from its aim, then towards it, as a pilot walks, and the special's button
 at once, then the same with the button later than Balance.combo.window;
@@ -569,6 +578,11 @@ def describe(r):
         lines.append(f"  {e['type']} ({TIERS[e['tier']]}{lead}, {e['hp']} HP): hits {e['hits']}, "
                      f"ttk {fmt_s(e['ttk'])} from its first hit, {fmt_s(e['ttkEngaged'])} "
                      f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}{by}")
+        # A lead's exchanges and the HP it lost by the moment (issue #364)
+        if e.get("lead") and e.get("strings") is not None:
+            dealt = e.get("dealtBy") or {}
+            lines.append(f"    exchanges {e.get('exchanges', 0)} of {len(e['strings'])} strings; HP lost "
+                         + ", ".join(f"{k} {dealt.get(k, 0)}" for k in ("guard", "rest", "retreat", "opening")))
     person = r.get("person")
     if person:
         lines.append(f"  the person: {answers_line(person)}")
@@ -683,6 +697,28 @@ def person_lines(results):
         if not won:
             what += f"; why: {why_lost(r)}"
         out.append((won, f"{tag}: {what}; {answers_line(r['person'])}"))
+    return out
+
+
+# The duels whose lead's HP is set by the person's exchanges (issue #364)
+MELEE_DUELS = ("duel", "guardianduel")
+
+
+def check_person_exchanges(results, bands):
+    """(ok, line) per duel with a melee lead the person played with no
+    special (issue #364): it fells the lead in personExchanges exchanges,
+    strings of the lead's in which it wound up a blow, and stands"""
+    lo, hi = bands["personExchanges"]
+    out = []
+    for r in results:
+        if r["answer"] != PERSON or r.get("special") or r["room"] not in MELEE_DUELS:
+            continue
+        lead = next((e for e in r["enemies"] if e.get("lead")), None)
+        n = lead.get("exchanges") if lead else None
+        ok = r["outcome"] == "cleared" and n is not None and lo <= n <= hi
+        what = f"{n} exchanges" if n is not None else "no lead"
+        out.append((ok, f"{r['room']} depth {r['depth']} person: fells the lead in {lo}-{hi} exchanges "
+                        f"and stands ({what}, {r['outcome']}, {fmt_s(lead['ttkEngaged'] if lead else None)})"))
     return out
 
 
@@ -801,14 +837,35 @@ def check_stun(results, step=1 / 60):
     return out
 
 
+def lead_time(r):
+    """Seconds from a fight's lead engaging to its death, None alive"""
+    leads = [e for e in r["enemies"] if e["tier"] == 2] or r["enemies"]
+    return leads[0]["ttkEngaged"]
+
+
+def answering_time(results, room, depth, slow):
+    """(least, text) for a pilot that should be slow in the duel room at
+    depth (issue #364): slow times the longest "skilled" and the person
+    (no special) took to kill its lead there, None when neither did, and
+    their times as text"""
+    them = [r for r in results if r["room"] == room and r["depth"] == depth
+            and (r["answer"] == "skilled" or r["answer"] == PERSON and not r.get("special"))]
+    times = {r["answer"]: lead_time(r) for r in them}
+    done = [t for t in times.values() if t is not None]
+    least = max(done) * slow if done else None
+    took = ", ".join(f"{p} {fmt_s(t)}" for p, t in sorted(times.items())) or "no answering pilot played"
+    return least, took
+
+
 def check_bolt(results, step=1 / 60):
     """(ok, line) for the bolt's fights (issue #319): in the flow fight it
     hit enemies; in every bolt fight each hit dealt a damage the table
     allows, some hit from out of the sword's reach, no bolt flew past its
     reach and one that ended there flew all of it, every bolt that ended
     at a wall ended at the room's wall and none outside the room; in the
-    spitter duel the masher with the bolt takes at least duelSlow seconds
-    to kill the lead, or falls, and the masher's own time beside it"""
+    spitter duel the masher with the bolt takes at least mashSlow times as
+    long to kill the lead as "skilled" and the person (no special) do
+    there, or falls, and the masher's own time beside it (issue #364)"""
     out = []
     rs = [r for r in results if r["answer"] == BOLT]
     for r in rs:
@@ -855,11 +912,12 @@ def check_bolt(results, step=1 / 60):
                 ml = [e for e in masher["enemies"] if e["tier"] == 2] or masher["enemies"]
                 mt = "fell" if masher["outcome"] == "fallen" else "alive" if ml[0]["ttkEngaged"] is None \
                     else f"{ml[0]['ttkEngaged']:.2f} s"
-            ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
+            least, took = answering_time(results, "spitterduel", r["depth"], bands["mashSlow"])
+            ok = r["outcome"] == "fallen" or t is None or (least is not None and t >= least)
             what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
-            out.append((ok, f"{tag}: the masher with the bolt takes at least {bands['duelSlow']} s to kill "
-                            f"the spitter lead, or falls ({what}, {len(hits)} bolt hits; the masher without "
-                            f"it {mt or 'not played'})"))
+            out.append((ok, f"{tag}: the masher with the bolt takes at least {bands['mashSlow']} times as long "
+                            f"as answering, {fmt_s(least)}, to kill the spitter lead, or falls ({what}, {len(hits)} "
+                            f"bolt hits; {took}; the masher without it {mt or 'not played'})"))
     return out
 
 
@@ -987,8 +1045,10 @@ def fmt_span(a, b):
     return f"{a:.2f}-{'end' if b is None else f'{b:.2f}'} s"
 
 
-def check(results, bands):
-    """One (ok, line) per band of Balance.pacing for the fights played"""
+def check(results, bands, persons=()):
+    """One (ok, line) per band of Balance.pacing for the fights played;
+    persons are the person's fights, which no band of this holds but
+    the masher's is measured against (issue #364)"""
     out = []
     for r in results:
         if r["room"] != "flow":
@@ -1018,21 +1078,21 @@ def check(results, bands):
         duel = DUELS[i]
         for pilot, r in sorted(by.items()):
             out.extend(check_duel_sound(r, f"{duel} depth {depth} {pilot}"))
-        def lead_time(r):
-            leads = [e for e in r["enemies"] if e["tier"] == 2] or r["enemies"]
-            return leads[0]["ttkEngaged"]
         for pilot in ("masher", "charge"):
             r = by.get(pilot)
             if not r:
                 continue
             # A charge let go in a lead's rest or retreat is an answer to
-            # its string (issue #363): only the masher is held to duelSlow
+            # its string (issue #363): only the masher is held to be slow,
+            # at least mashSlow times as long as answering takes (issue
+            # #364)
             if pilot == "masher":
                 t = lead_time(r)
-                ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
+                least, took = answering_time(list(by.values()) + list(persons), duel, depth, bands["mashSlow"])
+                ok = r["outcome"] == "fallen" or t is None or (least is not None and t >= least)
                 what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
-                out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
-                                f"or falls ({what})"))
+                out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['mashSlow']} times as long "
+                                f"as answering, {fmt_s(least)}, or falls ({what}; {took})"))
             # The lead strikes a knight charging in its reach first, outside
             # its rests and its retreat (#272, #363)
             if pilot == "charge":
@@ -1255,9 +1315,10 @@ def pacing(args, loader):
         print(f"the person wins {sum(1 for won, _ in person if won)} of {len(person)} fights")
     lines = []
     if args.check and banded:
-        lines = check(banded, banded[0]["pacing"])
+        lines = check(banded, banded[0]["pacing"], ordered)
     if args.check and person:
         lines += check_person_misses(ordered, ordered[0]["pacing"]["person"])
+        lines += check_person_exchanges(ordered, ordered[0]["pacing"])
         lines += check_person_specials(ordered) + check_person_hurt(ordered)
     if args.check:
         lines += check_stun(ordered) + check_bolt(ordered) + check_ball(ordered)

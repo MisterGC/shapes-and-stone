@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `pace`, `retreat`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `pace`, `retreat`, `shares`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2010,9 +2010,10 @@ centre along its aim, the way it faces. It flies `bolt.speed` wu a second,
 `bolt.size` wu across, at most `bolt.reach` wu, and hurts the first enemy it
 meets for `bolt.damage` times the knight's atk, less the enemy's defense.
 It is a blow as any other: a guardian's shield takes it from the front,
-and a room's lead or the Warden takes a chip of it on its stance that wears
-the stance - but never below one wear, so a bolt never breaks a stance and
-never opens a lead; the sword's next blow does. A wall or a closed door
+and a room's lead takes it as a swing (issue #364) - into its guard a
+share, in a rest or its retreat all of it, in an opening more; the Warden a
+chip of it -, and it wears the stance, but never below one wear, so a bolt
+never breaks a stance and never opens a lead; the sword's next blow does. A wall or a closed door
 ends it, past its reach it fades out, and it passes the breakables as the
 spitter's shots do. It hurts no knight. It is drawn violet round a white
 core with a light of its own; where it ends sparks fly, and it plays its
@@ -2053,7 +2054,8 @@ for `combo.whirlwind.swing` times atk and still needs full momentum; the
 stun freezes for `combo.stun.freeze` seconds within `combo.stun.reach`, a
 lead or the Warden in it still only losing its wind-up; the bolt deals
 `combo.bolt.damage` times atk, `combo.bolt.size` wu across at
-`combo.bolt.speed`, still a chip on a lead's stance that never breaks it.
+`combo.bolt.speed`, still the bolt's share on a lead's stance and never
+breaking it.
 Each has a name - *Tempest*, *Quake*, *Lance* - that shows over the
 knight as it fires, with a gold ring and sparks round it and the swell
 `sfx/special_surge` over the special's own sound; the stronger whirlwind's
@@ -2273,19 +2275,43 @@ A room's lead, its tough enemy, has a stance (issue #271, the table's
 `lead` group): it takes no knockback, no hit, shove or shield dash
 staggers it, and it keeps winding up under hits. Its HP is the tough tier's
 (`enemy.tierHp`), many times a normal enemy's, times its type's
-`enemy.<type>.leadHp`: a grunt or guardian lead has two thirds of it, a
-spitter lead all of it (issue #288). It falls in its openings,
-not to a few swings. A blow outside an
-opening does only `lead.chip` of its damage and wears `lead.wear` off its
-stance, a charged swing `lead.heavyWear`; with no blow for
-`lead.regenDelay` seconds the stance comes back. A parry, a perfect block,
-a charged swing landed while it recovers from its lunge (`lead.recovery`
-seconds, shorter than a full charge: a charge the lunge cancelled is not
-full again in time), in a rest of its string or in its retreat after one
-(issue #363) or a stance worn to 0 breaks it: an opening, a stagger
-of `lead.openingTime` seconds in which every blow does `lead.openingDamage`
-times its damage. The blow that opens it lands whole, and after the
-opening the stance is full again. A swing parries a lead only when it
+`enemy.<type>.leadHp`: a grunt lead has a third more, a guardian lead a
+tenth more, a spitter or slinger lead all of it (issue #364).
+
+Every good answer to a lead does damage (issue #364). What a blow does
+depends on the moment it lands in:
+
+- **Into its guard** - while the lead stands, walks, winds up or strikes -
+  a blow does `lead.guard` (40 %) of its damage and wears `lead.wear` off
+  its stance, a charged swing `lead.heavyWear`.
+- **In a rest of its string or in its retreat** a blow lands whole, a
+  charged swing too. It wears the stance as well, but opens nothing: a
+  charged swing there no longer opens a lead, as it did before.
+- **In an opening** a blow does `lead.openingDamage` (2 times) its
+  damage, more than at any other moment.
+
+The stance also answers the lead's own strikes - a lunge, a shot or a
+metal ball. One that a held shield stops wears `lead.blockWear` off it,
+and one that hits the knight steadies it, `lead.steady` of it back at
+once. About six blows into the guard or blocked strikes, in any mix,
+break the stance into an opening. Mashing through the strings gets hit,
+and every hit steadies the lead, so mashing seldom opens it. With
+nothing worn for `lead.regenDelay` seconds the stance comes back. A
+parry, a perfect block, a shot or a metal ball sent back, or a stance
+worn to 0 breaks it: an opening, a stagger of `lead.openingTime`
+seconds. The blow that opens it lands whole, the blow that wears it to
+0 at its own share, and after the opening the stance is full again. The
+number over the lead shows what landed, on every screen. The fight
+bench's person pilot fells a grunt or guardian lead in three to five
+exchanges at the Standard duel pace, an exchange being one string of
+the lead's and the knight's answers to it.
+
+The Hollow Warden keeps its stance as before until its own duel (issue
+#368, `lead.warden`): a blow outside an opening does `lead.warden.chip`
+(10 %) of its damage and wears `lead.warden.wear`, its blocked and
+landed strikes do nothing to its stance, a charged swing landed while
+it recovers (`lead.recovery` seconds) opens it, and an opening does
+`lead.warden.openingDamage` times a blow. A swing parries a lead only when it
 began in the parry window (`lead.parryStart` steps before it lands): a
 swing under way that the lunge runs into is a blow like any other. Nor
 does a swing begun less than `lead.parryRest` steps after the knight's
@@ -2294,7 +2320,21 @@ and the held charge open no lead, a deliberate swing does. The
 stance shows as a bar under the lead, an opening as a flash, a ring, the
 word `lead.word` and the stagger. In a session the host's lead keeps the
 stance: `lead`, `stance` and `opening` are replicated, the knight's own
-screen judges whether its blow opens the lead, and the host opens it.
+screen judges whether its blow opens the lead, and the host opens it; a
+blocked or landed strike on a joiner's knight is told to the host, which
+wears or steadies the stance. The shares bench swings at a grunt lead
+held in each moment - into its guard, in a rest, in its retreat, in an
+opening, a plain and a charged swing - and checks the HP it lost, the
+number shown and the wear, that six blows or six blocked strikes break the
+stance, that a blocked lunge wears it and a landed one steadies it, a
+spitter's shot and a slinger's ball the same, the bolt's shares and a
+shot sent back, the number on another screen, a normal grunt's whole
+blow, and the Warden's old stance:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/shares/shares.qml
+```
+
 A duel sounds and looks like one (issue #273, the table's `duel` group):
 a lead growls as it spots the knight (`sfx/lead_growl`), and while one
 within `music.reach` is after the knight the dungeon song plays its duel
@@ -2359,7 +2399,9 @@ fight record counts `ballsBack`, `ballsAimed` and `ballBackHits`. The
 ball bench checks its look beside the spitter's, its bounces against the
 mirror path, its fall, the knight it hurts, the dash, both shields and the
 lead a shield's ball opens, and in a session the same bounces and the
-same turn on both screens and the host's lead opened once:
+same turn on both screens, the host's lead opened once, and a ball of the
+host's lead's that the joiner's shield bounces wearing its stance on the
+host, one that hits the joiner's knight steadying it (issue #364):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/ball/ball.qml
@@ -2369,8 +2411,8 @@ A lead attacks in strings (issue #272), in the arrow slits' beat notation:
 `lead.strings` holds each lead type's - the slinger's among them -, 1 a strike, 2 a feint, 0 a rest,
 `lead.beat` seconds a beat, and the parry ring closes once per beat. A
 feint's wind-up holds `lead.feintHold` longer, its ring standing at
-`lead.feintRing`, then strikes; a rest is a recovery a charged swing
-opens. A knight within `lead.reach` holding a charge is struck first,
+`lead.feintRing`, then strikes; a rest is a recovery, its guard down: a
+blow in it lands whole (issue #364). A knight within `lead.reach` holding a charge is struck first,
 `enemy.minTelegraph` after it is seen, and the hit cancels the charge -
 but not in a rest, which stands its beat (issue #363). `stringName` and
 `feintHold` are replicated. The strings bench steps every string of every
@@ -2386,7 +2428,8 @@ times the duel pace, 1.16 s at Standard). It steps back `lead.retreat.back`
 wu the way its last blow came over the first `lead.retreat.step` of the
 beat, then stands with its guard down: it strikes nobody - no string, no
 blow at a charging knight, no counter -, a guardian's shield stops
-nothing, and a charged swing landed in it opens the lead. A full charge
+nothing, and a blow landed in it lands whole, a charged swing too, and
+opens nothing (issue #364). A full charge
 (`knight.chargeTime`, 0.6 s) begun as the retreat starts is let go inside
 it at every pace. It looks and sounds like no other state of a lead, on
 every screen, from the replicated aiState: the body dims to
@@ -2399,6 +2442,7 @@ its rests short for a charging knight (issue #368). The retreat bench
 plays every lead type's string at each duel pace in the paused fight room
 and checks the retreat's length, its step back, that it strikes nobody,
 that a held charge outlasts it and a charge begun with it lands in it,
+whole,
 the guardian's guard, the look and the sound against every other state
 of a lead, and the Warden's recovery:
 
@@ -2636,17 +2680,22 @@ sound's pitch kill by kill, the time engaged, the damage taken, the
 openings (an enemy staggered by a parry, a perfect block or a broken
 guard; a lead's by what broke its stance: `parry`, `perfect`, `heavy`,
 `worn` or `shot`), the charges a hit cancelled, the shots a perfect block
-sent back and the ones of them that hit an enemy; and what a player would
-have heard. `--check` adds one PASS
+sent back and the ones of them that hit an enemy; for a lead its exchanges
+- strings in which it wound up a blow - and the HP it lost by the moment
+the blow landed in: its guard, a rest, its retreat or an opening (issue
+#364); and what a player would have heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in either
-duel `masher` takes at least `duelSlow` seconds or falls, hits
+duel `masher` takes at least `mashSlow` times as long to kill the lead as
+`skilled` and the person do, or falls (issue #364), hits
 cancel at least `duelCancelled` of `charge`'s charges (#272) - `charge`
-is held to no time since a full charge let go in a lead's rest or retreat
-opens it, the answer the retreat is there for (issue #363) -, and
+is held to no time, since a full charge let go in a lead's rest or
+retreat is an answer to its string (issue #363) -, and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
-both, every duel band at the Standard duel pace (issue #361). The kill chain's lines (issue #270) read the flow fights' sound
+both; the person fells the lead in `personExchanges` exchanges and
+stands (issue #364); every duel band at the Standard duel pace (issue
+#361). The kill chain's lines (issue #270) read the flow fights' sound
 logs: the death sound climbs a step of the dungeon song's scale over a
 4-kill chain in one of them and falls back after a break in one, and each
 fight's counted chains are the ones its death sounds tell. How a duel
@@ -2679,13 +2728,14 @@ room (issue #319); `--check` tests the bolt. By hand, a bolt at an enemy
 less its defense; one with nothing in line flies `Balance.bolt.reach` and
 ends, an enemy just past it unhurt; one shot at the room's wall 5 wu off
 stops there. In the fights each hit deals the damage the table allows - a
-chip of it on a lead's stance, a guardian's shield's share from its front
--, some from out of the sword's reach, no bolt flies past its reach, and a
-bolt that ends at a wall ends at the room's wall, none outside it. In the
-spitter duel, the one place a knight could stand back and shoot, the
-masher with the bolt takes at least `Balance.pacing.duelSlow` seconds to
-kill the lead, or falls, as the masher must in a duel; the report shows
-the masher's own time beside it.
+lead's share of it by the moment it lands in, a guardian's shield's share
+from its front -, some from out of the sword's reach, no bolt flies past
+its reach, and a bolt that ends at a wall ends at the room's wall, none
+outside it. In the spitter duel, the one place a knight could stand back
+and shoot, the masher with the bolt takes at least
+`Balance.pacing.mashSlow` times as long to kill the lead as `skilled` and
+the person do there, or falls, as the masher must in a duel (issue #364);
+the report shows the masher's own time beside it.
 
 It also enters the combo by hand in the flow room (issue #320): for each
 special the knight's moves away from its aim, then towards it, as a pilot

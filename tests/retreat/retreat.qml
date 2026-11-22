@@ -20,7 +20,7 @@
 //   enemy.minTelegraph times the factor;
 // - a knight that starts a charge on the step the retreat starts and lets
 //   go as soon as it is full lands its charged swing inside the retreat,
-//   and the lead opens ("heavy").
+//   whole, and the lead opens nothing (issue #364).
 // A guardian lead in its retreat has its guard down: a blow from the
 // front is not blocked by its shield, and no counter follows it, where a
 // guardian lead facing the knight outside it blocks the same blow.
@@ -220,6 +220,7 @@ Window {
         e.opened.connect(onOpened)
         let w0 = e.windUps, n = 0, hp0 = p.hp, fullAt = -1, letGo = -1, stateAtLetGo = "", openedAt = -1
         let stateAtOpen = "", left = -1, steps = toSteps(e.beatLen)
+        let leadHp0 = e.hp, landedAt = -1, stateAtLand = "", lost = 0
         while (n < 600) {
             hold(p, e, x, y, false)
             if (p.chargeFull && fullAt < 0) fullAt = n
@@ -234,13 +235,20 @@ Window {
             if (causes.length > 0 && openedAt < 0) {
                 openedAt = n
                 stateAtOpen = was
+            }
+            if (e.hp < leadHp0 && landedAt < 0) {
+                landedAt = n
+                stateAtLand = was
+                lost = leadHp0 - e.hp
                 left = steps - n
             }
-            if (release ? openedAt >= 0 : e.aiState !== "retreat") break
+            if (release ? landedAt >= 0 : e.aiState !== "retreat") break
         }
         e.opened.disconnect(onOpened)
         let out = {retreated: retreated, steps: n, beat: steps, fullAt: fullAt, letGo: letGo,
                    stateAtLetGo: stateAtLetGo, causes: causes, openedAt: openedAt, stateAtOpen: stateAtOpen,
+                   landedAt: landedAt, stateAtLand: stateAtLand, lost: lost, opening: e.opening,
+                   whole: Math.floor(p.atk * Balance.knight.heavySwing) - e.def,
                    left: left, windUps: e.windUps - w0, hurt: hp0 - p.hp,
                    charging: p.isCharging, full: p.chargeFull, after: e.aiState}
         if (!release) {
@@ -415,11 +423,12 @@ Window {
 
             e = leadOf(leads[type], 1.5)
             let hit = chargeIntoRetreat(e, true)
-            check(hit.retreated && hit.stateAtLetGo === "retreat" && hit.causes.join() === "heavy"
-                  && hit.stateAtOpen === "retreat" && hit.left >= 0,
+            check(hit.retreated && hit.stateAtLetGo === "retreat" && hit.stateAtLand === "retreat" && hit.left >= 0
+                  && hit.lost === hit.whole && hit.causes.length === 0 && !hit.opening,
                   tag + ": a full charge begun as the retreat starts lands inside it: full at step " + hit.fullAt
-                  + ", let go there (" + hit.stateAtLetGo + "), it opens the lead (" + (hit.causes.join() || "nothing")
-                  + ") on step " + hit.openedAt + " of " + hit.beat + ", " + hit.left + " to spare")
+                  + ", let go there (" + hit.stateAtLetGo + "), it lands on step " + hit.landedAt + " of " + hit.beat
+                  + ", " + hit.left + " to spare, whole: " + hit.lost + " HP (" + hit.whole + "), and opens nothing ("
+                  + (hit.causes.join() || "nothing") + ", issue #364)")
         }
         let gd = guardDown(leadOf(leads.guardian, 1.5))
         check(gd.retreated && gd.front && !gd.inRetreat && !gd.countered && gd.state === "retreat" && gd.outside,

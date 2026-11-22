@@ -1259,6 +1259,7 @@ ClayWorld2d {
                                  blow.spare === true)
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "open") e.open(blow.cause)
+            else if (blow.kind === "met") e.strikeMet(blow.result)
             else if (blow.kind === "push") e.shove(blow.dx, blow.dy, blow.speed)
             else if (blow.kind === "stun") e.stun(blow.seconds)
         }
@@ -1302,11 +1303,13 @@ ClayWorld2d {
         onShotReceived: (shot) => {
             if (screen !== "game" || _shotsBack[shot.id]) return
             _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage, shot.pf)
+            _shotBy(shot.id, _enemyById[shot.by])
             playSpitShot(shot.x, shot.y)
         }
         onBallReceived: (b) => {
             if (screen !== "game" || _ballsDone[b.id] || _ballById[b.id]) return
             _flyBall(b.id, b.x, b.y, b.dx, b.dy, b.damage, b.pf)
+            _shotBy(b.id, _enemyById[b.by])
             playBallShot(b.x, b.y)
         }
         onStruckReported: (fromId, report) => {
@@ -1446,13 +1449,15 @@ ClayWorld2d {
         let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy, blow.pf)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
-        // a crushing blow's for the full stagger, and opens a lead
+        // a crushing blow's for the full stagger, and opens a lead; a
+        // block wears a lead's stance, a hit steadies it (issue #364)
         let e = _enemyById[blow.id]
         if (result === "blocked" && e && !e.destroyed) e.recoil(player)
         if (result === "perfect" && e && !e.destroyed) {
             if (e.lead) e.open("perfect")
             else e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
         }
+        if (e && !e.destroyed) e.strikeMet(result)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -7053,16 +7058,34 @@ ClayWorld2d {
     // another's, which reported it
     signal shotSentBack(string shotId, bool local)
     // perfectFrames is its shooter's perfect-block window in physics steps
-    // (Enemy.perfectFrames), 0 or none for the knight's own
-    function spawnProjectile(px, py, dirX, dirY, damage, perfectFrames) {
+    // (Enemy.perfectFrames), 0 or none for the knight's own; shooter the
+    // enemy that fired it, if any
+    function spawnProjectile(px, py, dirX, dirY, damage, perfectFrames, shooter) {
         let id = "shot" + (++_shotCount)
         let pf = perfectFrames > 0 ? perfectFrames : 0
         if (session.connected && session.isHost)
-            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage, pf: pf})
+            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage, pf: pf,
+                              by: shooter ? shooter.objectId : ""})
         _flyShot(id, px, py, dirX, dirY, damage, pf)
+        _shotBy(id, shooter)
+    }
+    // The enemy that fired each shot and slung each ball in flight, by its
+    // id, on every node: a lead's stance answers what a knight's shield
+    // made of it as of its lunge (Enemy.strikeMet, issue #364)
+    property var _shooterOf: ({})
+    function _shotBy(id, shooter) {
+        if (shooter) _shooterOf[id] = shooter
+    }
+    // This node's knight met shot or ball id: result as Player.takeDamage
+    // says it, told to the enemy that fired it
+    function _shotMet(id, result) {
+        let e = _shooterOf[id]
+        delete _shooterOf[id]
+        if (e && !e.destroyed && e.strikeMet) e.strikeMet(result)
     }
     // This node's knight met shot id; sent back ("perfect") from (x, y)
     function shotLanded(id, result, x, y) {
+        _shotMet(id, result)
         shotEnded(id, result, true)
         let report = {source: "shot", id: id, result: result}
         if (result === "perfect") {
@@ -7168,18 +7191,21 @@ ClayWorld2d {
     // A slinger slings a ball from its centre (x, y) along (dx, dy),
     // damage the blow it deals a knight: the host's on every node.
     // perfectFrames is its slinger's perfect-block window, as a shot's
-    function spawnBall(x, y, dx, dy, damage, perfectFrames) {
+    function spawnBall(x, y, dx, dy, damage, perfectFrames, shooter) {
         let id = "ball" + (++_ballCount)
         let pf = perfectFrames > 0 ? perfectFrames : 0
         if (session.connected && session.isHost)
-            session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage, pf: pf})
+            session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage, pf: pf,
+                              by: shooter ? shooter.objectId : ""})
         playBallShot(x, y)
+        _shotBy(id, shooter)
         return _flyBall(id, x, y, dx, dy, damage, pf)
     }
     // This node's knight met ball id: "hit" where it fell at (x, y), or
     // "blocked" or "perfect" where its shield turned it there, along
     // (dx, dy)
     function ballLanded(id, result, x, y, dx, dy) {
+        _shotMet(id, result)
         let report = {source: "ball", id: id, result: result, x: x, y: y}
         if (result === "blocked" || result === "perfect") {
             report.dx = dx
@@ -7563,6 +7589,7 @@ ClayWorld2d {
         }
         _shotById = {}
         _shotsBack = {}
+        _shooterOf = {}
         for (let id in _ballById) {
             try { if (_ballById[id] && !_ballById[id].destroyed) _ballById[id].vanish() } catch(err) {}
         }

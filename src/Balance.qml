@@ -294,9 +294,11 @@ QtObject {
     // a second, size wu across, at most reach wu from where it began, and
     // hurts the first enemy it meets for damage times the knight's atk -
     // a blow as any other: a guardian's shield takes it from the front,
-    // and a room's lead or the Warden takes a chip of it on its stance
-    // (Balance.lead.chip) that wears the stance but never breaks it, so
-    // the bolt never opens one. A wall or a closed door ends it, past
+    // and a room's lead takes it as it takes a swing (Balance.lead): a
+    // share of it into its guard, all of it in a rest or its retreat,
+    // more in an opening; the Warden a chip of it (lead.warden.chip). On
+    // a stance it wears it but never breaks it, so the bolt never opens
+    // one. A wall or a closed door ends it, past
     // reach it fades out; it passes the breakables, as the shots do, and
     // hurts no knight. It is drawn in color round a core of coreColor,
     // with a light of light wu; where it ends sparks sparks fly, and it
@@ -347,7 +349,7 @@ QtObject {
     //   or the Warden in it still only loses its wind-up, never opened
     // - bolt: damage times atk instead of bolt.damage, size wu across
     //   instead of bolt.size, at speed instead of bolt.speed; on a lead or
-    //   the Warden still a chip that never breaks the stance
+    //   the Warden still the bolt's share, and it never breaks the stance
     // As it fires the knight shows the stronger version's name in
     // wordColor over it, a ring of color out to ring wu and sparks sparks
     // round it, and plays sound/sfx/special_surge at volume over the
@@ -495,10 +497,15 @@ QtObject {
         tierHp: [20, 26, 238],
         // Per type: HP on top of the tier, attack, defense, speeds, and
         // leadHp: the share of its tough HP (tier and hpBonus) a lead of
-        // the type has, rounded to whole points. The melee leads fall a
-        // third sooner than the spitter's (issue #288)
-        grunt: { hpBonus: 2, leadHp: 0.67, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
-        guardian: { hpBonus: 0, leadHp: 0.67, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        // the type has, rounded to whole points. The melee leads' is set
+        // so that the fight bench's person pilot fells them in three to
+        // five exchanges at the Standard duel pace (pacing.personExchanges,
+        // issue #364): a grunt lead's a third over its tough HP, a
+        // guardian lead's, whose shield takes swings from the front, a
+        // tenth over. They fell a third sooner than the spitter's before,
+        // while only an opening did damage (issue #288)
+        grunt: { hpBonus: 2, leadHp: 1.33, atk: 18, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
+        guardian: { hpBonus: 0, leadHp: 1.1, atk: 12, def: 2, chaseSpeed: 4.0, patrolSpeed: 1.5 },
         spitter: { hpBonus: -2, leadHp: 1, atk: 10, def: 0, chaseSpeed: 2.4, patrolSpeed: 0.9 },
         // The slinger (issue #322): a lead of iron that slings metal balls
         // (Balance.ball), only ever a room's lead (spawn.slingerChance);
@@ -739,8 +746,13 @@ QtObject {
         // reported, not banded:
         // a win is a fight a person can do (README, "The person pilot").
         // --check fails when its misses over all its fights lie more than
-        // missSlack off miss
+        // missSlack off miss, and when in a duel with a grunt or a
+        // guardian lead it does not fell the lead in personExchanges
+        // exchanges, from the first number to the second, and stand (issue
+        // #364): an exchange is a string of the lead's in which it wound up
+        // a blow, the knight's answers to it with it
         person: { reaction: 0.25, miss: 0.2, missSlack: 0.05 },
+        personExchanges: [3, 5],
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
         // one charged swing, two or three swings, parries among them for
@@ -748,8 +760,9 @@ QtObject {
         // the knight does not fall
         flowHits: { charge: [1, 1], masher: [2, 3], skilled: [1, 3] },
         flowGap: 2.5,
-        // Duel, either lead: "masher" takes at least duelSlow seconds to
-        // kill the lead, from the moment it engages, or falls; "skilled"
+        // Duel, either lead: "masher" takes at least mashSlow times as long
+        // to kill the lead as "skilled" and the person do, from the moment
+        // it engages, or falls (issue #364); "skilled"
         // kills it within duelSkilled seconds and does not fall, and takes
         // less damage than either of the others. A lead strikes a knight
         // charging in its reach first (lead.reach) outside its rests and
@@ -759,11 +772,22 @@ QtObject {
         // lead there in 5.1 to 7.8 s where it took 4.6 to 14.4 s before the
         // pace, "masher" falls in every duel at either. "charge" was held
         // to duelSlow too until the lead's retreat (issue #363): a full
-        // charge let go in a rest or the retreat opens the lead, the answer
-        // the retreat is there for, and "charge" now kills every lead in
-        // 6.8 to 14.5 s, taking 14 to 60 damage, where it fell in every
-        // duel before
-        duelSlow: 20,
+        // charge let go in a rest or the retreat opened the lead, and
+        // "charge" killed every lead in 6.6 to 11.2 s, taking 14 to 60
+        // damage, where it fell in every duel before. Since every good
+        // answer does damage (issue #364) a charge in a rest or the
+        // retreat lands whole and opens nothing, a blow into the guard does
+        // a share, a strike that hits the knight steadies the lead's
+        // stance, and the melee leads have more HP: "charge" falls in two
+        // of the six melee duels and kills the lead in the others in 14.9
+        // to 18.4 s, taking 42 to 117 damage; "masher", which killed them
+        // in 8.4 to 11.4 s with the shares alone (the HP as before, no
+        // strike steadying the stance), falls in three and takes
+        // 1.6 to 2.3 times as long as the person in the others, and the
+        // person fells them in three or four exchanges, "skilled" in 7.3
+        // to 10.9 s. mashSlow holds the masher with the bolt in the
+        // spitter duel too (issue #319), where duelSlow, 20 s, did
+        mashSlow: 1.5,
         // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288;
         // from 4 to 5 s at the Standard duel pace, issue #361)
         duelSkilled: [5, 15],
@@ -784,13 +808,30 @@ QtObject {
 
     // A room's lead has a stance (issue #271): it takes no knockback, no
     // hit staggers it and it keeps winding up under hits. Its stance is
-    // full at 1. A blow outside an opening does chip of its damage and
-    // wears wear off the stance, a charged swing heavyWear; regen comes
-    // back per second once no blow has landed for regenDelay seconds. A
-    // parry, a perfect block, a charged swing landed while it recovers
-    // from its lunge, or its stance worn to 0 breaks it: an opening, a
-    // stagger of openingTime seconds in which every blow does
-    // openingDamage times its damage; the blow that opens it lands whole.
+    // full at 1. Every good answer does damage (issue #364): a blow into
+    // its guard - while it stands, walks, winds up or strikes - does guard
+    // of its damage, a blow in a rest of its string, its recovery or its
+    // retreat all of it, a blow in an opening openingDamage times it, the
+    // most of any moment. A blow outside an opening wears wear off the
+    // stance, a charged swing heavyWear, and a strike of its - a lunge, a
+    // shot, a metal ball - that a knight's held shield stops (not a
+    // perfect block, not a crushing blow that breaks the shield)
+    // blockWear; a strike of its that hits the knight steadies it, steady
+    // of it back at once, so mashing through its strings opens it seldom
+    // (issue #364); regen comes back per second once
+    // nothing has worn it for regenDelay seconds. About six blows into its
+    // guard or blocked strikes, 1 / wear of them, break it. A parry, a
+    // perfect block, a shot or a metal ball sent back, or its stance worn
+    // to 0 breaks it: an opening, a stagger of openingTime seconds in
+    // which every blow does openingDamage times its damage; the blow that
+    // opens it lands whole, the one that wears it to 0 at its own share.
+    // A charged swing in a rest or the retreat lands whole, times the
+    // charge, and opens nothing (issue #364; it opened the lead before).
+    // The number over the lead shows what landed. The Hollow Warden keeps
+    // its stance as before until issue #368, warden below: a blow outside
+    // an opening does chip of its damage and wears wear, a charged swing
+    // heavyWear, a blocked strike nothing, and a charged swing landed while
+    // it recovers opens it.
     // After the opening the stance is full again. A swing parries a lead
     // only when it began at most parryStart physics steps before it
     // lands, in the parry window: a swing under way that the lunge runs
@@ -811,7 +852,7 @@ QtObject {
     // wind-up is the count-in, enemy.windUp (a shot's shootWindUp). A
     // feint's wind-up holds feintHold seconds longer, its ring standing
     // at feintRing of the way and the lead still, then strikes. A rest
-    // stands a beat, a recovery a charged swing opens. A strike or a feint
+    // stands a beat, its guard down: a blow lands whole. A strike or a feint
     // winds up only at a knight within reach wu (a spitter's shootRange),
     // else the string is over; after it the lead retreats (retreat below),
     // the Hollow Warden recovers for recovery instead (issue #368).
@@ -822,15 +863,15 @@ QtObject {
     // their beat whatever the knight does (issue #363); the Warden cuts
     // a rest of its own short as before. reach is the knight's own heavy
     // swing's (knight.attackRange times heavyRange): a charge built
-    // outside it and let go on arriving in a rest or the retreat opens the
-    // lead.
+    // outside it and let go on arriving in a rest or the retreat lands
+    // whole (the Warden's, in its recovery, opens it).
     // The retreat (issue #363): after each string a lead steps back,
     // the way its last blow came, back wu over step of a beat, then
     // stands; it lasts one beat of its pace in all (lead.beat times the
     // duel pace, Balance.pace), and in it the lead strikes nobody: no
     // string, no blow at a charging knight, no counter. Its guard is down:
-    // a guardian's shield stops nothing, and a charged swing landed in it
-    // opens the lead, as one in a rest does. A full charge (knight.
+    // a guardian's shield stops nothing, and a blow landed in it lands
+    // whole, a charged swing too, as in a rest. A full charge (knight.
     // chargeTime) begun as it starts is let go inside it at every pace.
     // It has a look of its own on every screen, from the replicated
     // state: the body dims to color, the eyes close to eyes of their
@@ -844,13 +885,16 @@ QtObject {
         parryStart: 9,
         parryRest: 36,
         recovery: 0.3,
-        chip: 0.1,
-        wear: 0.03,
-        heavyWear: 0.1,
+        guard: 0.4,
+        wear: 0.17,
+        heavyWear: 0.34,
+        blockWear: 0.17,
+        steady: 1,
+        warden: { chip: 0.1, wear: 0.03, heavyWear: 0.1, openingDamage: 1.5 },
         regen: 0.1,
         regenDelay: 1.5,
         openingTime: 1.5,
-        openingDamage: 1.5,
+        openingDamage: 2,
         barColor: "#E8C872",
         flashColor: "#FFE9A8",
         word: "OPEN",
