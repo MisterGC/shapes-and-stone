@@ -56,10 +56,11 @@
 // wall stops it, a pause and a hit stop hold it. A blow or a shot the shield
 // stops costs knight.blockMana; down knight.manaRegenDelay with nothing
 // spent, mana comes back at knight.manaRegen, and a dash starts that over.
-// A room's lead (Balance.lead) takes lead.chip of a swing and no knockback;
-// a charged swing into its wind-up does not stop it; a parry, a perfect
-// block, a full charge let go while it retreats after its string (issue
-// #363) and a stance worn to 0
+// A room's lead (Balance.lead) takes lead.guard of a swing into its guard
+// and no knockback (issue #364); a charged swing into its wind-up does not
+// stop it; a full charge let go while it retreats after its string (issue
+// #363) lands whole and opens nothing (issue #364); a parry, a perfect
+// block and a stance worn to 0
 // each open it, a swing in the opening does lead.openingDamage times its
 // damage, the stance comes back after lead.regenDelay, and a swing begun
 // more than lead.parryStart steps before it lands in the window parries
@@ -1382,16 +1383,16 @@ Window {
             p.attackCooldown = 0
             faceIt(p, g)
 
-            // A swing outside an opening chips at it and wears its stance
+            // A swing into its guard takes its share and wears its stance
             Clayground.physicsStep(2)
             let hp0 = g.hp
             p.attack()
             let n = 0
             while (g.hp === hp0 && p.isAttacking && n < 60) { Clayground.physicsStep(1); n++ }
-            let chip = Math.max(Balance.minDamage, Math.round(Math.max(Balance.minDamage, p.atk - g.def) * l.chip))
+            let chip = Math.max(Balance.minDamage, Math.round(Math.max(Balance.minDamage, p.atk - g.def) * l.guard))
             check(hp0 - g.hp === chip && Math.abs(g.stance - (1 - l.wear)) < 0.05 + 1e-6
                   && g._knockT === 0 && g.aiState !== "stagger",
-                  "a swing on a lead takes " + (hp0 - g.hp) + " HP (" + l.chip + " of "
+                  "a swing into a lead's guard takes " + (hp0 - g.hp) + " HP (" + l.guard + " of "
                   + (p.atk - g.def) + " is " + chip + "), wears its stance to " + g.stance
                   + " and neither throws it back nor staggers it (" + g.aiState + ")")
             Clayground.physicsStep(Math.ceil((k.attackCooldown + k.swingFade) / stepS))
@@ -1413,7 +1414,7 @@ Window {
             let heavy = p.isHeavy
             Clayground.physicsStep(1)
             let heavyChip = Math.max(Balance.minDamage,
-                                     Math.round((Math.floor(p.atk * k.heavySwing) - g.def) * l.chip))
+                                     Math.round((Math.floor(p.atk * k.heavySwing) - g.def) * l.guard))
             let after = g.aiState
             let lunged = stepUntil(g, "lunge")
             check(wound && heavy && hp0 - g.hp === heavyChip && after === "telegraph" && lunged
@@ -1503,7 +1504,8 @@ Window {
             }
 
             // A full charge kept through a lunge that missed and let go
-            // while the lead retreats after its string opens it
+            // while the lead retreats after its string lands whole and
+            // opens nothing (issue #364)
             g.target = null
             g.aiState = "patrol"
             p.pressSwing()
@@ -1519,11 +1521,14 @@ Window {
             faceIt(p, g)
             let kept = p.chargeFull
             causes = []
+            hp0 = g.hp
             p.releaseSwing()
             Clayground.physicsStep(1)
-            check(recovering && kept && causes.join() === "heavy" && g.opening,
-                  "a full charge let go while the lead retreats opens it (retreating " + recovering
-                  + ", charge kept " + kept + ", opened by " + (causes.join() || "nothing") + ")")
+            let whole = Math.floor(p.atk * k.heavySwing) - g.def
+            check(recovering && kept && causes.length === 0 && !g.opening && hp0 - g.hp === whole,
+                  "a full charge let go while the lead retreats lands whole and opens nothing (retreating "
+                  + recovering + ", charge kept " + kept + ", " + (hp0 - g.hp) + " HP, " + whole
+                  + " whole, opened by " + (causes.join() || "nothing") + ")")
             Clayground.physicsStep(Math.ceil((l.openingTime + k.heavyRecovery) / stepS) + 10)
 
             // A perfect block of its lunge opens it

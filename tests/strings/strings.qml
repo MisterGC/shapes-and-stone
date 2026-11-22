@@ -20,7 +20,9 @@
 // its replicated action (Session: 4 a charge filling, 5 a full one): a
 // stand-in with actionState and no isCharging. A knight that starts a
 // charge in a rest is not: the rest stands its beat, the charge still
-// held, and the string's next blow comes on its beat (issue #363). Prints one PASS or FAIL line per check and exits with the
+// held, and the string's next blow comes on its beat (issue #363); a full
+// charge let go on arriving in a rest lands whole and opens nothing (issue
+// #364). Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/strings/strings.qml
@@ -400,10 +402,12 @@ Window {
         p.xWu = g.xWu - Balance.knight.attackRange * Balance.knight.heavyRange * 0.9
         p.yWu = g.yWu
         hold(p, g, p.xWu, p.yWu, false)
+        let hp0 = g.hp
         p.releaseSwing()
         Clayground.physicsStep(1)
         g.opened.disconnect(onOpened)
-        let out = {inRest: inRest, full: full, causes: causes, opening: g.opening}
+        let out = {inRest: inRest, full: full, causes: causes, opening: g.opening, lost: hp0 - g.hp,
+                   whole: Math.floor(p.atk * Balance.knight.heavySwing) - g.def}
         g.halt()
         g.lead = false
         Clayground.physicsStep(Math.ceil((l.openingTime + Balance.knight.heavyRecovery) / stepS) + 10)
@@ -518,9 +522,11 @@ Window {
               + " a beat), the charge still held (" + cut.charging + "), and the string's next blow winds up "
               + cut.wound + " s, its beat less the lunge (" + next + ")")
         let let_go = tryRestCharge()
-        check(let_go.inRest && let_go.full && let_go.causes.join() === "heavy" && let_go.opening,
-              "a full charge built outside lead.reach and let go on arriving in a rest opens the lead "
-              + "(in the rest " + let_go.inRest + ", charge full " + let_go.full + ", opened by "
+        check(let_go.inRest && let_go.full && let_go.causes.length === 0 && !let_go.opening
+              && let_go.lost === let_go.whole,
+              "a full charge built outside lead.reach and let go on arriving in a rest lands whole and opens "
+              + "nothing (issue #364): " + let_go.lost + " HP (" + let_go.whole + " whole; in the rest "
+              + let_go.inRest + ", charge full " + let_go.full + ", opened by "
               + (let_go.causes.join() || "nothing") + ")")
         Clayground.paused = false
         console.log("[Strings] done,", failures, "failed")

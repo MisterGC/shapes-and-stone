@@ -11,9 +11,11 @@
 // an enemy just past the reach unhurt; aimed at a wall it ends there. A
 // guardian's shield takes it from the front as any blow. Short of the mana
 // the button lets nothing loose. In the duel scenario the lead takes it as
-// a blow on its stance - a chip of it, its stance worn, not opened - and a
+// a blow on its stance - its share of it by the moment it lands in
+// (Enemy.leadShare, issue #364), its stance worn, not opened - and a
 // bolt into a stance worn to the last wear leaves it unbroken, which the
-// sword's next blow breaks. In the boss scenario the same for the Warden.
+// sword's next blow breaks. In the boss scenario the same for the Warden,
+// with its own chip and wear (Balance.lead.warden, issue #368).
 // In a session, a host and a joiner joined over LAN in one process: the
 // joiner's bolt flies through the host's knight to an enemy the host runs
 // - it flies on the host's screen too, the host's enemy loses the bolt's
@@ -95,11 +97,12 @@ Window {
         p.padAimAngle = angle
     }
     // What a bolt does to enemy e: the knight's bolt.damage times atk less
-    // its defense, a chip of that on a lead's stance (Enemy._blow)
+    // its defense, on a lead's stance its share of that by the moment it
+    // lands in (Enemy.leadShare, issue #364)
     function boltDamage(p, e) {
         let amount = Math.round(p.atk * Balance.bolt.damage)
         let d = Math.max(Balance.minDamage, amount - e.def)
-        if (e.lead && !e.opening) d = Math.max(Balance.minDamage, Math.round(d * Balance.lead.chip))
+        if (e.lead && !e.opening) d = Math.max(Balance.minDamage, Math.round(d * e.leadShare()))
         return d
     }
 
@@ -253,14 +256,16 @@ Window {
         lead.opened.connect(() => opened++)
         let r = shoot(p)
         check(!!r.end && r.end.enemy === lead && hp - lead.hp === want,
-              what + " takes it on its stance: a chip of it, " + want + " (HP " + hp + " -> " + lead.hp + ")")
-        let worn = Math.round((0.6 - Balance.lead.wear) * 20) / 20
+              what + " takes it on its stance: its share of it, " + lead.leadShare() + ", " + want + " (HP " + hp
+              + " -> " + lead.hp + ")")
+        let wear = (lead.boss ? Balance.lead.warden : Balance.lead).wear
+        let worn = Math.round((0.6 - wear) * 20) / 20
         check(!lead.opening && opened === 0 && Math.abs(lead.stance - worn) < 1e-6 && lead.aiState !== "stagger",
               "it wears the stance as a blow does and does not open it (stance 0.6 -> " + lead.stance
               + ", " + lead.aiState + ")")
         // Worn to the last wear: a bolt leaves it unbroken, the sword's next
         // blow breaks it
-        lead._setStance(Balance.lead.wear * 0.7)
+        lead._setStance(wear * 0.7)
         p.mana = p.maxMana
         r = shoot(p)
         check(!!r.end && r.end.enemy === lead && !lead.opening && opened === 0 && lead._stanceLeft > 0,

@@ -163,8 +163,10 @@ Item {
     // "reach"), how far it flew, where it ended, how far from the room's
     // centre along either axis, and for an enemy its type, whether a
     // lead, the damage it dealt and the damages the table allows it -
-    // bolt.damage times atk less its defense, a chip of that on a lead's
-    // stance, that much in an opening, a guardian's shield's share of it
+    // bolt.damage times atk less its defense, on a lead its share of that
+    // (Enemy.leadShare: into its guard or whole in a rest or its retreat,
+    // the moment it landed in maybe past by now), that much in an opening,
+    // a guardian's shield's share of it
     property var boltEnds: []
     property bool _boltsFollowed: false
     function boltEnded(id, how, enemy, dealt, x, y, travelled, own) {
@@ -174,9 +176,11 @@ Item {
         if (how === "enemy" && enemy) {
             let p = game.player
             let base = Math.max(Balance.minDamage, Math.round(p.atk * Balance.bolt.damage) - enemy.def)
+            let shares = enemy.boss ? [Balance.lead.warden.chip] : [Balance.lead.guard, 1]
             let allowed = enemy.lead && enemy.opening ? [Math.floor(base * Balance.lead.openingDamage)]
-                : enemy.lead ? [Math.max(Balance.minDamage, Math.round(base * Balance.lead.chip))] : [base]
-            if (enemy.enemyType === "guardian") allowed.push(Math.floor(allowed[0] * Balance.enemy.blockedShare))
+                : enemy.lead ? shares.map(c => Math.max(Balance.minDamage, Math.round(base * c))) : [base]
+            if (enemy.enemyType === "guardian")
+                allowed = allowed.concat(allowed.map(a => Math.floor(a * Balance.enemy.blockedShare)))
             Object.assign(b, { type: enemy.enemyType, lead: enemy.lead, dealt: dealt, allowed: allowed })
         }
         boltEnds.push(b)

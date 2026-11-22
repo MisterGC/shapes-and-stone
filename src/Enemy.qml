@@ -146,10 +146,11 @@ PhysicsItem {
     property int tier: 1
     // A room's lead (Balance.lead, issue #271): its tough enemy. It takes
     // no knockback and no stagger; its stance, from 1 down to 0, wears
-    // under blows, and a parry, a perfect block, a charged swing into its
-    // rest, recovery or retreat, or a worn stance breaks it: opening is
-    // true for the long stagger that follows. In a session the host's lead
-    // keeps the stance and every screen shows it
+    // under blows and under its strikes a held shield stops, and a parry,
+    // a perfect block, a shot sent back or a worn stance breaks it (the
+    // Warden's a charged swing into its recovery too): opening is true for
+    // the long stagger that follows. In a session the host's lead keeps
+    // the stance and every screen shows it
     property bool lead: tier === 2
     property real stance: 1
     property bool opening: false
@@ -1845,6 +1846,7 @@ PhysicsItem {
                 // here
                 if (result === "blocked") recoil(target)
                 if (result === "perfect") perfectBlocked()
+                strikeMet(result)
                 if (result !== "hit") return
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
@@ -1888,13 +1890,13 @@ PhysicsItem {
         // A slinger's shot is a metal ball, from its centre (Balance.ball)
         if (slinger) {
             if (gameWorld && gameWorld.spawnBall)
-                gameWorld.spawnBall(centreXWu, centreYWu, _dirToTargetX, _dirToTargetY, atk, perfectFrames)
+                gameWorld.spawnBall(centreXWu, centreYWu, _dirToTargetX, _dirToTargetY, atk, perfectFrames, enemy)
             return
         }
         if (gameWorld && gameWorld.spawnProjectile) {
             let half = Balance.projectile.size / 2
             gameWorld.spawnProjectile(centreXWu - half, centreYWu + half, _dirToTargetX, _dirToTargetY, atk,
-                                      perfectFrames)
+                                      perfectFrames, enemy)
             if (gameWorld.playSpitShot) gameWorld.playSpitShot(xWu, yWu)
             console.log("[Enemy] Spitter fired projectile!")
         }
@@ -2009,13 +2011,36 @@ PhysicsItem {
     }
     // A blow outside an opening wears the stance, a charged swing more; a
     // worn stance breaks. A bolt's (spare) wears it, but never below one
-    // wear, so it never breaks it (Balance.bolt)
+    // wear, so it never breaks it (Balance.bolt). The Warden's wears by
+    // its own, lead.warden (issue #368)
     function _wearStance(heavy, spare) {
+        let w = boss ? Balance.lead.warden : Balance.lead
+        let left = _stanceLeft - (heavy === true ? w.heavyWear : w.wear)
+        if (spare === true) left = Math.max(left, Math.min(_stanceLeft, w.wear))
+        _wear(left)
+    }
+    function _wear(left) {
         _stanceRest = 0
-        let left = _stanceLeft - (heavy === true ? Balance.lead.heavyWear : Balance.lead.wear)
-        if (spare === true) left = Math.max(left, Math.min(_stanceLeft, Balance.lead.wear))
         _setStance(left)
         if (_stanceLeft <= 1e-6) open("worn")
+    }
+    // What a knight made of a strike of its - a lunge, a shot or a metal
+    // ball -, result as Player.takeDamage says it (issue #364): a held
+    // shield that stopped it ("blocked")
+    // wears a lead's stance by Balance.lead.blockWear, and a worn one
+    // breaks; a strike that hit the knight steadies it, Balance.lead.steady
+    // of it back. A perfect block opens it (perfectBlocked); the Warden's
+    // stance takes neither (issue #368). Where it is remote the host
+    // applies it, and every screen shows the stance
+    function strikeMet(result) {
+        if (!lead || boss || opening || destroyed) return
+        if (result !== "blocked" && result !== "hit") return
+        if (remote) {
+            if (gameWorld) gameWorld.strikeEnemy(enemy, {kind: "met", result: result})
+            return
+        }
+        if (result === "blocked") _wear(_stanceLeft - Balance.lead.blockWear)
+        else _setStance(_stanceLeft + Balance.lead.steady)
     }
     // No blow for regenDelay seconds: the stance comes back
     function _restStance(dt) {
@@ -2024,14 +2049,24 @@ PhysicsItem {
             _setStance(_stanceLeft + Balance.lead.regen * dt)
     }
     // Whether a blow breaks a lead's stance, judged on the striker's
-    // screen: a parry, or a charged swing while it recovers from its
-    // lunge, rests or retreats (the whirlwind's blows are heavy too). Its
-    // cause, or "" for a blow that does not
+    // screen: a parry; on the Warden also a charged swing while it
+    // recovers from its lunge or rests (the whirlwind's blows are heavy
+    // too), which on any other lead lands whole (issue #364). Its cause,
+    // or "" for a blow that does not
     function _opens(heavy, parried) {
         if (!lead || opening) return ""
         if (parried === true) return "parry"
-        if (heavy === true && (aiState === "recovery" || aiState === "retreat")) return "heavy"
+        if (boss && heavy === true && (aiState === "recovery" || aiState === "retreat")) return "heavy"
         return ""
+    }
+    // The share of a blow a lead takes outside an opening, by the moment it
+    // lands in, judged on the striker's screen as the number over it shows
+    // it (Balance.lead, issue #364): guard of it into its guard, all of it
+    // in a rest of its string, its recovery or its retreat. The Warden
+    // takes lead.warden.chip of it, its guard always up (issue #368)
+    function leadShare() {
+        if (boss) return Balance.lead.warden.chip
+        return aiState === "recovery" || aiState === "retreat" ? 1 : Balance.lead.guard
     }
 
     function onCollision(other) {}
@@ -2051,7 +2086,8 @@ PhysicsItem {
     // charged swing) goes through the shield, and a lead's retreat has it
     // down (Balance.lead.retreat). On a lead (Balance.lead) a
     // blow in an opening does openingDamage times as much, the one that
-    // opens it (opens, its cause) all of it, any other chip of it
+    // opens it (opens, its cause) all of it, any other its share by the
+    // moment it lands in (leadShare)
     function _blow(amount, attackerX, attackerY, heavy, opens) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
@@ -2063,9 +2099,9 @@ PhysicsItem {
             blocked = true
         }
         if (lead && opening)
-            finalDamage = Math.floor(finalDamage * Balance.lead.openingDamage)
+            finalDamage = Math.floor(finalDamage * (boss ? Balance.lead.warden : Balance.lead).openingDamage)
         else if (lead && !opens)
-            finalDamage = Math.max(Balance.minDamage, Math.round(finalDamage * Balance.lead.chip))
+            finalDamage = Math.max(Balance.minDamage, Math.round(finalDamage * leadShare()))
         return {damage: finalDamage, blocked: blocked}
     }
 
