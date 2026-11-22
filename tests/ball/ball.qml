@@ -24,7 +24,10 @@
 // raised shield bounces is turned on the host's screen too, from the same
 // place the same way, and the host's lead it meets loses the blow once,
 // opens on the host's screen, and the ball falls on both; no knight is
-// hurt. Muted. Prints one PASS or FAIL line per check and exits with the
+// hurt. Then the host's lead slings at the joiner's knight (issue #364):
+// a ball its raised shield bounces wears the host's lead's stance by
+// Balance.lead.blockWear, and one that hits the knight steadies it by
+// Balance.lead.steady, the joiner's screen telling the host. Muted. Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/ball/ball.qml
@@ -407,6 +410,10 @@ Window {
     property int leadHp: 0
     property var leadCauses: []
     property var hp0: null
+    // The host's lead's stance before a ball it slung met the joiner's
+    // knight, and the joiner's HP then (issue #364)
+    property real leadStance: 0
+    property int joinerHp: 0
     // The joiner's knight at base, its shield raised facing right; the
     // host's knight below it; the lead standing where the shield sends a
     // ball coming from the right; both knights in a long grace, so a ball
@@ -515,7 +522,59 @@ Window {
                   "the ball falls there on both screens (" + fj.how + " / " + fh.how + ")")
             check(host.player.hp === hp0.host && joiner.player.hp === hp0.joiner,
                   "no knight is hurt (HP " + host.player.hp + ", " + joiner.player.hp + ")")
+            // The lead stood again, its stance full, behind the joiner's
+            // knight: a ball the shield bounces flies away from it
+            let l = byId(host)[leadId]
+            if (l) {
+                l.halt()
+                l._setStance(1)
+            }
+            lineUp()
+            if (l) put(l, base.x - 4, base.y + 2)
+        }],
+        // A ball the host's lead slings, bounced by the joiner's shield
+        [500, () => {
+            lineUp()
+            let l = byId(host)[leadId]
+            if (l) put(l, base.x - 4, base.y + 2)
+            joiner.player.graceLeft = 0
+            leadStance = l ? l._stanceLeft : -1
+            let b = host.spawnBall(base.x + 4, base.y, -1, 0, 10, 0, l)
+            sessionBall = b.ballId
+        }],
+        [() => !!hostSeen.turned[sessionBall], () => {}],
+        [300, () => {
+            let l = byId(host)[leadId]
+            let after = l ? l._stanceLeft : -1
+            check(!!l && Math.abs(leadStance - after - Balance.lead.blockWear) < 1e-6 && !l.opening,
+                  "a ball the host's lead slings and the joiner's raised shield bounces wears the lead's stance on "
+                  + "the host from " + leadStance.toFixed(3) + " to " + after.toFixed(3) + " (lead.blockWear "
+                  + Balance.lead.blockWear + ")")
+            // Next its ball hits the joiner's knight, the stance worn first
+            if (l) l._setStance(0.3)
             joiner.player.isBlocking = false
+            joiner.player.graceLeft = 0
+        }],
+        [300, () => {
+            let l = byId(host)[leadId]
+            if (l) put(l, base.x - 4, base.y + 2)
+            put(joiner.player, base.x, base.y)
+            joiner.player.isBlocking = false
+            joiner.player.graceLeft = 0
+            leadStance = l ? l._stanceLeft : -1
+            joinerHp = joiner.player.hp
+            let b = host.spawnBall(base.x + 4, base.y, -1, 0, 10, 0, l)
+            sessionBall = b.ballId
+        }],
+        [() => !!joinSeen.fell[sessionBall], () => {}],
+        [300, () => {
+            let l = byId(host)[leadId]
+            let after = l ? l._stanceLeft : -1
+            let want = Math.min(1, leadStance + Balance.lead.steady)
+            check(!!l && joiner.player.hp < joinerHp && Math.abs(after - want) < 1e-6,
+                  "one that hits the joiner's knight (" + (joinerHp - joiner.player.hp) + " HP) steadies the lead's "
+                  + "stance on the host from " + leadStance.toFixed(3) + " to " + after.toFixed(3) + " (lead.steady "
+                  + Balance.lead.steady + ")")
             hostNet.leave()
             joinNet.leave()
         }],

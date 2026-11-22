@@ -2399,7 +2399,9 @@ fight record counts `ballsBack`, `ballsAimed` and `ballBackHits`. The
 ball bench checks its look beside the spitter's, its bounces against the
 mirror path, its fall, the knight it hurts, the dash, both shields and the
 lead a shield's ball opens, and in a session the same bounces and the
-same turn on both screens and the host's lead opened once:
+same turn on both screens, the host's lead opened once, and a ball of the
+host's lead's that the joiner's shield bounces wearing its stance on the
+host, one that hits the joiner's knight steadying it (issue #364):
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/ball/ball.qml
