@@ -209,6 +209,8 @@ Item {
         let f = { ref: e, type: e.enemyType, tier: e.tier, lead: e.lead, hp: e.maxHp, lastHp: e.hp,
                   lastState: e.aiState, lastStance: e.stance, engagedAt: null, firstHitAt: null,
                   diedAt: null, hits: 0, openings: 0, opened: {}, openedAt: [],
+                  strings: [], lastWindUps: e.windUps, lastOpening: e.opening,
+                  dealtBy: { guard: 0, rest: 0, retreat: 0, opening: 0 },
                   cameAt: steps > 0 ? now() : 0,
                   stuns: [], lastStunAt: null, frozen: null, frozenSpans: [] }
         // A lead's openings by what broke its stance (Enemy.open), and when
@@ -252,6 +254,20 @@ Item {
             type: f.type, tier: f.tier, lead: f.lead, hp: f.hp,
             engagedAt: f.engagedAt, firstHitAt: f.firstHitAt, diedAt: f.diedAt,
             hits: f.hits, openings: f.openings, opened: f.opened, openedAt: f.openedAt,
+            // A lead's strings (Balance.lead.strings, issue #364), the one
+            // it died in among them: each one's name, when it began, its
+            // wind-ups and how it ended - "retreat" (played out), "open"
+            // (an answer opened the lead), "died", "running" (the fight
+            // stopped) or the state it went into. An exchange is a string
+            // in which the lead wound up at least one blow
+            strings: f.strings.map(x => ({ name: x.name, at: x.at, windUps: x.windUps, end: x.end })),
+            exchanges: f.strings.filter(x => x.windUps > 0).length,
+            // The HP a lead lost by the moment the blow landed in (issue
+            // #364), as the step before it saw the lead: "opening",
+            // "retreat", "rest" (a rest of a string or its recovery) or
+            // "guard" (any other); the killing blow's by the last step it
+            // was seen
+            dealtBy: f.dealtBy,
             // Its stuns, and each span it stood frozen (issue #318): from
             // the last stun that froze it to its thaw, how far it moved and
             // the state it thawed into; open at the end when it died
@@ -394,13 +410,17 @@ Item {
             let e = f.ref
             if (!alive(e)) {
                 f.diedAt = t
+                let last = f.strings.length > 0 ? f.strings[f.strings.length - 1] : null
+                if (last && last.end === "running") last.end = "died"
                 if (f.lastHp > 0) {
+                    f.dealtBy[momentOf(f)] += f.lastHp
                     f.hits++
                     if (f.firstHitAt === null) f.firstHitAt = t
                 }
                 continue
             }
             if (e.hp < f.lastHp) {
+                f.dealtBy[momentOf(f)] += f.lastHp - e.hp
                 f.hits++
                 if (f.firstHitAt === null) f.firstHitAt = t
             }
@@ -409,11 +429,37 @@ Item {
             if (into) engaged = true
             if (into && f.engagedAt === null) f.engagedAt = t
             if (e.aiState === "stagger" && f.lastState !== "stagger") f.openings++
+            trackString(f, e, t)
+            f.lastOpening = e.opening
             trackFrozen(f, e, t)
             f.lastState = e.aiState
             f.lastStance = e.stance
         }
         if (engaged) engagedSeconds += dt
+    }
+
+    // A lead's string begun, its wind-ups, its end: a string ends on the
+    // step its name is gone (or another's stands), going into the state
+    // seen then
+    function trackString(f, e, t) {
+        let cur = f.strings.length > 0 ? f.strings[f.strings.length - 1] : null
+        let running = !!cur && cur.end === "running"
+        if (running && e.stringName !== cur.name) {
+            cur.end = e.opening ? "open" : e.aiState
+            running = false
+        }
+        if (!running && e.stringName !== "") {
+            cur = { name: e.stringName, at: t, w0: f.lastWindUps, windUps: 0, end: "running" }
+            f.strings.push(cur)
+            running = true
+        }
+        if (running) cur.windUps = e.windUps - cur.w0
+        f.lastWindUps = e.windUps
+    }
+    // The moment a blow landed in, by the state the step before saw
+    function momentOf(f) {
+        return f.lastOpening ? "opening" : f.lastState === "retreat" ? "retreat"
+            : f.lastState === "recovery" ? "rest" : "guard"
     }
 
     // A frozen span (issue #318): it begins on the step the enemy is seen

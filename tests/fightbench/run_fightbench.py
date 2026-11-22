@@ -569,6 +569,11 @@ def describe(r):
         lines.append(f"  {e['type']} ({TIERS[e['tier']]}{lead}, {e['hp']} HP): hits {e['hits']}, "
                      f"ttk {fmt_s(e['ttk'])} from its first hit, {fmt_s(e['ttkEngaged'])} "
                      f"from engaging, died at {fmt_s(e['diedAt'])}, openings {e['openings']}{by}")
+        # A lead's exchanges and the HP it lost by the moment (issue #364)
+        if e.get("lead") and e.get("strings") is not None:
+            dealt = e.get("dealtBy") or {}
+            lines.append(f"    exchanges {e.get('exchanges', 0)} of {len(e['strings'])} strings; HP lost "
+                         + ", ".join(f"{k} {dealt.get(k, 0)}" for k in ("guard", "rest", "retreat", "opening")))
     person = r.get("person")
     if person:
         lines.append(f"  the person: {answers_line(person)}")
