@@ -62,6 +62,7 @@ QUICK = [
     ("pace", "pace/pace.qml", []),
     ("retreat", "retreat/retreat.qml", []),
     ("shares", "shares/shares.qml", []),
+    ("riposte", "riposte/riposte.qml", []),
     ("boss", "boss/boss.qml", []),
     ("clock", "clock/clock.qml", []),
     ("hitstop", "hitstop/hitstop.qml", []),
