@@ -381,7 +381,8 @@ Window {
             press(Qt.Key_S)
             press(Qt.Key_S)
             press(Qt.Key_S)
-            check(find(menu(), "pauseChoiceControlInput").isCurrent, "S three times in the pause menu picks Control Input")
+            press(Qt.Key_S)
+            check(find(menu(), "pauseChoiceControlInput").isCurrent, "S four times in the pause menu picks Control Input")
             press(Qt.Key_Return)
         }],
         [() => page() !== null && page().activeFocus, () => {
@@ -401,7 +402,7 @@ Window {
         }],
         [() => outDir === "" || captured, () => press(Qt.Key_Escape)],
         [() => page() === null && menu() !== null && menu().activeFocus, () => {
-            check(game.menuOpen && game.gamePaused && menu().selectedIndex === 3,
+            check(game.menuOpen && game.gamePaused && menu().selectedIndex === 4,
                   "Esc goes back to the pause menu, on Control Input, the game still paused")
             click(find(game, "pauseChoiceControlInput"))
         }],

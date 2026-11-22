@@ -10234,7 +10234,10 @@ ClayWorld2d {
                 muteKey: controlTable.key("mute")
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
+                duelPace: world.playedDuelPace
+                paceByHost: session.connected && !session.isHost
                 onVolumeSet: (which, value) => world.setVolume(which, value)
+                onDuelPaceSet: (name) => world.setDuelPace(name)
                 onResume: world.closeMenu()
                 onToTitle: world.backToTitle()
                 onControlInput: world.openControlInput()
