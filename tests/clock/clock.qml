@@ -74,7 +74,10 @@ Window {
             game.forceActiveFocus()
         }],
         [() => game.player && game.enemies.some(e => e.enemyType !== "spitter"), () => {
-            enemy = game.enemies.find(e => e.enemyType !== "spitter")
+            // No room's lead, whose wind-up the duel pace draws out
+            // (Balance.pace) past the waits below, unless there is no other
+            enemy = game.enemies.find(e => e.enemyType !== "spitter" && !e.lead)
+                || game.enemies.find(e => e.enemyType !== "spitter")
             Clayground.paused = true
             check(!game.physics.running, "Clayground.paused stops the world")
             telegraph()

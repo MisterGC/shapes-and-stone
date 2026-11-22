@@ -7,7 +7,8 @@
 // lead, its one tough enemy (issue #269), harder blows and enemies with
 // more HP, as the table's depth group says; tough grunts and guardians,
 // and no other enemy, wind up a crushing blow at
-// enemy.crushChance, for enemy.crushWindUp, and one on a held shield
+// enemy.crushChance, for enemy.crushWindUp - a lead's wind-ups and walk
+// at the game's duel pace (Balance.pace) -, and one on a held shield
 // takes enemy.crushMana, enemy.crushShare of the damage and drops the
 // shield for enemy.crushLockout; the smith sells level I of the sword,
 // the shield, the harness, the blade and the boots for shop.upgradePrice, each
@@ -75,14 +76,19 @@ Window {
         if (tier === 2) base = Math.round(base * Balance.enemy[type].leadHp)
         return Math.round(base * (1 + game.danger * Balance.depth.hp))
     }
+    // A room's lead but the Warden plays at the game's duel pace
+    // (Balance.pace, issue #361): its wind-ups that many times as long, its
+    // walk that many times slower; every other enemy at 1
+    function paceOf(e) { return e.lead && e.enemyType !== "warden" ? game.duelPaceFactor : 1 }
     function checkEnemy(e) {
         let t = Balance.enemy[e.enemyType]
         let hp = hpOf(e.enemyType, e.tier)
         let atk = t.atk + Math.round(game.depth * Balance.depth.atk)
-        return e.maxHp === hp && e.atk === atk && e.def === t.def
-            && near(e.chaseSpeed, t.chaseSpeed) && near(e.patrolSpeed, t.patrolSpeed)
+        let f = paceOf(e)
+        return e.maxHp === hp && e.atk === atk && e.def === t.def && near(e.pace, f)
+            && near(e.chaseSpeed, t.chaseSpeed / f) && near(e.patrolSpeed, t.patrolSpeed / f)
             && near(e.lungeRange, Balance.enemy.lungeRange)
-            && near(e.windUpDuration, Balance.enemy.windUp)
+            && near(e.windUpDuration, Balance.enemy.windUp * f)
             && near(e.shootCooldown, Balance.enemy.shootCooldown)
             && near(e.shieldArc, Balance.enemy.shieldArc)
             && near(e.crushChance, crushChanceOf(e))
@@ -194,10 +200,11 @@ Window {
             let crushWindUp = gd._attackTimer, crushState = gd.aiState
             gd.crushChance = 0
             gd.windUp(be.windUp)
-            check(crushState === "crush" && near(crushWindUp, be.crushWindUp)
+            let gf = paceOf(gd)
+            check(crushState === "crush" && near(crushWindUp, be.crushWindUp * gf)
                   && gd.aiState === "telegraph" && near(gd._attackTimer, be.windUp),
                   "a crushing blow winds up for " + crushWindUp + " s (" + crushState + "), the table says "
-                  + be.crushWindUp + "; a lunge for " + gd._attackTimer + " s")
+                  + be.crushWindUp + " times the lead's duel pace " + gf + "; a lunge for " + gd._attackTimer + " s")
             gd.aiState = "patrol"
             gd.crushChance = be.crushChance
             // A crushing blow on the held shield, from the front

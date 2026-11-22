@@ -1327,7 +1327,8 @@ Item {
     // the room and its danger, so the fights of one run miss on different
     // answers (a roll per answer would leave a short fight to luck). A miss is by
     // one window early (a swing begun before the parry window, the shield
-    // up before the perfect block's) or late (no press before the blow
+    // up before the perfect block's - the enemy's window, a lead's wider at
+    // its duel pace, Balance.pace) or late (no press before the blow
     // lands), as the seed rolls. A shot began with its spitter's wind-up
     // (aiState "shoot"), which the person sees, not with its flight. The
     // times are the physics clock's, the game's own: a slow motion gives
@@ -1444,18 +1445,30 @@ Item {
         }
         return threat ? { e: threat, d: threatDist } : null
     }
+    // The physics steps until enemy e's parry window opens, -1 when no
+    // lunge of its is coming
+    function toWindow(e) {
+        let pf = e.parryFrames
+        if (e.aiState === "lunge") return e._lungeSteps - pf
+        if (e.aiState === "telegraph")
+            return Math.ceil(e._attackTimer * 60 - 1e-6) + e.lungeStepCount(1 / 60) - pf
+        return -1
+    }
+    // A window is the enemy's own: a room's lead's are wider at a slow
+    // duel pace (Balance.pace, issue #361), and one of its windows early
+    // is that much early
     function answerPerson(p, threat) {
         let e = threat.e, plan = personPlan(e)
         letGo(p)
         face(p, e)
         stand(p)
-        let pf = Balance.enemy.parryFrames
+        let pf = e.parryFrames
         if (plan.kind === "parry") {
             p.isBlocking = false
             if (!plan.miss) {
                 if (e.parryWindow && threat.d <= p.attackRange) p.attack()
-            } else if (plan.early && !plan.pressed && e.aiState === "lunge"
-                       && e._lungeSteps > pf && e._lungeSteps <= 2 * pf && threat.d <= p.attackRange) {
+            } else if (plan.early && !plan.pressed && toWindow(e) > 0 && toWindow(e) <= pf
+                       && threat.d <= p.attackRange) {
                 // One window early: the swing is under way before it opens
                 p.attack()
                 plan.pressed = true
@@ -1465,7 +1478,7 @@ Item {
         // A perfect block: perfectLead steps before the blow lands, one
         // window earlier (an ordinary block) or not before it lands
         let lead = !plan.miss ? perfectLead
-                 : plan.early ? perfectLead + Balance.knight.perfectBlockFrames : -1
+                 : plan.early ? perfectLead + e.perfectFrames : -1
         p.isBlocking = lead >= 0 && e.aiState === "lunge" && e._lungeSteps <= lead
     }
     // A shot on its way that the person has seen, as answerShot with
@@ -1497,7 +1510,9 @@ Item {
                 faceShot(p, shot, aim)
                 let cd = Math.hypot(shot.xWu + shot.widthWu / 2 - p.xWu - p.widthWu / 2,
                                     shot.yWu - shot.heightWu / 2 - p.yWu + p.heightWu / 2)
-                let from = perfectFrom + (plan.miss ? shot.speed * Balance.knight.perfectBlockFrames / 60 : 0)
+                // One of its shooter's windows early (Projectile, MetalBall)
+                let frames = shot.perfectFrames > 0 ? shot.perfectFrames : Balance.knight.perfectBlockFrames
+                let from = perfectFrom + (plan.miss ? shot.speed * frames / 60 : 0)
                 if (!p.isBlocking && cd > from) {
                     if (towards) moveTowards(p, towards.xWu, towards.yWu, 1)
                     else stand(p)

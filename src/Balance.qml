@@ -753,10 +753,15 @@ QtObject {
         // kills it within duelSkilled seconds and does not fall, and takes
         // less damage than either of the others. A lead strikes a knight
         // charging in its reach first (lead.reach): hits cancel at least
-        // duelCancelled of "charge"'s charges
+        // duelCancelled of "charge"'s charges. Every duel band holds at the
+        // Standard duel pace (Balance.pace, issue #361): "skilled" kills a
+        // grunt or guardian lead there in 5.1 to 7.8 s where it took 4.6
+        // to 14.4 s before the pace, "masher" and "charge" fall in every
+        // duel at either
         duelSlow: 20,
-        // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288)
-        duelSkilled: [4, 15],
+        // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288;
+        // from 4 to 5 s at the Standard duel pace, issue #361)
+        duelSkilled: [5, 15],
         duelCancelled: 1,
         // Boss (issue #274): the Hollow Warden alone (Balance.boss), its
         // adds coming in its phase 2, played at bossDepths - its first
@@ -855,6 +860,31 @@ QtObject {
                 { name: "landslide", beats: [1, 1, 1, 0, 2] }
             ]
         }
+    })
+
+    // The duel pace (issue #361): a room's lead plays its side of a duel
+    // factor times slower than the table above gives it. Its beat
+    // (lead.beat), its count-in, every wind-up - a strike's, a crushing
+    // blow's (enemy.crushWindUp), a shot's (enemy.shootWindUp), a
+    // guardian's counter, the blow it strikes a charging knight with
+    // (enemy.minTelegraph) -, a feint's hold (lead.feintHold) and its
+    // recovery (lead.recovery) last factor times as long; it walks, kites
+    // and steps back in its wind-up at its speeds divided by factor, and a
+    // guardian lead turns its shield at enemy.shieldTurnSpeed divided by
+    // factor. Against it the knight's parry window (enemy.parryFrames,
+    // lead.parryStart) and perfect-block window (knight.perfectBlockFrames)
+    // are factor times as many physics steps, rounded. The lunge itself,
+    // the knight's own swing, shield, charge and dash and every other
+    // enemy keep their timing. steps are the paces the game offers, by
+    // name; it plays at standard. The Hollow Warden keeps its own tempo
+    // (Balance.boss) and plays at factor 1 for now (issue #368)
+    readonly property var pace: ({
+        steps: [
+            { name: "Swift", factor: 1.3 },
+            { name: "Standard", factor: 1.65 },
+            { name: "Deliberate", factor: 2 }
+        ],
+        standard: "Standard"
     })
 
     // A duel sounds and looks like one (issue #273). While a room's lead

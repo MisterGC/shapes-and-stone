@@ -199,6 +199,14 @@ ClayWorld2d {
     // null when there is none
     property var duelLead: null
     readonly property bool duelEngaged: duelLead !== null
+    // The duel pace a room's lead plays at (Balance.pace, issue #361): one
+    // of its steps by name, and that step's factor - 1 for a name it does
+    // not have
+    property string duelPace: Balance.pace.standard
+    readonly property real duelPaceFactor: {
+        let s = Balance.pace.steps.find(p => p.name === duelPace)
+        return s ? s.factor : 1
+    }
     property bool followFightOnSteps: false
     readonly property bool _followingFight: levelType === "dungeon" && player !== null
     Timer {
