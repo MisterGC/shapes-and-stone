@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `pace`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `pace`, `duelpace`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -533,8 +533,8 @@ the bundle's page asks before leaving while a write is under way
 At depth 0 a line at the bottom of the screen names the controls: every
 action of the table with its key or mouse button, or its pad button while a
 pad is in use, the moves as one ("WASD move").
-Esc opens a menu with Resume, the Music and Sound volumes, Control Input
-and Title. Alone it pauses the game: the
+Esc opens a menu with Resume, the Music and Sound volumes, the Duel pace,
+Control Input and Title. Alone it pauses the game: the
 world stops, and its first step after Resume is one frame long, so nothing
 of the pause is caught up (clayground#338). In a session it pauses nothing, since a host's pause
 would stop every player's enemies: the menu says the party fights on and
@@ -2408,6 +2408,42 @@ knight and the Warden keep theirs:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/pace/pace.qml
+```
+
+The Esc menu's *Duel pace* row, under *Sound*, chooses the step (issue
+#362): A and D, the arrows, a click on the row's arrows or the pad's stick
+left and right turn it a step quicker or slower, from Swift to
+Deliberate and no further, as a volume row turns. The choice is kept with
+the record (`KeyValueStore` "ShapesAndStone", key `duelPace`) at once and
+survives a restart and, in the browser, a reload. In a session the
+host's pace is the party's (the session property `duelPace`): every
+screen plays it, and a joiner's row shows it without arrows, under "The
+host sets the duel pace"; the joiner's own choice stays kept and is the
+one it plays alone again. Only the game's window keeps the pace
+(`keepsDuelPace`, set in `src/Main.qml`): a bench that builds the game,
+the fight bench and the dojo play at Standard whatever is stored, unless
+they set `duelPace` themselves, and leave the stored pace as it was; the
+dojo's row still turns the pace until the next reload. The fight bench's
+pacing check says that every fight it played was at Standard. The duel
+pace bench turns the row with the keys, the mouse and a pad in the duel
+room in a record store of its own and reads the lead's beat at each
+step, starts a new game on that store, checks that a game not keeping
+the pace plays at Standard with another stored, and plays a host and a
+joiner joined over LAN in one process; it exits with the number of
+failed checks:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/duelpace/duelpace.qml
+```
+
+The browser pace bench loads the browser game (`packaging/web-bundle.py`)
+in a fresh headless Chromium, turns the row to Deliberate through the
+menu, reloads the page once the store has written it and checks that the
+game starts at Deliberate; it needs Playwright, as the browser pad bench
+does, and exits with the number of failed checks:
+
+```
+python3 tests/browserpace/browserpace.py build/web
 ```
 
 Every third dungeon ends in a boss room (issue #274, the table's `boss`
