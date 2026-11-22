@@ -217,6 +217,11 @@ Item {
     // property "specials"; null before the host has set it (issue #159)
     readonly property var hostSpecials: net.connected && net.sessionProperties.specials
                                         ? net.sessionProperties.specials : null
+    // The duel pace the host plays at (Game.duelPace, Balance.pace, issue
+    // #362), the session property "duelPace": every screen plays it; ""
+    // before the host has set it
+    readonly property string hostDuelPace: net.connected && net.sessionProperties.duelPace
+                                           ? String(net.sessionProperties.duelPace) : ""
     // Host: the names it has been sent
     property var _names: ({})
 
@@ -673,6 +678,10 @@ Item {
     // Host: the travellers its party freed this run, for every camp
     function publishFreed(freed) {
         if (net.isHost) net.setSessionProperty("freed", freed)
+    }
+    // Host: its duel pace is the party's, for every screen
+    function publishDuelPace(name) {
+        if (net.isHost) net.setSessionProperty("duelPace", name)
     }
     // Host: the specials with its camps, for every camp
     function publishSpecials(ids) {
