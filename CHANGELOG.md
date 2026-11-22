@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-22
+
 ## [0.6.0] - 2026-11-20
 
 The knight gets a toolkit: before each dungeon it picks one of three specials - the whirlwind, a stun or a bolt - and a quick move away from its aim and back fires the special's stronger version, while kills in a chain make its blows stronger. A new lead, the slinger, slings metal balls that bounce off walls and off any raised shield, and the Hollow Warden tells, line by line, that it was a knight once. A dungeon opens with a descent intro, critters scurry over its floor, and the smith sells swift boots. Built on Clayground v2026.13.
