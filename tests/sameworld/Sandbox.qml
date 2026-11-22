@@ -253,7 +253,8 @@ Item {
         p.isBlocking = true
         e.target = p
         e.beginString(i, false)
-        return {name: list[i].name, hold: Balance.lead.feintHold}
+        // The hold at the lead's duel pace (Balance.pace, issue #361)
+        return {name: list[i].name, hold: Balance.lead.feintHold * e.pace / e.speedUp}
     }
     // Enemy id's string as this screen shows it: {name, hold}
     function stringOf(id) {

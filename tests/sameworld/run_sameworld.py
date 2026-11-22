@@ -482,7 +482,7 @@ def lead_string(H, J, b, settle, check):
               f"the joiner shows the host's lead {b} striking its string \"{want['name']}\" "
               f"(joiner: \"{seen['name']}\")")
         check(abs(seen["hold"] - want["hold"]) < 1e-6,
-              f"the joiner shows its feint's hold, {seen['hold']} s ({want['hold']} by the table)")
+              f"the joiner shows its feint's hold, {seen['hold']} s ({want['hold']} by the table at its duel pace)")
         ended = settle(lambda: (H.json(f"stringOf('{b}')") or {}).get("name") == ""
                        and (J.json(f"stringOf('{b}')") or {}).get("name") == "", 8)
         check(ended, f"when the host's string is over the joiner shows {b} striking none")

@@ -14,6 +14,10 @@ PhysicsItem {
     property real dirY: 0
     property real speed: Balance.projectile.speed
     property int damage: Balance.enemy.spitter.atk
+    // Its shooter's perfect-block window in physics steps (Enemy.
+    // perfectFrames, wider for a lead at a slow duel pace); 0 for the
+    // knight's own
+    property int perfectFrames: 0
     property bool destroyed: false
     // A perfect block sent it back (Balance.projectile, issue #283): it
     // flies back along its line, hurts no knight and bursts on the first
@@ -128,7 +132,7 @@ PhysicsItem {
         if (!entity.takeDamage || entity.objectName === "enemy") return
 
         // The shield stops it whole; raised just before, it sends it back
-        let shield = entity.shieldShot ? entity.shieldShot(xWu, yWu, widthWu, dirX, dirY) : ""
+        let shield = entity.shieldShot ? entity.shieldShot(xWu, yWu, widthWu, dirX, dirY, perfectFrames) : ""
         if (shield === "perfect") {
             sendBack(true, Math.round(entity.atk * Balance.projectile.backDamage))
             if (gameWorld && gameWorld.shotLanded) gameWorld.shotLanded(shotId, "perfect", xWu, yWu)
@@ -140,7 +144,7 @@ PhysicsItem {
             return
         }
         // A shot the knight dodges or ignores bursts without a hit
-        let result = entity.takeDamage(damage, xWu, yWu, widthWu, false, dirX, dirY)
+        let result = entity.takeDamage(damage, xWu, yWu, widthWu, false, dirX, dirY, perfectFrames)
         if (gameWorld) {
             if (result === "hit" || result === "blocked") {
                 gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)

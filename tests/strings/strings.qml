@@ -4,16 +4,18 @@
 // ball duel the slinger (issue #322) - strikes
 // every string of its own (Balance.lead.strings) at the knight, which
 // stands with its shield up, the bench stepping the world one physics
-// step at a time. Every strike or feint beat gets its blow - a lunge or a
+// step at a time, at the game's duel pace (Balance.pace, issue #361): f,
+// its factor. Every strike or feint beat gets its blow - a lunge or a
 // shot - and its ring: the ring closes once per beat, and a lunge's parry
 // window opens on the step the ring closes and stays open for
-// enemy.parryFrames steps; one blow lands lead.beat seconds after the
-// one before, a rest a beat more, a feint lead.feintHold later, its ring
-// held at lead.feintRing for that long; a rest is a recovery a beat long.
+// enemy.parryFrames times f steps, rounded; one blow lands lead.beat
+// times f seconds after the one before, a rest a beat more, a feint
+// lead.feintHold times f later, its ring held at lead.feintRing for that
+// long; a rest is a recovery a beat long.
 // Then a knight within lead.reach holding a full charge is struck first:
-// the grunt winds up at once, for enemy.minTelegraph, and its blow
-// cancels the charge; a knight with no charge gets the string's count-in,
-// enemy.windUp. So for another node's knight, known to the host only by
+// the grunt winds up at once, for enemy.minTelegraph times f, and its
+// blow cancels the charge; a knight with no charge gets the string's
+// count-in, enemy.windUp times f. So for another node's knight, known to the host only by
 // its replicated action (Session: 4 a charge filling, 5 a full one): a
 // stand-in with actionState and no isCharging. Prints one PASS or FAIL line per check and exits with the
 // number of failures.
@@ -147,7 +149,7 @@ Window {
         }
         // A shot leaves on the step its ring closes: the step before it
         // shows the ring a step short of its outline
-        let top = melee ? 0.999 : 1 - 1.5 * stepS / Math.min(l.beat, Balance.enemy.shootWindUp)
+        let top = melee ? 0.999 : 1 - 1.5 * stepS / Math.min(e.beatLen, e.shootWindUp)
         check(rings.length === strikes.length && rings.every(g => g[0] < 0.3 && g[1] >= top),
               tag + ": the ring closes once per beat (" + rings.map(g => g[0].toFixed(2) + "-"
               + g[1].toFixed(2)).join(", ") + ")")
@@ -155,12 +157,12 @@ Window {
         if (melee) {
             // A parry window on every beat, opening as the ring closes
             let wins = runs(r.rows, x => x.window)
-            let good = wins.filter(w => w[1] - w[0] + 1 === Balance.enemy.parryFrames
+            let good = wins.filter(w => w[1] - w[0] + 1 === e.parryFrames
                                    && r.rows[w[0]].ring === 1 && w[0] > 0 && r.rows[w[0] - 1].ring < 1)
             check(wins.length === strikes.length && good.length === wins.length,
                   tag + ": a parry window on every beat, " + wins.length + " of them ("
                   + strikes.length + " beats), " + good.length + " open "
-                  + Balance.enemy.parryFrames + " steps from the step the ring closes ("
+                  + e.parryFrames + " steps from the step the ring closes ("
                   + wins.map(w => (w[1] - w[0] + 1) + " steps").join(", ") + ")")
             // Each window ends as its blow lands
             check(r.blows.every((w, j) => wins[j] && Math.abs(w.step - wins[j][1]) <= 1),
@@ -170,15 +172,19 @@ Window {
         }
 
         // One blow a beat after the one before, a rest a beat more, a
-        // feint feintHold later
+        // feint feintHold later, each at its pace
+        let f = e.pace, hold = l.feintHold * f
         let gaps = [], want = []
         for (let j = 1; j < r.blows.length; j++) {
             gaps.push(r.blows[j].step - r.blows[j - 1].step)
-            want.push(steps((strikes[j].k - strikes[j - 1].k) * l.beat + (strikes[j].b === 2 ? l.feintHold : 0)))
+            want.push(steps((strikes[j].k - strikes[j - 1].k) * e.beatLen + (strikes[j].b === 2 ? hold : 0)))
         }
-        check(gaps.every((g, j) => Math.abs(g - want[j]) <= 1),
+        // A beat that is no whole number of steps runs to the next one: a
+        // step off per beat
+        check(near(e.beatLen, l.beat * f, 1e-9) && gaps.every((g, j) => Math.abs(g - want[j])
+                  <= Math.max(1, strikes[j + 1].k - strikes[j].k)),
               tag + ": blows " + gaps.join(", ") + " steps apart (" + want.join(", ")
-              + " by lead.beat " + l.beat + " s and lead.feintHold " + l.feintHold + " s)")
+              + " by lead.beat " + l.beat + " s and lead.feintHold " + l.feintHold + " s times " + f + ")")
 
         // A feint holds its ring at feintRing for feintHold, no window open
         let feints = strikes.filter(x => x.b === 2)
@@ -187,9 +193,9 @@ Window {
             let flat = held.filter(h => r.rows.slice(h[0], h[1] + 1).every(
                 x => near(x.ring, l.feintRing, 1e-6) && !x.window))
             check(held.length === feints.length && flat.length === held.length
-                  && held.every(h => Math.abs(h[1] - h[0] + 1 - steps(l.feintHold)) <= 1),
+                  && held.every(h => Math.abs(h[1] - h[0] + 1 - steps(hold)) <= 1),
                   tag + ": each feint holds " + held.map(h => h[1] - h[0] + 1).join(", ") + " steps ("
-                  + steps(l.feintHold) + " by lead.feintHold), its ring at " + l.feintRing
+                  + steps(hold) + " by lead.feintHold times " + f + "), its ring at " + l.feintRing
                   + " and no window open (" + flat.length + " of " + held.length + ")")
         }
         // A rest is a recovery a beat long: those before the last blow,
@@ -202,15 +208,15 @@ Window {
         if (rests > 0) {
             let still = runs(r.rows.slice(0, lastStep), x => x.state === "recovery")
             let len = still.reduce((a, h) => a + h[1] - h[0] + 1, 0)
-            check(Math.abs(len - rests * steps(l.beat)) <= rests,
-                  tag + ": its " + rests + " rests stand " + len + " steps (" + rests * steps(l.beat)
-                  + " by lead.beat)")
+            check(Math.abs(len - rests * steps(e.beatLen)) <= rests,
+                  tag + ": its " + rests + " rests stand " + len + " steps (" + rests * steps(e.beatLen)
+                  + " by lead.beat times " + f + ")")
         }
         if (after > 0) {
             let len = r.rows.slice(lastStep + 1).filter(x => x.state === "recovery" && x.beat >= 0).length
-            check(Math.abs(len - after * steps(l.beat)) <= after,
+            check(Math.abs(len - after * steps(e.beatLen)) <= after,
                   tag + ": its " + after + " rests after the last blow stand " + len + " steps ("
-                  + after * steps(l.beat) + " by lead.beat)")
+                  + after * steps(e.beatLen) + " by lead.beat times " + f + ")")
         }
         e.halt()
         e.lead = false
@@ -449,6 +455,13 @@ Window {
     function run() {
         Clayground.paused = true
         let l = Balance.lead
+        // The game's duel pace, the leads' (Balance.pace): its default
+        let f = game.duelPaceFactor
+        let std = Balance.pace.steps.find(x => x.name === Balance.pace.standard)
+        check(game.duelPace === Balance.pace.standard && std && near(f, std.factor, 1e-9),
+              "the leads play at the game's duel pace, " + game.duelPace + ", factor " + f)
+        let tele = Balance.enemy.minTelegraph * f, countIn = Balance.enemy.windUp * f
+        let feint = Balance.lead.feintHold * f
         let types = ["grunt", "guardian", "spitter"]
         let table = types.every(t => (l.strings[t] || []).length > 0 && l.strings[t].every(
             s => s.beats.length > 0 && s.beats[0] !== 0 && s.beats.every(b => b === 0 || b === 1 || b === 2)))
@@ -463,40 +476,39 @@ Window {
 
         let punished = tryPunish("full")
         check(punished.full && punished.name !== ""
-              && near(punished.wound, Balance.enemy.minTelegraph, 1e-6)
+              && near(punished.wound, tele, 1e-6)
               && punished.landed && punished.hurt > 0 && punished.charge === "spent",
               "a knight " + ((l.reach + Balance.enemy.lungeRange) / 2) + " wu off with a full charge ("
               + punished.full + ") is struck first: the lead winds up " + punished.wound
-              + " s (enemy.minTelegraph " + Balance.enemy.minTelegraph + "), its blow takes "
+              + " s (enemy.minTelegraph " + Balance.enemy.minTelegraph + " times " + f + "), its blow takes "
               + punished.hurt + " HP and cancels the charge (" + punished.charge + ")")
         let filling = tryPunish("filling")
-        check(filling.filling && near(filling.wound, Balance.enemy.minTelegraph, 1e-6)
+        check(filling.filling && near(filling.wound, tele, 1e-6)
               && filling.landed && filling.charge === "spent",
               "so is one whose charge still fills (" + filling.filling + "): wound up "
               + filling.wound + " s, the charge cancelled (" + filling.charge + ")")
         let calm = tryPunish("")
-        check(calm.name !== "" && near(calm.wound, Balance.enemy.windUp, 1e-6),
+        check(calm.name !== "" && near(calm.wound, countIn, 1e-6),
               "a knight with no charge gets the string's count-in: " + calm.wound
-              + " s (enemy.windUp " + Balance.enemy.windUp + ")")
+              + " s (enemy.windUp " + Balance.enemy.windUp + " times " + f + ")")
         for (let code of [4, 5]) {
             let r = tryRemotePunish(code)
-            check(r.name !== "" && near(r.wound, Balance.enemy.minTelegraph, 1e-6),
+            check(r.name !== "" && near(r.wound, tele, 1e-6),
                   "another node's knight with action " + code + " (" + (code === 4 ? "filling" : "full")
                   + " charge) is struck first: wound up " + r.wound + " s after " + r.steps
-                  + " steps (enemy.minTelegraph " + Balance.enemy.minTelegraph + ")")
+                  + " steps (enemy.minTelegraph " + Balance.enemy.minTelegraph + " times " + f + ")")
         }
         let idle = tryRemotePunish(0)
         // The count-in, a feint's hold on it when the string rolled opens
         // with a feint
-        check(idle.name !== "" && (near(idle.wound, Balance.enemy.windUp, 1e-6)
-                                   || near(idle.wound, Balance.enemy.windUp + Balance.lead.feintHold, 1e-6)),
+        check(idle.name !== "" && (near(idle.wound, countIn, 1e-6) || near(idle.wound, countIn + feint, 1e-6)),
               "another node's knight with action 0 gets the count-in: " + idle.wound + " s (enemy.windUp "
-              + Balance.enemy.windUp + ", with a feint " + (Balance.enemy.windUp + Balance.lead.feintHold) + ")")
+              + Balance.enemy.windUp + " times " + f + ", with a feint " + (countIn + feint) + ")")
         let cut = tryRestCut()
-        check(cut.inRest && cut.cutAfter < steps(l.beat) && near(cut.wound, Balance.enemy.minTelegraph, 1e-6),
+        check(cut.inRest && cut.cutAfter < steps(l.beat * f) && near(cut.wound, tele, 1e-6),
               "a knight that starts a charge in reach during a rest of \"" + cut.name
               + "\" is struck first: the rest is cut short after " + cut.cutAfter + " steps ("
-              + steps(l.beat) + " a beat) and the lead winds up " + cut.wound + " s")
+              + steps(l.beat * f) + " a beat) and the lead winds up " + cut.wound + " s")
         let let_go = tryRestCharge()
         check(let_go.inRest && let_go.full && let_go.causes.join() === "heavy" && let_go.opening,
               "a full charge built outside lead.reach and let go on arriving in a rest opens the lead "

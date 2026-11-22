@@ -247,8 +247,18 @@ PhysicsItem {
     // The shield was down long enough before it rose
     property bool _rearmed: true
     // A blow the shield meets now is blocked perfectly
-    readonly property bool perfectGuard: isBlocking && _rearmed
-        && _steps - _raisedAt <= Balance.knight.perfectBlockFrames
+    readonly property bool perfectGuard: perfectGuardFor(Balance.knight.perfectBlockFrames)
+    // The same against an attacker whose perfect-block window is frames
+    // physics steps: a room's lead's is wider at a slower duel pace
+    // (Enemy.perfectFrames, Balance.pace)
+    function perfectGuardFor(frames) {
+        return isBlocking && _rearmed && _steps - _raisedAt <= frames
+    }
+    // The perfect-block window against an attacker, in physics steps: the
+    // knight's own (knight.perfectBlockFrames) unless one is given
+    function _perfectWindow(frames) {
+        return frames > 0 ? frames : Balance.knight.perfectBlockFrames
+    }
     property real attackCooldown: 0
     // The swing under way is a charged heavy one
     property bool isHeavy: false
@@ -658,7 +668,7 @@ PhysicsItem {
                 // by none begun within parryRest steps of the swing before
                 // it, nor by a charged one (issue #288)
                 let parried = enemy.parryWindow
-                    && (!enemy.lead || _parriesLead())
+                    && (!enemy.lead || _parriesLead(enemy))
                 let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
                         : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
                 if (parried) dmg = atk * Balance.knight.parrySwing
@@ -853,14 +863,17 @@ PhysicsItem {
     // crushing blow (Balance.enemy.crush...). (alongX, alongY) is the way
     // the blow travelled, y up - a lunge's or a shot's - which a hit
     // throws the knight back along; without it, from the attacker's centre
-    // through the knight's.
-    function takeDamage(amount, attackerX, attackerY, attackerSize, crush, alongX, alongY) {
+    // through the knight's. perfectFrames is the attacker's perfect-block
+    // window in physics steps (Enemy.perfectFrames), the knight's own
+    // knight.perfectBlockFrames without it.
+    function takeDamage(amount, attackerX, attackerY, attackerSize, crush, alongX, alongY, perfectFrames) {
         if (fallen || held) return "ignored"
         if (isDashing) return "dodged"  // Invulnerable during dash
         if (graceLeft > 0) return "ignored"  // and for a moment after a hit
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         let blocked = isBlocking && isShieldFacing(attackerX, attackerY, attackerSize)
-        if (blocked && perfectGuard) return _perfectBlock(attackerX, attackerY, attackerSize)
+        if (blocked && perfectGuardFor(_perfectWindow(perfectFrames)))
+            return _perfectBlock(attackerX, attackerY, attackerSize)
         if (blocked && crush === true)
             return _crushed(finalDamage, attackerX, attackerY, attackerSize, alongX, alongY)
         if (blocked) {
@@ -938,10 +951,11 @@ PhysicsItem {
     // alongY): the raised shield facing it takes it whole, "perfect" when
     // raised just before it (perfectGuard), which sends it back, else
     // "blocked" at the shield's mana cost; "" when the shield does not
-    // stop it
-    function shieldShot(fromX, fromY, size, alongX, alongY) {
+    // stop it. perfectFrames is the shooter's perfect-block window, as
+    // takeDamage's
+    function shieldShot(fromX, fromY, size, alongX, alongY, perfectFrames) {
         if (!isBlocking || !isShieldFacing(fromX, fromY, size)) return ""
-        if (perfectGuard) return _perfectBlock(fromX, fromY, size)
+        if (perfectGuardFor(_perfectWindow(perfectFrames))) return _perfectBlock(fromX, fromY, size)
         view.block()
         acted("block")
         if (gameWorld) {
@@ -1097,10 +1111,13 @@ PhysicsItem {
     // The step the swing before the last began on
     property int _prevSwingStep: -1000000
     // Whether the swing under way parries a lead in its window: a light
-    // swing begun in it and parryRest steps or more after the one before
-    function _parriesLead() {
+    // swing begun in it - at most its parryStart steps before it lands,
+    // lead.parryStart at its duel pace (Enemy.parryStart) - and parryRest
+    // steps or more after the one before
+    function _parriesLead(enemy) {
         let l = Balance.lead
-        return !isHeavy && _steps - _swingStep <= l.parryStart
+        let start = enemy && enemy.parryStart > 0 ? enemy.parryStart : l.parryStart
+        return !isHeavy && _steps - _swingStep <= start
             && _swingStep - _prevSwingStep >= l.parryRest
     }
     property bool _bashed: true

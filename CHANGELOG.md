@@ -8,6 +8,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [0.7.0] - 2026-11-22
 
+### Changed
+
+- **A room's lead fights at a slower duel pace:** a lead now winds up, strikes, feints and recovers 1.65 times slower than before - in its strings a blow comes every 1.16 s where it came every 0.7 s - and walks at 2.4 instead of 4.0, slower than your knight with its shield up, so you can back away from it behind the shield. Your windows against it widen by as much: a shield raised up to 13 physics steps (0.22 s) before its blow is a perfect block, where it was 8, a parry has 15 steps where it had 9, and a guardian lead turns its shield at 73 degrees a second instead of 120, so you can walk round it. This is the Standard step of a duel pace that has two more, Swift (1.3 times slower) and Deliberate (twice as slow); the game plays at Standard, and the menu does not offer the choice yet. Your knight's swing, shield, charge and dash, the weak and normal enemies and the Hollow Warden keep their timing. ([#361](https://github.com/MisterGC/shapes-and-stone/issues/361))
+
 ## [0.6.0] - 2026-11-20
 
 The knight gets a toolkit: before each dungeon it picks one of three specials - the whirlwind, a stun or a bolt - and a quick move away from its aim and back fires the special's stronger version, while kills in a chain make its blows stronger. A new lead, the slinger, slings metal balls that bounce off walls and off any raised shield, and the Hollow Warden tells, line by line, that it was a knight once. A dungeon opens with a descent intro, critters scurry over its floor, and the smith sells swift boots. Built on Clayground v2026.13.

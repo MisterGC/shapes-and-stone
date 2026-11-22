@@ -199,6 +199,14 @@ ClayWorld2d {
     // null when there is none
     property var duelLead: null
     readonly property bool duelEngaged: duelLead !== null
+    // The duel pace a room's lead plays at (Balance.pace, issue #361): one
+    // of its steps by name, and that step's factor - 1 for a name it does
+    // not have
+    property string duelPace: Balance.pace.standard
+    readonly property real duelPaceFactor: {
+        let s = Balance.pace.steps.find(p => p.name === duelPace)
+        return s ? s.factor : 1
+    }
     property bool followFightOnSteps: false
     readonly property bool _followingFight: levelType === "dungeon" && player !== null
     Timer {
@@ -1279,12 +1287,12 @@ ClayWorld2d {
         onBoltEndReceived: (fromId, bolt) => _boltEndReported(bolt)
         onShotReceived: (shot) => {
             if (screen !== "game" || _shotsBack[shot.id]) return
-            _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage)
+            _flyShot(shot.id, shot.x, shot.y, shot.dx, shot.dy, shot.damage, shot.pf)
             playSpitShot(shot.x, shot.y)
         }
         onBallReceived: (b) => {
             if (screen !== "game" || _ballsDone[b.id] || _ballById[b.id]) return
-            _flyBall(b.id, b.x, b.y, b.dx, b.dy, b.damage)
+            _flyBall(b.id, b.x, b.y, b.dx, b.dy, b.damage, b.pf)
             playBallShot(b.x, b.y)
         }
         onStruckReported: (fromId, report) => {
@@ -1348,7 +1356,8 @@ ClayWorld2d {
                                                  size: enemy.widthWu, crush: enemy.crushing,
                                                  dx: enemy._dirToTargetX, dy: enemy._dirToTargetY,
                                                  ax: enemy.aimXWu, ay: enemy.aimYWu,
-                                                 reach: Balance.enemy.lungeHitRange + enemy.bulk})
+                                                 reach: Balance.enemy.lungeHitRange + enemy.bulk,
+                                                 pf: enemy.perfectFrames, pw: enemy.parryFrames})
     }
     // A host's enemy struck this knight: the blow lands when this screen
     // shows the lunge land, the enemy's render delay after it arrived. A
@@ -1357,7 +1366,9 @@ ClayWorld2d {
     // hold, a parry in the window's last render delay on this screen came
     // after the blow of the lunge it parried. The window is counted in
     // physics steps, as the enemy's attack runs (issue #35); the hold is
-    // wall clock, as this screen renders the enemy.
+    // wall clock, as this screen renders the enemy. The windows are the
+    // host's enemy's, which a lead's duel pace widens (Balance.pace): its
+    // parry window pw and its perfect-block window pf, in steps.
     // knightStruck says what became of each blow: "hit", "blocked",
     // "perfect", "crushed", "dodged", "ignored", "out of reach" or
     // "parried"; a crushing blow is never parried. This
@@ -1402,7 +1413,8 @@ ClayWorld2d {
         if (!player) return
         let crush = blow.crush === true
         let at = _parriedAt[blow.id]
-        if (!crush && at !== undefined && at >= blow.arrived - Balance.enemy.parryFrames) {
+        let pw = blow.pw > 0 ? blow.pw : Balance.enemy.parryFrames
+        if (!crush && at !== undefined && at >= blow.arrived - pw) {
             _struck(blow.id, "parried")
             return
         }
@@ -1417,7 +1429,7 @@ ClayWorld2d {
         }
         // A blow sounds the shield's own block or the knight's hurt, in
         // takeDamage
-        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy)
+        let result = player.takeDamage(blow.atk, blow.x, blow.y, blow.size, crush, blow.dx, blow.dy, blow.pf)
         // A blocked one throws the host's enemy back off the shield; a
         // perfect block staggers it, as it does an enemy of this node's,
         // a crushing blow's for the full stagger, and opens a lead
@@ -7026,11 +7038,14 @@ ClayWorld2d {
     // A perfect block sent shot id back: this node's knight's (local) or
     // another's, which reported it
     signal shotSentBack(string shotId, bool local)
-    function spawnProjectile(px, py, dirX, dirY, damage) {
+    // perfectFrames is its shooter's perfect-block window in physics steps
+    // (Enemy.perfectFrames), 0 or none for the knight's own
+    function spawnProjectile(px, py, dirX, dirY, damage, perfectFrames) {
         let id = "shot" + (++_shotCount)
+        let pf = perfectFrames > 0 ? perfectFrames : 0
         if (session.connected && session.isHost)
-            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage})
-        _flyShot(id, px, py, dirX, dirY, damage)
+            session.sendShot({id: id, x: px, y: py, dx: dirX, dy: dirY, damage: damage, pf: pf})
+        _flyShot(id, px, py, dirX, dirY, damage, pf)
     }
     // This node's knight met shot id; sent back ("perfect") from (x, y)
     function shotLanded(id, result, x, y) {
@@ -7077,13 +7092,14 @@ ClayWorld2d {
         shotEnded(r.id, r.result, false)
         shotSentBack(r.id, false)
     }
-    function _flyShot(id, px, py, dirX, dirY, damage) {
+    function _flyShot(id, px, py, dirX, dirY, damage, perfectFrames) {
         let proj = projectileComponent.createObject(world.room, {
             shotId: id,
             xWu: px, yWu: py,
             dirX: dirX, dirY: dirY,
             speed: Balance.projectile.speed,
             damage: damage,
+            perfectFrames: perfectFrames > 0 ? perfectFrames : 0,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,
@@ -7136,13 +7152,15 @@ ClayWorld2d {
         return doors.length > 0 && doorShut(gx + "," + gy)
     }
     // A slinger slings a ball from its centre (x, y) along (dx, dy),
-    // damage the blow it deals a knight: the host's on every node
-    function spawnBall(x, y, dx, dy, damage) {
+    // damage the blow it deals a knight: the host's on every node.
+    // perfectFrames is its slinger's perfect-block window, as a shot's
+    function spawnBall(x, y, dx, dy, damage, perfectFrames) {
         let id = "ball" + (++_ballCount)
+        let pf = perfectFrames > 0 ? perfectFrames : 0
         if (session.connected && session.isHost)
-            session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage})
+            session.sendBall({id: id, x: x, y: y, dx: dx, dy: dy, damage: damage, pf: pf})
         playBallShot(x, y)
-        return _flyBall(id, x, y, dx, dy, damage)
+        return _flyBall(id, x, y, dx, dy, damage, pf)
     }
     // This node's knight met ball id: "hit" where it fell at (x, y), or
     // "blocked" or "perfect" where its shield turned it there, along
@@ -7171,13 +7189,14 @@ ClayWorld2d {
         _ballsDone[r.id] = true
         if (b && !b.destroyed) b.fallAt(r.x, r.y, "report")
     }
-    function _flyBall(id, x, y, dx, dy, damage) {
+    function _flyBall(id, x, y, dx, dy, damage, perfectFrames) {
         let size = Balance.ball.size
         let b = ballComponent.createObject(world.room, {
             ballId: id,
             xWu: x - size / 2, yWu: y + size / 2,
             dirX: dx, dirY: dy,
             damage: damage,
+            perfectFrames: perfectFrames > 0 ? perfectFrames : 0,
             pixelPerUnit: Qt.binding(() => world.pixelPerUnit),
             world: world.physics,
             gameWorld: world,

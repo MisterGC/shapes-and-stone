@@ -1442,7 +1442,12 @@ Window {
             hp0 = g.hp
             let parries = game.fightRecord.parries
             p.attack()
-            Clayground.physicsStep(1)
+            // The swing hits on each of its steps: the lead's window, wider
+            // at its duel pace (Balance.pace), may open before it is in
+            // the sword's reach
+            n = 0
+            do { Clayground.physicsStep(1); n++ }
+            while (game.fightRecord.parries === parries && p.isAttacking && g.parryWindow && n < 60)
             let parryDmg = Math.floor(p.atk * k.parrySwing) - g.def
             check(game.fightRecord.parries === parries + 1 && g.opening && g.aiState === "stagger"
                   && Math.abs(g._attackTimer - l.openingTime) <= stepS + 1e-6
@@ -1577,16 +1582,19 @@ Window {
             let begun = p._steps
             n = 0
             while (!g.parryWindow && g.aiState === "lunge" && n < 600) { Clayground.physicsStep(1); n++ }
+            // Turned away till the swing is older than the lead's
+            // parryStart, which its duel pace widens (Balance.pace)
+            while (p._steps - begun < g.parryStart && g.parryWindow && n < 600) { Clayground.physicsStep(1); n++ }
             faceIt(p, g)
             hp0 = g.hp
             parries = game.fightRecord.parries
             causes = []
             Clayground.physicsStep(1)
             let age = p._steps - begun
-            check(age > l.parryStart && hp0 - g.hp === chip && game.fightRecord.parries === parries
+            check(age > g.parryStart && hp0 - g.hp === chip && game.fightRecord.parries === parries
                   && causes.length === 0 && !g.opening,
                   "a swing begun " + age + " steps before it lands in the parry window (parryStart "
-                  + l.parryStart + ") takes " + (hp0 - g.hp) + " HP (" + chip + ", a blow), parries "
+                  + l.parryStart + ", " + g.parryStart + " at its duel pace) takes " + (hp0 - g.hp) + " HP (" + chip + ", a blow), parries "
                   + (game.fightRecord.parries - parries) + " times and opens nothing ("
                   + (causes.join() || "nothing") + ")")
             g.opened.disconnect(opener)
