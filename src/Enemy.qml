@@ -147,9 +147,9 @@ PhysicsItem {
     // A room's lead (Balance.lead, issue #271): its tough enemy. It takes
     // no knockback and no stagger; its stance, from 1 down to 0, wears
     // under blows, and a parry, a perfect block, a charged swing into its
-    // recovery or a worn stance breaks it: opening is true for the long
-    // stagger that follows. In a session the host's lead keeps the stance
-    // and every screen shows it
+    // rest, recovery or retreat, or a worn stance breaks it: opening is
+    // true for the long stagger that follows. In a session the host's lead
+    // keeps the stance and every screen shows it
     property bool lead: tier === 2
     property real stance: 1
     property bool opening: false
@@ -263,7 +263,8 @@ PhysicsItem {
     property int _lungeSteps: 0     // physics steps until the lunge lands
 
     // AI state: patrol, chase, telegraph, crush, lunge, stagger, recovery,
-    // kite, shoot, frozen (a knight's stun, Balance.stun)
+    // kite, shoot, frozen (a knight's stun, Balance.stun), retreat (a
+    // lead's after its string, Balance.lead.retreat)
     property string aiState: "patrol"
     // The state before the last change, for the lead's growl
     property string _wasState: "patrol"
@@ -366,9 +367,14 @@ PhysicsItem {
         opacity: 0.38
     }
 
-    // Tough enemy glow ring
+    // A lead retreats (Balance.lead.retreat): on every screen, from the
+    // replicated aiState; its look reads this
+    readonly property bool retreating: aiState === "retreat"
+
+    // Tough enemy glow ring; gone while a lead retreats, its guard down
     Rectangle {
-        visible: tier === 2 && !enemy.boss
+        objectName: "toughRing"
+        visible: tier === 2 && !enemy.boss && !enemy.retreating
         anchors.centerIn: parent
         width: parent.width * 1.4
         height: parent.height * 1.4
@@ -408,6 +414,39 @@ PhysicsItem {
     readonly property real _breath: aiState === "frozen" ? 0 : Math.sin(_lifeT * 2.1) * (1 - _speed)
     readonly property real _bob: Math.abs(Math.sin(_lifeT * 12)) * _speed
 
+    // Its body's colour, by its state (visual): on every screen, from the
+    // replicated aiState
+    readonly property color bodyColor: {
+        let isSpitter = enemyType === "spitter"
+        // The slinger's iron: grey steel, colder as it hunts
+        if (enemy.slinger && ["patrol", "chase", "kite", "recovery", "idle"].indexOf(enemy.aiState) >= 0) {
+            let iron = enemy.aiState === "patrol" || enemy.aiState === "idle" ? "#6E7A86"
+                : enemy.aiState === "chase" ? "#7F8C99" : "#93A1AE"
+            return tier === 0 ? Qt.darker(iron, 1.4) : tier === 2 ? Qt.lighter(iron, 1.2) : iron
+        }
+        let base
+        switch (enemy.aiState) {
+        // A lead's retreat dims it, its own colour whatever its kind
+        case "retreat": return Balance.lead.retreat.color
+        case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
+        case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
+        case "circle": base = "#B84040"; break
+        case "kite": base = "#8EBB5A"; break
+        // A spitter winding up its shot turns warm yellow: an attack
+        // coming, like the melee telegraph, and far from its kiting green
+        case "shoot": base = "#F2D13A"; break
+        case "telegraph": base = "#FF8C00"; break
+        // A crushing blow winds up white-hot
+        case "crush": return Balance.crush.glow
+        case "lunge": base = "#FF4444"; break
+        case "stagger": base = "#666666"; break
+        // Frozen by a knight's stun: ice
+        case "frozen": base = Balance.stun.color; break
+        default: base = isSpitter ? "#6B8E4A" : "#8B3A3A"
+        }
+        return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
+    }
+
     // Visual
     Rectangle {
         id: visual
@@ -427,34 +466,7 @@ PhysicsItem {
         // enemy round
         radius: enemy.slinger ? width * 0.22 : width * .5
         opacity: tier === 0 ? 0.6 : 1.0
-        color: {
-            let isSpitter = enemyType === "spitter"
-            // The slinger's iron: grey steel, colder as it hunts
-            if (enemy.slinger && ["patrol", "chase", "kite", "recovery", "idle"].indexOf(enemy.aiState) >= 0) {
-                let iron = enemy.aiState === "patrol" || enemy.aiState === "idle" ? "#6E7A86"
-                    : enemy.aiState === "chase" ? "#7F8C99" : "#93A1AE"
-                return tier === 0 ? Qt.darker(iron, 1.4) : tier === 2 ? Qt.lighter(iron, 1.2) : iron
-            }
-            let base
-            switch (enemy.aiState) {
-            case "patrol": base = isSpitter ? "#6B8E4A" : "#8B3A3A"; break
-            case "chase": base = isSpitter ? "#7BA854" : "#CC4444"; break
-            case "circle": base = "#B84040"; break
-            case "kite": base = "#8EBB5A"; break
-            // A spitter winding up its shot turns warm yellow: an attack
-            // coming, like the melee telegraph, and far from its kiting green
-            case "shoot": base = "#F2D13A"; break
-            case "telegraph": base = "#FF8C00"; break
-            // A crushing blow winds up white-hot
-            case "crush": return Balance.crush.glow
-            case "lunge": base = "#FF4444"; break
-            case "stagger": base = "#666666"; break
-            // Frozen by a knight's stun: ice
-            case "frozen": base = Balance.stun.color; break
-            default: base = isSpitter ? "#6B8E4A" : "#8B3A3A"
-            }
-            return tier === 0 ? Qt.darker(base, 1.4) : tier === 2 ? Qt.lighter(base, 1.2) : base
-        }
+        color: enemy.bodyColor
         Behavior on color { ColorAnimation { duration: 100 } }
 
         BodyShade {
@@ -730,10 +742,11 @@ PhysicsItem {
         }
     }
 
-    // Squash on a hit, crouch while winding up, stretch into the lunge
+    // Squash on a hit, crouch while winding up, stretch into the lunge,
+    // sag in a lead's retreat
     property real _poseScale: !_fx ? 1
         : aiState === "telegraph" || aiState === "crush" || aiState === "shoot" || aiState === "bash" ? 0.8
-        : aiState === "lunge" ? 1.15 : 1
+        : aiState === "lunge" ? 1.15 : retreating ? Balance.lead.retreat.pose : 1
     Behavior on _poseScale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
     property real _squash: 1
     SequentialAnimation {
@@ -759,6 +772,9 @@ PhysicsItem {
         readonly property color eyeColor: slit ? "#BFE6FF" : spitter ? "#D8FF80"
             : enemy.aiState === "telegraph" || enemy.aiState === "crush" || enemy.aiState === "lunge"
             ? "#FFF2C0" : "#FFB040"
+        // In a lead's retreat they close to a slit and dim
+        readonly property real shut: enemy.retreating ? Balance.lead.retreat.eyes : 1
+        opacity: enemy.retreating ? Balance.lead.retreat.eyesOpacity : 1
         property real open: 1
         SequentialAnimation on open {
             loops: Animation.Infinite
@@ -775,7 +791,7 @@ PhysicsItem {
                 // Halo, then the eye itself
                 Rectangle {
                     width: enemy.width * (glowEyes.slit ? 0.6 : glowEyes.spitter ? 0.5 : 0.36)
-                    height: width * (glowEyes.slit ? 0.3 : 1) * (0.4 + 0.6 * glowEyes.open)
+                    height: width * (glowEyes.slit ? 0.3 : 1) * (0.4 + 0.6 * glowEyes.open) * glowEyes.shut
                     radius: height / 2
                     x: -width / 2; y: -height / 2
                     color: glowEyes.eyeColor
@@ -783,7 +799,7 @@ PhysicsItem {
                 }
                 Rectangle {
                     width: enemy.width * (glowEyes.slit ? 0.44 : glowEyes.spitter ? 0.18 : 0.13)
-                    height: width * (glowEyes.slit ? 0.14 : 1) * glowEyes.open
+                    height: width * (glowEyes.slit ? 0.14 : 1) * glowEyes.open * glowEyes.shut
                     radius: width / 2
                     x: -width / 2; y: -height / 2
                     color: glowEyes.eyeColor
@@ -974,12 +990,15 @@ PhysicsItem {
         if (gameWorld && gameWorld.leadOpened) gameWorld.leadOpened(enemy)
     }
 
-    // Guardian shield arc
+    // Guardian shield arc; in a lead's retreat it hangs low, close in and
+    // faint: its guard is down
     Canvas {
         id: guardianShield
+        objectName: "guardianShield"
         visible: enemyType === "guardian" && aiState !== "stagger"
+        opacity: enemy.retreating ? Balance.lead.retreat.shieldOpacity : 1
         readonly property real shieldSize: enemy.width * 0.8
-        readonly property real orbitRadius: enemy.width * 0.5
+        readonly property real orbitRadius: enemy.width * (enemy.retreating ? Balance.lead.retreat.shieldOrbit : 0.5)
         readonly property real angleRad: facingAngle * Math.PI / 180
         width: shieldSize
         height: shieldSize
@@ -1054,6 +1073,9 @@ PhysicsItem {
         } else if (aiState !== "lunge") {
             crushing = false
         }
+        // A lead's retreat sighs, on every screen (Balance.lead.retreat)
+        if (aiState === "retreat" && gameWorld && gameWorld.playLeadRetreat)
+            gameWorld.playLeadRetreat(xWu, yWu)
         // A room's lead growls as it spots the knight: from its patrol into
         // the hunt, on every screen (Balance.duel)
         if (lead && _wasState === "patrol" && aiState !== "patrol" && aiState !== "idle"
@@ -1202,6 +1224,9 @@ PhysicsItem {
         case "recovery":
             // A rest of a string: the next beat when it is over
             if (_beat >= 0 && _attackTimer <= 0) _nextBeat("")
+            break
+        case "retreat":
+            _stepRetreat()
             break
         case "lunge":
             _stepLunge()
@@ -1372,14 +1397,51 @@ PhysicsItem {
             windUp(w, hold)
         }
     }
-    // The string is over: it recovers lead.recovery, then goes for the
-    // knight again; a spitter shoots again after its cooldown
+    // The string is over: it retreats (Balance.lead.retreat), then goes
+    // for the knight again; the Warden recovers lead.recovery instead
+    // (issue #368). A spitter shoots again after its cooldown
     function _endString() {
         _clearString()
         if (ranged) _shootTimer = shootCooldown
         body.linearVelocity = Qt.point(0, 0)
+        if (!boss) {
+            _retreat()
+            return
+        }
         aiState = "recovery"
         attackCooldown = Balance.lead.recovery * pace
+    }
+    // The retreat (Balance.lead.retreat, issue #363): one beat of its pace,
+    // counted on the physics steps. It steps back along (_backX, _backY),
+    // back the way its last blow came - a lunge ends on the knight, so
+    // where the knight stands says little -, back wu over the first step
+    // of the beat, then stands; it strikes nobody until the beat is over,
+    // and goes for the knight then
+    property real _backX: 0
+    property real _backY: 0
+    property real _retreatLen: 0
+    function _retreat() {
+        let len = Math.sqrt(_dirToTargetX * _dirToTargetX + _dirToTargetY * _dirToTargetY)
+        _backX = len > 0.01 ? -_dirToTargetX / len : 0
+        _backY = len > 0.01 ? -_dirToTargetY / len : 0
+        _retreatLen = beatLen
+        _attackTimer = beatLen
+        attackCooldown = 0
+        aiState = "retreat"
+    }
+    function _stepRetreat() {
+        if (_attackTimer <= 0) {
+            body.linearVelocity = Qt.point(0, 0)
+            aiState = "chase"
+            _recalcChasePath()
+            return
+        }
+        let r = Balance.lead.retreat
+        let stepT = r.step * _retreatLen
+        let speed = stepT > 0 ? r.back / stepT : 0
+        // Negate Y for world-to-screen
+        body.linearVelocity = _retreatLen - _attackTimer < stepT - 1e-6
+            ? Qt.point(_backX * speed, -_backY * speed) : Qt.point(0, 0)
     }
     function _clearString() {
         _string = []
@@ -1394,8 +1456,9 @@ PhysicsItem {
                             || knight.actionState === 4 || knight.actionState === 5)
     }
     // Whether a lead strikes first: at its knight, in sight within
-    // lead.reach, holding a charge, as soon as it may attack - in a rest
-    // of a string too, not in its recovery after one
+    // lead.reach, holding a charge, as soon as it may attack - not in a
+    // rest of a string, its recovery or its retreat (the Warden in a rest
+    // of its own, issue #363)
     function _punishes(dist, canSee) {
         return lead && canSee && attackCooldown <= 0 && dist <= Balance.lead.reach + bulk
             && _holdsCharge(target)
@@ -1665,10 +1728,12 @@ PhysicsItem {
 
         case "recovery":
             // After an attack, or a rest of a string (_stepAttack runs
-            // it), which a knight charging in reach cuts short
+            // it), which stands its beat whatever the knight does; only
+            // the Warden's is cut short by a knight charging in reach
+            // (issue #363, until #368)
             body.linearVelocity = Qt.point(0, 0)
             if (enemyType === "guardian") _lerpFacing(dy, dx, dt)
-            if (_beat >= 0 && _punishes(dist, canSee)) {
+            if (boss && _beat >= 0 && _punishes(dist, canSee)) {
                 beginString(-1, true)
                 break
             }
@@ -1960,12 +2025,12 @@ PhysicsItem {
     }
     // Whether a blow breaks a lead's stance, judged on the striker's
     // screen: a parry, or a charged swing while it recovers from its
-    // lunge (the whirlwind's blows are heavy too). Its cause, or "" for a
-    // blow that does not
+    // lunge, rests or retreats (the whirlwind's blows are heavy too). Its
+    // cause, or "" for a blow that does not
     function _opens(heavy, parried) {
         if (!lead || opening) return ""
         if (parried === true) return "parry"
-        if (heavy === true && aiState === "recovery") return "heavy"
+        if (heavy === true && (aiState === "recovery" || aiState === "retreat")) return "heavy"
         return ""
     }
 
@@ -1983,14 +2048,16 @@ PhysicsItem {
 
     // What a blow of amount from (attackerX, attackerY) does: the damage
     // and whether a guardian's shield took it. A heavy blow (the knight's
-    // charged swing) goes through the shield. On a lead (Balance.lead) a
+    // charged swing) goes through the shield, and a lead's retreat has it
+    // down (Balance.lead.retreat). On a lead (Balance.lead) a
     // blow in an opening does openingDamage times as much, the one that
     // opens it (opens, its cause) all of it, any other chip of it
     function _blow(amount, attackerX, attackerY, heavy, opens) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
-        if (enemyType === "guardian" && aiState !== "stagger" && aiState !== "frozen" && heavy !== true
+        if (enemyType === "guardian" && aiState !== "stagger" && aiState !== "frozen"
+            && aiState !== "retreat" && heavy !== true
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true

@@ -1025,12 +1025,16 @@ def check(results, bands):
             r = by.get(pilot)
             if not r:
                 continue
-            t = lead_time(r)
-            ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
-            what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
-            out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
-                            f"or falls ({what})"))
-            # The lead strikes a knight charging in its reach first (#272)
+            # A charge let go in a lead's rest or retreat is an answer to
+            # its string (issue #363): only the masher is held to duelSlow
+            if pilot == "masher":
+                t = lead_time(r)
+                ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
+                what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
+                out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
+                                f"or falls ({what})"))
+            # The lead strikes a knight charging in its reach first, outside
+            # its rests and its retreat (#272, #363)
             if pilot == "charge":
                 least = bands["duelCancelled"]
                 out.append((r["cancelledCharges"] >= least,
