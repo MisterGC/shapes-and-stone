@@ -18,6 +18,8 @@ Window {
         anchors.fill: parent
         // Each dungeon opens with its depth, its name and a count (issue #316)
         descentIntro: true
+        // The menu's duel pace is kept with the record (issue #362)
+        keepsDuelPace: true
         Component.onCompleted: console.log("[Main] Game component loaded")
     }
 }

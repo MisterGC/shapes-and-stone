@@ -350,6 +350,7 @@ Window {
             press(Qt.Key_S)
             press(Qt.Key_S)
             press(Qt.Key_S)
+            press(Qt.Key_S)
             press(Qt.Key_Return)
         }],
         [() => page() !== null && page().activeFocus, () => {

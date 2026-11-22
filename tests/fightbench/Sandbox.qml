@@ -278,6 +278,11 @@ Item {
             sword: sword,
             boots: boots,
             moveSpeed: p ? p.maxSpeed : Balance.knight.moveSpeed,
+            // The duel pace the leads played at, and the game's standard
+            // one (Balance.pace, issue #362): the bench keeps no pace, so
+            // it plays the standard whatever the machine has stored
+            duelPace: game.playedDuelPace,
+            standardPace: Balance.pace.standard,
             outcome: cleared ? "cleared" : fallen ? "fallen" : "running",
             steps: steps,
             seconds: round3(r.seconds),

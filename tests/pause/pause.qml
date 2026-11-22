@@ -1,5 +1,6 @@
 // Pause bench - a first-time player sees the controls at depth 0, and Esc
-// opens a menu with Resume, Music, Sound, Control Input and Title (issue #39).
+// opens a menu with Resume, Music, Sound, Duel pace, Control Input and Title
+// (issues #39, #362).
 //
 // Alone: at depth 0 the controls hint names LMB and its hold to charge,
 // RMB, Space for the dash (not Shift), E, M and Esc, and deeper it is gone. With D held, Esc opens
@@ -206,7 +207,8 @@ Window {
             press(menu(solo), Qt.Key_S)
             press(menu(solo), Qt.Key_S)
             press(menu(solo), Qt.Key_S)
-            check(menu(solo).selectedIndex === 4, "S four times picks Title, past Music, Sound and Control Input")
+            press(menu(solo), Qt.Key_S)
+            check(menu(solo).selectedIndex === 5, "S five times picks Title, past Music, Sound, Duel pace and Control Input")
             press(menu(solo), Qt.Key_Return)
         }],
         [() => solo.screen === "title", () => {
@@ -333,6 +335,7 @@ Window {
             press(host, Qt.Key_Escape)
         }],
         [() => menu(host) !== null && menu(host).activeFocus, () => {
+            press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)
             press(menu(host), Qt.Key_S)

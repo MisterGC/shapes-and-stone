@@ -8,9 +8,13 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [0.7.0] - 2026-11-22
 
+### Added
+
+- **Choose how slow duels are:** the Esc menu has a *Duel pace* row under *Sound*, with Swift, Standard and Deliberate. Turn it as you turn a volume - A and D, the arrow keys, a click on its arrows or the pad's stick - and a room's lead fights at that pace from its next move: Swift 1.3 times slower than the fast fights, Standard 1.65 times, Deliberate twice. Standard is where the game starts. Your choice is kept and survives a restart and, in the browser, a reload. In co-op the host decides what the enemies do, so the host's pace holds on every screen; a joiner's menu shows the host's pace in the row and says the host sets it, and the joiner's own choice comes back when it plays alone. The Hollow Warden keeps its own tempo for now. ([#362](https://github.com/MisterGC/shapes-and-stone/issues/362))
+
 ### Changed
 
-- **A room's lead fights at a slower duel pace:** a lead now winds up, strikes, feints and recovers 1.65 times slower than before - in its strings a blow comes every 1.16 s where it came every 0.7 s - and walks at 2.4 instead of 4.0, slower than your knight with its shield up, so you can back away from it behind the shield. Your windows against it widen by as much: a shield raised up to 13 physics steps (0.22 s) before its blow is a perfect block, where it was 8, a parry has 15 steps where it had 9, and a guardian lead turns its shield at 73 degrees a second instead of 120, so you can walk round it. This is the Standard step of a duel pace that has two more, Swift (1.3 times slower) and Deliberate (twice as slow); the game plays at Standard, and the menu does not offer the choice yet. Your knight's swing, shield, charge and dash, the weak and normal enemies and the Hollow Warden keep their timing. ([#361](https://github.com/MisterGC/shapes-and-stone/issues/361))
+- **A room's lead fights at a slower duel pace:** a lead now winds up, strikes, feints and recovers 1.65 times slower than before - in its strings a blow comes every 1.16 s where it came every 0.7 s - and walks at 2.4 instead of 4.0, slower than your knight with its shield up, so you can back away from it behind the shield. Your windows against it widen by as much: a shield raised up to 13 physics steps (0.22 s) before its blow is a perfect block, where it was 8, a parry has 15 steps where it had 9, and a guardian lead turns its shield at 73 degrees a second instead of 120, so you can walk round it. This is the Standard step of a duel pace that has two more, Swift (1.3 times slower) and Deliberate (twice as slow); the game plays at Standard unless you choose another in the menu. Your knight's swing, shield, charge and dash, the weak and normal enemies and the Hollow Warden keep their timing. ([#361](https://github.com/MisterGC/shapes-and-stone/issues/361))
 
 ## [0.6.0] - 2026-11-20
 

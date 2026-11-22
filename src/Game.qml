@@ -199,14 +199,44 @@ ClayWorld2d {
     // null when there is none
     property var duelLead: null
     readonly property bool duelEngaged: duelLead !== null
-    // The duel pace a room's lead plays at (Balance.pace, issue #361): one
-    // of its steps by name, and that step's factor - 1 for a name it does
-    // not have
+    // The duel pace a room's lead plays at (Balance.pace, issue #361): this
+    // machine's, one of its steps by name, which the menu's "Duel pace"
+    // row sets (setDuelPace, issue #362). playedDuelPace is the one the
+    // leads play: in a session the host's on every screen
+    // (session.hostDuelPace), else this machine's; duelPaceFactor is its
+    // step's factor - 1 for a name it does not have
     property string duelPace: Balance.pace.standard
+    readonly property string playedDuelPace: session.connected && !session.isHost
+                                             && session.hostDuelPace !== ""
+                                             ? session.hostDuelPace : duelPace
     readonly property real duelPaceFactor: {
-        let s = Balance.pace.steps.find(p => p.name === duelPace)
+        let s = Balance.pace.steps.find(p => p.name === playedDuelPace)
         return s ? s.factor : 1
     }
+    // Whether this machine's duel pace is read from the record at the
+    // start and kept there when the menu sets it (key "duelPace"): the
+    // game's window does (Main.qml). A bench or the dojo plays at
+    // Balance.pace.standard unless it sets the pace itself, and leaves the
+    // pace stored on the machine as it was
+    property bool keepsDuelPace: false
+    // The menu's row: a step Balance.pace has, kept with the record when
+    // keepsDuelPace; a joiner's menu plays the host's and sets nothing
+    function setDuelPace(name) {
+        if (session.connected && !session.isHost) return
+        if (!Balance.pace.steps.some(p => p.name === name) || name === duelPace) return
+        duelPace = name
+        if (keepsDuelPace) records.set("duelPace", name)
+        console.log("[Game] Duel pace:", name + (keepsDuelPace ? ", kept" : ""))
+    }
+    function _loadDuelPace() {
+        if (!keepsDuelPace) return
+        let name = records.get("duelPace", Balance.pace.standard)
+        duelPace = Balance.pace.steps.some(p => p.name === name) ? name : Balance.pace.standard
+        console.log("[Game] Duel pace kept:", duelPace)
+    }
+    // The host's pace is the party's: published as it hosts and on every
+    // change
+    onDuelPaceChanged: if (session.connected && session.isHost) session.publishDuelPace(duelPace)
     property bool followFightOnSteps: false
     readonly property bool _followingFight: levelType === "dungeon" && player !== null
     Timer {
@@ -2097,6 +2127,7 @@ ClayWorld2d {
             if (session.connected) Qt.callLater(() => {
                 if (!session.connected || !session.isHost) return
                 session.publishRecord(world.ownRecord)
+                session.publishDuelPace(world.duelPace)
                 campFreed.publish()
             })
         }
@@ -2119,6 +2150,7 @@ ClayWorld2d {
         _loadRecord()
         campFreed.load()
         _loadVolumes()
+        _loadDuelPace()
         controlTable.load()
         _loadMaster()
         runStartRecord = ownRecord.depth
@@ -10202,7 +10234,10 @@ ClayWorld2d {
                 muteKey: controlTable.key("mute")
                 musicVolume: world.musicVolume
                 soundVolume: world.soundVolume
+                duelPace: world.playedDuelPace
+                paceByHost: session.connected && !session.isHost
                 onVolumeSet: (which, value) => world.setVolume(which, value)
+                onDuelPaceSet: (name) => world.setDuelPace(name)
                 onResume: world.closeMenu()
                 onToTitle: world.backToTitle()
                 onControlInput: world.openControlInput()

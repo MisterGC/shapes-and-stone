@@ -989,7 +989,12 @@ def fmt_span(a, b):
 
 def check(results, bands):
     """One (ok, line) per band of Balance.pacing for the fights played"""
-    out = []
+    # The bands hold at the standard duel pace, which every fight plays
+    # whatever pace the machine keeps for the game (issue #362)
+    paces = sorted({r.get("duelPace", "?") for r in results})
+    out = [(all(r.get("duelPace") == r.get("standardPace") for r in results),
+            f"every fight plays at the standard duel pace, {results[0].get('standardPace') if results else '?'} "
+            f"({', '.join(paces)})")]
     for r in results:
         if r["room"] != "flow":
             continue

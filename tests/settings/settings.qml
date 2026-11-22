@@ -119,16 +119,16 @@ Window {
         }],
         [() => shown("pauseMenu") !== null && shown("pauseMenu").activeFocus, () => {
             let m = shown("pauseMenu")
-            check(m.choices.join(",") === "Resume,Music,Sound,Control Input,Title",
-                  "the menu has Resume, Music, Sound, Control Input, Title")
-            check(find(m, "pauseVolumeMusic").text === "100%", "Music shows 100%")
+            check(m.choices.join(",") === "Resume,Music,Sound,Duel pace,Control Input,Title",
+                  "the menu has Resume, Music, Sound, Duel pace, Control Input, Title")
+            check(find(m, "pauseValueMusic").text === "100%", "Music shows 100%")
             press(Qt.Key_S)
             press(Qt.Key_A)
         }],
         [100, () => {
             let t = tracks(game)
             check(near(game.musicVolume, 0.9), "S then A turns the music to 90%")
-            check(find(shown("pauseMenu"), "pauseVolumeMusic").text === "90%", "the row shows 90%")
+            check(find(shown("pauseMenu"), "pauseValueMusic").text === "90%", "the row shows 90%")
             check(near(t["village.song.json"].volume, 0.35 * 0.9) && near(t["dungeon.song.json"].volume, 0.3 * 0.9)
                   && near(t["village.sfx.json"].level, 0.4 * 0.9),
                   "the music and the ambience play at their own volume times 0.9")

@@ -217,8 +217,8 @@ Window {
         }]],
         start(),
         [[() => menu() !== null, () => {}]],
-        down(), down(), down(),
-        [[0, () => check(menu().selectedIndex === 3, "down three times in the menu picks Control Input")]],
+        down(), down(), down(), down(),
+        [[0, () => check(menu().selectedIndex === 4, "down four times in the menu picks Control Input")]],
         a(),
         [[() => controlPage() !== null, () => {
             check(menu() === null && solo.menuOpen && solo.gamePaused,
@@ -228,7 +228,7 @@ Window {
         [[0, () => check(controlPage().selectedIndex === 1, "down picks the page's second row")]],
         b(),
         [[() => controlPage() === null && menu() !== null, () => {
-            check(solo.menuOpen && menu().selectedIndex === 3, "B goes back to the pause menu, on Control Input")
+            check(solo.menuOpen && menu().selectedIndex === 4, "B goes back to the pause menu, on Control Input")
         }]],
         a(),
         [[() => controlPage() !== null, () => {}]],
@@ -237,7 +237,7 @@ Window {
             check(solo.menuOpen && solo.gamePaused, "Start on the page goes back to the pause menu, it does not resume")
         }]],
         down(),
-        [[0, () => check(menu().selectedIndex === 4, "down once more picks Title")]],
+        [[0, () => check(menu().selectedIndex === 5, "down once more picks Title")]],
         a(),
         [[() => solo.screen === "title" && titleAt(0), () => {
             check(solo.player === null && !solo.menuOpen, "A on Title clears the run and goes to the title")
