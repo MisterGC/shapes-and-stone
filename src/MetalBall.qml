@@ -23,6 +23,10 @@ PhysicsItem {
     property real dirY: 0
     property real speed: Balance.ball.speed
     property int damage: Balance.enemy.slinger.atk
+    // Its slinger's perfect-block window in physics steps (Enemy.
+    // perfectFrames, wider for a lead at a slow duel pace); 0 for the
+    // knight's own
+    property int perfectFrames: 0
     // The walls it bounced off so far
     property int bounces: 0
     // A shield bounced it: back, as a spitter's shot sent back is (so
@@ -223,7 +227,7 @@ PhysicsItem {
 
         // Any raised shield facing it bounces it: perfect along the way
         // the knight faces, plain off the shield
-        let shield = entity.shieldShot ? entity.shieldShot(xWu, yWu, widthWu, dirX, dirY) : ""
+        let shield = entity.shieldShot ? entity.shieldShot(xWu, yWu, widthWu, dirX, dirY, perfectFrames) : ""
         if (shield === "perfect" || shield === "blocked") {
             let rad = entity.facingAngle * Math.PI / 180
             let d = shield === "perfect" ? Qt.point(Math.cos(rad), Math.sin(rad))
@@ -235,7 +239,7 @@ PhysicsItem {
             return
         }
         // Dodged in a dash, or met in the grace after a hit: it flies on
-        let result = entity.takeDamage(damage, xWu, yWu, widthWu, false, dirX, dirY)
+        let result = entity.takeDamage(damage, xWu, yWu, widthWu, false, dirX, dirY, perfectFrames)
         if (result !== "hit" && result !== "blocked") return
         if (gameWorld) {
             gameWorld.impact("projectileHit", entity.xWu, entity.yWu, dirX, dirY)

@@ -202,21 +202,35 @@ PhysicsItem {
     readonly property real aimYWu: yWu - bulk
     // How much faster than its table it plays, and a beat of its strings
     readonly property real speedUp: tempo * (phase === 2 ? Balance.boss.phase2Tempo : 1)
-    readonly property real beatLen: (boss ? Balance.boss.beat : Balance.lead.beat) / speedUp
+    readonly property real beatLen: (boss ? Balance.boss.beat : Balance.lead.beat * pace) / speedUp
+    // The duel pace (Balance.pace, issue #361): how many times slower than
+    // the table a room's lead plays its side of a duel, the game's
+    // duelPaceFactor; 1 for every other enemy and for the Warden, which
+    // keeps its own tempo (issue #368). Its wind-ups, feint holds and
+    // recoveries last pace times as long, it walks pace times slower, and
+    // against it the knight's parry and perfect-block windows are pace
+    // times as many steps: parryFrames, parryStart and perfectFrames
+    readonly property real pace: lead && !boss && gameWorld && gameWorld.duelPaceFactor > 0
+                                 ? gameWorld.duelPaceFactor : 1
+    readonly property int parryFrames: Math.round(Balance.enemy.parryFrames * pace)
+    readonly property int parryStart: Math.round(Balance.lead.parryStart * pace)
+    readonly property int perfectFrames: Math.round(Balance.knight.perfectBlockFrames * pace)
     // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
     // was built with (issue #157)
     property string fromHole: ""
     property real facingAngle: 0          // Guardian tracks player direction
     readonly property real shieldArc: Balance.enemy.shieldArc
-    readonly property real shieldRotSpeed: Balance.enemy.shieldTurnSpeed
+    readonly property real shieldRotSpeed: Balance.enemy.shieldTurnSpeed / pace
 
     // Stats, from the balance table; hp, atk and def are set on spawn
     readonly property var _typeStats: Balance.enemy[enemyType] || Balance.enemy.grunt
-    readonly property real chaseSpeed: _typeStats.chaseSpeed
-    readonly property real patrolSpeed: _typeStats.patrolSpeed
+    readonly property real chaseSpeed: _typeStats.chaseSpeed / pace
+    readonly property real patrolSpeed: _typeStats.patrolSpeed / pace
     property real _lungeSpeed: 0  // Calculated per attack
-    readonly property real windUpSpeed: Balance.enemy.windUpSpeed
-    readonly property real windUpDuration: Balance.enemy.windUp
+    readonly property real windUpSpeed: Balance.enemy.windUpSpeed / pace
+    readonly property real windUpDuration: Balance.enemy.windUp * pace
+    readonly property real crushWindUp: Balance.enemy.crushWindUp * pace
+    readonly property real shootWindUp: Balance.enemy.shootWindUp * pace
     // A lead's string's first wind-up: the Warden's its own (boss.countIn)
     readonly property real countIn: boss ? Balance.boss.countIn : windUpDuration
     readonly property real lungeDuration: Balance.enemy.lungeDuration
@@ -229,7 +243,7 @@ PhysicsItem {
     // Spitter-specific
     readonly property real preferredDist: Balance.enemy.preferredDist
     readonly property real shootRange: Balance.enemy.shootRange
-    readonly property real kiteSpeed: Balance.enemy.kiteSpeed
+    readonly property real kiteSpeed: Balance.enemy.kiteSpeed / pace
     readonly property real shootCooldown: Balance.enemy.shootCooldown
     property real _shootTimer: 0
 
@@ -284,7 +298,7 @@ PhysicsItem {
         : ranged ? "#F2D13A" : "#FF8C00"
     // Seconds of a lunge after its first step until the parry window opens
     readonly property real _ringLunge: aiState === "shoot" || aiState === "bash" ? 0
-        : Math.max(0, lungeStepCount(_ringStep) - 1 - Balance.enemy.parryFrames) * _ringStep
+        : Math.max(0, lungeStepCount(_ringStep) - 1 - parryFrames) * _ringStep
     readonly property real ringProgress: {
         if (!ringShows) return 0
         if (parryWindow) return 1
@@ -297,7 +311,7 @@ PhysicsItem {
     // Seconds until the ring closes, of total
     function _ringLeft(total) {
         return remote ? total - _ringT
-            : aiState === "lunge" ? Math.max(0, _lungeSteps - Balance.enemy.parryFrames) * _ringStep
+            : aiState === "lunge" ? Math.max(0, _lungeSteps - parryFrames) * _ringStep
             : _attackTimer + _ringLunge
     }
     // A feint's wind-up is feintHold longer than its ring (base): the ring
@@ -1151,7 +1165,7 @@ PhysicsItem {
 
     // An attack runs on the physics steps, not on the AI's think ticks: a
     // telegraph lasts its wind-up to the step, and the parry window is open
-    // for exactly Balance.enemy.parryFrames steps (issue #35)
+    // for exactly parryFrames steps (issue #35)
     Connections {
         target: enemy.world
         enabled: !enemy.halted && !enemy.remote
@@ -1269,7 +1283,7 @@ PhysicsItem {
             -_dirToTargetY * _lungeSpeed)
         _lungeSteps--
         if (_lungeSteps > 0) {
-            parryWindow = !crushing && _lungeSteps <= Balance.enemy.parryFrames
+            parryWindow = !crushing && _lungeSteps <= parryFrames
             return
         }
         parryWindow = false
@@ -1284,7 +1298,7 @@ PhysicsItem {
             return
         }
         aiState = "recovery"
-        attackCooldown = lead ? Balance.lead.recovery : Balance.enemy.recovery
+        attackCooldown = lead ? Balance.lead.recovery * pace : Balance.enemy.recovery
     }
 
     // ---- a lead's strings (Balance.lead, issue #272) ----
@@ -1292,7 +1306,8 @@ PhysicsItem {
     // level's attack rolls for i -1, so a seed plays the same fight.
     // punish: it strikes first, at a knight holding a charge within
     // lead.reach - its first wind-up enemy.minTelegraph; otherwise the
-    // first wind-up is the count-in, enemy.windUp (a shot's shootWindUp)
+    // first wind-up is the count-in, enemy.windUp (a shot's shootWindUp),
+    // each pace times as long
     function beginString(i, punish) {
         let list = Balance.lead.strings[enemyType] || []
         if (list.length === 0) return false
@@ -1342,9 +1357,9 @@ PhysicsItem {
             _dirToTargetY = dy / len
         }
         // A punishing blow comes at once: no feint
-        let hold = b === 2 && first !== "punish" ? l.feintHold / speedUp : 0
-        let w = first === "punish" ? Balance.enemy.minTelegraph
-            : first === "first" ? (shot ? Balance.enemy.shootWindUp : countIn) / speedUp
+        let hold = b === 2 && first !== "punish" ? l.feintHold * pace / speedUp : 0
+        let w = first === "punish" ? Balance.enemy.minTelegraph * pace
+            : first === "first" ? (shot ? shootWindUp : countIn) / speedUp
             : beatLen - (shot ? 0 : lungeDuration)
         if (shot) {
             body.linearVelocity = Qt.point(0, 0)
@@ -1364,7 +1379,7 @@ PhysicsItem {
         if (ranged) _shootTimer = shootCooldown
         body.linearVelocity = Qt.point(0, 0)
         aiState = "recovery"
-        attackCooldown = Balance.lead.recovery
+        attackCooldown = Balance.lead.recovery * pace
     }
     function _clearString() {
         _string = []
@@ -1607,7 +1622,7 @@ PhysicsItem {
             // Shoot when cooldown ready
             if (_shootTimer <= 0 && dist <= shootRange) {
                 _shootTimer = shootCooldown
-                _attackTimer = telegraphTime(Balance.enemy.shootWindUp)
+                _attackTimer = telegraphTime(shootWindUp)
                 aimShot(target)
                 aiState = "shoot"
             }
@@ -1664,14 +1679,14 @@ PhysicsItem {
     }
 
     // Winds up a lunge of seconds, or now and then a crushing blow of
-    // Balance.enemy.crushWindUp; the roll is the level's, so a seed plays
+    // crushWindUp; the roll is the level's, so a seed plays
     // the same fight. A feint holds hold seconds more; a crushing blow is
     // no feint
     function windUp(seconds, hold) {
         let crush = crushChance > 0 && gameWorld && gameWorld.rollAttack
             && gameWorld.rollAttack() < crushChance
         feintHold = crush || !(hold > 0) ? 0 : hold
-        _attackTimer = telegraphTime(crush ? Balance.enemy.crushWindUp : seconds) + feintHold
+        _attackTimer = telegraphTime(crush ? crushWindUp : seconds) + feintHold
         windUps++
         aiState = crush ? "crush" : "telegraph"
     }
@@ -1758,7 +1773,7 @@ PhysicsItem {
             let dist = Math.sqrt(dx * dx + dy * dy)
             if (dist < Balance.enemy.lungeHitRange + bulk) {
                 let result = target.takeDamage(atk, xWu, yWu, widthWu, crushing,
-                                               _dirToTargetX, _dirToTargetY)
+                                               _dirToTargetX, _dirToTargetY, perfectFrames)
                 // A blocked blow throws it back, a perfect block staggers
                 // it, a crushing blow's for the full stagger; the knight
                 // sounds its own block or hurt, so the lunge plays nothing
@@ -1808,12 +1823,13 @@ PhysicsItem {
         // A slinger's shot is a metal ball, from its centre (Balance.ball)
         if (slinger) {
             if (gameWorld && gameWorld.spawnBall)
-                gameWorld.spawnBall(centreXWu, centreYWu, _dirToTargetX, _dirToTargetY, atk)
+                gameWorld.spawnBall(centreXWu, centreYWu, _dirToTargetX, _dirToTargetY, atk, perfectFrames)
             return
         }
         if (gameWorld && gameWorld.spawnProjectile) {
             let half = Balance.projectile.size / 2
-            gameWorld.spawnProjectile(centreXWu - half, centreYWu + half, _dirToTargetX, _dirToTargetY, atk)
+            gameWorld.spawnProjectile(centreXWu - half, centreYWu + half, _dirToTargetX, _dirToTargetY, atk,
+                                      perfectFrames)
             if (gameWorld.playSpitShot) gameWorld.playSpitShot(xWu, yWu)
             console.log("[Enemy] Spitter fired projectile!")
         }
