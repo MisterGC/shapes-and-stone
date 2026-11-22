@@ -44,7 +44,10 @@ The pacing pilots: "charge" holds a full charge
 and lets go at the nearest enemy, "masher" clicks, "skilled" parries,
 perfect-blocks - crushing blows and shots, which it sends back - and
 strikes in openings, "person" plays as "skilled" with a person's reaction
-time and misses (Balance.pacing.person, issue #315); --special gives it a
+time and misses (Balance.pacing.person, issue #315), and meets
+Balance.pacing.person.block of a lead's strikes with a held shield and a
+riposte (Balance.lead.riposte, issue #365); each report counts the
+ripostes, the person's among its answers; --special gives it a
 special it fires with the same reaction and misses, paid from the
 knight's own mana (issue #344). --room is who stands in the fight room: "mixed" its usual lineup (Balance.spawn.fightRoom), "flow" fodder
 only, "duel" a room's lead alone, a grunt, "guardianduel" a guardian lead
@@ -560,7 +563,8 @@ def describe(r):
                 + ", ".join(f"{k} {n}" for k, n in sorted(how.items())) + ")")
     lines = [f"{r['room']} depth {r['depth']} sword {r['sword']}{boots_tag(r)} {pilot(r)}: "
              f"{r['outcome']} after {r['seconds']:.2f} s, damage taken {r['damageTaken']}, "
-             f"openings {r['openings']}, cancelled charges {r['cancelledCharges']}, "
+             f"openings {r['openings']}, ripostes {r.get('ripostes', 0)}, "
+             f"cancelled charges {r['cancelledCharges']}, "
              f"engaged {r['engagedSeconds']:.2f} s, shots sent back {r.get('shotsBack', 0)} "
              f"({r.get('shotBackHits', 0)} hit){stun}"]
     balls = r.get("balls") or []
@@ -622,10 +626,12 @@ def answers_line(person):
     """The person's answers and misses (issue #315) as text"""
     a, m = person["answers"], person["missed"]
     fastest = person.get("fastest")
-    kinds = ("parry", "perfect", "shot") + (("special",) if "special" in a else ())
+    kinds = ("parry", "perfect", "shot") + tuple(k for k in ("riposte", "special") if k in a)
+    blocks = person.get("blocks")
     return (f"missed {sum(m.values())} of {sum(a.values())} answers ("
             + ", ".join(f"{k} {m[k]}/{a[k]}" for k in kinds)
-            + "), fastest answer " + ("-" if fastest is None else f"{fastest:.3f} s")
+            + ")" + ("" if blocks is None else f", {blocks} strikes met with the shield")
+            + ", fastest answer " + ("-" if fastest is None else f"{fastest:.3f} s")
             + f" after it began (reaction {person['reaction']} s, miss {person['miss']})")
 
 

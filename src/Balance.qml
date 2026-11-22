@@ -750,8 +750,11 @@ QtObject {
         // guardian lead it does not fell the lead in personExchanges
         // exchanges, from the first number to the second, and stand (issue
         // #364): an exchange is a string of the lead's in which it wound up
-        // a blow, the knight's answers to it with it
-        person: { reaction: 0.25, miss: 0.2, missSlack: 0.05 },
+        // a blow, the knight's answers to it with it. block of a lead's
+        // strikes - not its crushing blows, not the Warden's - it meets
+        // with a held shield and a riposte, in turn, the others with a
+        // parry, and it misses its ripostes as its parries (issue #365)
+        person: { reaction: 0.25, miss: 0.2, missSlack: 0.05, block: 0.5 },
         personExchanges: [3, 5],
         // Flow, every pilot: each enemy dies to as many blows that land as
         // flowHits gives that pilot, from the first number to the second -
