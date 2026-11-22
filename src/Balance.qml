@@ -880,7 +880,23 @@ QtObject {
     // (0.5 outside the retreat) at shieldOpacity, and the body sags to
     // pose of its size;
     // and a sound of its own: the lead's growl (Balance.duel), pitch
-    // semitones up, at volume, fading with the distance as the growl does
+    // semitones up, at volume, fading with the distance as the growl does.
+    // The riposte (issue #365): a light swing begun at most riposte.frames
+    // physics steps after a knight's held shield stopped a lead's strike -
+    // a lunge, a shot or a metal ball, not a perfect block, not a crushing
+    // blow that breaks the shield - times the duel pace (Balance.pace),
+    // rounded: 30 steps, half a second, at Standard. It lands on that lead
+    // whole, whatever its stance and through a guardian's shield, an
+    // opening's share in an opening, and wears the stance as any blow. It
+    // gives back what that block cost: the mana the strike took off the
+    // shield and the shield's upkeep (knight.blockDrain) since the shield
+    // rose or since the riposte before, at most upkeepBeats of the lead's
+    // beats of it, so a knight that holds its shield through a string and
+    // ripostes every blow keeps its mana. One riposte per stopped strike.
+    // It shows word in color over the lead, its number in color, and
+    // plays the shield's clang pitch semitones up at volume. A parry in
+    // the same swing is a parry. Weak and normal enemies and the Hollow
+    // Warden (issue #368) give none
     readonly property var lead: ({
         parryStart: 9,
         parryRest: 36,
@@ -913,6 +929,14 @@ QtObject {
             pose: 0.9,
             pitch: 7,
             volume: 0.55
+        },
+        riposte: {
+            frames: 18,
+            upkeepBeats: 2.5,
+            word: "RIPOSTE",
+            color: "#9FF0D0",
+            pitch: 9,
+            volume: 0.6
         },
         strings: {
             grunt: [
@@ -952,8 +976,9 @@ QtObject {
     // and steps back in its wind-up at its speeds divided by factor, and a
     // guardian lead turns its shield at enemy.shieldTurnSpeed divided by
     // factor. Against it the knight's parry window (enemy.parryFrames,
-    // lead.parryStart) and perfect-block window (knight.perfectBlockFrames)
-    // are factor times as many physics steps, rounded. The lunge itself,
+    // lead.parryStart), perfect-block window (knight.perfectBlockFrames)
+    // and riposte window (lead.riposte.frames, issue #365) are factor
+    // times as many physics steps, rounded. The lunge itself,
     // the knight's own swing, shield, charge and dash and every other
     // enemy keep their timing. steps are the paces the game offers, by
     // name; it plays at standard. The Hollow Warden keeps its own tempo

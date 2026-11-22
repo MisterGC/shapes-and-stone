@@ -234,6 +234,7 @@ PhysicsItem {
             _cancelCharge()
             _rearmed = _steps - _loweredAt >= Balance.knight.perfectBlockRearm
             _raisedAt = _steps
+            _upkeep = 0
         } else {
             _loweredAt = _steps
         }
@@ -366,8 +367,10 @@ PhysicsItem {
                 if (openLeft === 0 && _shieldWanted && !fallen && mana > 0) isBlocking = true
             }
             if (isBlocking && !fallen) {
+                let was = mana
                 let left = mana - blockDrain * dt
                 mana = left < 1e-6 ? 0 : left
+                _upkeep += was - mana
                 if (mana <= 0) {
                     isBlocking = false
                     _shieldBreak()
@@ -438,8 +441,8 @@ PhysicsItem {
 
     // A moment others should see: "attack", "heavy", "whirlwind", "stun", "bolt",
     // a special's stronger version as "whirlwind+", "stun+" or "bolt+",
-    // "dash", "parry", "block", "perfectBlock", "hurt", "shieldBreak",
-    // "sit" or "stand".
+    // "dash", "parry", "block", "perfectBlock", "riposte", "hurt",
+    // "shieldBreak", "sit" or "stand".
     // Game.qml sends it to the other players, whose RemotePlayer shows it.
     signal acted(string action)
 
@@ -669,6 +672,9 @@ PhysicsItem {
                 // it, nor by a charged one (issue #288)
                 let parried = enemy.parryWindow
                     && (!enemy.lead || _parriesLead(enemy))
+                // A light swing begun right after the held shield stopped
+                // this lead's strike is a riposte (Balance.lead.riposte)
+                let riposte = !parried && _ripostes(enemy)
                 let dmg = isBlocking ? Math.floor(atk * Balance.knight.blockingSwing)
                         : isDashing ? Math.floor(atk * Balance.knight.dashingSwing) : atk
                 if (parried) dmg = atk * Balance.knight.parrySwing
@@ -682,8 +688,9 @@ PhysicsItem {
                 dmg = chained(dmg)
                 // A lead's stance takes a share of it, or breaks: the
                 // number shows what it did
-                let dealt = enemy.takeDamage(dmg, xWu, yWu, isHeavy, parried)
+                let dealt = enemy.takeDamage(dmg, xWu, yWu, isHeavy, parried, riposte)
                 if (dealt !== undefined) dmg = dealt
+                if (riposte) _riposte(enemy)
                 if (isHeavy) _heavyLanded = true
                 _hitThisSwing.add(enemy)
                 hitCount++
@@ -707,6 +714,15 @@ PhysicsItem {
                         gameWorld.spawnWord(enemy.xWu, enemy.yWu + 0.5, "PARRY", "#FFD700")
                     }
                     console.log("[Player] PARRY! Dealt", dmg, "damage!")
+                } else if (riposte) {
+                    let rp = Balance.lead.riposte
+                    if (gameWorld) {
+                        gameWorld.playImpact()
+                        gameWorld.playRiposte()
+                        gameWorld.spawnDamageNumber(enemy.xWu, enemy.yWu, dmg, rp.color)
+                        gameWorld.spawnWord(enemy.xWu, enemy.yWu + 0.5, rp.word, rp.color)
+                    }
+                    console.log("[Player] RIPOSTE! Dealt", dmg, "damage!")
                 } else {
                     if (gameWorld) {
                         gameWorld.playImpact()
@@ -1067,13 +1083,58 @@ PhysicsItem {
             gameWorld.spawnWord(xWu, yWu + 0.4, Balance.knight.noManaWord, Balance.knight.noManaColor)
     }
     // A blow the raised shield stopped, a lunge or a shot: it costs
-    // blockMana, and the shield breaks if that empties it
+    // blockMana, and the shield breaks if that empties it. What it took is
+    // kept for a riposte to give back (riposteOpen)
     function payBlock() {
+        let was = mana
         _spend(blockMana)
+        _blockPaid = was - mana
         if (mana <= 0 && isBlocking) {
             isBlocking = false
             _shieldBreak()
         }
+    }
+
+    // The riposte (Balance.lead.riposte, issue #365). The mana the last
+    // blow the shield stopped took off it, and the shield's upkeep since
+    // it rose or since the last riposte gave it back
+    property real _blockPaid: 0
+    property real _upkeep: 0
+    // The lead whose strike the held shield stopped last, null once its
+    // riposte landed; the physics step it was stopped on, the steps a
+    // riposte has to begin in, what that block took and the lead's beat
+    property var _riposteLead: null
+    property int _riposteFrom: -1000000
+    property int _riposteFrames: 0
+    property real _ripostePaid: 0
+    property real _riposteBeat: 0
+    // The held shield stopped a strike of enemy's - a lunge, a shot, a
+    // metal ball - that payBlock paid for: a room's lead's opens a
+    // riposte's window; any other enemy's, and the Warden's, nothing
+    function riposteOpen(enemy) {
+        if (!enemy || enemy.riposteable !== true) return
+        _riposteLead = enemy
+        _riposteFrom = _steps
+        _riposteFrames = enemy.riposteFrames
+        _ripostePaid = _blockPaid
+        _riposteBeat = enemy.beatLen
+    }
+    // Whether the swing under way ripostes enemy: a light one begun in the
+    // window after its strike was stopped
+    function _ripostes(enemy) {
+        return !isHeavy && !!enemy && enemy === _riposteLead && enemy.riposteable === true
+            && _swingStep >= _riposteFrom && _swingStep - _riposteFrom <= _riposteFrames
+    }
+    // A riposte landed on enemy: the block's mana back - the strike's and
+    // the upkeep, at most upkeepBeats of the lead's beats of it -, once
+    function _riposte(enemy) {
+        let rp = Balance.lead.riposte
+        let upkeep = Math.min(_upkeep, rp.upkeepBeats * _riposteBeat * blockDrain)
+        mana = Math.min(maxMana, mana + _ripostePaid + upkeep)
+        _upkeep = 0
+        _riposteLead = null
+        acted("riposte")
+        if (gameWorld) gameWorld.countFight("riposte")
     }
 
     // The shield ran dry while raised: it breaks, with a crack, and the
