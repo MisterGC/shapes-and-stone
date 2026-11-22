@@ -718,6 +718,20 @@ ClayWorld2d {
             logSound("sfx/lead_growl", "growl", 0, _distTo(xWu, yWu), gain)
         }
     }
+    // A room's lead retreats after its string: its growl, higher and
+    // softer (Balance.lead.retreat), fading as the growl does
+    SfxPlayer {
+        id: leadRetreatSound
+        source: "../sound/sfx/lead_growl.sfx.json"
+        volume: muted ? 0 : Balance.lead.retreat.volume * soundVolume
+    }
+    function playLeadRetreat(xWu, yWu) {
+        let gain = _gainAt(xWu, yWu)
+        if (gain <= 0) return
+        let pitch = Balance.lead.retreat.pitch
+        leadRetreatSound.play(gain, pitch)
+        logSound("sfx/lead_growl", "retreat", pitch, _distTo(xWu, yWu), gain)
+    }
 
     // The dungeon song's sting (Balance.duel): for a parry or a perfect
     // block of this knight in a duel, and an opening of a lead within its

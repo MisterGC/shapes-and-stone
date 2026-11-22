@@ -748,16 +748,21 @@ QtObject {
         // the knight does not fall
         flowHits: { charge: [1, 1], masher: [2, 3], skilled: [1, 3] },
         flowGap: 2.5,
-        // Duel, either lead: "masher" and "charge" take at least duelSlow seconds to
-        // kill the lead, from the moment it engages, or fall; "skilled"
+        // Duel, either lead: "masher" takes at least duelSlow seconds to
+        // kill the lead, from the moment it engages, or falls; "skilled"
         // kills it within duelSkilled seconds and does not fall, and takes
         // less damage than either of the others. A lead strikes a knight
-        // charging in its reach first (lead.reach): hits cancel at least
-        // duelCancelled of "charge"'s charges. Every duel band holds at the
-        // Standard duel pace (Balance.pace, issue #361): "skilled" kills a
-        // grunt or guardian lead there in 5.1 to 7.8 s where it took 4.6
-        // to 14.4 s before the pace, "masher" and "charge" fall in every
-        // duel at either
+        // charging in its reach first (lead.reach) outside its rests and
+        // its retreat: hits cancel at least duelCancelled of "charge"'s
+        // charges. Every duel band holds at the Standard duel pace
+        // (Balance.pace, issue #361): "skilled" kills a grunt or guardian
+        // lead there in 5.1 to 7.8 s where it took 4.6 to 14.4 s before the
+        // pace, "masher" falls in every duel at either. "charge" was held
+        // to duelSlow too until the lead's retreat (issue #363): a full
+        // charge let go in a rest or the retreat opens the lead, the answer
+        // the retreat is there for, and "charge" now kills every lead in
+        // 6.8 to 14.5 s, taking 14 to 60 damage, where it fell in every
+        // duel before
         duelSlow: 20,
         // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288;
         // from 4 to 5 s at the Standard duel pace, issue #361)
@@ -808,14 +813,33 @@ QtObject {
     // at feintRing of the way and the lead still, then strikes. A rest
     // stands a beat, a recovery a charged swing opens. A strike or a feint
     // winds up only at a knight within reach wu (a spitter's shootRange),
-    // else the string is over; after it the lead recovers for recovery.
+    // else the string is over; after it the lead retreats (retreat below),
+    // the Hollow Warden recovers for recovery instead (issue #368).
     // A knight within reach holding a charge, filling or full, is struck
-    // first: the lead begins a string at once - a rest of one cut short,
-    // not its recovery after one -, its first blow wound up for
-    // enemy.minTelegraph and no feint, and the hit cancels the charge.
-    // reach is the knight's own heavy swing's (knight.attackRange times
-    // heavyRange): a charge built outside it and let go on arriving in a
-    // rest or the recovery opens the lead
+    // first: the lead begins a string at once, its first blow wound up for
+    // enemy.minTelegraph and no feint, and the hit cancels the charge -
+    // but never in a rest of a string or in its retreat, which stand
+    // their beat whatever the knight does (issue #363); the Warden cuts
+    // a rest of its own short as before. reach is the knight's own heavy
+    // swing's (knight.attackRange times heavyRange): a charge built
+    // outside it and let go on arriving in a rest or the retreat opens the
+    // lead.
+    // The retreat (issue #363): after each string a lead steps back,
+    // the way its last blow came, back wu over step of a beat, then
+    // stands; it lasts one beat of its pace in all (lead.beat times the
+    // duel pace, Balance.pace), and in it the lead strikes nobody: no
+    // string, no blow at a charging knight, no counter. Its guard is down:
+    // a guardian's shield stops nothing, and a charged swing landed in it
+    // opens the lead, as one in a rest does. A full charge (knight.
+    // chargeTime) begun as it starts is let go inside it at every pace.
+    // It has a look of its own on every screen, from the replicated
+    // state: the body dims to color, the eyes close to eyes of their
+    // height and dim to eyesOpacity, the ring round a lead is gone, a
+    // guardian's shield hangs low, shieldOrbit of the body's width out
+    // (0.5 outside the retreat) at shieldOpacity, and the body sags to
+    // pose of its size;
+    // and a sound of its own: the lead's growl (Balance.duel), pitch
+    // semitones up, at volume, fading with the distance as the growl does
     readonly property var lead: ({
         parryStart: 9,
         parryRest: 36,
@@ -834,6 +858,18 @@ QtObject {
         feintHold: 0.35,
         feintRing: 0.6,
         reach: 2.5,
+        retreat: {
+            back: 0.6,
+            step: 0.4,
+            color: "#4A4257",
+            eyes: 0.35,
+            eyesOpacity: 0.5,
+            shieldOrbit: 0.3,
+            shieldOpacity: 0.35,
+            pose: 0.9,
+            pitch: 7,
+            volume: 0.55
+        },
         strings: {
             grunt: [
                 { name: "two-and-one", beats: [1, 1, 0, 1] },

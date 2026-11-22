@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `pace`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `pace`, `retreat`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2281,7 +2281,8 @@ stance, a charged swing `lead.heavyWear`; with no blow for
 `lead.regenDelay` seconds the stance comes back. A parry, a perfect block,
 a charged swing landed while it recovers from its lunge (`lead.recovery`
 seconds, shorter than a full charge: a charge the lunge cancelled is not
-full again in time) or a stance worn to 0 breaks it: an opening, a stagger
+full again in time), in a rest of its string or in its retreat after one
+(issue #363) or a stance worn to 0 breaks it: an opening, a stagger
 of `lead.openingTime` seconds in which every blow does `lead.openingDamage`
 times its damage. The blow that opens it lands whole, and after the
 opening the stance is full again. A swing parries a lead only when it
@@ -2370,13 +2371,39 @@ A lead attacks in strings (issue #272), in the arrow slits' beat notation:
 feint's wind-up holds `lead.feintHold` longer, its ring standing at
 `lead.feintRing`, then strikes; a rest is a recovery a charged swing
 opens. A knight within `lead.reach` holding a charge is struck first,
-`enemy.minTelegraph` after it is seen, a rest cut short, and the hit
-cancels the charge. `stringName` and `feintHold` are replicated. The
-strings bench steps every string of every lead type and finds the parry
-window on every beat:
+`enemy.minTelegraph` after it is seen, and the hit cancels the charge -
+but not in a rest, which stands its beat (issue #363). `stringName` and
+`feintHold` are replicated. The strings bench steps every string of every
+lead type and finds the parry window on every beat:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/strings/strings.qml
+```
+
+A lead ends each string with a retreat (issue #363, `lead.retreat`), the
+knight's turn: aiState `retreat`, one beat of its pace long (`lead.beat`
+times the duel pace, 1.16 s at Standard). It steps back `lead.retreat.back`
+wu the way its last blow came over the first `lead.retreat.step` of the
+beat, then stands with its guard down: it strikes nobody - no string, no
+blow at a charging knight, no counter -, a guardian's shield stops
+nothing, and a charged swing landed in it opens the lead. A full charge
+(`knight.chargeTime`, 0.6 s) begun as the retreat starts is let go inside
+it at every pace. It looks and sounds like no other state of a lead, on
+every screen, from the replicated aiState: the body dims to
+`lead.retreat.color`, the eyes close to a slit and dim, the ring round a
+lead is gone, a guardian's shield hangs low and faint, the body sags; and
+it sighs, the lead's growl `lead.retreat.pitch` semitones up. Outside a
+rest and the retreat a lead still strikes a charging knight first. The
+Hollow Warden recovers `lead.recovery` after a string as before and cuts
+its rests short for a charging knight (issue #368). The retreat bench
+plays every lead type's string at each duel pace in the paused fight room
+and checks the retreat's length, its step back, that it strikes nobody,
+that a held charge outlasts it and a charge begun with it lands in it,
+the guardian's guard, the look and the sound against every other state
+of a lead, and the Warden's recovery:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/retreat/retreat.qml
 ```
 
 A room's lead fights at the duel pace (issue #361, the table's `pace`
@@ -2385,8 +2412,8 @@ table gives it, by one factor. The game plays at Standard, factor 1.65;
 the other steps are Swift, 1.3, and Deliberate, 2. A lead's beat
 (`lead.beat`), its count-in, every wind-up of its - a strike's, a
 crushing blow's, a shot's, a guardian's counter, the blow it strikes a
-charging knight with -, a feint's hold and its recovery last that many
-times as long: at Standard a melee lead's blows come 1.16 s apart where
+charging knight with -, a feint's hold, its recovery and its retreat
+after a string (issue #363) last that many times as long: at Standard a melee lead's blows come 1.16 s apart where
 they came 0.7 s apart. It walks, kites and steps back in its wind-up
 that many times slower: a melee lead walks 2.4 wu/s at Standard and 2.0
 at Deliberate, slower than the knight behind its shield (3.0), so the
@@ -2614,8 +2641,10 @@ have heard. `--check` adds one PASS
 or FAIL line per band of `Balance.pacing` and exits 1 when one fails:
 in the flow room each enemy dies to as many hits as `flowHits` gives the
 pilot and no two kills lie more than `flowGap` seconds apart; in either
-duel `masher` and `charge` take at least `duelSlow` seconds or fall, hits
-cancel at least `duelCancelled` of `charge`'s charges (#272), and
+duel `masher` takes at least `duelSlow` seconds or falls, hits
+cancel at least `duelCancelled` of `charge`'s charges (#272) - `charge`
+is held to no time since a full charge let go in a lead's rest or retreat
+opens it, the answer the retreat is there for (issue #363) -, and
 `skilled` kills the lead within `duelSkilled` and takes less damage than
 both, every duel band at the Standard duel pace (issue #361). The kill chain's lines (issue #270) read the flow fights' sound
 logs: the death sound climbs a step of the dungeon song's scale over a

@@ -11,13 +11,16 @@
 // enemy.parryFrames times f steps, rounded; one blow lands lead.beat
 // times f seconds after the one before, a rest a beat more, a feint
 // lead.feintHold times f later, its ring held at lead.feintRing for that
-// long; a rest is a recovery a beat long.
+// long; a rest is a recovery a beat long, and after the string it
+// retreats (Balance.lead.retreat, issue #363).
 // Then a knight within lead.reach holding a full charge is struck first:
 // the grunt winds up at once, for enemy.minTelegraph times f, and its
 // blow cancels the charge; a knight with no charge gets the string's
 // count-in, enemy.windUp times f. So for another node's knight, known to the host only by
 // its replicated action (Session: 4 a charge filling, 5 a full one): a
-// stand-in with actionState and no isCharging. Prints one PASS or FAIL line per check and exits with the
+// stand-in with actionState and no isCharging. A knight that starts a
+// charge in a rest is not: the rest stands its beat, the charge still
+// held, and the string's next blow comes on its beat (issue #363). Prints one PASS or FAIL line per check and exits with the
 // number of failures.
 //
 //   QT_QPA_PLATFORM=offscreen qml -I <build>/bin/qml tests/strings/strings.qml
@@ -133,11 +136,11 @@ Window {
         let r = play(e, i)
         let tag = type + " string \"" + s.name + "\" [" + s.beats.join(", ") + "]"
         let strikes = s.beats.map((b, k) => ({b: b, k: k})).filter(x => x.b !== 0)
-        check(r.ended && r.state === "recovery" && r.blows.length === strikes.length
+        check(r.ended && r.state === "retreat" && r.blows.length === strikes.length
               && r.blows.every((w, j) => w.beat === strikes[j].k
                                && w.kind === (strikes[j].b === 2 ? "feint" : melee ? "strike" : "shot")),
               tag + ": " + r.blows.length + " blows on beats " + r.blows.map(w => w.beat + " " + w.kind).join(", ")
-              + " (" + strikes.length + " by the table), then it recovers (" + r.state + ")")
+              + " (" + strikes.length + " by the table), then it retreats (" + r.state + ")")
 
         // The ring closes once per beat: from the step after one blow to
         // the next it starts open and reaches its outline
@@ -322,7 +325,8 @@ Window {
 
     // The grunt strikes its first string at the standing knight; in its
     // first rest the knight presses for a charge. How many steps the rest
-    // lasted, and the wind-up that came then
+    // lasted, the wind-up that came then and whether the charge was still
+    // held as it came
     function tryRestCut() {
         let p = game.player
         let l = Balance.lead
@@ -351,7 +355,8 @@ Window {
             Clayground.physicsStep(1)
             n++
         }
-        let out = {inRest: inRest, name: name, cutAfter: n, wound: g.windUpLength}
+        let out = {inRest: inRest, name: name, cutAfter: n, wound: g.windUpLength, state: g.aiState,
+                   charging: p.isCharging, beatLen: g.beatLen}
         p.dropSwing()
         g.halt()
         g.lead = false
@@ -505,10 +510,13 @@ Window {
               "another node's knight with action 0 gets the count-in: " + idle.wound + " s (enemy.windUp "
               + Balance.enemy.windUp + " times " + f + ", with a feint " + (countIn + feint) + ")")
         let cut = tryRestCut()
-        check(cut.inRest && cut.cutAfter < steps(l.beat * f) && near(cut.wound, tele, 1e-6),
+        let next = cut.beatLen - Balance.enemy.lungeDuration
+        check(cut.inRest && Math.abs(cut.cutAfter - steps(l.beat * f)) <= 1 && cut.state === "telegraph"
+              && near(cut.wound, next, 1e-6) && cut.charging,
               "a knight that starts a charge in reach during a rest of \"" + cut.name
-              + "\" is struck first: the rest is cut short after " + cut.cutAfter + " steps ("
-              + steps(l.beat * f) + " a beat) and the lead winds up " + cut.wound + " s")
+              + "\" is not struck first: the rest stands " + cut.cutAfter + " steps (" + steps(l.beat * f)
+              + " a beat), the charge still held (" + cut.charging + "), and the string's next blow winds up "
+              + cut.wound + " s, its beat less the lunge (" + next + ")")
         let let_go = tryRestCharge()
         check(let_go.inRest && let_go.full && let_go.causes.join() === "heavy" && let_go.opening,
               "a full charge built outside lead.reach and let go on arriving in a rest opens the lead "

@@ -60,6 +60,7 @@ QUICK = [
     ("leads", "leads/leads.qml", []),
     ("strings", "strings/strings.qml", []),
     ("pace", "pace/pace.qml", []),
+    ("retreat", "retreat/retreat.qml", []),
     ("boss", "boss/boss.qml", []),
     ("clock", "clock/clock.qml", []),
     ("hitstop", "hitstop/hitstop.qml", []),

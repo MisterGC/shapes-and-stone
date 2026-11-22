@@ -7,7 +7,7 @@
 // Swift, Standard and Deliberate - set as the game's duelPace:
 // - a grunt, a guardian and a spitter lead carry the step's factor: their
 //   beat (lead.beat), count-in, wind-ups (enemy.windUp, enemy.crushWindUp,
-//   enemy.shootWindUp) and recovery (lead.recovery) are factor times as
+//   enemy.shootWindUp) and retreat (a beat) are factor times as
 //   long, their walking, kiting and wind-up speeds factor times slower, a
 //   guardian lead turns its shield at enemy.shieldTurnSpeed over factor,
 //   and against them the parry window (enemy.parryFrames,
@@ -15,7 +15,8 @@
 //   (knight.perfectBlockFrames) are factor times as many steps, rounded;
 // - the grunt lead plays it: its string's count-in, a feint's hold, a
 //   blow it strikes a charging knight with, a crushing blow's wind-up and
-//   the recovery after a string last as long as that, its lunge is open
+//   the retreat after a string (issue #363) last as long as that, its
+//   lunge is open
 //   to a parry for its parryFrames steps, a swing begun its parryStart
 //   steps before parries it and one a step earlier does not, a shield
 //   raised its perfectFrames steps before its blow blocks it perfectly
@@ -328,7 +329,7 @@ Window {
 
         let g = leads.grunt
         // Its string's count-in, a feint's hold, a punishing blow, a
-        // crushing blow and the recovery after a string
+        // crushing blow and the retreat after a string
         let w = firstWindUp(g, 0, false)
         check(w === toSteps(en.windUp * f), name + ": the grunt lead's string winds up its first blow for "
               + w + " steps, enemy.windUp times " + f + " is " + toSteps(en.windUp * f))
@@ -348,9 +349,9 @@ Window {
         only(g, 1.8)
         g.beginString(0, false)
         g._endString()
-        check(g.aiState === "recovery" && near(g.attackCooldown, l.recovery * f),
-              name + ": after a string it recovers " + r3(g.attackCooldown) + " s, lead.recovery times "
-              + f + " is " + r3(l.recovery * f))
+        w = stepsIn(g, "retreat")
+        check(w === toSteps(l.beat * f), name + ": after a string it retreats for " + w
+              + " steps, lead.beat times " + f + " is " + toSteps(l.beat * f))
         // Its windows
         let open = parryOpen(g)
         check(open === g.parryFrames && open === Math.round(en.parryFrames * f),

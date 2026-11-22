@@ -1025,12 +1025,16 @@ def check(results, bands):
             r = by.get(pilot)
             if not r:
                 continue
-            t = lead_time(r)
-            ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
-            what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
-            out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
-                            f"or falls ({what})"))
-            # The lead strikes a knight charging in its reach first (#272)
+            # A charge let go in a lead's rest or retreat is an answer to
+            # its string (issue #363): only the masher is held to duelSlow
+            if pilot == "masher":
+                t = lead_time(r)
+                ok = r["outcome"] == "fallen" or t is None or t >= bands["duelSlow"]
+                what = "fell" if r["outcome"] == "fallen" else "alive" if t is None else f"{t:.2f} s"
+                out.append((ok, f"{duel} depth {depth} {pilot}: takes at least {bands['duelSlow']} s "
+                                f"or falls ({what})"))
+            # The lead strikes a knight charging in its reach first, outside
+            # its rests and its retreat (#272, #363)
             if pilot == "charge":
                 least = bands["duelCancelled"]
                 out.append((r["cancelledCharges"] >= least,
@@ -1141,7 +1145,9 @@ def check_duel_sound(r, tag):
                     f"{lead['engagedAt']:.2f} s {'to its fall at ' + format(died, '.2f') + ' s' if died is not None else 'on'}"
                     f" ({', '.join(fmt_span(a, b) for a, b in spans) if spans else 'never'}"
                     f"{', the fight ends on its fall' if last and end is None else ''})"))
-    growls = [x for x in r["sounds"] if x["cue"] == GROWL]
+    # The retreat's sigh is the growl's sample too (issue #363): the
+    # growl is the one logged as such
+    growls = [x for x in r["sounds"] if x["cue"] == GROWL and x["what"] == "growl"]
     out.append((len(growls) == 1 and growls[0]["t"] <= lead["engagedAt"] + step,
                 f"{tag}: the lead growls once as it engages "
                 f"({', '.join(format(x['t'], '.2f') + ' s' for x in growls) or 'never'})"))
