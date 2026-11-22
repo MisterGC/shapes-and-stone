@@ -19,7 +19,10 @@
 //   to a parry for its parryFrames steps, a swing begun its parryStart
 //   steps before parries it and one a step earlier does not, a shield
 //   raised its perfectFrames steps before its blow blocks it perfectly
-//   and one a step earlier does not; the spitter lead's shot winds up for
+//   and one a step earlier does not - its own lunge landing on the shield
+//   too, a spitter lead's shot and a slinger lead's ball meeting it -,
+//   and a real swing older than lead.parryStart, no older than its
+//   parryStart, parries its lunge; the spitter lead's shot winds up for
 //   its shootWindUp; chasing the knight it walks no faster than its
 //   chaseSpeed, and at Standard and Deliberate slower than the knight
 //   with its shield up (knight.moveSpeed times knight.blockSpeed);
@@ -94,6 +97,7 @@ Window {
         e._attackTimer = 0
         e._knockT = 0
         e.crushChance = 0
+        e.opening = false
         e.body.linearVelocity = Qt.point(0, 0)
     }
     // Only e has the knight for its target, dx wu to the knight's right
@@ -157,6 +161,95 @@ Window {
         p.isBlocking = false
         return res
     }
+    // What became of e's own lunge at the knight 1.5 wu off, the shield
+    // raised as k steps of it are left to land - "perfect", "blocked" or
+    // "hit", by the fight record - and how many steps the shield was up
+    // when the blow met it: the hit is Enemy's, the window its lunge's.
+    // The lunge goes a wu short of the knight, within its blow's reach
+    // (enemy.lungeHitRange), so it lands in front of the shield: on the
+    // bench's paused steps a full one runs into the knight
+    function lungeOnShield(e, k) {
+        let p = game.player, r = game.fightRecord
+        only(e, 1.5)
+        // The shield down long enough before it rises (perfectBlockRearm)
+        e.target = null
+        Clayground.physicsStep(Balance.knight.perfectBlockRearm + 1)
+        only(e, 1.5)
+        let perfect = r.perfectBlocks, blocks = r.blocks, up = -1
+        e._startLunge()
+        e._lungeSpeed = Math.max(0, e._lungeSpeed * e.lungeDuration - 1.0) / e.lungeDuration
+        let n = 0
+        while (e.aiState === "lunge" && n < 600) {
+            if (e._lungeSteps === k && !p.isBlocking) p.isBlocking = true
+            Clayground.physicsStep(1)
+            n++
+            if (up < 0 && e.aiState !== "lunge") up = p._steps - p._raisedAt
+        }
+        p.isBlocking = false
+        p.hp = p.maxHp
+        p.mana = p.maxMana
+        let res = r.perfectBlocks > perfect ? "perfect" : r.blocks > blocks ? "blocked" : "hit"
+        return { res: res, up: up }
+    }
+    // What became of a shot - a spitter's, or a slinger's ball - that
+    // ranged lead e fires at the knight 4 wu off, meeting a shield raised k
+    // steps before: "perfect" (sent back, or turned so), "blocked" or what
+    // the shot's own sensor made of it. Fired by Enemy, met by Projectile
+    // or MetalBall, so the window is the one the shot carries
+    function shotOnShield(e, k) {
+        let p = game.player
+        only(e, 4)
+        e.aimShot(p)
+        let pool = e.slinger ? game._ballById : game._shotById
+        let had = new Set(Object.keys(pool))
+        e.fireProjectile()
+        let id = Object.keys(pool).find(x => !had.has(x))
+        let shot = id ? pool[id] : null
+        if (!shot) return "no shot"
+        p.isBlocking = true
+        p._rearmed = true
+        p._raisedAt = p._steps - k
+        let target = { getBody: () => ({ target: p }) }
+        let res
+        if (e.slinger) {
+            shot.met(target)
+            res = shot.turnedBy !== "" ? shot.turnedBy : "not turned"
+        } else {
+            shot.onHitPlayer(target)
+            res = shot.back ? "perfect" : shot.destroyed ? "blocked" : "not met"
+        }
+        if (shot.destroyed === false) shot.vanish()
+        p.isBlocking = false
+        p.mana = p.maxMana
+        return res
+    }
+    // Whether a real swing parries e's lunge at the knight 1.5 wu off: the
+    // knight turned away swings, keeps turned away for age steps, then
+    // faces the lead as a few steps of the lunge are left; how many steps
+    // old the swing was when it met the lead
+    function swingParries(e, age) {
+        let p = game.player, r = game.fightRecord
+        only(e, 1.5)
+        p.attackCooldown = 0
+        p.isAttacking = false
+        p._swingStep = p._steps - 1000
+        e._startLunge()
+        let n = 0
+        while (e.aiState === "lunge" && e._lungeSteps > age + 4 && n < 600) { Clayground.physicsStep(1); n++ }
+        p.facingAngle = 180
+        p.attack()
+        let begun = p._steps, parries = r.parries, met = -1
+        while (p._steps - begun < age && e.aiState === "lunge" && n < 600) { Clayground.physicsStep(1); n++ }
+        let open = e.parryWindow
+        p.facingAngle = 0
+        Clayground.physicsStep(1)
+        met = p._steps - begun
+        let parried = r.parries > parries && e.opening
+        while (e.aiState === "lunge" && n < 600) { Clayground.physicsStep(1); n++ }
+        p.hp = p.maxHp
+        return { parried: parried, met: met, open: open }
+    }
+
     // The steps e's lunge, begun now at the knight 1.5 wu off, is open to
     // a parry; cooldown is the recovery it set as it landed
     property real cooldown: 0
@@ -272,6 +365,27 @@ Window {
         check(atPf === "perfect" && pastPf === "blocked" && pf === Math.round(k.perfectBlockFrames * f),
               name + ": a shield raised " + pf + " steps before its blow blocks it " + atPf + ", "
               + (pf + 1) + " steps before " + pastPf + " (knight.perfectBlockFrames times " + f + ")")
+        // The same windows through the blows themselves: its own lunge on
+        // the shield, a spitter lead's shot and a slinger lead's ball on
+        // it, and a real swing at its lunge
+        let atL = lungeOnShield(g, pf), pastL = lungeOnShield(g, pf + 1)
+        check(atL.res === "perfect" && pastL.res === "blocked" && atL.up === pf && pastL.up === pf + 1,
+              name + ": its own lunge meets a shield up " + atL.up + " steps: " + atL.res + ", up "
+              + pastL.up + " steps: " + pastL.res + " (its perfectFrames " + pf + ")")
+        for (let type of ["spitter", "slinger"]) {
+            let r = leads[type], rf = r.perfectFrames
+            let atS = shotOnShield(r, rf), pastS = shotOnShield(r, rf + 1)
+            check(rf === pf && atS === "perfect" && pastS === "blocked",
+                  name + ": the " + type + " lead's " + (type === "slinger" ? "ball" : "shot")
+                  + " meets a shield raised " + rf + " steps before: " + atS + ", " + (rf + 1)
+                  + " steps before: " + pastS)
+        }
+        let age = Math.floor((l.parryStart + 1 + ps) / 2)
+        let sw = swingParries(g, age)
+        check(sw.parried && sw.open && sw.met > l.parryStart && sw.met <= ps,
+              name + ": a real swing " + sw.met + " steps old when it meets its lunge in the window ("
+              + sw.open + ") parries it (" + sw.parried + "): more than lead.parryStart " + l.parryStart
+              + ", at most its own " + ps)
         let s = leads.spitter
         w = firstWindUp(s, 0, false)
         check(w === toSteps(en.shootWindUp * f), name + ": the spitter lead's shot winds up for " + w
@@ -357,7 +471,8 @@ Window {
             leads = {
                 grunt: spawn("grunt", 2, 0, 5),
                 guardian: g,
-                spitter: spawn("spitter", 2, 0, -5)
+                spitter: spawn("spitter", 2, 0, -5),
+                slinger: spawn("slinger", 2, 5, 0)
             }
             others = [spawn("grunt", 0, 5, 5), spawn("grunt", 1, -5, 5), spawn("guardian", 1, 5, -5),
                       spawn("spitter", 1, -5, -5)]
