@@ -2331,7 +2331,9 @@ swings after it - on the window's last step, a step later, twice, a
 charged swing, behind the shield -, a guardian lead's too, compares a
 perfect block, holds the shield through every string of a grunt and a
 guardian lead at each pace and ripostes every blow, and checks the
-number on another screen, a normal grunt and the Warden:
+number on another screen, a blow stopped on a joiner's screen, a
+spitter lead's shot and a slinger lead's ball stopped by the shield, a
+normal grunt and the Warden:
 
 ```
 QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/riposte/riposte.qml

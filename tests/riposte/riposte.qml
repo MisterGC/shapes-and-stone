@@ -25,6 +25,11 @@
 //   - its last riposte landed - with at least the mana it began with;
 // - a lead shown on another screen gives the riposte's whole number, and
 //   the host's lead takes it whole;
+// - a host's lead's blow stopped by a joiner's held shield, landed as the
+//   joiner's screen lands it (Game._landKnightBlow), opens the window on
+//   that lead, and so do a spitter lead's shot and a slinger lead's ball
+//   stopped by the held shield (Game.shotLanded, ballLanded): a swing in
+//   it lands whole;
 // - against a normal grunt nothing changes: a swing right after its
 //   blocked lunge lands as any swing, no riposte, no mana back; the Hollow
 //   Warden gives no riposte either (issue #368): a swing right after a
@@ -439,6 +444,96 @@ Window {
               + "), a plain blow at the guard's share (" + plain + ")")
     }
 
+    // The knight's shield stopped a strike of e's a moment ago, its window
+    // open or not: e stands halted 1.2 wu off in its guard, and the
+    // knight, its shield lowered, swings 10 steps after the block. Whether
+    // the window was open on e, the HP e lost and the ripostes counted
+    function swingAfterBlock(e) {
+        let p = game.player
+        let open = p._riposteLead === e
+        let from = p._riposteFrom
+        let ripostes0 = game.fightRecord.ripostes
+        e.halted = true
+        e.aiState = "telegraph"
+        e._setStance(1)
+        e.xWu = p.xWu + 1.2
+        e.yWu = p.yWu + e.bulk
+        p.lowerShield()
+        p.isBlocking = false
+        face(e)
+        let n = 0
+        while (p._steps - from < 10 && n < 60) { face(e); Clayground.physicsStep(1); n++ }
+        let hp0 = e.hp
+        p.attack()
+        n = 0
+        while (e.hp === hp0 && n < 60) { face(e); Clayground.physicsStep(1); n++ }
+        let out = {open: open, lost: hp0 - e.hp, ripostes: game.fightRecord.ripostes - ripostes0}
+        e.halt()
+        knightReady(e)
+        return out
+    }
+    // A host's lead's blow on a joiner's knight lands through the game's
+    // own path for it (Game._landKnightBlow), on the held shield
+    function checkJoinerBlow(g) {
+        let p = game.player
+        setUp(g, "chase")
+        g.xWu = p.xWu + 1.0
+        p.mana = 30
+        p.isBlocking = true
+        for (let i = 0; i < 30; i++) { face(g); Clayground.physicsStep(1) }
+        let id = "riposteBenchLead"
+        game._enemyById[id] = g
+        let blocks0 = game.fightRecord.blocks
+        game._landKnightBlow({id: id, atk: g.atk, x: g.xWu, y: g.yWu, size: g.widthWu, crush: false,
+                              dx: -1, dy: 0, ax: g.aimXWu, ay: g.aimYWu,
+                              reach: Balance.enemy.lungeHitRange + g.bulk, pf: g.perfectFrames,
+                              pw: g.parryFrames, arrived: game._physicsSteps})
+        delete game._enemyById[id]
+        let blocked = game.fightRecord.blocks - blocks0
+        let r = swingAfterBlock(g)
+        check(blocked === 1 && r.open && r.lost === base(g) && r.ripostes === 1,
+              "a host's lead's blow stopped by a joiner's held shield (Game._landKnightBlow, " + blocked
+              + " blocked) opens the riposte's window on that lead (" + r.open + "), and a swing in it lands "
+              + "whole: " + r.lost + " HP (" + base(g) + "), " + r.ripostes + " riposte")
+    }
+    // A spitter lead's shot and a slinger lead's metal ball, flying at the
+    // knight behind its shield, met there (Game.shotLanded, ballLanded)
+    function checkShotBlocks(sp, sl) {
+        let p = game.player
+        for (let [e, ball, what] of [[sp, false, "a spitter lead's shot"], [sl, true, "a slinger lead's ball"]]) {
+            setUp(e, "chase")
+            e.xWu = p.xWu + 4
+            knightReady(e)
+            p.mana = 30
+            p.isBlocking = true
+            for (let i = 0; i < 30; i++) { face(e); Clayground.physicsStep(1) }
+            let blocks0 = game.fightRecord.blocks, from0 = p._riposteFrom
+            let cx = p.xWu + p.widthWu / 2, cy = p.yWu - p.heightWu / 2
+            if (ball) game.spawnBall(cx + 3, cy, -1, 0, e.atk, 0, e)
+            else game.spawnProjectile(cx + 3 - Balance.projectile.size / 2, cy + Balance.projectile.size / 2,
+                                      -1, 0, e.atk, 0, e)
+            let n = 0
+            while (n < 120 && p._riposteFrom === from0 && game.fightRecord.blocks === blocks0) {
+                p.isBlocking = true
+                face(e)
+                Clayground.physicsStep(1)
+                n++
+            }
+            let blocked = game.fightRecord.blocks - blocks0
+            // The ball the shield glanced away falls here: it would hit the
+            // slinger brought close for the swing
+            for (let i = 0; i < game.room.children.length; i++) {
+                let o = game.room.children[i]
+                if (o.objectName === "ball" && o.destroyed === false) o.fallAt(o.xWu, o.yWu, "bench")
+            }
+            let r = swingAfterBlock(e)
+            check(blocked === 1 && r.open && r.lost === base(e) && r.ripostes === 1,
+                  what + " stopped by the held shield (" + blocked + " blocked) opens the riposte's window on "
+                  + "the shooter (" + r.open + "), and a swing in it, the shooter come close, lands whole: "
+                  + r.lost + " HP (" + base(e) + "), " + r.ripostes + " riposte")
+        }
+    }
+
     // Weak and normal enemies keep their fight
     function checkNormal(e) {
         e.tier = 1
@@ -497,17 +592,22 @@ Window {
             let g = spawn("grunt", 2, 0, 5)
             let gu = spawn("guardian", 2, 0, -5)
             let normal = spawn("grunt", 1, -6, 0)
-            for (let e of [g, gu, normal]) e.halt()
+            let sp = spawn("spitter", 2, 6, 0)
+            let sl = spawn("slinger", 2, 6, 5)
+            for (let e of [g, gu, normal, sp, sl]) e.halt()
             Clayground.physicsStep(2)
-            check(g.lead && gu.lead && !g.boss && !normal.lead && game.duelPace === Balance.pace.standard,
-                  "a grunt and a guardian lead and a normal grunt stand in the fight room (" + game.duelPace
-                  + " pace)")
+            check(g.lead && gu.lead && sp.lead && sl.lead && !g.boss && !normal.lead
+                  && game.duelPace === Balance.pace.standard,
+                  "a grunt, a guardian, a spitter and a slinger lead and a normal grunt stand in the fight room ("
+                  + game.duelPace + " pace)")
             checkWindow(g)
             checkRiposte(g)
             checkGuardian(gu)
             checkPerfect(g)
             checkStrings(g, gu)
             checkRemote(g)
+            checkJoinerBlow(g)
+            checkShotBlocks(sp, sl)
             checkNormal(normal)
             Clayground.paused = false
             game.applyScenario("boss", 2)
