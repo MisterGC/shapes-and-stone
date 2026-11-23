@@ -313,6 +313,18 @@ ClayWorld2d {
         shieldClangSound.play(gain === undefined ? 1 : gain, pitch)
         logSound("sfx/shield_clang", perfect ? "perfectBlock" : "block", pitch, _gainDist(gain), gain)
     }
+    // A riposte landed (Balance.lead.riposte, issue #365): the shield's
+    // clang, higher, on a player of its own so it rings over the block's
+    SfxPlayer {
+        id: riposteSound
+        source: "../sound/sfx/shield_clang.sfx.json"
+        volume: muted ? 0 : Balance.lead.riposte.volume * soundVolume
+    }
+    function playRiposte(gain) {
+        let pitch = Balance.lead.riposte.pitch
+        riposteSound.play(gain === undefined ? 1 : gain, pitch)
+        logSound("sfx/shield_clang", "riposte", pitch, _gainDist(gain), gain)
+    }
 
     function playSwordSwing(gain) {
         swordSwingSound.triggerOneShot(gain === undefined ? 1 : gain)
@@ -1256,7 +1268,7 @@ ClayWorld2d {
             if (!e || e.destroyed) return
             if (blow.kind === "damage")
                 e.takeRemoteBlow(blow.amount, blow.x, blow.y, fromId, blow.heavy === true, blow.opens || "",
-                                 blow.spare === true)
+                                 blow.spare === true, blow.whole === true)
             else if (blow.kind === "stagger") e.stagger(blow.seconds)
             else if (blow.kind === "open") e.open(blow.cause)
             else if (blow.kind === "met") e.strikeMet(blow.result)
@@ -1458,6 +1470,9 @@ ClayWorld2d {
             else e.stagger(crush ? Balance.enemy.stagger : Balance.knight.perfectBlockStagger)
         }
         if (e && !e.destroyed) e.strikeMet(result)
+        // A lead's blow the held shield stopped: a riposte's window opens
+        // (Balance.lead.riposte, issue #365)
+        if (result === "blocked" && e && !e.destroyed) player.riposteOpen(e)
         _struck(blow.id, result)
     }
     // Host: another node's knight killed an enemy
@@ -3581,6 +3596,8 @@ ClayWorld2d {
         property int parries: 0
         property int blocks: 0
         property int perfectBlocks: 0
+        // Ripostes that landed on a lead (Balance.lead.riposte, issue #365)
+        property int ripostes: 0
         // Crushing blows that broke the held shield
         property int crushed: 0
         // Whirlwinds that hit an enemy, and the enemies they hit
@@ -3627,7 +3644,7 @@ ClayWorld2d {
     function resetFightRecord() {
         let r = fightRecord
         r.damageDealt = 0; r.damageTaken = 0; r.parries = 0; r.blocks = 0
-        r.perfectBlocks = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
+        r.perfectBlocks = 0; r.ripostes = 0; r.crushed = 0; r.whirlwinds = 0; r.whirlHits = 0
         r.stuns = 0; r.stunFrozen = 0; r.stunInterrupted = 0
         r.bolts = 0; r.boltHits = 0; r.strongSpecials = 0
         r.shotsBack = 0; r.shotBackHits = 0
@@ -3703,6 +3720,7 @@ ClayWorld2d {
             r.perfectBlocks++
             if (duelEngaged) playSting()
             break
+        case "riposte": r.ripostes++; break
         case "crushed": r.crushed++; break
         case "whirlwind": r.whirlwinds++; break
         case "whirlHit": r.whirlHits++; break
@@ -7077,11 +7095,13 @@ ClayWorld2d {
         if (shooter) _shooterOf[id] = shooter
     }
     // This node's knight met shot or ball id: result as Player.takeDamage
-    // says it, told to the enemy that fired it
+    // says it, told to the enemy that fired it; one its held shield
+    // stopped opens a riposte's window on a lead (Balance.lead.riposte)
     function _shotMet(id, result) {
         let e = _shooterOf[id]
         delete _shooterOf[id]
         if (e && !e.destroyed && e.strikeMet) e.strikeMet(result)
+        if (result === "blocked" && e && !e.destroyed && player && player.riposteOpen) player.riposteOpen(e)
     }
     // This node's knight met shot id; sent back ("perfect") from (x, y)
     function shotLanded(id, result, x, y) {

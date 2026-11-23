@@ -210,12 +210,19 @@ PhysicsItem {
     // keeps its own tempo (issue #368). Its wind-ups, feint holds and
     // recoveries last pace times as long, it walks pace times slower, and
     // against it the knight's parry and perfect-block windows are pace
-    // times as many steps: parryFrames, parryStart and perfectFrames
+    // times as many steps: parryFrames, parryStart, perfectFrames and
+    // riposteFrames
     readonly property real pace: lead && !boss && gameWorld && gameWorld.duelPaceFactor > 0
                                  ? gameWorld.duelPaceFactor : 1
     readonly property int parryFrames: Math.round(Balance.enemy.parryFrames * pace)
     readonly property int parryStart: Math.round(Balance.lead.parryStart * pace)
     readonly property int perfectFrames: Math.round(Balance.knight.perfectBlockFrames * pace)
+    // The riposte (Balance.lead.riposte, issue #365): whether a knight's
+    // swing right after its held shield stopped a strike of this enemy's
+    // is one - a room's lead's, not the Warden's (issue #368) -, and the
+    // physics steps it has to begin in
+    readonly property bool riposteable: lead && !boss
+    readonly property int riposteFrames: Math.round(Balance.lead.riposte.frames * pace)
     // The spawn hole it crawled out of, "gx,gy"; "" for one the dungeon
     // was built with (issue #157)
     property string fromHole: ""
@@ -1847,6 +1854,9 @@ PhysicsItem {
                 if (result === "blocked") recoil(target)
                 if (result === "perfect") perfectBlocked()
                 strikeMet(result)
+                // A lead's blow the held shield stopped: a riposte's
+                // window opens (Balance.lead.riposte, issue #365)
+                if (result === "blocked" && target.riposteOpen) target.riposteOpen(enemy)
                 if (result !== "hit") return
                 console.log("[Enemy] Lunge hit! Dealt", atk, "damage")
             }
@@ -2086,21 +2096,22 @@ PhysicsItem {
     // charged swing) goes through the shield, and a lead's retreat has it
     // down (Balance.lead.retreat). On a lead (Balance.lead) a
     // blow in an opening does openingDamage times as much, the one that
-    // opens it (opens, its cause) all of it, any other its share by the
-    // moment it lands in (leadShare)
-    function _blow(amount, attackerX, attackerY, heavy, opens) {
+    // opens it (opens, its cause) all of it, a riposte (whole,
+    // Balance.lead.riposte) all of it and past the shield, any other its
+    // share by the moment it lands in (leadShare)
+    function _blow(amount, attackerX, attackerY, heavy, opens, whole) {
         let finalDamage = Math.max(Balance.minDamage, amount - def)
         // Guardian frontal shield
         let blocked = false
         if (enemyType === "guardian" && aiState !== "stagger" && aiState !== "frozen"
-            && aiState !== "retreat" && heavy !== true
+            && aiState !== "retreat" && heavy !== true && whole !== true
             && attackerX !== undefined && _isShieldFacing(attackerX, attackerY)) {
             finalDamage = Math.floor(finalDamage * Balance.enemy.blockedShare)
             blocked = true
         }
         if (lead && opening)
             finalDamage = Math.floor(finalDamage * (boss ? Balance.lead.warden : Balance.lead).openingDamage)
-        else if (lead && !opens)
+        else if (lead && !opens && whole !== true)
             finalDamage = Math.max(Balance.minDamage, Math.round(finalDamage * leadShare()))
         return {damage: finalDamage, blocked: blocked}
     }
@@ -2113,10 +2124,13 @@ PhysicsItem {
     // The descent intro holds the world: no blow lands (issue #316)
     function _held() { return !!gameWorld && gameWorld.introHeld === true }
     // This node's knight struck the enemy; heavy for its charged swing,
-    // parried for a swing into its parry window. This screen judges
-    // whether the blow breaks a lead's stance. Returns the damage it does
-    function takeDamage(amount, attackerX, attackerY, heavy, parried) {
-        return _struck(amount, attackerX, attackerY, heavy, _opens(heavy, parried))
+    // parried for a swing into its parry window, riposte for a riposte
+    // (Balance.lead.riposte, issue #365), which lands whole on a lead
+    // that is no Warden. This screen judges whether the blow breaks a
+    // lead's stance. Returns the damage it does
+    function takeDamage(amount, attackerX, attackerY, heavy, parried, riposte) {
+        return _struck(amount, attackerX, attackerY, heavy, _opens(heavy, parried), false,
+                       riposte === true && riposteable)
     }
     // A shot this node's knight sent back with a perfect block hit it
     // (Balance.projectile, issue #283), or a metal ball its shield bounced
@@ -2134,20 +2148,21 @@ PhysicsItem {
     }
     // This node's knight's blow, opens the cause it breaks a lead's
     // stance with, or ""; spare for a bolt's, which wears it but never
-    // breaks it
-    function _struck(amount, attackerX, attackerY, heavy, opens, spare) {
+    // breaks it; whole for a riposte's, which lands whole
+    function _struck(amount, attackerX, attackerY, heavy, opens, spare, whole) {
         if (_held()) return 0
         if (dormant) return _glance(attackerX, attackerY)
-        if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens, spare)
+        if (!remote) return _takeBlow(amount, attackerX, attackerY, "", heavy, opens, spare, whole)
         // Remote: the hit looks and counts here, the host applies it
-        let b = _blow(amount, attackerX, attackerY, heavy, opens)
+        let b = _blow(amount, attackerX, attackerY, heavy, opens, whole)
         let hdx = attackerX !== undefined ? xWu - attackerX : 0
         let hdy = attackerY !== undefined ? yWu - attackerY : 0
         if (gameWorld) {
             gameWorld.countFight("dealt", b.damage)
             gameWorld.impact(_hitKind(b.blocked, heavy), xWu, yWu, hdx, hdy, visual.color)
             gameWorld.strikeEnemy(enemy, {kind: "damage", amount: amount, x: attackerX, y: attackerY,
-                                          heavy: heavy === true, opens: opens, spare: spare === true})
+                                          heavy: heavy === true, opens: opens, spare: spare === true,
+                                          whole: whole === true})
         }
         hitFlashAnimation.restart()
         if (_fx) hitSquash.restart()
@@ -2165,21 +2180,23 @@ PhysicsItem {
 
     // Host: the knight of node byId struck the enemy; that node drew the
     // hit and counted it, and judged whether it opens a lead (opens);
-    // spare for a bolt's blow
-    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens, spare) {
-        _takeBlow(amount, attackerX, attackerY, byId, heavy, opens || "", spare === true)
+    // spare for a bolt's blow, whole for a riposte's
+    function takeRemoteBlow(amount, attackerX, attackerY, byId, heavy, opens, spare, whole) {
+        _takeBlow(amount, attackerX, attackerY, byId, heavy, opens || "", spare === true,
+                  whole === true && riposteable)
     }
 
     // A blow from this node's knight (byId "") or another node's; opens
     // the cause it breaks a lead's stance with, or ""; spare for a bolt's,
-    // which wears a lead's stance but never breaks it
-    function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens, spare) {
+    // which wears a lead's stance but never breaks it; whole for a
+    // riposte's, which lands whole (Balance.lead.riposte)
+    function _takeBlow(amount, attackerX, attackerY, byId, heavy, opens, spare, whole) {
         // Asleep, the Warden's stone takes nothing: its fight begins when
         // its room shuts, not with a blow from a knight its room let in
         // while another waits outside
         if (dormant || _held()) return 0
         if (opens && (!lead || opening)) opens = ""
-        let b = _blow(amount, attackerX, attackerY, heavy, opens)
+        let b = _blow(amount, attackerX, attackerY, heavy, opens, whole)
         let finalDamage = b.damage
         let blocked = b.blocked
         let own = byId === ""

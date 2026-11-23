@@ -94,8 +94,12 @@ Item {
         _shotsSeen = new Map()
         _shotPlans = new Map()
         _zonesSeen = new Map()
-        personAnswers = { parry: 0, perfect: 0, shot: 0 }
-        personMissed = { parry: 0, perfect: 0, shot: 0 }
+        personAnswers = { parry: 0, perfect: 0, shot: 0, riposte: 0 }
+        personMissed = { parry: 0, perfect: 0, shot: 0, riposte: 0 }
+        personBlocks = 0
+        _leadStrikes = 0
+        _riposteSeen = -1
+        _ripostePlan = null
         personFastest = -1
         _answerCount = 0
         _missPhase = answer === "person" ? missPhaseOf(s, room, danger) : 0
@@ -306,6 +310,9 @@ Item {
             parries: r.parries,
             blocks: r.blocks,
             perfectBlocks: r.perfectBlocks,
+            // Ripostes that landed on a lead (Balance.lead.riposte, issue
+            // #365), as the game's record counts them
+            ripostes: r.ripostes,
             // Shots a perfect block sent back, and the ones that hit an
             // enemy (Balance.projectile)
             shotsBack: r.shotsBack,
@@ -373,6 +380,8 @@ Item {
             person: answer !== "person" ? null : {
                 reaction: Balance.pacing.person.reaction, miss: Balance.pacing.person.miss,
                 answers: personAnswers, missed: personMissed,
+                // The lead's strikes it met with a held shield (issue #365)
+                blocks: personBlocks, block: Balance.pacing.person.block,
                 fastest: personFastest < 0 ? null : round3(personFastest),
                 // Its special (issue #344): which, its presses, the ones
                 // that went off, and its presses one window early or late
@@ -1383,6 +1392,15 @@ Item {
     // (aiState "shoot"), which the person sees, not with its flight. The
     // times are the physics clock's, the game's own: a slow motion gives
     // it no more.
+    // A room's lead's strikes - not its crushing blows, not the Warden's -
+    // it meets with the shield and a riposte at Balance.pacing.person.block
+    // of them, in turn, the others with a parry (issue #365): it raises
+    // the shield as it sees the wind-up and holds it until the blow lands,
+    // a held block with no timing to miss; once its shield stopped the
+    // blow it lowers it and swings reaction seconds later, a riposte
+    // (Balance.lead.riposte). A riposte is an answer as a parry is: missed
+    // in turn with the others, and a missed one is late, no swing in its
+    // window. In the window it swings at the lead only so.
     readonly property real reaction: Balance.pacing.person.reaction
     readonly property real missShare: Balance.pacing.person.miss
     // Per enemy the attack it is in: {n, at, endedAt, last}, its count,
@@ -1398,6 +1416,14 @@ Item {
     property var personAnswers: ({ parry: 0, perfect: 0, shot: 0 })
     property var personMissed: ({ parry: 0, perfect: 0, shot: 0 })
     property real personFastest: -1
+    // The lead's strikes met with the shield, the lead's strikes planned
+    // so far (the block's turn), the block the last riposte was planned
+    // for (Player._riposteFrom) and that plan: {e, at, miss}, at the
+    // physics step (Player._steps) it swings on
+    property int personBlocks: 0
+    property int _leadStrikes: 0
+    property int _riposteSeen: -1
+    property var _ripostePlan: null
     // Answers so far, and where in the share's turn the first miss lies
     property int _answerCount: 0
     property real _missPhase: 0
@@ -1475,6 +1501,14 @@ Item {
         let a = _attacks.get(e), plan = _personPlans.get(e)
         if (plan && plan.n === a.n) return plan
         let kind = e.aiState === "crush" || e.crushing ? "perfect" : "parry"
+        if (kind === "parry" && e.riposteable === true && blockTurn()) {
+            // A held block has no timing to miss: no answer of its own
+            plan = { n: a.n, kind: "block", miss: false, early: false, pressed: false }
+            _personPlans.set(e, plan)
+            personBlocks++
+            answered(a.at)
+            return plan
+        }
         let m = rollMiss()
         plan = { n: a.n, kind: kind, miss: m.miss, early: m.early, pressed: false }
         _personPlans.set(e, plan)
@@ -1482,6 +1516,40 @@ Item {
         if (m.miss) personMissed[kind]++
         answered(a.at)
         return plan
+    }
+    // Whether the lead's next strike is met with the shield: block of them,
+    // in turn
+    function blockTurn() {
+        let n = _leadStrikes++
+        let share = Balance.pacing.person.block
+        return Math.floor((n + 1) * share + 1e-9) > Math.floor(n * share + 1e-9)
+    }
+    // The riposte after a block of the person's: "swing" on the step it
+    // swings, "hold" in the window before it, or after a missed one until
+    // the window is over, "" otherwise
+    function personRiposte(p) {
+        let e = p._riposteLead
+        if (alive(e) && p._riposteFrom !== _riposteSeen) {
+            _riposteSeen = p._riposteFrom
+            let m = rollMiss()
+            personAnswers.riposte++
+            if (m.miss) personMissed.riposte++
+            _ripostePlan = { e: e, miss: m.miss, at: p._riposteFrom + Math.round(reaction * 60),
+                             until: p._riposteFrom + e.riposteFrames }
+        }
+        let plan = _ripostePlan
+        if (!plan || !alive(plan.e) || p._steps > plan.until) {
+            _ripostePlan = null
+            return ""
+        }
+        if (plan.miss || p._steps < plan.at) return "hold"
+        _ripostePlan = null
+        letGo(p)
+        p.isBlocking = false
+        face(p, plan.e)
+        stand(p)
+        p.attack()
+        return "swing"
     }
     // The nearest attack within reach the person has seen, as answerThreat
     function personThreat(p, foes) {
@@ -1513,6 +1581,10 @@ Item {
         face(p, e)
         stand(p)
         let pf = e.parryFrames
+        if (plan.kind === "block") {
+            p.isBlocking = true
+            return
+        }
         if (plan.kind === "parry") {
             p.isBlocking = false
             if (!plan.miss) {
@@ -1683,12 +1755,22 @@ Item {
                 return true
             })) return
         if (personSpecial === "stun" && personSpecialNow(p, foes)) return
+        let riposte = personRiposte(p)
+        if (riposte === "swing") return
         let threat = personThreat(p, foes)
         if (threat) {
             answerPerson(p, threat)
             return
         }
         let near = nearest(p, foes), target = near.e
+        // In a riposte's window it swings at the lead only as the riposte
+        if (riposte === "hold") {
+            letGo(p)
+            p.isBlocking = false
+            face(p, _ripostePlan.e)
+            stand(p)
+            return
+        }
         if (personShot(p, dt, near.d > 1.3 ? target : null, target)) return
         if (personSpecial !== "" && personSpecial !== "stun" && personSpecialNow(p, foes)) return
         letGo(p)

@@ -145,7 +145,7 @@ not load or runs past 120 s fails the job. They are `wallpush`, `sound`,
 `pause`, `fallen`, `focus`, `gamepad`, `controls`, `controlinput`, `rebind`, `padnotice`, `downed`, `joinleave`, `gold`,
 `dialogue`, `camp`, `sit`, `campsound`, `moths`, `fishing`, `depth` (twice,
 `first` and `second`), `record`, `danger`, `spikes`, `deep`,
-`dungeonmaster`, `strings`, `pace`, `retreat`, `shares`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
+`dungeonmaster`, `strings`, `pace`, `retreat`, `shares`, `riposte`, `boss`, `clock`, `hitstop`, `descent`, `specials`, `combo`, `killchain`, `critters`, `boots`, `ball`, `answer`, `cues`, `lipsync` and
 `fightmusic`; the list is `QUICK` in `tests/run_quick.py`. It
 runs them with `QML_XHR_ALLOW_FILE_READ=1`, as the game reads `sound/*.json`
 through `XMLHttpRequest`. To run them, or some of them, the same way:
@@ -2306,6 +2306,39 @@ bench's person pilot fells a grunt or guardian lead in three to five
 exchanges at the Standard duel pace, an exchange being one string of
 the lead's and the knight's answers to it.
 
+A swing right after a block is a riposte (issue #365, `lead.riposte`).
+When the knight's held shield stops a lead's strike - a lunge, a shot or
+a metal ball, not a perfect block, not a crushing blow that breaks the
+shield - a plain swing begun within `lead.riposte.frames` physics steps
+times the duel pace (30 steps, half a second, at Standard; 23 at Swift,
+36 at Deliberate) lands on that lead whole, whatever its stance and past
+a guardian's shield, and in an opening at the opening's share. It wears
+the stance as any blow does. It gives back what that block cost: the
+mana the strike took off the shield and the shield's upkeep since the
+shield rose or since the riposte before, at most `lead.riposte.upkeepBeats`
+of the lead's beats of it, so a knight that holds its shield through a
+string and ripostes every blow ends the string with the mana it began
+with. One stopped strike gives one riposte; a charged swing is never
+one, and a swing that parries is a parry. The riposte shows the word
+`lead.riposte.word` and its number in its own colour over the lead and
+rings the shield's clang (`sfx/shield_clang`) `lead.riposte.pitch`
+semitones up; in a session the other screens hear it too, and the
+host's lead takes it whole. A perfect block still pays more: it opens
+the lead, takes no HP and gives mana back where a held block with its
+riposte comes out even. Weak and normal enemies and the Hollow Warden
+give no riposte. The riposte bench blocks a grunt lead's lunge and
+swings after it - on the window's last step, a step later, twice, a
+charged swing, behind the shield -, a guardian lead's too, compares a
+perfect block, holds the shield through every string of a grunt and a
+guardian lead at each pace and ripostes every blow, and checks the
+number on another screen, a blow stopped on a joiner's screen, a
+spitter lead's shot and a slinger lead's ball stopped by the shield, a
+normal grunt and the Warden:
+
+```
+QT_QPA_PLATFORM=offscreen qml -I build/bin/qml tests/riposte/riposte.qml
+```
+
 The Hollow Warden keeps its stance as before until its own duel (issue
 #368, `lead.warden`): a blow outside an opening does `lead.warden.chip`
 (10 %) of its damage and wears `lead.warden.wear`, its blocked and
@@ -2808,6 +2841,12 @@ both in `Balance.pacing.person`:
   block - or late, no press before the blow lands, as the seed rolls.
   The window is the enemy's own: a lead's, wider at its duel pace, is
   missed by as much more (issue #361).
+- **Shield and riposte**, `block: 0.5`: every other strike of a room's
+  lead - not its crushing blows, not the Warden's - it meets with a held
+  shield, raised as it sees the wind-up, and a riposte 0.25 s after the
+  shield stopped the blow (issue #365). The block has no timing to miss;
+  the riposte is an answer like a parry and is missed in turn with the
+  others, a missed one being late: no swing in its window.
   Zones are not missed, only seen late. A spitter's shot begins with the
   spitter's wind-up, which a person sees, not with its flight.
 

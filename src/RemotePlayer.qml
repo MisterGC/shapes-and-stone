@@ -153,6 +153,9 @@ PhysicsItem {
         } else if (name === "perfectBlock") {
             view.perfectBlock()
             if (gameWorld && gain > 0) gameWorld.playBlock(gain, true)
+        } else if (name === "riposte") {
+            // Its swing showed with "attack": the riposte's own ring
+            if (gameWorld && gain > 0) gameWorld.playRiposte(gain)
         } else if (name === "hurt") {
             view.hurt()
             _grace.restart()
