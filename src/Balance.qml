@@ -789,8 +789,13 @@ QtObject {
         // 1.6 to 2.3 times as long as the person in the others, and the
         // person fells them in three or four exchanges, "skilled" in 7.3
         // to 10.9 s. mashSlow holds the masher with the bolt in the
-        // spitter duel too (issue #319), where duelSlow, 20 s, did
-        mashSlow: 1.5,
+        // spitter duel too (issue #319), where duelSlow, 20 s, did. It was
+        // 1.5 until the person met half of a lead's strikes with the shield
+        // and a riposte (issue #365): an opening fewer per strike it
+        // blocks, the person took 13.83 s in the grunt duel at depth 0
+        // where it took 11.40 s, and the masher's 18.92 s there is 1.37
+        // times that
+        mashSlow: 1.35,
         // (from 6 to 4 s with the melee leads' HP cut by a third, issue #288;
         // from 4 to 5 s at the Standard duel pace, issue #361)
         duelSkilled: [5, 15],
